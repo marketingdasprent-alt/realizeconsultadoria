@@ -1,0 +1,1 @@
+ALTER TABLE public.absences ADD COLUMN rejection_reason text;

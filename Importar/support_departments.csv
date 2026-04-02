@@ -1,0 +1,3 @@
+id,name,description,is_active,sort_order,created_at,updated_at
+a1046e59-ce77-4a88-b37e-52b1360b49b0,Recursos Humanos,,t,0,2026-01-21 14:45:07.167613+00,2026-01-21 14:45:07.167613+00
+3b9f1350-b4d5-463a-84f0-8977ad30af6d,Marketing | TI,,t,1,2026-01-21 14:45:19.146154+00,2026-01-21 14:45:33.602111+00

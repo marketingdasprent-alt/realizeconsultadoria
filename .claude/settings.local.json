@@ -1,0 +1,40 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(gh auth:*)",
+      "Bash(git credential-manager:*)",
+      "Bash(git config:*)",
+      "Bash(vercel --version)",
+      "Bash(vercel whoami:*)",
+      "Bash(vercel --yes --prod -e VITE_SUPABASE_PROJECT_ID=egyrbhlnoniukekrxrvq -e VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVneXJiaGxub25pdWtla3J4cnZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2Mjk1NjEsImV4cCI6MjA4MzIwNTU2MX0.9e3jqj60ilsHEH2V-dUySx7nNLobMAFP-Js575YohWw -e VITE_SUPABASE_URL=https://egyrbhlnoniukekrxrvq.supabase.co)",
+      "Bash(vercel --yes --prod --name realizeconsultadoria -e VITE_SUPABASE_PROJECT_ID=egyrbhlnoniukekrxrvq -e VITE_SUPABASE_PUBLISHABLE_KEY=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImVneXJiaGxub25pdWtla3J4cnZxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Njc2Mjk1NjEsImV4cCI6MjA4MzIwNTU2MX0.9e3jqj60ilsHEH2V-dUySx7nNLobMAFP-Js575YohWw -e VITE_SUPABASE_URL=https://egyrbhlnoniukekrxrvq.supabase.co)",
+      "Bash(supabase --version)",
+      "Bash(npm --version)",
+      "Bash(npm install:*)",
+      "Bash(node migrate.mjs)",
+      "Bash(npx supabase@latest db push --db-url \"postgresql://postgres:Morango100.*@db.jvvnsoasylusbmxfotci.supabase.co:5432/postgres\" --project-dir \"c:/Users/ThiagoSousa/OneDrive - DASPRENT/Documentos/Projetos/Realize Consultadoria\")",
+      "Bash(npx supabase@latest db push --db-url \"postgresql://postgres:Morango100.*@db.jvvnsoasylusbmxfotci.supabase.co:5432/postgres\")",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_1f7d2c31efdf191009f56bc3041e9cf3ee373168 npx supabase@latest db push --linked --project-ref jvvnsoasylusbmxfotci -p \"Morango100.*\")",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_1f7d2c31efdf191009f56bc3041e9cf3ee373168 npx supabase@latest link --project-ref jvvnsoasylusbmxfotci -p \"Morango100.*\")",
+      "Bash(SUPABASE_ACCESS_TOKEN=sbp_1f7d2c31efdf191009f56bc3041e9cf3ee373168 npx supabase@latest db push -p \"Morango100.*\" --include-all)",
+      "Bash(grep -i \"absence_type_check\\\\|absence_type\" \"c:/Users/ThiagoSousa/OneDrive - DASPRENT/Documentos/Projetos/Realize Consultadoria/supabase/migrations/\"*.sql)",
+      "Bash(node -e ':*)",
+      "Bash(node reimport.mjs)",
+      "Bash(vercel env:*)",
+      "Bash(vercel --yes --prod)",
+      "Bash(vercel inspect:*)",
+      "Bash(npm run:*)",
+      "Bash(vercel build:*)",
+      "Bash(vercel pull:*)",
+      "Bash(vercel deploy:*)",
+      "Bash(vercel logs:*)",
+      "Read(//c/Users/ThiagoSousa/AppData/Roaming/com.vercel.cli/**)",
+      "Read(//c/Users/ThiagoSousa/.local/share/com.vercel.cli/**)",
+      "Read(//c/Users/ThiagoSousa/AppData/Roaming/**)",
+      "Bash(node -e \"console.log\\('ok'\\)\")",
+      "Bash(node fix.mjs)",
+      "Bash(vercel promote:*)",
+      "Bash(vercel ls:*)"
+    ]
+  }
+}

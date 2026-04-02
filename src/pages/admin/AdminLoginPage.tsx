@@ -16,6 +16,10 @@ const AdminLoginPage = () => {
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [showForgotPassword, setShowForgotPassword] = useState(false);
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
+  const [forgotPasswordLoading, setForgotPasswordLoading] = useState(false);
+  const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
 
   useEffect(() => {
     // Check if already logged in as admin
@@ -61,6 +65,45 @@ const AdminLoginPage = () => {
 
     return () => subscription.unsubscribe();
   }, [navigate]);
+
+  const handleForgotPassword = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setForgotPasswordLoading(true);
+
+    try {
+      const { error } = await supabase.auth.resetPasswordForEmail(
+        forgotPasswordEmail.trim().toLowerCase(),
+        {
+          redirectTo: `${window.location.origin}/auth/set-password?mode=admin`,
+        }
+      );
+
+      if (error) {
+        toast({
+          title: "Erro",
+          description: "Não foi possível enviar o email de recuperação. Verifique o endereço inserido.",
+          variant: "destructive",
+        });
+        setForgotPasswordLoading(false);
+        return;
+      }
+
+      setForgotPasswordSent(true);
+      toast({
+        title: "Email enviado",
+        description: "Verifique a sua caixa de correio para redefinir a palavra-passe.",
+      });
+    } catch (error: any) {
+      console.error("Forgot password error:", error);
+      toast({
+        title: "Erro",
+        description: "Ocorreu um erro inesperado. Tente novamente.",
+        variant: "destructive",
+      });
+    } finally {
+      setForgotPasswordLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -131,69 +174,140 @@ const AdminLoginPage = () => {
         >
           <Button
             variant="ghost"
-            onClick={() => navigate("/")}
+            onClick={() => showForgotPassword ? setShowForgotPassword(false) : navigate("/")}
             className="mb-8 -ml-2"
           >
             <ArrowLeft className="h-4 w-4 mr-2" />
-            Voltar
+            {showForgotPassword ? "Voltar ao login" : "Voltar"}
           </Button>
 
           <div className="flex items-center gap-4 mb-8">
             <img src={logo} alt="Realize Logo" className="h-12 w-auto" />
           </div>
 
-          <h1 className="text-3xl font-bold mb-2">Área de Administração</h1>
-          <p className="text-muted-foreground mb-8">
-            Insira as suas credenciais para aceder ao painel.
-          </p>
+          {showForgotPassword ? (
+            <>
+              <h1 className="text-3xl font-bold mb-2">Recuperar Palavra-passe</h1>
+              <p className="text-muted-foreground mb-8">
+                Insira o seu email de administrador para receber um link de recuperação.
+              </p>
 
-          <form onSubmit={handleSubmit} className="space-y-6">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="admin@empresa.pt"
-                required
-                disabled={isLoading}
-              />
-            </div>
-
-            <div className="space-y-2">
-              <Label htmlFor="password">Password</Label>
-              <div className="relative">
-                <Input
-                  id="password"
-                  type={showPassword ? "text" : "password"}
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  placeholder="••••••••"
-                  required
-                  disabled={isLoading}
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                </button>
-              </div>
-            </div>
-
-            <Button type="submit" className="w-full" variant="gold" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                  A entrar...
-                </>
+              {forgotPasswordSent ? (
+                <div className="text-center py-8">
+                  <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mx-auto mb-4">
+                    <Eye className="h-8 w-8 text-primary" />
+                  </div>
+                  <h2 className="text-xl font-semibold mb-2">Email Enviado!</h2>
+                  <p className="text-muted-foreground mb-6">
+                    Verifique a sua caixa de correio em <strong>{forgotPasswordEmail}</strong> para redefinir a palavra-passe.
+                  </p>
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setShowForgotPassword(false);
+                      setForgotPasswordSent(false);
+                      setForgotPasswordEmail("");
+                    }}
+                  >
+                    Voltar ao login
+                  </Button>
+                </div>
               ) : (
-                "Entrar"
+                <form onSubmit={handleForgotPassword} className="space-y-6">
+                  <div className="space-y-2">
+                    <Label htmlFor="forgot-email">Email Administrator</Label>
+                    <Input
+                      id="forgot-email"
+                      type="email"
+                      value={forgotPasswordEmail}
+                      onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                      placeholder="admin@empresa.pt"
+                      required
+                      disabled={forgotPasswordLoading}
+                    />
+                  </div>
+
+                  <Button type="submit" className="w-full" variant="gold" disabled={forgotPasswordLoading}>
+                    {forgotPasswordLoading ? (
+                      <>
+                        <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                        A enviar...
+                      </>
+                    ) : (
+                      "Enviar Link de Recuperação"
+                    )}
+                  </Button>
+                </form>
               )}
-            </Button>
-          </form>
+            </>
+          ) : (
+            <>
+              <h1 className="text-3xl font-bold mb-2">Área de Administração</h1>
+              <p className="text-muted-foreground mb-8">
+                Insira as suas credenciais para aceder ao painel.
+              </p>
+
+              <form onSubmit={handleSubmit} className="space-y-6">
+                <div className="space-y-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="admin@empresa.pt"
+                    required
+                    disabled={isLoading}
+                  />
+                </div>
+
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between">
+                    <Label htmlFor="password">Password</Label>
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setShowForgotPassword(true);
+                        setForgotPasswordEmail(email);
+                      }}
+                      className="text-sm text-muted-foreground hover:text-gold transition-colors"
+                    >
+                      Esqueceu-se da password?
+                    </button>
+                  </div>
+                  <div className="relative">
+                    <Input
+                      id="password"
+                      type={showPassword ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      placeholder="••••••••"
+                      required
+                      disabled={isLoading}
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPassword(!showPassword)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                    >
+                      {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                    </button>
+                  </div>
+                </div>
+
+                <Button type="submit" className="w-full" variant="gold" disabled={isLoading}>
+                  {isLoading ? (
+                    <>
+                      <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                      A entrar...
+                    </>
+                  ) : (
+                    "Entrar"
+                  )}
+                </Button>
+              </form>
+            </>
+          )}
         </motion.div>
       </div>
 

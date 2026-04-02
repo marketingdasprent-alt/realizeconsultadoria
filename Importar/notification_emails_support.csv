@@ -1,0 +1,4 @@
+id,department_id,email,is_active,created_at,created_by
+292c92e1-3137-4e42-8fac-b1a59095b054,a1046e59-ce77-4a88-b37e-52b1360b49b0,gestao.rh@dasprent.pt,t,2026-01-21 15:25:18.856996+00,
+c23a50cc-0dc2-44e4-b74a-4b517aa76392,3b9f1350-b4d5-463a-84f0-8977ad30af6d,marketing@dasprent.pt,t,2026-01-21 15:29:05.960084+00,
+67499492-3877-4f90-9929-8a0dd0c21541,a1046e59-ce77-4a88-b37e-52b1360b49b0,beatrizveloso@dasprent.pt,t,2026-01-21 15:29:19.105368+00,

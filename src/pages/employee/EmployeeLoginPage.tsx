@@ -81,11 +81,16 @@ const EmployeeLoginPage = () => {
       });
 
       if (error) {
+        console.error("Auth error details:", error);
         let errorMessage = "Email ou senha incorretos.";
+        
         if (error.message.includes("Invalid login credentials")) {
           errorMessage = "Email ou senha incorretos.";
         } else if (error.message.includes("Email not confirmed")) {
-          errorMessage = "Email não confirmado. Contacte o administrador.";
+          errorMessage = "Email não confirmado. Por favor, contacte o suporte.";
+        } else if (error.status === 400 || error.status === 422) {
+          // Show more detailed error for debugging if it's not a generic failure
+          errorMessage = `Erro: ${error.message}`;
         }
         
         toast({

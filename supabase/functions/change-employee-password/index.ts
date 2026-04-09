@@ -106,10 +106,17 @@ serve(async (req: Request) => {
       );
     }
 
-    // Update password
+    // Get the actual auth user to see what email they login with
+    const { data: authUser, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(employee.user_id);
+    const authEmail = authUser?.user?.email || employee.email;
+
+    // Update password AND force confirm email / clear any blocks
     const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
       employee.user_id,
-      { password: new_password }
+      { 
+        password: new_password,
+        email_confirm: true
+      }
     );
 
     if (updateError) {
@@ -139,9 +146,10 @@ serve(async (req: Request) => {
                 <h2>Olá ${employee.name || ""},</h2>
                 <p>A sua palavra-passe de acesso ao portal da Realize Consultadoria foi alterada.</p>
                 <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; border-left: 4px solid #d5b884;">
-                  <p>📧 <strong>Email:</strong> ${employee.email}</p>
+                  <p>📧 <strong>Email de Login:</strong> ${authEmail}</p>
                   <p>🔐 <strong>Nova Palavra-passe:</strong> ${new_password}</p>
                 </div>
+                ${authEmail.toLowerCase() !== employee.email.toLowerCase() ? `<p style="color: #eab308; font-size: 13px;">Nota: O seu email de login (${authEmail}) é diferente do seu email de contacto profissional.</p>` : ''}
                 <p>Aceda aqui: <a href="${baseUrl}/colaborador/login">${baseUrl}/colaborador/login</a></p>
               </td></tr>
             </table>

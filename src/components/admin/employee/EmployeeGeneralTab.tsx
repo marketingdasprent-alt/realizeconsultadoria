@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { format, addMonths, parseISO } from "date-fns";
 import { pt } from "date-fns/locale";
-import { Loader2, CalendarIcon } from "lucide-react";
+import { Loader2, CalendarIcon, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -22,6 +22,8 @@ import {
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
+import ChangeEmployeePasswordDialog from "@/components/admin/ChangeEmployeePasswordDialog";
+import ResendInviteSuccessDialog from "@/components/admin/ResendInviteSuccessDialog";
 
 interface Employee {
   id: string;
@@ -64,6 +66,9 @@ const EmployeeGeneralTab = ({
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
+  const [isResending, setIsResending] = useState(false);
+  const [resendSuccessData, setResendSuccessData] = useState<{ name: string; password: string } | null>(null);
   const currentYear = new Date().getFullYear();
   const originalEmail = employee?.email || "";
 
@@ -89,10 +94,65 @@ const EmployeeGeneralTab = ({
     safety_checkup_renewal_months: employee?.safety_checkup_renewal_months?.toString() || "12",
   });
 
-  // Calculate next renewal date
   const nextRenewalDate = formData.safety_checkup_date && formData.safety_checkup_renewal_months
     ? addMonths(formData.safety_checkup_date, parseInt(formData.safety_checkup_renewal_months) || 12)
     : null;
+
+  const handleResendInvite = async () => {
+    if (!employee) return;
+    setIsResending(true);
+    try {
+      // Local password generation
+      const chars = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*";
+      let newPassword = "";
+      for (let i = 0; i < 12; i++) {
+        newPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+
+      const { data, error } = await supabase.functions.invoke('change-employee-password', {
+        body: { 
+          employee_id: employee.id,
+          new_password: newPassword,
+          send_email: true
+        },
+        headers: {
+          Authorization: `Bearer ${sessionData.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      
+      if (data?.success) {
+        setResendSuccessData({
+          name: employee.name,
+          password: newPassword
+        });
+        
+        if (data?.email_success) {
+          toast({ title: "Convite re-enviado com sucesso!" });
+        } else {
+          toast({
+            title: "Convite Enviado (SEM EMAIL)",
+            description: `A senha foi alterada, mas o email falhou: ${data?.email_error || "Erro na Brevo"}`,
+            variant: "destructive",
+          });
+        }
+      } else {
+        throw new Error(data?.error || "Erro ao re-enviar convite");
+      }
+    } catch (error: any) {
+      console.error('Error resending invite:', error);
+      toast({
+        title: "Erro ao re-enviar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsResending(null);
+    }
+  };
 
   const emailChanged = isEditMode && formData.email.toLowerCase().trim() !== originalEmail.toLowerCase().trim();
 
@@ -522,6 +582,21 @@ const EmployeeGeneralTab = ({
             >
               Cancelar
             </Button>
+            {isEditMode && employee && (
+              <Button 
+                type="button" 
+                variant="outline" 
+                onClick={handleResendInvite}
+                disabled={isResending}
+              >
+                {isResending ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <RefreshCw className="h-4 w-4 mr-2" />
+                )}
+                Re-enviar Convite
+              </Button>
+            )}
             <Button type="submit" variant="gold" disabled={isSubmitting}>
               {isSubmitting ? (
                 <>
@@ -535,6 +610,22 @@ const EmployeeGeneralTab = ({
           </div>
         </form>
       </CardContent>
+      {employee && (
+        <ChangeEmployeePasswordDialog
+          open={passwordDialogOpen}
+          onOpenChange={setPasswordDialogOpen}
+          employeeId={employee.id}
+          employeeName={employee.name}
+        />
+      )}
+      {employee && (
+        <ResendInviteSuccessDialog
+          open={!!resendSuccessData}
+          onOpenChange={(open) => !open && setResendSuccessData(null)}
+          employeeName={resendSuccessData?.name || ""}
+          newPassword={resendSuccessData?.password || ""}
+        />
+      )}
     </Card>
   );
 };

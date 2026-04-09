@@ -115,6 +115,7 @@ const EmployeeLoginPage = () => {
         return;
       }
 
+      localStorage.setItem("auth_preference", "employee");
       toast({
         title: "Bem-vindo!",
         description: "Login efetuado com sucesso.",
@@ -138,12 +139,12 @@ const EmployeeLoginPage = () => {
     setForgotPasswordLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        forgotPasswordEmail.trim().toLowerCase(),
-        {
+      const { error } = await supabase.functions.invoke("recover-password", {
+        body: {
+          email: forgotPasswordEmail.trim().toLowerCase(),
           redirectTo: `${window.location.origin}/auth/set-password?mode=employee`,
         }
-      );
+      });
 
       if (error) {
         toast({

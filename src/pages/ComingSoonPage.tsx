@@ -1,11 +1,49 @@
-import { Link } from "react-router-dom";
+import { useState, useEffect } from "react";
+import { Link, useNavigate } from "react-router-dom";
+import { supabase } from "@/integrations/supabase/client";
 import { motion } from "framer-motion";
-import { Rocket, Sparkles } from "lucide-react";
+import { Rocket, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import ComingSoonHeader from "@/components/layout/ComingSoonHeader";
 import Footer from "@/components/layout/Footer";
 
 const ComingSoonPage = () => {
+  const navigate = useNavigate();
+  const [isRedirecting, setIsRedirecting] = useState(true);
+
+  useEffect(() => {
+    const checkAuthAndRedirect = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      
+      if (session) {
+        const preference = localStorage.getItem("auth_preference");
+        
+        if (preference === "admin") {
+          navigate("/admin");
+          return;
+        } else if (preference === "employee") {
+          navigate("/colaborador");
+          return;
+        }
+      }
+      
+      setIsRedirecting(false);
+    };
+
+    checkAuthAndRedirect();
+  }, [navigate]);
+
+  if (isRedirecting) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-background">
+        <div className="text-center">
+          <Loader2 className="h-10 w-10 animate-spin text-primary mx-auto mb-4" />
+          <p className="text-muted-foreground animate-pulse text-sm">A carregar ambiente...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-primary/5">
       <ComingSoonHeader />

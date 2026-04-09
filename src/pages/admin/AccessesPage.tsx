@@ -26,6 +26,7 @@ import {
   Phone,
   Package,
   ClipboardList,
+  Info,
 } from "lucide-react";
 import AdminLayout from "@/components/layout/AdminLayout";
 import { Button } from "@/components/ui/button";
@@ -1105,6 +1106,21 @@ const AccessesPage = () => {
           </DialogHeader>
           <form onSubmit={handleSubmit}>
             <div className="space-y-4 py-4">
+              {/* Aviso para Acesso Principal / Login */}
+              {(formData.category_id === mainAccessCategory?.id || formData.employee_id) && (
+                <Alert className="mb-4 bg-blue-50 border-blue-200 dark:bg-blue-900/20 dark:border-blue-800">
+                  <Info className="h-4 w-4 text-blue-600 dark:text-blue-400" />
+                  <AlertTitle className="text-blue-800 dark:text-blue-300 text-sm font-semibold">
+                    Aviso de Credenciais
+                  </AlertTitle>
+                  <AlertDescription className="text-blue-700 dark:text-blue-400 text-xs mt-1 leading-relaxed">
+                    Esta senha é apenas informativa para este registo de acesso. 
+                    <strong> Alterar a senha aqui NÃO altera a senha de login do colaborador no Portal. </strong> 
+                    Para repor a senha de login, vá ao menu <strong className="underline">Colaboradores</strong> e selecione "Definir Nova Senha".
+                  </AlertDescription>
+                </Alert>
+              )}
+
               <div className="space-y-2">
                 <Label htmlFor="title">Título *</Label>
                 <Input

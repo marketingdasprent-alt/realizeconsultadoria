@@ -120,95 +120,73 @@ serve(async (req: Request) => {
       );
     }
 
+    let email_success = false;
+    let email_error = null;
+
     // Send email if requested
-    if (send_email && brevoApiKey) {
-      const baseUrl = "https://realizeconsultadoria.lovable.app";
+    if (send_email) {
+      if (brevoApiKey) {
+        const baseUrl = "https://realizeconsultadoria.lovable.app";
+        const emailHtml = `
+          <!DOCTYPE html>
+          <html>
+          <body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: sans-serif;">
+            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 40px auto;">
+              <tr><td style="background-color: #000000; padding: 30px; text-align: center;">
+                <h1 style="color: #d5b884; margin: 0; font-size: 28px;">REALIZE</h1>
+              </td></tr>
+              <tr><td style="background-color: #ffffff; padding: 40px 30px;">
+                <h2>Olá ${employee.name || ""},</h2>
+                <p>A sua palavra-passe de acesso ao portal da Realize Consultadoria foi alterada.</p>
+                <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; border-left: 4px solid #d5b884;">
+                  <p>📧 <strong>Email:</strong> ${employee.email}</p>
+                  <p>🔐 <strong>Nova Palavra-passe:</strong> ${new_password}</p>
+                </div>
+                <p>Aceda aqui: <a href="${baseUrl}/colaborador/login">${baseUrl}/colaborador/login</a></p>
+              </td></tr>
+            </table>
+          </body>
+          </html>
+        `;
 
-      const emailHtml = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-</head>
-<body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
-  <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 40px auto;">
-    <tr>
-      <td style="background-color: #000000; padding: 30px; text-align: center;">
-        <h1 style="color: #d5b884; margin: 0; font-size: 28px; letter-spacing: 2px;">REALIZE</h1>
-        <p style="color: #d5b884; margin: 5px 0 0 0; font-size: 12px; letter-spacing: 4px;">CONSULTADORIA</p>
-      </td>
-    </tr>
-    <tr>
-      <td style="background-color: #ffffff; padding: 40px 30px;">
-        <h2 style="color: #333333; margin: 0 0 20px 0; font-size: 22px;">Olá ${employee.name || ""},</h2>
-        <p style="color: #666666; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
-          A sua palavra-passe de acesso ao Portal do Colaborador foi alterada por um administrador.
-        </p>
-        
-        <div style="background-color: #f9f9f9; border-radius: 8px; padding: 20px; margin: 0 0 25px 0;">
-          <h3 style="color: #333333; margin: 0 0 15px 0; font-size: 16px;">Os seus dados de acesso:</h3>
-          <p style="color: #666666; font-size: 14px; line-height: 1.8; margin: 0;">
-            <strong>Email:</strong> ${employee.email}<br>
-            <strong>Nova Palavra-passe:</strong> ${new_password}
-          </p>
-        </div>
-        
-        <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
-          <tr>
-            <td style="background-color: #d5b884; border-radius: 6px;">
-              <a href="${baseUrl}/colaborador/login" style="display: inline-block; padding: 16px 40px; color: #000000; text-decoration: none; font-weight: 600; font-size: 16px;">
-                Aceder ao Portal
-              </a>
-            </td>
-          </tr>
-        </table>
-        
-        <p style="color: #999999; font-size: 14px; line-height: 1.6; margin: 30px 0 0 0;">
-          Recomendamos que altere a sua palavra-passe após o primeiro acesso.
-        </p>
-      </td>
-    </tr>
-    <tr>
-      <td style="background-color: #000000; padding: 20px 30px; text-align: center;">
-        <p style="color: #888888; font-size: 12px; margin: 0;">
-          © ${new Date().getFullYear()} Realize Consultadoria. Todos os direitos reservados.
-        </p>
-      </td>
-    </tr>
-  </table>
-</body>
-</html>
-      `;
+        try {
+          const emailResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
+            method: "POST",
+            headers: {
+              "accept": "application/json",
+              "api-key": brevoApiKey,
+              "content-type": "application/json",
+            },
+            body: JSON.stringify({
+              sender: { name: "Realize Consultadoria", email: "noreply@dasprent.pt" },
+              to: [{ email: employee.email, name: employee.name || employee.email }],
+              subject: "Realize - A sua palavra-passe foi alterada",
+              htmlContent: emailHtml,
+            }),
+          });
 
-      try {
-        const emailResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
-          method: "POST",
-          headers: {
-            "accept": "application/json",
-            "api-key": brevoApiKey,
-            "content-type": "application/json",
-          },
-          body: JSON.stringify({
-            sender: { name: "Realize Consultadoria", email: "noreply@dasprent.pt" },
-            to: [{ email: employee.email, name: employee.name || employee.email }],
-            subject: "Realize - A sua palavra-passe foi alterada",
-            htmlContent: emailHtml,
-          }),
-        });
-
-        if (!emailResponse.ok) {
-          console.error("Brevo email error:", await emailResponse.text());
-        } else {
-          console.log(`Password change email sent to ${employee.email}`);
+          if (!emailResponse.ok) {
+            email_error = await emailResponse.text();
+            console.error("Brevo email error:", email_error);
+          } else {
+            console.log(`Password change email sent to ${employee.email}`);
+            email_success = true;
+          }
+        } catch (err: any) {
+          console.error("Error sending email:", err);
+          email_error = err.message;
         }
-      } catch (emailError) {
-        console.error("Error sending email:", emailError);
+      } else {
+        email_error = "Configuração BREVO_API_KEY ausente no Supabase";
       }
     }
 
     return new Response(
-      JSON.stringify({ success: true }),
+      JSON.stringify({ 
+        success: true, 
+        email_success, 
+        email_error 
+      }),
       { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   } catch (error: any) {

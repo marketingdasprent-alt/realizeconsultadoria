@@ -36,5 +36,8 @@ verify_jwt = false
 [functions.change-employee-password]
 verify_jwt = false
 
+[functions.resend-welcome-email]
+verify_jwt = false
+
 [functions.send-ticket-reply-notification]
 verify_jwt = false

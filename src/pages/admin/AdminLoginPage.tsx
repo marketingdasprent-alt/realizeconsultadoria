@@ -71,12 +71,12 @@ const AdminLoginPage = () => {
     setForgotPasswordLoading(true);
 
     try {
-      const { error } = await supabase.auth.resetPasswordForEmail(
-        forgotPasswordEmail.trim().toLowerCase(),
-        {
+      const { error } = await supabase.functions.invoke("recover-password", {
+        body: {
+          email: forgotPasswordEmail.trim().toLowerCase(),
           redirectTo: `${window.location.origin}/auth/set-password?mode=admin`,
         }
-      );
+      });
 
       if (error) {
         toast({
@@ -145,6 +145,7 @@ const AdminLoginPage = () => {
           return;
         }
 
+        localStorage.setItem("auth_preference", "admin");
         toast({
           title: "Login efetuado",
           description: "Bem-vindo ao painel de administração.",

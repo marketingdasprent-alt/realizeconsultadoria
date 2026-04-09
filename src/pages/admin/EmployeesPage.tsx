@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { Plus, Search, Edit, Trash2, MoreHorizontal, AlertTriangle, Key, ArrowUp, ArrowDown, ArrowUpDown, Upload } from "lucide-react";
+import { Plus, Search, Edit, Trash2, MoreHorizontal, AlertTriangle, Key, ArrowUp, ArrowDown, ArrowUpDown, Upload, RefreshCw, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -27,6 +27,7 @@ import DeleteConfirmDialog from "@/components/admin/DeleteConfirmDialog";
 import ChangeEmployeePasswordDialog from "@/components/admin/ChangeEmployeePasswordDialog";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import BulkDocumentUploadDialog from "@/components/admin/BulkDocumentUploadDialog";
+import ResendInviteSuccessDialog from "@/components/admin/ResendInviteSuccessDialog";
 
 interface Employee {
   id: string;
@@ -54,6 +55,8 @@ const EmployeesPage = () => {
   const [isDeleting, setIsDeleting] = useState(false);
   const [passwordDialogEmployee, setPasswordDialogEmployee] = useState<Employee | null>(null);
   const [bulkDocDialogOpen, setBulkDocDialogOpen] = useState(false);
+  const [isResending, setIsResending] = useState<string | null>(null);
+  const [resendSuccessData, setResendSuccessData] = useState<{ name: string; password: string } | null>(null);
   
   // Sorting state
   type SortField = 'name' | 'email' | 'company' | 'position' | 'status';
@@ -131,6 +134,61 @@ const EmployeesPage = () => {
       });
     } finally {
       setIsDeleting(false);
+    }
+  };
+
+  const handleResendInvite = async (employee: Employee) => {
+    setIsResending(employee.id);
+    try {
+      // Local password generation
+      const chars = "abcdefghijkmnopqrstuvwxyzABCDEFGHJKLMNPQRSTUVWXYZ23456789!@#$%&*";
+      let newPassword = "";
+      for (let i = 0; i < 12; i++) {
+        newPassword += chars.charAt(Math.floor(Math.random() * chars.length));
+      }
+
+      const { data: sessionData } = await supabase.auth.getSession();
+
+      const { data, error } = await supabase.functions.invoke('change-employee-password', {
+        body: { 
+          employee_id: employee.id,
+          new_password: newPassword,
+          send_email: true
+        },
+        headers: {
+          Authorization: `Bearer ${sessionData.session?.access_token}`,
+        },
+      });
+
+      if (error) throw error;
+      
+      if (data?.success) {
+        setResendSuccessData({
+          name: employee.name,
+          password: newPassword
+        });
+        
+        if (data?.email_success) {
+          toast({ title: "Convite re-enviado com sucesso!" });
+        } else {
+          toast({
+            title: "Convite Enviado (SEM EMAIL)",
+            description: `A senha foi alterada, mas o email falhou: ${data?.email_error || "Erro na Brevo"}`,
+            variant: "destructive",
+          });
+        }
+      } else {
+        throw new Error(data?.error || "Erro ao re-enviar convite");
+      }
+    } catch (error: any) {
+      console.error('Error resending invite:', error);
+      toast({
+        title: "Erro ao re-enviar",
+        description: error.message,
+        variant: "destructive",
+      });
+    } finally {
+      setIsResending(null);
     }
   };
 
@@ -321,12 +379,25 @@ const EmployeesPage = () => {
                               </DropdownMenuItem>
                             )}
                             {canResetPassword && (
-                              <DropdownMenuItem 
-                                onClick={() => setPasswordDialogEmployee(employee)}
-                              >
-                                <Key className="h-4 w-4 mr-2" />
-                                Definir Nova Senha
-                              </DropdownMenuItem>
+                              <>
+                                <DropdownMenuItem 
+                                  onClick={() => setPasswordDialogEmployee(employee)}
+                                >
+                                  <Key className="h-4 w-4 mr-2" />
+                                  Definir Nova Senha
+                                </DropdownMenuItem>
+                                <DropdownMenuItem 
+                                  onClick={() => handleResendInvite(employee)}
+                                  disabled={!!isResending}
+                                >
+                                  {isResending === employee.id ? (
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                  ) : (
+                                    <RefreshCw className="h-4 w-4 mr-2" />
+                                  )}
+                                  Re-enviar Convite
+                                </DropdownMenuItem>
+                              </>
                             )}
                             {canDelete && (
                               <DropdownMenuItem 
@@ -382,6 +453,14 @@ const EmployeesPage = () => {
         <BulkDocumentUploadDialog
           open={bulkDocDialogOpen}
           onOpenChange={setBulkDocDialogOpen}
+        />
+
+        {/* Resend Success Dialog */}
+        <ResendInviteSuccessDialog
+          open={!!resendSuccessData}
+          onOpenChange={(open) => !open && setResendSuccessData(null)}
+          employeeName={resendSuccessData?.name || ""}
+          newPassword={resendSuccessData?.password || ""}
         />
       </div>
     </AdminLayout>

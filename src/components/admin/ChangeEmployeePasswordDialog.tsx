@@ -119,12 +119,25 @@ const ChangeEmployeePasswordDialog = ({
         throw new Error(data.error);
       }
 
-      toast({
-        title: "Palavra-passe alterada",
-        description: sendEmail
-          ? "O colaborador receberá um email com as novas credenciais"
-          : "A palavra-passe foi alterada com sucesso",
-      });
+      if (sendEmail) {
+        if (data?.email_success) {
+          toast({
+            title: "Palavra-passe alterada",
+            description: "O colaborador recebeu o email com as novas credenciais.",
+          });
+        } else {
+          toast({
+            title: "Palavra-passe alterada (SEM EMAIL)",
+            description: `A senha foi alterada, mas o email falhou: ${data?.email_error || "Erro desconhecido"}`,
+            variant: "destructive",
+          });
+        }
+      } else {
+        toast({
+          title: "Palavra-passe alterada",
+          description: "A palavra-passe foi alterada com sucesso.",
+        });
+      }
 
       setNewPassword("");
       setConfirmPassword("");

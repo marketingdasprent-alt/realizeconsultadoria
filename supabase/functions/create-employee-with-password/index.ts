@@ -168,6 +168,9 @@ const handler = async (req: Request): Promise<Response> => {
       console.log("[create-employee-with-password] Vacation balance created:", vacationDays, "days for year", currentYear);
     }
 
+    let emailSent = false;
+    let emailErrorMessage = null;
+
     // Send welcome email with credentials via Brevo
     const brevoApiKey = Deno.env.get("BREVO_API_KEY");
     if (brevoApiKey) {
@@ -250,19 +253,29 @@ const handler = async (req: Request): Promise<Response> => {
         if (!brevoResponse.ok) {
           const brevoError = await brevoResponse.text();
           console.error("[create-employee-with-password] Brevo error:", brevoError);
+          emailErrorMessage = "Erro no serviço de email (Brevo)";
         } else {
           console.log("[create-employee-with-password] Welcome email sent to:", email);
+          emailSent = true;
         }
       } catch (emailError) {
         console.error("[create-employee-with-password] Error sending email:", emailError);
+        emailErrorMessage = "Falha na conexão com serviço de email";
       }
+    } else {
+      emailErrorMessage = "Configuração de API de email ausente";
     }
 
     return new Response(
       JSON.stringify({ 
         success: true, 
         employee: employee,
-        message: "Colaborador criado com sucesso" 
+        employeeId: employee.id,
+        emailSent,
+        emailError: emailErrorMessage,
+        message: emailSent 
+          ? "Colaborador criado com sucesso" 
+          : `Colaborador criado, mas houve uma falha no email: ${emailErrorMessage}`
       }),
       { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
     );

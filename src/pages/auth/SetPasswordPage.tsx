@@ -108,12 +108,14 @@ const SetPasswordPage = () => {
       console.log("[SetPasswordPage] Updating password...");
       
       // Single updateUser call with password + metadata
-      const { error: updateError } = await supabase.auth.updateUser({
+      console.log("[SetPasswordPage] Calling updateUser for email:", sessionRef.current?.user?.email);
+      const { data, error: updateError } = await supabase.auth.updateUser({
         password: trimmedPassword,
         data: { must_set_password: false }
       });
 
       if (updateError) {
+        console.error("[SetPasswordPage] Update error:", updateError);
         hasSubmitted.current = false;
         // Map common errors to Portuguese messages
         let errorMessage = "Não foi possível definir a palavra-passe.";
@@ -139,10 +141,11 @@ const SetPasswordPage = () => {
 
       // Get user for redirect logic
       const { data: { user } } = await supabase.auth.getUser();
+      const userEmail = user?.email || "";
 
       toast({
         title: "Sucesso",
-        description: "Palavra-passe definida com sucesso!",
+        description: `Palavra-passe definida com sucesso para ${userEmail}!`,
       });
 
       // Prevent any further auth event handling

@@ -335,6 +335,20 @@ const EmployeeDashboard = () => {
       const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
       const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
 
+      // Validate notice period (48h)
+      const today = new Date(new Date().setHours(0, 0, 0, 0));
+      const minNoticeDate = new Date(today);
+      minNoticeDate.setDate(minNoticeDate.getDate() + 2);
+
+      if (minDate < minNoticeDate) {
+        toast({
+          title: "Erro de antecedência",
+          description: "Os pedidos de ausência devem ser feitos com pelo menos 48 horas de antecedência.",
+          variant: "destructive",
+        });
+        return;
+      }
+
       // Create the main absence record
       const { data: absenceData, error: absenceError } = await supabase
         .from('absences')

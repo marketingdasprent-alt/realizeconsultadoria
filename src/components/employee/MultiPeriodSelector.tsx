@@ -95,16 +95,10 @@ const MultiPeriodSelector = ({
     if (isHoliday(date, holidays)) return true;
     
     const today = new Date(new Date().setHours(0, 0, 0, 0));
+    const minNoticeDate = new Date(today);
+    minNoticeDate.setDate(minNoticeDate.getDate() + 2);
     
-    // Allow past dates (up to 30 days) for sick leave and appointments
-    if (absenceType === 'sick_leave' || absenceType === 'appointment') {
-      const thirtyDaysAgo = new Date(today);
-      thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
-      return date < thirtyDaysAgo;
-    }
-    
-    // For other types, block past dates
-    return date < today;
+    return date < minNoticeDate;
   };
 
   const handleAddPeriod = () => {

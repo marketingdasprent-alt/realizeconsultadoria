@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { useSearchParams } from "react-router-dom";
-import { Clock, Check, X, Filter, RefreshCw, Search } from "lucide-react";
+import { Clock, Check, X, Filter, RefreshCw, Search, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,7 @@ import AbsenceRequestCard from "@/components/admin/AbsenceRequestCard";
 import AbsenceApprovalDialog from "@/components/admin/AbsenceApprovalDialog";
 import AbsenceDocumentsDialog from "@/components/admin/AbsenceDocumentsDialog";
 import AbsenceEditDialog from "@/components/admin/AbsenceEditDialog";
+import AdminAddAbsenceDialog from "@/components/admin/AdminAddAbsenceDialog";
 import {
   Dialog,
   DialogContent,
@@ -97,6 +98,7 @@ const AbsenceRequestsPage = () => {
   const [unapproveRequest, setUnapproveRequest] = useState<AbsenceRequest | null>(null);
   const [isUnapproving, setIsUnapproving] = useState(false);
   const [unapproveNote, setUnapproveNote] = useState("");
+  const [addDialogOpen, setAddDialogOpen] = useState(false);
 
   useEffect(() => {
     fetchHolidays();
@@ -531,10 +533,16 @@ const AbsenceRequestsPage = () => {
               Gerir pedidos de férias e ausências dos colaboradores
             </p>
           </div>
-          <Button variant="outline" onClick={() => fetchRequests()} disabled={isLoading}>
-            <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
-            Atualizar
-          </Button>
+          <div className="flex items-center gap-2">
+            <Button variant="gold" onClick={() => setAddDialogOpen(true)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Adicionar
+            </Button>
+            <Button variant="outline" onClick={() => fetchRequests()} disabled={isLoading}>
+              <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? "animate-spin" : ""}`} />
+              Atualizar
+            </Button>
+          </div>
         </div>
 
         {/* Stats */}
@@ -676,6 +684,13 @@ const AbsenceRequestsPage = () => {
         open={editDialogOpen}
         onOpenChange={setEditDialogOpen}
         request={editRequest}
+        onSuccess={fetchRequests}
+      />
+
+      <AdminAddAbsenceDialog
+        open={addDialogOpen}
+        onOpenChange={setAddDialogOpen}
+        holidays={holidays}
         onSuccess={fetchRequests}
       />
 

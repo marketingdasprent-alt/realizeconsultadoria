@@ -47,6 +47,7 @@ interface MultiPeriodSelectorProps {
   maxDays?: number;
   existingAbsences?: ExistingAbsence[];
   absenceType?: string;
+  adminMode?: boolean;
 }
 
 const MultiPeriodSelector = ({
@@ -56,6 +57,7 @@ const MultiPeriodSelector = ({
   maxDays,
   existingAbsences,
   absenceType,
+  adminMode = false,
 }: MultiPeriodSelectorProps) => {
   const [currentPeriod, setCurrentPeriod] = useState<{
     from: Date | undefined;
@@ -93,6 +95,9 @@ const MultiPeriodSelector = ({
   const isDateDisabled = (date: Date) => {
     if (isWeekend(date)) return true;
     if (isHoliday(date, holidays)) return true;
+    
+    // Admins can select any date — skip the 48h notice restriction
+    if (adminMode) return false;
     
     const today = new Date(new Date().setHours(0, 0, 0, 0));
     const minNoticeDate = new Date(today);

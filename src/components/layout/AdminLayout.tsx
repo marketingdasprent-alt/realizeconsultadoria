@@ -85,10 +85,10 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           return;
         }
 
-        const { data: roles, error: rolesError } = await supabase
-          .from('user_roles')
-          .select('role')
-          .eq('user_id', session.user.id);
+        const { data: hasAdminRole, error: rolesError } = await supabase.rpc("has_role", {
+          _user_id: session.user.id,
+          _role: "admin",
+        });
 
         if (rolesError) {
           console.error("Error checking roles:", rolesError);
@@ -97,9 +97,10 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           return;
         }
 
-        if (!roles?.some(r => r.role === 'admin')) {
+        if (!hasAdminRole) {
           setAuthStatus("unauthorized");
           navigate('/colaborador');
+          localStorage.setItem("auth_preference", "employee");
           return;
         }
 

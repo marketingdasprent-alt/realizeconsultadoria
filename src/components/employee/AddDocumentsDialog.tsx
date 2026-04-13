@@ -66,8 +66,8 @@ const AddDocumentsDialog = ({
           .upload(filePath, item.file);
 
         if (uploadError) {
-          console.error("Upload error:", uploadError);
-          return false;
+          console.error("Storage upload error:", uploadError.message, uploadError);
+          return { success: false, error: `Storage: ${uploadError.message}` };
         }
 
         const { error: docError } = await supabase
@@ -82,16 +82,19 @@ const AddDocumentsDialog = ({
           });
 
         if (docError) {
-          console.error("Document record error:", docError);
-          return false;
+          console.error("DB insert error:", docError.message, docError);
+          // Clean up the uploaded file since DB insert failed
+          await supabase.storage.from("absence-documents").remove([filePath]);
+          return { success: false, error: `Base de dados: ${docError.message}` };
         }
 
-        return true;
+        return { success: true, error: null };
       });
 
       const results = await Promise.all(uploadPromises);
-      const successCount = results.filter((r) => r).length;
-      const failedCount = results.length - successCount;
+      const successCount = results.filter((r) => r.success).length;
+      const failedResults = results.filter((r) => !r.success);
+      const failedCount = failedResults.length;
 
       if (successCount > 0) {
         toast({
@@ -103,9 +106,10 @@ const AddDocumentsDialog = ({
       }
 
       if (failedCount > 0 && successCount === 0) {
+        const firstError = failedResults[0]?.error;
         toast({
-          title: "Erro",
-          description: "Não foi possível enviar os documentos.",
+          title: "Erro ao enviar documentos",
+          description: firstError || "Não foi possível enviar os documentos.",
           variant: "destructive",
         });
       } else if (failedCount > 0) {

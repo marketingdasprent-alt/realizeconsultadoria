@@ -16,8 +16,31 @@ const ComingSoonPage = () => {
       const { data: { session } } = await supabase.auth.getSession();
       
       if (session) {
-        const preference = localStorage.getItem("auth_preference");
+        let preference = localStorage.getItem("auth_preference");
         
+        // Always verify admin role to prevent incorrect redirection even if a preference exists
+        const { data: hasAdminRole } = await supabase.rpc("has_role", {
+          _user_id: session.user.id,
+          _role: "admin",
+        });
+
+        if (hasAdminRole) {
+          preference = "admin";
+          localStorage.setItem("auth_preference", "admin");
+        } else if (!preference) {
+          // If not admin and no preference, check if it's an employee
+          const { data: employee } = await supabase
+            .from("employees")
+            .select("id")
+            .eq("user_id", session.user.id)
+            .maybeSingle();
+          
+          if (employee) {
+            preference = "employee";
+            localStorage.setItem("auth_preference", "employee");
+          }
+        }
+
         if (preference === "admin") {
           navigate("/admin");
           return;

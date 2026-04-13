@@ -36,6 +36,7 @@ const EmployeeLoginPage = () => {
         .maybeSingle();
 
       if (employee) {
+        localStorage.setItem("auth_preference", "employee");
         navigate("/colaborador");
         return true;
       }

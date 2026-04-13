@@ -37,6 +37,7 @@ const AdminLoginPage = () => {
           _role: "admin",
         });
         if (hasAdminRole) {
+          localStorage.setItem("auth_preference", "admin");
           navigate("/admin");
         }
       }
@@ -57,6 +58,7 @@ const AdminLoginPage = () => {
             _role: "admin",
           });
           if (hasAdminRole) {
+            localStorage.setItem("auth_preference", "admin");
             navigate("/admin");
           }
         }

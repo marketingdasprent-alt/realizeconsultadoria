@@ -1,0 +1,3 @@
+id,name,description,is_super_admin,is_active,created_at,updated_at
+fec9f265-82ce-4dca-a082-ddcabe0abb49,Super Admin,Acesso total a todos os módulos do sistema,t,t,2026-01-21 09:18:49.176226+00,2026-01-21 09:18:49.176226+00
+2722789d-f2a4-4610-b52a-6842d260274e,RH,,f,t,2026-01-21 14:34:50.275367+00,2026-03-09 10:59:24.698273+00

@@ -1,0 +1,9 @@
+id,name,nif,email,phone,address,city,postal_code,country,notes,is_active,created_at,updated_at,domain
+de2f8545-a966-445f-a05c-0c4cc355a32a,DASPRENT RENT A CAR LDA,516989820,geral@dasprent.pt,"","","","",Portugal,"",t,2026-01-05 17:07:40.906017+00,2026-01-05 17:07:40.906017+00,
+402cafcd-ac21-4baa-8c35-ca9b67a50323,"Useful Car, Unipessoal Lda",516751611,geral@daspautorepair.pt,"","","","",Portugal,"",t,2026-01-16 12:52:22.194394+00,2026-01-16 12:52:22.194394+00,
+58cf69ea-eb35-4a21-bbad-21625f4fe827,Distância Arrojada - Unipessoal Lda,516600800,geral@distanciaarrojada.pt,"","","","",Portugal,"",t,2026-01-16 12:52:49.200759+00,2026-01-16 12:52:49.200759+00,
+2bf88623-96bc-41e8-bd11-9ee17696ffe1,"Realize Consultadoria, Lda",517979616,geral@realizeconsultadoria.pt,"","","","",Portugal,"",t,2026-01-16 16:16:30.256016+00,2026-01-16 16:16:30.256016+00,
+04a7061c-0ab1-4938-9665-2b9e6407f998,DASP AUTO REPAIR,000000000,geral@daspautorepair.pt,,,,,Portugal,,t,2026-02-06 15:10:04.386701+00,2026-02-06 15:10:04.386701+00,
+4dc2adbf-bc77-4a35-b7b5-7be77c57c18b,DASPRENT SUL,999999999,geral@dasprentsul.pt,,,,,Portugal,,t,2026-02-06 16:33:16.258434+00,2026-02-06 16:33:16.258434+00,@dasprentsul.pt
+5dfd6f8a-a54f-42a8-af67-a1adfa2f1d5c,Pro Peças,509123456,geral.propecas@gmail.com,,,,,Portugal,,t,2026-02-06 16:55:42.491572+00,2026-02-06 16:55:42.491572+00,
+37b63b28-3733-46ee-8afa-92e120db9fb0,Década Ousada,509111222,geral@decadaousada.pt,,,,,Portugal,,t,2026-02-06 16:58:17.946848+00,2026-02-06 16:58:17.946848+00,decadaousada.pt

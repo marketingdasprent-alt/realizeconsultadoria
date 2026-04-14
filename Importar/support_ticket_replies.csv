@@ -1,0 +1,5 @@
+id,ticket_id,user_id,sender_role,message,created_at
+76f7eba6-f20d-46e1-be09-c070145ef853,675b5bbf-ec9f-4c14-aa59-aca95641e137,baccc6ed-dac1-43b8-aab6-b847f7258f2f,admin,Ja tinha pedido Sr Arthur,2026-02-23 18:11:46.628929+00
+7c27300a-74d8-418f-9c59-21865cbb63b4,63916dc5-f6ec-4eb4-ba24-c143a39cdf24,cece7740-db48-4fcc-9218-bd37ce31e79d,admin,"Tinha que carregar em ""Adicionar Periodo""",2026-03-03 15:02:05.431682+00
+44d3f889-28ee-424f-8ebc-f04b93ca65ff,f5e6f664-2126-46e6-853b-395c33597707,a98f4883-a5a8-4f3a-8a85-3e86b2f91291,admin,Bom dia!,2026-03-10 10:13:23.037233+00
+cf072172-10cc-4108-8b29-649f63d5e2ca,f5e6f664-2126-46e6-853b-395c33597707,a98f4883-a5a8-4f3a-8a85-3e86b2f91291,admin,"Autorizada remarcação com antecedência, ciente de análise consoante ás datas . Obrigada",2026-03-10 10:15:05.137886+00

@@ -1,0 +1,40 @@
+id,user_id,name,email,phone,avatar_url,created_at,updated_at
+397dab99-b774-4f67-afd7-eacf73107ae9,cece7740-db48-4fcc-9218-bd37ce31e79d,Thiago Galdino de Sousa,thiago.sousa@dasprent.pt,,,2026-01-05 17:04:47.16135+00,2026-01-05 17:04:47.16135+00
+c0d6e88a-dbf7-4e7d-9f82-efda30dfbcc1,baccc6ed-dac1-43b8-aab6-b847f7258f2f,Beatriz Veloso,beatrizveloso@dasprent.pt,,,2026-01-06 21:12:53.931432+00,2026-01-06 21:12:53.931432+00
+e0c4d697-88d4-45c1-9983-ffc784962fa8,58ddd586-b2a5-4023-b0e2-a770e28e16ce,Paulo Simão,paulosimao@dasprent.pt,,,2026-01-06 21:14:09.880414+00,2026-01-06 21:14:09.880414+00
+e385b783-4a83-42e7-a8b7-76c07567a231,ad751ea5-c4df-42a6-b5db-d9643728ced2,Vania Sousa,vania.sousa@dasprent.pt,,,2026-01-07 09:24:39.210924+00,2026-01-07 09:24:39.210924+00
+526e0923-81f2-4a67-acb6-79862ad9088f,b5f43e07-bd59-4348-84a7-1372b34a3b58,Inês Ricardo,ines.ricardo@dasprent.pt,,,2026-01-07 10:00:33.799285+00,2026-01-07 10:00:33.799285+00
+e90c474f-5e3c-4139-8dd3-e74ff8de21c9,7ebcc374-b2d4-405d-bcca-9ef16af36048,Ana Cláudia de Jesus Fonseca,claudia.fonseca@dasprent.pt,,,2026-01-16 14:22:04.878649+00,2026-01-16 14:22:04.878649+00
+5d483901-7987-4d83-b460-4a042528ee17,6118f234-4e0e-403a-952e-3b235cdbea21,David Hélio Duarte Coteiro Junior,david.junior@dasprent.pt,,,2026-01-16 14:23:07.607348+00,2026-01-16 14:23:07.607348+00
+2d3b03ce-f121-4cc6-a19d-ba9140d5667a,6ccc73ae-6fe0-4c0d-9927-7448a2659389,Dinis da Silva Assunção,dinis.silva@dasprent.pt,,,2026-01-16 14:24:44.517405+00,2026-01-16 14:24:44.517405+00
+3ee616df-e2e2-4189-8bd0-e05b97b59484,5a9e2074-3ca1-4fa4-8bfc-7b44483dad59,Elena Aparecida Galdino Brandão,elena.brandao@dasprent.pt,,,2026-01-16 14:31:41.117263+00,2026-01-16 14:31:41.117263+00
+1998221d-f3e8-446a-9796-7fa6ac4b0bd4,a98f4883-a5a8-4f3a-8a85-3e86b2f91291,Franciele Laís Ribeiro da Silva,franciele.silva@dasprent.pt,,,2026-01-16 14:33:00.192496+00,2026-01-16 14:33:00.192496+00
+fdd44f80-f72a-4f3d-bc88-fdd53575a779,73325e4d-5dd0-42a0-bf85-94d01748487a,Hugo João Antunes Mesquita,hugo.mesquita@dasprent.pt,,,2026-01-16 14:34:58.574542+00,2026-01-16 14:34:58.574542+00
+c8d327af-db0f-4bce-9980-33155445cc65,2c3b3f00-8821-45a2-ae6b-bf5cc351a941,Ivone Marina Silva Marques,ivone.marques@dasprent.pt,,,2026-01-16 14:36:24.714557+00,2026-01-16 14:36:24.714557+00
+f6fe8b30-4980-4824-8ddb-48f57158e5f2,a543346d-c126-481b-a702-4c8b82a49f9b,Johnathan Cleber dos Santos Lima,johnathan.santos@dasprent.pt,,,2026-01-16 14:37:05.236474+00,2026-01-16 14:37:05.236474+00
+aff85d5a-73cc-484c-b3ff-7e9cdc146f4c,33985a6f-6793-4041-8f8a-7a3cdc7e8fd7,Marcia Alexandra Gonçalves Gil,marcia.gil@dasprent.pt,,,2026-01-16 14:37:30.435194+00,2026-01-16 14:37:30.435194+00
+e9a6a96b-086f-4a97-86db-2a71ebc59a09,8dfed322-3108-4365-8fd3-f8a57c7577ad,Thais Lorraine dos Santos Mendes,thais.lorraine@dasprent.pt,,,2026-01-16 14:39:07.432143+00,2026-01-16 14:39:07.432143+00
+4aae7537-4f94-4e56-8ea4-ddf559b93bf2,52a6f5f8-596d-43b0-bb09-cdbe65a96dca,Julio da Gloria Souza,juliosouza912@gmail.com,,,2026-01-16 14:55:54.058866+00,2026-01-16 14:55:54.058866+00
+db58fe28-4e05-45ea-9d18-b3f681b3afc3,6d8052fb-fe01-448d-b2cd-5bf756683ad2,Renan Soares de Farias Cascalho,soaresfaria17@gmail.com,,,2026-01-16 14:58:17.608394+00,2026-01-16 14:58:17.608394+00
+af8ca6f4-e12c-4b2a-ac86-0de9c81611ae,5987803e-008b-40cd-ac4d-d63fd1c72909,Gerónimo Cá,geronimoca@gmail.com,,,2026-01-16 14:59:31.592393+00,2026-01-16 14:59:31.592393+00
+85994746-7f88-434b-b536-2c0ab210edd6,7af66a63-fc20-4028-8f3b-1146bcc473f1,Christielly Katriny dos Santos Lima,christielly.lima@daspautorepair.pt,,,2026-01-16 15:00:49.303243+00,2026-01-16 15:00:49.303243+00
+a8449bed-29b4-4f4f-b8f7-4e11668257be,77020f0e-10e6-447f-8bb1-7be2cc9accf2,Lourenço Macedo Cuambe,lourencomacedo94@gmail.com,,,2026-01-16 15:01:18.818026+00,2026-01-16 15:01:18.818026+00
+6534a806-e35c-482e-b438-b7e7087960a9,1dc6f932-339a-4b84-9a18-6db12e92627c,Arthur Lopes Muralli,arthur.muralli@dasprent.pt,,,2026-01-16 15:02:32.974511+00,2026-01-16 15:02:32.974511+00
+a7e1b6e9-b046-4e69-9da7-3036fb9f9164,2b695877-7662-4280-8122-37be5a960ad2,Cintia Cintra Mengatto Morais,cintia.mengatto@daspautorepair.pt,,,2026-01-16 15:03:07.284381+00,2026-01-16 15:03:07.284381+00
+b524c676-3ac6-4de8-ac38-5d7d1852fcc9,ab47cd01-767b-4679-bb43-73162fdbf75f,Rui Carlos Manocane,uimulungo123@gmail.com,,,2026-01-16 15:03:59.747459+00,2026-01-16 15:03:59.747459+00
+c31b322e-908b-41b8-acc6-a7a0af4fde9c,c5aea23f-61f9-4aba-9e9d-594b9f1f7f13,Dércio António Custódio do Rosário,dorosariodercio3@gmail.com,,,2026-01-16 15:04:56.029078+00,2026-01-16 15:04:56.029078+00
+fee31c83-cad4-479f-929c-1110c740a0d8,707f465d-5d9d-49f3-a125-3b8a82a00f6b,Juliano Cury,juliano.cury@distanciaarrojada.pt,,,2026-01-16 15:52:34.10147+00,2026-01-16 15:52:34.10147+00
+347415f9-e74f-437f-8c54-c150798a8c72,da188e9b-37fa-4bf1-87f2-ec0303ce59fd,Lucas Gomes,lucas.gomes@distanciaarrojada.pt,,,2026-01-16 15:53:38.204346+00,2026-01-16 15:53:38.204346+00
+4625e701-e1b4-4f72-953c-a6226522af29,75097595-8316-4dbb-bbe2-b372200bea13,Cátia Inês Soares Pereira,catia.pereira@distanciaarrojada.pt,,,2026-01-16 15:54:15.761251+00,2026-01-16 15:54:15.761251+00
+dfc7baaf-2d11-4617-a0b9-e0579c8de305,21fed398-605f-4f0f-aafd-0516bfb8ccea,Bruno Garcia de Matos Paulo,bruno.paulo@dasprent.pt,,,2026-01-16 15:54:47.653948+00,2026-01-16 15:54:47.653948+00
+265e16a6-d0df-4d73-89b3-ae2161e0dd4f,b1494738-3c17-48e8-bf10-7401da60e1dc,Rafaela Ingrid Ribeiro Ramos,rafaela.ramos@distanciaarrojada.pt,,,2026-01-16 15:55:17.438088+00,2026-01-16 15:55:17.438088+00
+485fffc3-f06a-4b8d-b2ba-acbe49bb8c87,d66acea2-fc3b-4051-b110-05e545140b34,Juliana Souza da Silva,juliana.silva@distanciaarrojada.pt,,,2026-01-16 15:55:46.536403+00,2026-01-16 15:55:46.536403+00
+0bd8ef48-0bff-4091-8613-29193d536f32,5c81f01a-f266-40d0-a098-29ce074277af,Ana Alexandra Marques da Silva,ana.silva@distanciaarrojada.pt,,,2026-01-16 15:56:19.077677+00,2026-01-16 15:56:19.077677+00
+9b2cad6b-70b5-4dc9-aea7-cd3f7cd78937,a7e26a5f-daf1-4a13-9445-29c0407756d4,Fábio Vitor Oliveira Magnavita,fabio.magnavita@distanciaarrojada.pt,,,2026-01-16 15:56:48.743637+00,2026-01-16 15:56:48.743637+00
+1e5c74a5-21fd-490b-9d4a-877fe24bcd47,925d12a7-525c-4819-9825-2b95d2bda0cd,Franciele Laís Ribeiro da Silva,francielelais701@gmail.com,,,2026-01-27 11:13:17.762055+00,2026-01-27 11:13:17.762055+00
+9df4eb59-84a9-47b6-b164-a89e76b3f383,ba483539-dce5-4a49-b957-dcc4148e9cab,Thiago Galdino de Sousa,socialgaldinothi@gmail.com,,,2026-01-27 11:18:24.829483+00,2026-01-27 11:18:24.829483+00
+ea7dc7a4-b513-4b64-89be-41291a215527,62ef01b7-bce2-4c41-9519-5ab3a336a880,Beatriz Veloso,beatriz.veloso2022@gmail.com,,,2026-02-06 12:38:39.447207+00,2026-02-06 12:38:39.447207+00
+2b0c7dc4-3c7a-4e61-aaae-576af6363e1d,6bfaa980-1f48-4a70-b327-410c997fc816,Vania Alexandra da Silva Sousa,vaniaalexandra123@hotmail.com,,,2026-02-06 12:38:47.760303+00,2026-02-06 12:38:47.760303+00
+92ff12da-6173-4e90-903f-3ab39d8f4d0f,afdf81d1-5280-41b9-93f9-f5d2409f09e7,Carmelita Isabel Alves dos Santos,litas@live.com.pt,,,2026-03-09 09:59:28.138203+00,2026-03-09 09:59:28.138203+00
+82ab18cc-cb22-41dc-b9a1-32e3adcb9452,2a810ed2-4ea1-4dad-a3d4-6463d9e2e60c,Carlos Filipe Matos Soares,cfsoares79@gmail.com,,,2026-03-13 15:40:43.016346+00,2026-03-13 15:40:43.016346+00
+c270882f-5631-4e36-a571-7f1b57bd5181,d206f465-6ae5-442e-b0de-85e48f082f90,Marta Valentina Melo dos Santos de Sousa ,martinhaval@hotmail.com,,,2026-03-31 09:42:24.324279+00,2026-03-31 09:42:24.324279+00

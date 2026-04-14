@@ -1,0 +1,43 @@
+project_id = "egyrbhlnoniukekrxrvq"
+
+[functions.send-safety-checkup-reminders]
+verify_jwt = false
+
+[functions.create-employee-with-password]
+verify_jwt = false
+
+[functions.send-absence-notification]
+verify_jwt = false
+
+[functions.invite-admin]
+verify_jwt = false
+
+[functions.remove-admin]
+verify_jwt = false
+
+[functions.send-ticket-notification]
+verify_jwt = false
+
+[functions.send-ticket-status-notification]
+verify_jwt = false
+
+[functions.update-employee-email]
+verify_jwt = false
+
+[functions.repair-mixed-account]
+verify_jwt = false
+
+[functions.change-admin-password]
+verify_jwt = false
+
+[functions.get-admin-auth-emails]
+verify_jwt = false
+
+[functions.change-employee-password]
+verify_jwt = false
+
+[functions.resend-welcome-email]
+verify_jwt = false
+
+[functions.send-ticket-reply-notification]
+verify_jwt = false

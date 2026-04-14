@@ -479,9 +479,9 @@ const EquipmentsTab = ({ canManage, companies, companyFilter, setCompanyFilter }
       <Table className="min-w-[700px] border-collapse">
         <TableHeader className="bg-muted/30">
           <TableRow className="border-b-2">
-            <TableHead>Equipamento</TableHead>
-            <TableHead>Identificação</TableHead>
-            <TableHead>Atribuição</TableHead>
+            <TableHead className="w-[40%]">Equipamento</TableHead>
+            <TableHead className="w-[30%]">Identificação</TableHead>
+            <TableHead className="w-[20%]">Atribuição</TableHead>
             <TableHead className="text-center w-24">Fatura</TableHead>
             {canManage && <TableHead className="w-12"></TableHead>}
           </TableRow>
@@ -489,15 +489,15 @@ const EquipmentsTab = ({ canManage, companies, companyFilter, setCompanyFilter }
       <TableBody>
         {categoryEquipments.map((equipment) => (
           <TableRow key={equipment.id} className="group hover:bg-muted/10 transition-colors">
-            <TableCell>
+            <TableCell className="align-top py-4">
               <div className="flex flex-col gap-1.5">
                 <div className="flex items-center gap-2">
                   {equipment.equipment_number && (
-                    <span className="font-mono text-[10px] bg-secondary/80 text-secondary-foreground px-1.5 py-0.5 rounded-sm shrink-0">
+                    <span className="font-mono text-[10px] bg-secondary/80 text-secondary-foreground px-1.5 py-0.5 rounded-sm shrink-0 mt-0.5">
                       #{equipment.equipment_number}
                     </span>
                   )}
-                  <span className="font-semibold text-sm">
+                  <span className="font-semibold text-sm leading-tight">
                     {equipment.brand} <span className="font-medium text-muted-foreground">{equipment.model || ""}</span>
                   </span>
                 </div>
@@ -509,7 +509,7 @@ const EquipmentsTab = ({ canManage, companies, companyFilter, setCompanyFilter }
               </div>
             </TableCell>
 
-            <TableCell>
+            <TableCell className="align-top py-4">
               <div className="flex flex-col gap-2">
                 {equipment.serial_number ? (
                   <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -539,11 +539,11 @@ const EquipmentsTab = ({ canManage, companies, companyFilter, setCompanyFilter }
               </div>
             </TableCell>
 
-            <TableCell>
+            <TableCell className="align-top py-4">
               <div className="flex flex-col items-start gap-1.5">
                 {getStatusBadge(equipment)}
                 {equipment.employees && (
-                  <div className="flex items-center gap-1.5 bg-muted/40 border border-border/50 px-2 py-0.5 rounded text-xs mt-1">
+                  <div className="flex items-center gap-1.5 bg-muted/40 border border-border/50 px-2 py-0.5 rounded text-xs">
                     <User className="h-3 w-3 text-muted-foreground" />
                     <span className="font-medium">{equipment.employees.name}</span>
                   </div>
@@ -551,7 +551,7 @@ const EquipmentsTab = ({ canManage, companies, companyFilter, setCompanyFilter }
               </div>
             </TableCell>
 
-            <TableCell className="text-center">
+            <TableCell className="align-top py-4 text-center">
                {equipment.invoice_url ? (
                   <Button
                     variant="ghost"
@@ -568,7 +568,7 @@ const EquipmentsTab = ({ canManage, companies, companyFilter, setCompanyFilter }
             </TableCell>
 
             {canManage && (
-              <TableCell>{renderEquipmentActions(equipment)}</TableCell>
+              <TableCell className="align-top py-4">{renderEquipmentActions(equipment)}</TableCell>
             )}
           </TableRow>
         ))}

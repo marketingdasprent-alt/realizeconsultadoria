@@ -185,7 +185,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         </div>
 
         <div className="flex-1 flex flex-col min-h-0">
-          <nav className="px-3 py-2 space-y-2">
+          <nav className="px-3 py-2 space-y-1">
             {navItems.map((item) => {
               const isActive = location.pathname === item.href;
               return (
@@ -205,7 +205,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           </nav>
         </div>
 
-        <div className="p-4 border-t border-sidebar-border mt-auto">
+        <div className="p-4 border-t border-sidebar-border mt-auto mb-2">
           <div className="flex items-center gap-3 px-4 py-2 mb-2">
             <div className="w-8 h-8 bg-sidebar-primary rounded-full flex items-center justify-center text-sm font-semibold text-sidebar-primary-foreground">
               {userInitial}

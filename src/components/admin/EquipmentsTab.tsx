@@ -223,6 +223,7 @@ const EquipmentsTab = ({ canManage, companies, companyFilter, setCompanyFilter }
         category_id: data.category_id || null,
         company_id: data.company_id,
         employee_id: data.employee_id || null,
+        status: data.employee_id ? "assigned" : "available",
         brand: data.brand,
         model: data.model || null,
         serial_number: data.serial_number || null,

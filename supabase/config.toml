@@ -1,4 +1,4 @@
-project_id = "egyrbhlnoniukekrxrvq"
+project_id = "jvvnsoasylusbmyfotci"
 
 [functions.send-safety-checkup-reminders]
 verify_jwt = false
@@ -40,4 +40,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-ticket-reply-notification]
+verify_jwt = false
+
+[functions.send-legal-payment-reminders]
+verify_jwt = false
+
+[functions.send-domain-renewal-reminders]
 verify_jwt = false

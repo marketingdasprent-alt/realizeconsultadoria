@@ -4,7 +4,6 @@ import { Clock, Check, X, Filter, RefreshCw, Search, Plus } from "lucide-react";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 import { Input } from "@/components/ui/input";
-import AdminLayout from "@/components/layout/AdminLayout";
 import { getLogoBase64 } from "@/lib/logo-utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -523,7 +522,7 @@ const AbsenceRequestsPage = () => {
   const rejectedCount = filteredRequests.filter((r) => r.status === "rejected").length;
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -738,7 +737,7 @@ const AbsenceRequestsPage = () => {
           </DialogFooter>
         </DialogContent>
       </Dialog>
-    </AdminLayout>
+    </>
   );
 };
 

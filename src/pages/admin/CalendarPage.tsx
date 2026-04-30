@@ -27,7 +27,6 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import AdminLayout from "@/components/layout/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { isWeekend } from "@/lib/vacation-utils";
 import { absenceTypeLabels } from "@/lib/absence-types";
@@ -249,7 +248,7 @@ const CalendarPage = () => {
   };
 
   return (
-    <AdminLayout>
+    <>
       <TooltipProvider>
         <div className="space-y-6">
           {/* Header - hidden on print */}
@@ -603,7 +602,7 @@ const CalendarPage = () => {
           </div>
         </div>
       </TooltipProvider>
-    </AdminLayout>
+    </>
   );
 };
 

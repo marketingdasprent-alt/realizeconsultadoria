@@ -87,6 +87,14 @@ export const PERMISSIONS_CONFIG: ModuleTopicsConfig[] = [
       { key: 'notifications', label: 'Gerir avisos', description: 'Criar avisos globais', hasView: true, hasExecute: true },
       { key: 'support_subjects', label: 'Gerir assuntos suporte', description: 'Configurar assuntos de suporte', hasView: true, hasExecute: true }
     ]
+  },
+  {
+    moduleKey: 'legal',
+    moduleLabel: 'Jurídico',
+    topics: [
+      { key: 'view', label: 'Ver jurídico', description: 'Visualizar a área jurídica', hasView: true, hasExecute: false },
+      { key: 'manage', label: 'Gerir jurídico', description: 'Criar e editar conteúdo jurídico', hasView: false, hasExecute: true }
+    ]
   }
 ];
 

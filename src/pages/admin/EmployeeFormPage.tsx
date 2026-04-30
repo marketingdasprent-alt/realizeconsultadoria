@@ -3,7 +3,6 @@ import { useParams, useNavigate } from "react-router-dom";
 import { ArrowLeft, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import AdminLayout from "@/components/layout/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import { useAdminPermissions } from "@/hooks/useAdminPermissions";
@@ -103,16 +102,16 @@ const EmployeeFormPage = () => {
 
   if (isLoading) {
     return (
-      <AdminLayout>
+      <>
         <div className="flex items-center justify-center min-h-[400px]">
           <Loader2 className="h-8 w-8 animate-spin text-gold" />
         </div>
-      </AdminLayout>
+      </>
     );
   }
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex items-center gap-4">
@@ -182,7 +181,7 @@ const EmployeeFormPage = () => {
           )}
         </Tabs>
       </div>
-    </AdminLayout>
+    </>
   );
 };
 

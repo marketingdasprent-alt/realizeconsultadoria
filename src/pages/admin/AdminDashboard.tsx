@@ -2,7 +2,6 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { Building2, Users, Calendar, Clock, TrendingUp, Headset } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import AdminLayout from "@/components/layout/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import PWAInstallBanner from "@/components/PWAInstallBanner";
 
@@ -135,7 +134,7 @@ const AdminDashboard = () => {
   ];
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-8">
         {/* PWA Install Banner */}
         <PWAInstallBanner />
@@ -222,7 +221,7 @@ const AdminDashboard = () => {
           </Card>
         </div>
       </div>
-    </AdminLayout>
+    </>
   );
 };
 

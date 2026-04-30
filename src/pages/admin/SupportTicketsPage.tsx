@@ -45,7 +45,6 @@ import {
   AlertDialogFooter,
   AlertDialogCancel,
 } from "@/components/ui/alert-dialog";
-import AdminLayout from "@/components/layout/AdminLayout";
 import { getLogoBase64, getLogoHeaderHtml } from "@/lib/logo-utils";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
@@ -455,7 +454,7 @@ const SupportTicketsPage = () => {
   );
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div>
@@ -862,7 +861,7 @@ const SupportTicketsPage = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-    </AdminLayout>
+    </>
   );
 };
 

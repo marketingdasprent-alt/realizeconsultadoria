@@ -19,7 +19,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
-import AdminLayout from "@/components/layout/AdminLayout";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
 import EmployeeAvisoDialog from "@/components/admin/EmployeeAvisoDialog";
@@ -223,7 +222,7 @@ const EmployeesPage = () => {
   });
 
   return (
-    <AdminLayout>
+    <>
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -463,7 +462,7 @@ const EmployeesPage = () => {
           newPassword={resendSuccessData?.password || ""}
         />
       </div>
-    </AdminLayout>
+    </>
   );
 };
 

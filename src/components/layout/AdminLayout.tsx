@@ -1,18 +1,19 @@
 import { useEffect, useState, useMemo } from "react";
-import { useNavigate, Link, useLocation } from "react-router-dom";
-import { 
-  LayoutDashboard, 
-  Building2, 
-  Users, 
-  Calendar, 
-  Settings, 
+import { useNavigate, Link, useLocation, Outlet } from "react-router-dom";
+import {
+  LayoutDashboard,
+  Building2,
+  Users,
+  Calendar,
+  Settings,
   LogOut,
   Menu,
   X,
   ClipboardList,
   Loader2,
   Headset,
-  Lock
+  Lock,
+  Scale
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { supabase } from "@/integrations/supabase/client";
@@ -21,7 +22,7 @@ import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import logo from "@/assets/logo-realize.png";
 
 interface AdminLayoutProps {
-  children: React.ReactNode;
+  children?: React.ReactNode;
 }
 
 type AuthStatus = "checking" | "authorized" | "unauthorized";
@@ -35,6 +36,7 @@ interface NavItem {
 
 const allNavItems: NavItem[] = [
   { href: "/admin", icon: LayoutDashboard, label: "Dashboard", moduleKey: "dashboard" },
+  { href: "/admin/juridico", icon: Scale, label: "Jurídico", moduleKey: "legal" },
   { href: "/admin/empresas", icon: Building2, label: "Empresas", moduleKey: "companies" },
   { href: "/admin/colaboradores", icon: Users, label: "Colaboradores", moduleKey: "employees" },
   { href: "/admin/acessos", icon: Lock, label: "Acessos", moduleKey: "accesses" },
@@ -50,6 +52,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const { toast } = useToast();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [userName, setUserName] = useState("");
+  const [userDepartment, setUserDepartment] = useState<string | null>(null);
   const [authStatus, setAuthStatus] = useState<AuthStatus>("checking");
   const { canView, isLoading: isLoadingPermissions, isSuperAdmin } = useAdminPermissions();
 
@@ -57,13 +60,18 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const navItems = useMemo(() => {
     if (isLoadingPermissions) return [];
     return allNavItems.filter(item => {
+      // Módulo Jurídico exclusivo para Dinis ou departamento Jurídico
+      if (item.moduleKey === 'legal') {
+        const isDinis = userName.toLowerCase().includes("dinis silva");
+        return isDinis || userDepartment === "Jurídico";
+      }
       // Módulo de acessos exclusivo para super admins
       if (item.moduleKey === 'accesses') {
         return isSuperAdmin;
       }
       return canView(item.moduleKey);
     });
-  }, [canView, isLoadingPermissions, isSuperAdmin]);
+  }, [canView, isLoadingPermissions, isSuperAdmin, userName, userDepartment]);
 
   // Get first initial for avatar
   const userInitial = userName.charAt(0).toUpperCase();
@@ -72,7 +80,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     const checkAdmin = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
-        
+
         if (!session) {
           setAuthStatus("unauthorized");
           navigate('/admin/login');
@@ -104,8 +112,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           return;
         }
 
-        // User is authorized
-        setAuthStatus("authorized");
+        // Defer setAuthStatus to after profile fetch to prevent UI flicker
 
         const { data: profile } = await supabase
           .from('profiles')
@@ -116,6 +123,19 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         if (profile) {
           setUserName(profile.name);
         }
+
+        const { data: employeeData } = await supabase
+          .from('employees')
+          .select('department')
+          .eq('user_id', session.user.id)
+          .maybeSingle();
+
+        if (employeeData) {
+          setUserDepartment(employeeData.department);
+        }
+
+        // Finally set as authorized and show layout
+        setAuthStatus("authorized");
       } catch (error) {
         console.error("Auth check error:", error);
         setAuthStatus("unauthorized");
@@ -156,35 +176,36 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     <div className="min-h-screen bg-secondary flex overflow-x-hidden">
       {/* Sidebar - Desktop */}
       <aside className="hidden lg:flex lg:flex-col w-64 bg-sidebar fixed inset-y-0 left-0 z-50 print:hidden">
-        <div className="p-6">
-          <img 
-            src={logo} 
-            alt="Realize Consultadoria" 
-            className="h-28 w-auto brightness-0 invert"
+        <div className="p-4 flex justify-center">
+          <img
+            src={logo}
+            alt="Realize Consultadoria"
+            className="h-16 w-auto brightness-0 invert"
           />
         </div>
 
-        <nav className="flex-1 px-4 space-y-1">
-          {navItems.map((item) => {
-            const isActive = location.pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
-                  isActive 
-                    ? 'bg-sidebar-accent text-sidebar-primary' 
+        <div className="flex-1 flex flex-col min-h-0">
+          <nav className="px-3 py-2 space-y-2">
+            {navItems.map((item) => {
+              const isActive = location.pathname === item.href;
+              return (
+                <Link
+                  key={item.href}
+                  to={item.href}
+                  className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${isActive
+                    ? 'bg-sidebar-accent text-sidebar-primary'
                     : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-                }`}
-              >
-                <item.icon className="h-5 w-5" />
-                <span className="font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
+                    }`}
+                >
+                  <item.icon className="h-5 w-5" />
+                  <span className="font-medium">{item.label}</span>
+                </Link>
+              );
+            })}
+          </nav>
+        </div>
 
-        <div className="p-4 border-t border-sidebar-border">
+          <div className="p-4 border-t border-sidebar-border mb-4">
           <div className="flex items-center gap-3 px-4 py-2 mb-2">
             <div className="w-8 h-8 bg-sidebar-primary rounded-full flex items-center justify-center text-sm font-semibold text-sidebar-primary-foreground">
               {userInitial}
@@ -194,8 +215,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
               <p className="text-xs text-sidebar-foreground/60">Administrador</p>
             </div>
           </div>
-          <Button 
-            variant="ghost" 
+          <Button
+            variant="ghost"
             className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
             onClick={handleLogout}
           >
@@ -208,9 +229,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       {/* Mobile Header */}
       <div className="lg:hidden fixed top-0 left-0 right-0 h-14 lg:h-16 bg-sidebar z-50 flex items-center justify-between px-4 print:hidden">
         <div className="flex items-center gap-3">
-          <img 
-            src={logo} 
-            alt="Realize Consultadoria" 
+          <img
+            src={logo}
+            alt="Realize Consultadoria"
             className="h-10 lg:h-16 w-auto brightness-0 invert"
           />
         </div>
@@ -231,7 +252,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       {/* Mobile Sidebar */}
       {isSidebarOpen && (
         <div className="lg:hidden fixed inset-0 z-40 bg-black/50" onClick={() => setIsSidebarOpen(false)}>
-          <aside 
+          <aside
             className="w-64 bg-sidebar h-full pt-16"
             onClick={(e) => e.stopPropagation()}
           >
@@ -256,11 +277,10 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
                     key={item.href}
                     to={item.href}
                     onClick={() => setIsSidebarOpen(false)}
-                    className={`flex items-center gap-3 px-4 py-3.5 rounded-lg transition-colors ${
-                      isActive 
-                        ? 'bg-sidebar-accent text-sidebar-primary' 
-                        : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-                    }`}
+                    className={`flex items-center gap-3 px-4 py-3.5 rounded-lg transition-colors ${isActive
+                      ? 'bg-sidebar-accent text-sidebar-primary'
+                      : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
+                      }`}
                   >
                     <item.icon className="h-5 w-5" />
                     <span className="font-medium">{item.label}</span>
@@ -269,9 +289,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
               })}
             </nav>
 
-            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-sidebar-border">
-              <Button 
-                variant="ghost" 
+            <div className="absolute bottom-0 left-0 right-0 p-4 border-t border-sidebar-border bg-sidebar pb-20">
+              <Button
+                variant="ghost"
                 className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent h-12"
                 onClick={handleLogout}
               >
@@ -286,7 +306,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       {/* Main Content */}
       <main className="flex-1 lg:ml-64 pt-14 lg:pt-0 print:ml-0 print:pt-0 overflow-x-hidden">
         <div className="p-4 lg:p-8 print:p-0 max-w-full">
-          {children}
+          {children || <Outlet />}
         </div>
       </main>
     </div>

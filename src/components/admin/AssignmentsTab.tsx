@@ -241,10 +241,13 @@ const AssignmentsTab = () => {
         .insert(items);
       if (itemsError) throw itemsError;
 
-      // Update equipment status to assigned
+      // Update equipment status and employee_id to assigned
       await supabase
         .from("equipments")
-        .update({ status: "assigned" })
+        .update({ 
+          status: "assigned",
+          employee_id: selectedEmployee 
+        })
         .in("id", selectedEquipment);
 
       // Update phones employee_id
@@ -287,7 +290,10 @@ const AssignmentsTab = () => {
 
         await supabase
           .from("equipments")
-          .update({ status: "available" })
+          .update({ 
+            status: "available",
+            employee_id: null
+          })
           .in("id", removedEquipmentIds);
 
         // Free removed phones
@@ -334,7 +340,10 @@ const AssignmentsTab = () => {
         await supabase.from("assignment_items").insert(newItems);
         await supabase
           .from("equipments")
-          .update({ status: "assigned" })
+          .update({ 
+            status: "assigned",
+            employee_id: editingAssignment.employee_id
+          })
           .in("id", newEquipmentIds);
 
         const newPhoneIds = Object.entries(selectedPhones)
@@ -427,7 +436,13 @@ const AssignmentsTab = () => {
 
       const equipmentIds = assignment?.assignment_items?.map((i: any) => i.equipment_id) || [];
       if (equipmentIds.length > 0) {
-        await supabase.from("equipments").update({ status: "available" }).in("id", equipmentIds);
+        await supabase
+          .from("equipments")
+          .update({ 
+            status: "available",
+            employee_id: null 
+          })
+          .in("id", equipmentIds);
       }
 
       const phoneIds = assignment?.assignment_items

@@ -32,7 +32,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return new Response(
         JSON.stringify({ error: "Não autorizado" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -42,18 +42,18 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     const token = authHeader.replace("Bearer ", "");
-    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
+    const { data: userData, error: userError } = await supabaseUser.auth.getUser(token);
     
-    if (claimsError || !claimsData?.claims?.sub) {
-      console.error("Token validation error:", claimsError);
+    if (userError || !userData?.user) {
+      console.error("Token validation error:", userError);
       return new Response(
         JSON.stringify({ error: "Token inválido" }),
-        { status: 401, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
-    const requesterId = claimsData.claims.sub;
-    const requesterEmail = claimsData.claims.email;
+    const requesterId = userData.user.id;
+    const requesterEmail = userData.user.email;
 
     // Check if requester is admin
     const { data: requesterRole } = await supabaseAdmin
@@ -66,7 +66,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (!requesterRole) {
       return new Response(
         JSON.stringify({ error: "Apenas administradores podem criar novos admins" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -77,7 +77,7 @@ const handler = async (req: Request): Promise<Response> => {
     if (!password || password.length < 8) {
       return new Response(
         JSON.stringify({ error: "A palavra-passe deve ter pelo menos 8 caracteres" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -96,7 +96,7 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({ 
           error: "Este email já está associado a um colaborador. Por favor utilize um email diferente para o administrador." 
         }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -119,7 +119,7 @@ const handler = async (req: Request): Promise<Response> => {
       if (existingRole) {
         return new Response(
           JSON.stringify({ error: "Este utilizador já é administrador" }),
-          { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
 
@@ -130,7 +130,7 @@ const handler = async (req: Request): Promise<Response> => {
         JSON.stringify({ 
           error: "Este email já está em uso no sistema. Por favor utilize um email diferente." 
         }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -148,7 +148,7 @@ const handler = async (req: Request): Promise<Response> => {
       console.error("Error creating user:", createError);
       return new Response(
         JSON.stringify({ error: `Erro ao criar utilizador: ${createError.message}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
@@ -164,11 +164,28 @@ const handler = async (req: Request): Promise<Response> => {
       console.error("Error adding admin role:", roleError);
       return new Response(
         JSON.stringify({ error: `Erro ao adicionar role admin: ${roleError.message}` }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
       );
     }
 
     console.log(`Added admin role to user ${userId}`);
+
+    // Create profile
+    const { error: profileError } = await supabaseAdmin
+      .from("profiles")
+      .insert({
+        user_id: userId,
+        name: displayName,
+        email: normalizedEmail,
+      });
+
+    if (profileError) {
+      console.error("Error creating profile:", profileError);
+      // We don't block here as user and role are already created, 
+      // but we log it for troubleshooting
+    } else {
+      console.log(`Created profile for user ${userId}`);
+    }
 
     const loginUrl = "https://realizeconsultadoria.lovable.app/admin/login";
 
@@ -278,7 +295,7 @@ const handler = async (req: Request): Promise<Response> => {
     console.error("Error in invite-admin function:", error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
     );
   }
 };

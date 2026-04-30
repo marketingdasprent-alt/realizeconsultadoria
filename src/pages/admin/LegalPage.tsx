@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef, useMemo } from "react";
+import { useNavigate } from "react-router-dom";
 import { Plus, Search, Edit, Scale, Loader2, CheckCircle2, AlertCircle, Clock } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -15,11 +16,26 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import LegalAgenda from "@/components/admin/legal/LegalAgenda";
 import LegalClientModal, { LegalClient } from "@/components/admin/legal/LegalClientModal";
 
 const LegalPage = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
+  const { canView, isLoading: isLoadingPermissions } = useAdminPermissions();
+
+  useEffect(() => {
+    if (!isLoadingPermissions && !canView('legal')) {
+      toast({
+        title: "Acesso Negado",
+        description: "Não tem permissão para aceder à área jurídica.",
+        variant: "destructive",
+      });
+      navigate('/admin');
+    }
+  }, [canView, isLoadingPermissions, navigate, toast]);
+
   const [clients, setClients] = useState<LegalClient[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState("");

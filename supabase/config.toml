@@ -1,4 +1,4 @@
-project_id = "jvvnsoasylusbmyfotci"
+project_id = "jvvnsoasylusbmxfotci"
 
 [functions.send-safety-checkup-reminders]
 verify_jwt = false
@@ -46,4 +46,10 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.send-domain-renewal-reminders]
+verify_jwt = false
+
+[functions.setup-juridico-group]
+verify_jwt = false
+
+[functions.update-db-rpc]
 verify_jwt = false

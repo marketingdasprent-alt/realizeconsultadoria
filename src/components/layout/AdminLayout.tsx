@@ -60,15 +60,6 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const navItems = useMemo(() => {
     if (isLoadingPermissions) return [];
     return allNavItems.filter(item => {
-      // Módulo Jurídico exclusivo para Dinis ou departamento Jurídico
-      if (item.moduleKey === 'legal') {
-        const isDinis = userName.toLowerCase().includes("dinis silva");
-        return isDinis || userDepartment === "Jurídico";
-      }
-      // Módulo de acessos exclusivo para super admins
-      if (item.moduleKey === 'accesses') {
-        return isSuperAdmin;
-      }
       return canView(item.moduleKey);
     });
   }, [canView, isLoadingPermissions, isSuperAdmin, userName, userDepartment]);
@@ -147,12 +138,17 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   }, [navigate]);
 
   const handleLogout = async () => {
-    await supabase.auth.signOut();
-    toast({
-      title: "Sessão terminada",
-      description: "Até breve!",
-    });
-    navigate('/');
+    try {
+      await supabase.auth.signOut();
+      toast({
+        title: "Sessão terminada",
+        description: "Até breve!",
+      });
+    } catch (error) {
+      console.error("Error signing out:", error);
+    } finally {
+      window.location.href = '/';
+    }
   };
 
   // Show loading state until auth is confirmed

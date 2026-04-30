@@ -48,14 +48,27 @@ export const useAdminPermissions = (): AdminPermissions => {
         (m: any) => m.admin_groups?.is_super_admin && m.admin_groups?.is_active
       );
 
+      setIsSuperAdmin(inSuperAdminGroup || false);
+
+      // Start with empty permissions
+      const permissionMap = new Map<string, TopicPermission>();
+
+      // 1. Always add 'dashboard' view permission for any authenticated admin
+      permissionMap.set('dashboard:', {
+        module_key: 'dashboard',
+        topic_key: null,
+        can_view: true,
+        can_edit: false,
+        can_execute: false
+      });
+
+      // 2. If Super Admin, add everything except 'legal'
       if (inSuperAdminGroup) {
-        // Super admin has full access to all modules and topics
-        setIsSuperAdmin(true);
-        const allPermissions: TopicPermission[] = [];
-        
-        // Add module-level permissions
         ALL_MODULE_KEYS.forEach(moduleKey => {
-          allPermissions.push({
+          if (moduleKey === 'legal' || moduleKey === 'dashboard') return;
+          
+          const key = `${moduleKey}:`;
+          permissionMap.set(key, {
             module_key: moduleKey,
             topic_key: null,
             can_view: true,
@@ -63,11 +76,13 @@ export const useAdminPermissions = (): AdminPermissions => {
             can_execute: true
           });
         });
-        
-        // Add topic-level permissions
+
         PERMISSIONS_CONFIG.forEach(module => {
+          if (module.moduleKey === 'legal' || module.moduleKey === 'dashboard') return;
+          
           module.topics.forEach(topic => {
-            allPermissions.push({
+            const key = `${module.moduleKey}:${topic.key}`;
+            permissionMap.set(key, {
               module_key: module.moduleKey,
               topic_key: topic.key,
               can_view: true,
@@ -76,68 +91,62 @@ export const useAdminPermissions = (): AdminPermissions => {
             });
           });
         });
+      }
+
+      // 2. Fetch and add permissions from all groups (including 'legal' if present)
+      const { data: memberships } = await supabase
+        .from('admin_group_members')
+        .select('group_id')
+        .eq('user_id', session.user.id);
+
+      if (memberships && memberships.length > 0) {
+        const groupIds = memberships.map(m => m.group_id);
         
-        setPermissions(allPermissions);
-      } else {
-        // Check if user has any group memberships
-        const { data: memberships } = await supabase
-          .from('admin_group_members')
-          .select('group_id')
-          .eq('user_id', session.user.id);
+        const { data: groupPermissions } = await supabase
+          .from('admin_group_permissions')
+          .select('module_key, topic_key, can_view, can_edit, can_execute, admin_groups!inner(is_active)')
+          .in('group_id', groupIds);
 
-        if (!memberships || memberships.length === 0) {
-          // No group membership - give basic dashboard access
-          setIsSuperAdmin(false);
-          setPermissions([{
-            module_key: 'dashboard',
-            topic_key: null,
-            can_view: true,
-            can_edit: false,
-            can_execute: false
-          }]);
-        } else {
-          // Fetch aggregated permissions from all groups
-          const groupIds = memberships.map(m => m.group_id);
-          
-          const { data: groupPermissions } = await supabase
-            .from('admin_group_permissions')
-            .select('module_key, topic_key, can_view, can_edit, can_execute, admin_groups!inner(is_active)')
-            .in('group_id', groupIds);
-
-          // Aggregate permissions (union of all groups)
-          const permissionMap = new Map<string, TopicPermission>();
-          
-          groupPermissions?.forEach((p: any) => {
-            if (p.admin_groups?.is_active) {
-              const key = `${p.module_key}:${p.topic_key || ''}`;
-              const existing = permissionMap.get(key);
-              if (existing) {
-                permissionMap.set(key, {
-                  module_key: p.module_key,
-                  topic_key: p.topic_key,
-                  can_view: existing.can_view || p.can_view,
-                  can_edit: existing.can_edit || p.can_edit,
-                  can_execute: existing.can_execute || p.can_execute
-                });
-              } else {
-                permissionMap.set(key, {
-                  module_key: p.module_key,
-                  topic_key: p.topic_key,
-                  can_view: p.can_view,
-                  can_edit: p.can_edit,
-                  can_execute: p.can_execute
-                });
-              }
+        groupPermissions?.forEach((p: any) => {
+          if (p.admin_groups?.is_active) {
+            const key = `${p.module_key}:${p.topic_key || ''}`;
+            const existing = permissionMap.get(key);
+            
+            if (existing) {
+              permissionMap.set(key, {
+                module_key: p.module_key,
+                topic_key: p.topic_key,
+                can_view: existing.can_view || p.can_view,
+                can_edit: existing.can_edit || p.can_edit,
+                can_execute: existing.can_execute || p.can_execute
+              });
+            } else {
+              permissionMap.set(key, {
+                module_key: p.module_key,
+                topic_key: p.topic_key,
+                can_view: p.can_view,
+                can_edit: p.can_edit,
+                can_execute: p.can_execute
+              });
             }
-          });
+          }
+        });
+      }
 
-          setIsSuperAdmin(false);
-          setPermissions(Array.from(permissionMap.values()));
-        }
+      // If no permissions at all (not super admin and no groups), give basic dashboard
+      if (permissionMap.size === 0) {
+        setPermissions([{
+          module_key: 'dashboard',
+          topic_key: null,
+          can_view: true,
+          can_edit: false,
+          can_execute: false
+        }]);
+      } else {
+        setPermissions(Array.from(permissionMap.values()));
       }
     } catch (error) {
       console.error('Error fetching permissions:', error);
-      // On error, give basic dashboard access
       setPermissions([{
         module_key: 'dashboard',
         topic_key: null,
@@ -154,59 +163,43 @@ export const useAdminPermissions = (): AdminPermissions => {
     fetchPermissions();
   }, [fetchPermissions]);
 
-  // Module-level permission checks (backwards compatible)
   const canView = useCallback((moduleKey: string): boolean => {
-    if (isSuperAdmin) return true;
-    // Check module-level or any topic with view permission
+    // We check module-level permission (topic_key = null)
+    // or any topic with view permission in that module
     return permissions.some(p => 
-      p.module_key === moduleKey && 
-      (p.topic_key === null || p.can_view) &&
-      p.can_view
+      p.module_key === moduleKey && p.can_view
     );
-  }, [permissions, isSuperAdmin]);
+  }, [permissions]);
 
   const canEdit = useCallback((moduleKey: string): boolean => {
-    if (isSuperAdmin) return true;
-    // Check module-level or any topic with edit permission
     return permissions.some(p => 
-      p.module_key === moduleKey && 
-      (p.topic_key === null || p.can_edit) &&
-      p.can_edit
+      p.module_key === moduleKey && p.can_edit
     );
-  }, [permissions, isSuperAdmin]);
+  }, [permissions]);
 
-  // Topic-level permission checks
   const canViewTopic = useCallback((moduleKey: string, topicKey: string): boolean => {
-    if (isSuperAdmin) return true;
-    
-    // Check specific topic permission
     const topicPerm = permissions.find(p => 
       p.module_key === moduleKey && p.topic_key === topicKey
     );
     if (topicPerm?.can_view) return true;
     
-    // Check module-level permission (null topic = all topics)
     const modulePerm = permissions.find(p => 
       p.module_key === moduleKey && p.topic_key === null
     );
     return modulePerm?.can_view ?? false;
-  }, [permissions, isSuperAdmin]);
+  }, [permissions]);
 
   const canExecuteTopic = useCallback((moduleKey: string, topicKey: string): boolean => {
-    if (isSuperAdmin) return true;
-    
-    // Check specific topic permission
     const topicPerm = permissions.find(p => 
       p.module_key === moduleKey && p.topic_key === topicKey
     );
     if (topicPerm?.can_execute) return true;
     
-    // Check module-level permission (null topic = all topics)
     const modulePerm = permissions.find(p => 
       p.module_key === moduleKey && p.topic_key === null
     );
     return modulePerm?.can_execute ?? false;
-  }, [permissions, isSuperAdmin]);
+  }, [permissions]);
 
   return {
     permissions,
@@ -220,5 +213,4 @@ export const useAdminPermissions = (): AdminPermissions => {
   };
 };
 
-// Re-export for backwards compatibility
 export { MODULE_LABELS, ALL_MODULE_KEYS };

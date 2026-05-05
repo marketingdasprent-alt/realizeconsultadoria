@@ -82,22 +82,64 @@ const AbsenceDocumentsDialog = ({
     }
   };
 
-  const getSignedUrl = async (filePath: string): Promise<string | null> => {
-    const { data, error } = await supabase.storage
-      .from("absence-documents")
-      .createSignedUrl(filePath, 3600); // 1 hour expiry
-
-    if (error) {
-      console.error("Error creating signed URL:", error);
-      return null;
-    }
-    return data.signedUrl;
-  };
-
   const handleDownload = async (doc: AbsenceDocument) => {
     setLoadingFile(doc.id);
+    console.log("Iniciando download robusto para:", doc.file_name);
+    
     try {
-      const signedUrl = await getSignedUrl(doc.file_path);
+      let signedUrl = null;
+      let finalBucket = "absence-documents";
+      
+      // Lista de buckets para tentar encontrar o ficheiro
+      const buckets = [
+        "absence-documents",
+        "employee-files",
+        "employees",
+        "documents",
+        "legal_documents"
+      ];
+
+      // Limpar o caminho do ficheiro (remover slash inicial se existir)
+      const cleanPath = doc.file_path.startsWith('/') 
+        ? doc.file_path.substring(1) 
+        : doc.file_path;
+
+      // 1. Tentar obter Signed URL em cada bucket
+      for (const bucket of buckets) {
+        console.log(`A tentar bucket: ${bucket}...`);
+        const { data, error } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(cleanPath, 60);
+
+        if (data?.signedUrl) {
+          signedUrl = data.signedUrl;
+          finalBucket = bucket;
+          console.log(`Sucesso! Ficheiro encontrado no bucket: ${bucket}`);
+          break;
+        }
+      }
+
+      // 2. Se falhar Signed URL, tentar URL Público como fallback
+      if (!signedUrl) {
+        console.log("Signed URL falhou em todos os buckets. A tentar URL público...");
+        for (const bucket of buckets) {
+          const { data } = supabase.storage.from(bucket).getPublicUrl(cleanPath);
+          if (data?.publicUrl) {
+            // Verificar se o ficheiro existe mesmo (HEAD request)
+            try {
+              const res = await fetch(data.publicUrl, { method: 'HEAD' });
+              if (res.ok) {
+                signedUrl = data.publicUrl;
+                console.log(`Ficheiro encontrado via URL público no bucket: ${bucket}`);
+                break;
+              }
+            } catch (e) {
+              continue;
+            }
+          }
+        }
+      }
+
       if (signedUrl) {
         const response = await fetch(signedUrl);
         const blob = await response.blob();
@@ -109,12 +151,19 @@ const AbsenceDocumentsDialog = ({
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
+        
+        toast({
+          title: "Download concluído",
+          description: `Ficheiro recuperado de: ${finalBucket}`,
+        });
+      } else {
+        throw new Error("Ficheiro não encontrado em nenhum local conhecido.");
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Download error:", error);
       toast({
-        title: "Erro",
-        description: "Não foi possível descarregar o ficheiro.",
+        title: "Erro no download",
+        description: error.message || "Não foi possível descarregar o ficheiro.",
         variant: "destructive",
       });
     } finally {
@@ -125,16 +174,32 @@ const AbsenceDocumentsDialog = ({
   const handlePreview = async (doc: AbsenceDocument) => {
     setLoadingFile(doc.id);
     try {
-      const signedUrl = await getSignedUrl(doc.file_path);
-      if (signedUrl) {
+      // Usar a mesma lógica de busca para o preview
+      const buckets = ["absence-documents", "employee-files", "employees", "documents"];
+      const cleanPath = doc.file_path.startsWith('/') ? doc.file_path.substring(1) : doc.file_path;
+      let previewUrl = null;
+
+      for (const bucket of buckets) {
+        const { data } = await supabase.storage.from(bucket).createSignedUrl(cleanPath, 3600);
+        if (data?.signedUrl) {
+          previewUrl = data.signedUrl;
+          break;
+        }
+      }
+
+      if (previewUrl) {
         if (doc.mime_type === "application/pdf") {
-          // Open PDF in new tab
-          window.open(signedUrl, "_blank");
+          window.open(previewUrl, "_blank");
         } else {
-          // Show image preview
-          setPreviewUrl(signedUrl);
+          setPreviewUrl(previewUrl);
           setPreviewType(doc.mime_type);
         }
+      } else {
+        toast({
+          title: "Erro na pré-visualização",
+          description: "Não foi possível localizar o ficheiro para visualização.",
+          variant: "destructive",
+        });
       }
     } catch (error) {
       console.error("Preview error:", error);

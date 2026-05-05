@@ -160,11 +160,55 @@ const EmployeeTicketsPage = () => {
   };
 
   const handleDownloadAttachment = async (attachment: TicketAttachment) => {
-    const { data, error } = await supabase.storage
-      .from("ticket-attachments")
-      .createSignedUrl(attachment.file_path, 300);
-    if (error || !data?.signedUrl) return;
-    window.open(data.signedUrl, "_blank");
+    console.log("Iniciando download robusto de anexo (Colaborador):", attachment.file_name);
+    
+    try {
+      let signedUrl = null;
+      const buckets = [
+        "ticket-attachments",
+        "employee-files",
+        "documents",
+        "employees"
+      ];
+
+      const cleanPath = attachment.file_path.startsWith('/') 
+        ? attachment.file_path.substring(1) 
+        : attachment.file_path;
+
+      // 1. Tentar Signed URL
+      for (const bucket of buckets) {
+        const { data } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(cleanPath, 300);
+
+        if (data?.signedUrl) {
+          signedUrl = data.signedUrl;
+          break;
+        }
+      }
+
+      // 2. Fallback para URL Público
+      if (!signedUrl) {
+        for (const bucket of buckets) {
+          const { data } = supabase.storage.from(bucket).getPublicUrl(cleanPath);
+          if (data?.publicUrl) {
+            try {
+              const res = await fetch(data.publicUrl, { method: 'HEAD' });
+              if (res.ok) {
+                signedUrl = data.publicUrl;
+                break;
+              }
+            } catch (e) { continue; }
+          }
+        }
+      }
+
+      if (signedUrl) {
+        window.open(signedUrl, "_blank");
+      }
+    } catch (error) {
+      console.error("Download error:", error);
+    }
   };
 
   const filteredTickets = tickets.filter((ticket) => {

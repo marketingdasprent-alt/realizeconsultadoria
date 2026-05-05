@@ -137,22 +137,65 @@ const EmployeeDocumentsTab = ({ employeeId }: EmployeeDocumentsTabProps) => {
 
   const handleDownload = async (doc: EmployeeDocument) => {
     try {
-      const { data, error } = await supabase.storage
-        .from("employee-files")
-        .download(doc.file_path);
+      const cleanPath = doc.file_path.startsWith('/') ? doc.file_path.substring(1) : doc.file_path;
+      const buckets = ["employee-files", "absence-documents", "equipment_invoices", "legal_documents", "employees", "documents"];
+      
+      let signedUrl = null;
+      let finalError = null;
 
-      if (error) throw error;
+      for (const bucket of buckets) {
+        console.log(`A tentar bucket '${bucket}':`, cleanPath);
+        
+        // Tentativa 1: URL Assinada (Privado)
+        const { data, error } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(cleanPath, 60);
 
-      const url = URL.createObjectURL(data);
+        if (!error && data?.signedUrl) {
+          signedUrl = data.signedUrl;
+          console.log(`Ficheiro encontrado no bucket '${bucket}' (via URL assinada)`);
+          break;
+        }
+
+        // Tentativa 2: URL Pública (Caso o bucket seja público)
+        const { data: publicData } = supabase.storage
+          .from(bucket)
+          .getPublicUrl(cleanPath);
+        
+        if (publicData?.publicUrl) {
+          try {
+            const resp = await fetch(publicData.publicUrl, { method: 'HEAD' });
+            if (resp.ok) {
+              signedUrl = publicData.publicUrl;
+              console.log(`Ficheiro encontrado no bucket '${bucket}' (via URL pública)`);
+              break;
+            }
+          } catch (e) {
+            // Ignorar erro de fetch head
+          }
+        }
+        
+        if (error) {
+          finalError = error;
+        }
+      }
+
+      if (!signedUrl) {
+        throw finalError || new Error("Ficheiro não encontrado em nenhum local de armazenamento.");
+      }
+
       const a = document.createElement("a");
-      a.href = url;
+      a.href = signedUrl;
       a.download = doc.file_name;
+      document.body.appendChild(a);
       a.click();
-      URL.revokeObjectURL(url);
+      document.body.removeChild(a);
+      
     } catch (error: any) {
+      console.error("Erro crítico no download:", error);
       toast({
         title: "Erro ao descarregar",
-        description: error.message,
+        description: `Não foi possível encontrar o ficheiro. (Caminho: ${doc.file_path})`,
         variant: "destructive",
       });
     }

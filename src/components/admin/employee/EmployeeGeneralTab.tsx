@@ -42,6 +42,7 @@ interface Employee {
   cartao_refeicao: string | null;
   safety_checkup_date: string | null;
   safety_checkup_renewal_months: number | null;
+  birth_date: string | null;
 }
 
 interface Company {
@@ -93,6 +94,7 @@ const EmployeeGeneralTab = ({
       ? parseISO(employee.safety_checkup_date)
       : null as Date | null,
     safety_checkup_renewal_months: employee?.safety_checkup_renewal_months?.toString() || "12",
+    birth_date: employee?.birth_date ? parseISO(employee.birth_date) : null as Date | null,
   });
 
   const nextRenewalDate = formData.safety_checkup_date && formData.safety_checkup_renewal_months
@@ -243,6 +245,9 @@ const EmployeeGeneralTab = ({
               safety_checkup_renewal_months: formData.safety_checkup_renewal_months
                 ? parseInt(formData.safety_checkup_renewal_months)
                 : null,
+              birth_date: formData.birth_date
+                ? format(formData.birth_date, 'yyyy-MM-dd')
+                : null,
             })
             .eq('id', employee.id);
 
@@ -275,6 +280,9 @@ const EmployeeGeneralTab = ({
               : null,
             safety_checkup_renewal_months: formData.safety_checkup_renewal_months
               ? parseInt(formData.safety_checkup_renewal_months)
+              : null,
+            birth_date: formData.birth_date
+              ? format(formData.birth_date, 'yyyy-MM-dd')
               : null,
           })
           .eq('id', employee.id);
@@ -320,6 +328,7 @@ const EmployeeGeneralTab = ({
             iban: formData.iban || null,
             cartao_da: formData.cartao_da || null,
             cartao_refeicao: formData.cartao_refeicao || null,
+            birth_date: formData.birth_date ? format(formData.birth_date, 'yyyy-MM-dd') : null,
           }
         });
 
@@ -463,6 +472,36 @@ const EmployeeGeneralTab = ({
                 value={formData.phone}
                 onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
               />
+            </div>
+            <div>
+              <label className="block text-sm font-medium mb-1">Data de Nascimento</label>
+              <Popover>
+                <PopoverTrigger asChild>
+                  <Button
+                    variant="outline"
+                    className={cn(
+                      "w-full justify-start text-left font-normal",
+                      !formData.birth_date && "text-muted-foreground"
+                    )}
+                  >
+                    <CalendarIcon className="mr-2 h-4 w-4" />
+                    {formData.birth_date ? (
+                      format(formData.birth_date, "dd/MM/yyyy", { locale: pt })
+                    ) : (
+                      <span>Selecionar data</span>
+                    )}
+                  </Button>
+                </PopoverTrigger>
+                <PopoverContent className="w-auto p-0" align="start">
+                  <Calendar
+                    mode="single"
+                    selected={formData.birth_date || undefined}
+                    onSelect={(date) => setFormData({ ...formData, birth_date: date || null })}
+                    initialFocus
+                    className="pointer-events-auto"
+                  />
+                </PopoverContent>
+              </Popover>
             </div>
             <div>
               <label className="block text-sm font-medium mb-1">Nacionalidade</label>

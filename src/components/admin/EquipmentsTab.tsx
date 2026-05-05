@@ -233,15 +233,31 @@ const EquipmentsTab = ({ canManage, companies, companyFilter, setCompanyFilter }
         ...(finalInvoiceUrl !== undefined && { invoice_url: finalInvoiceUrl })
       };
 
+      console.log("Saving equipment with payload:", payload);
+
       if (editingEquipment) {
-        const { error } = await supabase
+        const { error, data: result } = await supabase
           .from("equipments")
           .update(payload)
-          .eq("id", editingEquipment.id);
-        if (error) throw error;
+          .eq("id", editingEquipment.id)
+          .select();
+        
+        if (error) {
+          console.error("Supabase update error:", error);
+          throw error;
+        }
+        console.log("Update success:", result);
       } else {
-        const { error } = await supabase.from("equipments").insert(payload);
-        if (error) throw error;
+        const { error, data: result } = await supabase
+          .from("equipments")
+          .insert(payload)
+          .select();
+          
+        if (error) {
+          console.error("Supabase insert error:", error);
+          throw error;
+        }
+        console.log("Insert success:", result);
       }
     },
     onSuccess: () => {
@@ -255,13 +271,13 @@ const EquipmentsTab = ({ canManage, companies, companyFilter, setCompanyFilter }
           : "O novo equipamento foi criado com sucesso.",
       });
     },
-    onError: (error) => {
+    onError: (error: any) => {
       toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao guardar o equipamento.",
+        title: "Erro ao guardar",
+        description: error.message || "Ocorreu um erro ao guardar o equipamento.",
         variant: "destructive",
       });
-      console.error("Save error:", error);
+      console.error("Detailed save error:", error);
     },
   });
 
@@ -331,14 +347,57 @@ const EquipmentsTab = ({ canManage, companies, companyFilter, setCompanyFilter }
 
   const handleViewInvoice = async (path: string) => {
     try {
-      const { data, error } = await supabase.storage
-        .from("equipment_invoices")
-        .createSignedUrl(path, 60 * 60); // 1 hora
+      console.log("A tentar visualizar fatura em múltiplos buckets:", path);
+      let signedUrl = null;
+      let finalBucket = "equipment_invoices";
       
-      if (error) throw error;
+      const buckets = [
+        "equipment_invoices",
+        "employee-files",
+        "documents",
+        "employees"
+      ];
+
+      const cleanPath = path.startsWith('/') ? path.substring(1) : path;
+
+      // 1. Tentar Signed URL
+      for (const bucket of buckets) {
+        const { data } = await supabase.storage
+          .from(bucket)
+          .createSignedUrl(cleanPath, 3600);
+
+        if (data?.signedUrl) {
+          signedUrl = data.signedUrl;
+          finalBucket = bucket;
+          break;
+        }
+      }
+
+      // 2. Fallback para URL Público
+      if (!signedUrl) {
+        for (const bucket of buckets) {
+          const { data } = supabase.storage.from(bucket).getPublicUrl(cleanPath);
+          if (data?.publicUrl) {
+            try {
+              const res = await fetch(data.publicUrl, { method: 'HEAD' });
+              if (res.ok) {
+                signedUrl = data.publicUrl;
+                finalBucket = bucket;
+                break;
+              }
+            } catch (e) { continue; }
+          }
+        }
+      }
       
-      if (data?.signedUrl) {
-        window.open(data.signedUrl, "_blank");
+      if (signedUrl) {
+        window.open(signedUrl, "_blank");
+        toast({
+          title: "Fatura aberta",
+          description: `Ficheiro localizado no bucket: ${finalBucket}`,
+        });
+      } else {
+        throw new Error("Fatura não encontrada em nenhum bucket.");
       }
     } catch (error) {
       console.error("Erro ao abrir fatura:", error);

@@ -6,6 +6,7 @@ import ChangeAdminPasswordDialog from "@/components/admin/ChangeAdminPasswordDia
 import RepairMixedAccountDialog from "@/components/admin/RepairMixedAccountDialog";
 import AdminGroupsManager from "@/components/admin/AdminGroupsManager";
 import AdminGroupMembersManager from "@/components/admin/AdminGroupMembersManager";
+import MarketingEmailTab from "@/components/admin/MarketingEmailTab";
 import { NotificationEmailsManager } from "@/components/admin/NotificationEmailsManager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +21,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
 import { supabase } from "@/integrations/supabase/client";
 import { useToast } from "@/hooks/use-toast";
+import { useAdminPermissions } from "@/hooks/useAdminPermissions";
 import { format } from "date-fns";
 import { pt } from "date-fns/locale";
 
@@ -81,6 +83,7 @@ const SettingsPage = () => {
   const [changePasswordAdmin, setChangePasswordAdmin] = useState<AdminUser | null>(null);
   const [repairAdmin, setRepairAdmin] = useState<AdminUser | null>(null);
 
+  const { canViewTopic } = useAdminPermissions();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -512,6 +515,12 @@ const handleChangePassword = async () => {
               <Users className="h-4 w-4" />
               Acessos
             </TabsTrigger>
+            {canViewTopic('marketing', 'email') && (
+              <TabsTrigger value="email" className="gap-2">
+                <Bell className="h-4 w-4" />
+                E-mail
+              </TabsTrigger>
+            )}
             <TabsTrigger value="groups" className="gap-2">
               <FolderKey className="h-4 w-4" />
               Grupos
@@ -842,6 +851,12 @@ const handleChangePassword = async () => {
               />
             </div>
           </TabsContent>
+
+          {canViewTopic('marketing', 'email') && (
+            <TabsContent value="email">
+              <MarketingEmailTab />
+            </TabsContent>
+          )}
 
           <TabsContent value="groups">
             <AdminGroupsManager />

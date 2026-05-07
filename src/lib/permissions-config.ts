@@ -95,6 +95,13 @@ export const PERMISSIONS_CONFIG: ModuleTopicsConfig[] = [
       { key: 'view', label: 'Ver jurídico', description: 'Visualizar a área jurídica', hasView: true, hasExecute: false },
       { key: 'manage', label: 'Gerir jurídico', description: 'Criar e editar conteúdo jurídico', hasView: false, hasExecute: true }
     ]
+  },
+  {
+    moduleKey: 'marketing',
+    moduleLabel: 'Marketing',
+    topics: [
+      { key: 'email', label: 'E-mail', description: 'Comunicação interna e envio de e-mails', hasView: true, hasExecute: true }
+    ]
   }
 ];
 

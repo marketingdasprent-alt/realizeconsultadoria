@@ -515,12 +515,10 @@ const handleChangePassword = async () => {
               <Users className="h-4 w-4" />
               Acessos
             </TabsTrigger>
-            {(isSuperAdmin || canViewTopic('marketing', 'email')) && (
-              <TabsTrigger value="email" className="gap-2">
-                <Bell className="h-4 w-4" />
-                E-mail
-              </TabsTrigger>
-            )}
+            <TabsTrigger value="email" className="gap-2">
+              <Bell className="h-4 w-4" />
+              E-mail
+            </TabsTrigger>
             <TabsTrigger value="groups" className="gap-2">
               <FolderKey className="h-4 w-4" />
               Grupos
@@ -852,11 +850,9 @@ const handleChangePassword = async () => {
             </div>
           </TabsContent>
 
-          {(isSuperAdmin || canViewTopic('marketing', 'email')) && (
-            <TabsContent value="email">
-              <MarketingEmailTab />
-            </TabsContent>
-          )}
+          <TabsContent value="email">
+            <MarketingEmailTab />
+          </TabsContent>
 
           <TabsContent value="groups">
             <AdminGroupsManager />

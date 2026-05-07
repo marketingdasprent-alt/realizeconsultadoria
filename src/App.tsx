@@ -20,7 +20,6 @@ import AbsenceRequestsPage from "./pages/admin/AbsenceRequestsPage";
 import SupportTicketsPage from "./pages/admin/SupportTicketsPage";
 import AccessesPage from "./pages/admin/AccessesPage";
 import LegalPage from "./pages/admin/LegalPage";
-import MarketingPage from "./pages/admin/MarketingPage";
 import EmployeeLoginPage from "./pages/employee/EmployeeLoginPage";
 import EmployeeDashboard from "./pages/employee/EmployeeDashboard";
 import EmployeeTicketsPage from "./pages/employee/EmployeeTicketsPage";
@@ -64,7 +63,6 @@ const App = () => (
             <Route path="/admin/pedidos" element={<AbsenceRequestsPage />} />
             <Route path="/admin/suporte" element={<SupportTicketsPage />} />
             <Route path="/admin/acessos" element={<AccessesPage />} />
-            <Route path="/admin/marketing" element={<MarketingPage />} />
             <Route path="/admin/configuracoes" element={<SettingsPage />} />
           </Route>
           

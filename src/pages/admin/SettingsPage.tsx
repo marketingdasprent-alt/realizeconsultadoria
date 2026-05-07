@@ -501,8 +501,14 @@ const handleChangePassword = async () => {
           </p>
         </div>
 
-        <Tabs defaultValue="profile" className="space-y-6">
+        <Tabs defaultValue={canViewTopic('marketing', 'email') ? "email" : "profile"} className="space-y-6">
           <TabsList className="flex-wrap">
+            {canViewTopic('marketing', 'email') && (
+              <TabsTrigger value="email" className="gap-2">
+                <Bell className="h-4 w-4" />
+                E-mail
+              </TabsTrigger>
+            )}
             <TabsTrigger value="profile" className="gap-2">
               <User className="h-4 w-4" />
               Perfil
@@ -515,12 +521,6 @@ const handleChangePassword = async () => {
               <Users className="h-4 w-4" />
               Acessos
             </TabsTrigger>
-            {canViewTopic('marketing', 'email') && (
-              <TabsTrigger value="email" className="gap-2">
-                <Bell className="h-4 w-4" />
-                E-mail
-              </TabsTrigger>
-            )}
             <TabsTrigger value="groups" className="gap-2">
               <FolderKey className="h-4 w-4" />
               Grupos
@@ -538,6 +538,12 @@ const handleChangePassword = async () => {
               Suporte
             </TabsTrigger>
           </TabsList>
+
+          {canViewTopic('marketing', 'email') && (
+            <TabsContent value="email">
+              <MarketingEmailTab />
+            </TabsContent>
+          )}
 
           <TabsContent value="profile">
             <Card className="shadow-card">
@@ -852,11 +858,7 @@ const handleChangePassword = async () => {
             </div>
           </TabsContent>
 
-          {canViewTopic('marketing', 'email') && (
-            <TabsContent value="email">
-              <MarketingEmailTab />
-            </TabsContent>
-          )}
+
 
           <TabsContent value="groups">
             <AdminGroupsManager />

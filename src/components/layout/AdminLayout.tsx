@@ -37,6 +37,7 @@ interface NavItem {
 const allNavItems: NavItem[] = [
   { href: "/admin", icon: LayoutDashboard, label: "Dashboard", moduleKey: "dashboard" },
   { href: "/admin/juridico", icon: Scale, label: "Jurídico", moduleKey: "legal" },
+  { href: "/admin/marketing", icon: Bell, label: "Marketing", moduleKey: "marketing" },
   { href: "/admin/empresas", icon: Building2, label: "Empresas", moduleKey: "companies" },
   { href: "/admin/colaboradores", icon: Users, label: "Colaboradores", moduleKey: "employees" },
   { href: "/admin/acessos", icon: Lock, label: "Acessos", moduleKey: "accesses" },
@@ -60,6 +61,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const navItems = useMemo(() => {
     if (isLoadingPermissions) return [];
     return allNavItems.filter(item => {
+      if (item.moduleKey === 'settings') {
+        return isSuperAdmin || canView('settings') || canView('marketing');
+      }
       return canView(item.moduleKey);
     });
   }, [canView, isLoadingPermissions, isSuperAdmin, userName, userDepartment]);

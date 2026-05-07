@@ -83,7 +83,7 @@ const SettingsPage = () => {
   const [changePasswordAdmin, setChangePasswordAdmin] = useState<AdminUser | null>(null);
   const [repairAdmin, setRepairAdmin] = useState<AdminUser | null>(null);
 
-  const { canViewTopic } = useAdminPermissions();
+  const { canViewTopic, isSuperAdmin, isLoading: isLoadingPermissions } = useAdminPermissions();
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -501,14 +501,8 @@ const handleChangePassword = async () => {
           </p>
         </div>
 
-        <Tabs defaultValue={canViewTopic('marketing', 'email') ? "email" : "profile"} className="space-y-6">
+        <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="flex-wrap">
-            {canViewTopic('marketing', 'email') && (
-              <TabsTrigger value="email" className="gap-2">
-                <Bell className="h-4 w-4" />
-                E-mail
-              </TabsTrigger>
-            )}
             <TabsTrigger value="profile" className="gap-2">
               <User className="h-4 w-4" />
               Perfil
@@ -521,6 +515,12 @@ const handleChangePassword = async () => {
               <Users className="h-4 w-4" />
               Acessos
             </TabsTrigger>
+            {(isSuperAdmin || canViewTopic('marketing', 'email')) && (
+              <TabsTrigger value="email" className="gap-2">
+                <Bell className="h-4 w-4" />
+                E-mail
+              </TabsTrigger>
+            )}
             <TabsTrigger value="groups" className="gap-2">
               <FolderKey className="h-4 w-4" />
               Grupos
@@ -539,13 +539,7 @@ const handleChangePassword = async () => {
             </TabsTrigger>
           </TabsList>
 
-          {canViewTopic('marketing', 'email') && (
-            <TabsContent value="email">
-              <MarketingEmailTab />
-            </TabsContent>
-          )}
-
-          <TabsContent value="profile">
+            <TabsContent value="profile">
             <Card className="shadow-card">
               <CardHeader>
                 <CardTitle className="font-display text-xl">Informações do Perfil</CardTitle>
@@ -858,7 +852,11 @@ const handleChangePassword = async () => {
             </div>
           </TabsContent>
 
-
+          {(isSuperAdmin || canViewTopic('marketing', 'email')) && (
+            <TabsContent value="email">
+              <MarketingEmailTab />
+            </TabsContent>
+          )}
 
           <TabsContent value="groups">
             <AdminGroupsManager />

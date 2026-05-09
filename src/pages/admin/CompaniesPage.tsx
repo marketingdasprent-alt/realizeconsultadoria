@@ -175,6 +175,32 @@ const CompaniesPage = () => {
     }
   };
 
+  const toggleStatus = async (company: Company) => {
+    try {
+      const { error } = await supabase
+        .from('companies')
+        .update({ is_active: !company.is_active })
+        .eq('id', company.id);
+
+      if (error) throw error;
+      
+      setCompanies(prev => prev.map(c => 
+        c.id === company.id ? { ...c, is_active: !c.is_active } : c
+      ));
+      
+      toast({ 
+        title: "Estado atualizado", 
+        description: `A empresa ${company.name} está agora ${!company.is_active ? 'Ativa' : 'Desativada'}.` 
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar estado",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredCompanies = companies.filter(company =>
     company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     company.nif.includes(searchTerm) ||
@@ -348,9 +374,20 @@ const CompaniesPage = () => {
                       <TableCell>{company.nif}</TableCell>
                       <TableCell className="hidden md:table-cell">{company.email}</TableCell>
                       <TableCell className="hidden md:table-cell">{company.city || "-"}</TableCell>
-                      <TableCell>
-                        <Badge variant={company.is_active ? "default" : "secondary"}>
-                          {company.is_active ? "Ativa" : "Inativa"}
+                      <TableCell 
+                        className="py-1 px-2"
+                        onClick={(e) => {
+                          if (canManage) {
+                            e.stopPropagation();
+                            toggleStatus(company);
+                          }
+                        }}
+                      >
+                        <Badge 
+                          variant={company.is_active ? "default" : "secondary"}
+                          className={`text-xs py-0 ${canManage ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                        >
+                          {company.is_active ? "Ativa" : "Desativada"}
                         </Badge>
                       </TableCell>
                       <TableCell>

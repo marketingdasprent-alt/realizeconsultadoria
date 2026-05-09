@@ -185,7 +185,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         </div>
 
         <div className="flex-1 flex flex-col min-h-0">
-          <nav className="px-3 py-4 space-y-1">
+          <nav className="px-3 py-4 flex flex-col gap-[5px]">
             {navItems.map((item) => {
               const isActive = location.pathname === item.href;
               return (

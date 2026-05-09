@@ -191,6 +191,32 @@ const EmployeesPage = () => {
     }
   };
 
+  const toggleStatus = async (employee: Employee) => {
+    try {
+      const { error } = await supabase
+        .from('employees')
+        .update({ is_active: !employee.is_active })
+        .eq('id', employee.id);
+
+      if (error) throw error;
+      
+      setEmployees(prev => prev.map(e => 
+        e.id === employee.id ? { ...e, is_active: !e.is_active } : e
+      ));
+      
+      toast({ 
+        title: "Estado atualizado", 
+        description: `O colaborador ${employee.name} está agora ${!employee.is_active ? 'Ativo' : 'Desativado'}.` 
+      });
+    } catch (error: any) {
+      toast({
+        title: "Erro ao atualizar estado",
+        description: error.message,
+        variant: "destructive",
+      });
+    }
+  };
+
   const filteredEmployees = employees.filter(employee =>
     employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -352,9 +378,20 @@ const EmployeesPage = () => {
                       <TableCell className="hidden md:table-cell py-1 px-2 text-sm">{employee.email}</TableCell>
                       <TableCell className="py-1 px-2 text-sm">{employee.companies?.name}</TableCell>
                       <TableCell className="hidden md:table-cell py-1 px-2 text-sm">{employee.position || "-"}</TableCell>
-                      <TableCell className="py-1 px-2">
-                        <Badge variant={employee.is_active ? "default" : "secondary"} className="text-xs py-0">
-                          {employee.is_active ? "Ativo" : "Inativo"}
+                      <TableCell 
+                        className="py-1 px-2"
+                        onClick={(e) => {
+                          if (canEdit) {
+                            e.stopPropagation();
+                            toggleStatus(employee);
+                          }
+                        }}
+                      >
+                        <Badge 
+                          variant={employee.is_active ? "default" : "secondary"} 
+                          className={`text-xs py-0 ${canEdit ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                        >
+                          {employee.is_active ? "Ativo" : "Desativado"}
                         </Badge>
                       </TableCell>
                       <TableCell className="py-1 px-2" onClick={(e) => e.stopPropagation()}>

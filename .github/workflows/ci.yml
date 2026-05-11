@@ -13,7 +13,7 @@ concurrency:
 
 jobs:
   # Todos os jobs abaixo vão iniciar JUNTOS
-  
+
   format:
     name: 🎨 Format Check
     runs-on: ubuntu-latest

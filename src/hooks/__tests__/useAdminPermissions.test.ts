@@ -231,6 +231,3 @@ describe('useAdminPermissions', () => {
     expect(result.current.permissions).toEqual([]);
   });
 });
-
-
-

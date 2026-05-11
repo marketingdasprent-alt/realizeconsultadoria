@@ -4,7 +4,7 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main, develop, staging]
+    branches: [main, develop, master, staging]
   workflow_dispatch:
 
 concurrency:
@@ -24,8 +24,13 @@ jobs:
         with:
           node-version: '22'
           cache: 'pnpm'
+      - name: Install dependencies
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run format:check
+
+      - name: Generate Prisma Client
+      - run: pnpm --filter backend exec prisma generate
+
+
 
   lint:
     name: 🧹 Lint
@@ -37,8 +42,8 @@ jobs:
         with:
           node-version: '22'
           cache: 'pnpm'
-      - run: pnpm install --frozen-lockfile
-      - run: pnpm run lint
+      - name: Run Quality Checks (Lint, Type-Check, Build)
+      - run: pnpm turbo run lint type-check build
 
   type-check:
     name: 🔎 Type Check
@@ -51,7 +56,9 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: pnpm run type-check
+     
+      - name: Check Formatting
+      - run: pnpm run format:check
 
   build:
     name: 🏗️ Build

@@ -80,7 +80,7 @@ serve(async (req: Request) => {
         .maybeSingle();
 
       if (profile?.email) {
-        const baseUrl = 'https://realizeconsultadoria.lovable.app';
+        const baseUrl = 'https://realize.dasprent.pt';
 
         const emailHtml = `
           <!DOCTYPE html>

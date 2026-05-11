@@ -188,7 +188,7 @@ const handler = async (req: Request): Promise<Response> => {
       console.log(`Created profile for user ${userId}`);
     }
 
-    const loginUrl = 'https://realizeconsultadoria.lovable.app/admin/login';
+    const loginUrl = 'https://realize.dasprent.pt/admin/login';
 
     // Send welcome email via Brevo (always new user now)
     if (brevoApiKey) {

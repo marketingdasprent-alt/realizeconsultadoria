@@ -89,7 +89,7 @@ const handler = async (req: Request): Promise<Response> => {
     let emailError = null;
 
     if (brevoApiKey) {
-      const loginUrl = 'https://realizeconsultadoria.lovable.app/colaborador/login';
+      const loginUrl = 'https://realize.dasprent.pt/colaborador/login';
       const emailHtml = `
         <!DOCTYPE html>
         <html>

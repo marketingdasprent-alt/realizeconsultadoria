@@ -196,7 +196,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Send welcome email with credentials via Brevo
     const brevoApiKey = Deno.env.get('BREVO_API_KEY');
     if (brevoApiKey) {
-      const loginUrl = 'https://realizeconsultadoria.lovable.app/colaborador/login';
+      const loginUrl = 'https://realize.dasprent.pt/colaborador/login';
 
       const emailHtml = `
         <!DOCTYPE html>

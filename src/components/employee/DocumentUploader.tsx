@@ -1,6 +1,6 @@
-import { useState, useRef } from "react";
-import { Upload, X, FileText, Image as ImageIcon, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { useState, useRef } from 'react';
+import { Upload, X, FileText, Image as ImageIcon, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface SelectedFile {
   file: File;
@@ -15,12 +15,7 @@ interface DocumentUploaderProps {
   disabled?: boolean;
 }
 
-const ALLOWED_TYPES = [
-  "application/pdf",
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-];
+const ALLOWED_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp'];
 
 const formatFileSize = (bytes: number): string => {
   if (bytes < 1024) return `${bytes} B`;
@@ -46,7 +41,7 @@ const DocumentUploader = ({
     const validFiles: SelectedFile[] = [];
     const errors: string[] = [];
 
-    Array.from(newFiles).forEach((file) => {
+    Array.from(newFiles).forEach(file => {
       if (!ALLOWED_TYPES.includes(file.type)) {
         errors.push(`${file.name}: tipo não permitido`);
         return;
@@ -61,7 +56,7 @@ const DocumentUploader = ({
       }
 
       // Create preview for images
-      const isImage = file.type.startsWith("image/");
+      const isImage = file.type.startsWith('image/');
       validFiles.push({
         file,
         preview: isImage ? URL.createObjectURL(file) : undefined,
@@ -73,16 +68,16 @@ const DocumentUploader = ({
     }
 
     if (errors.length > 0) {
-      console.warn("File upload errors:", errors);
+      console.warn('File upload errors:', errors);
     }
   };
 
   const handleDrag = (e: React.DragEvent) => {
     e.preventDefault();
     e.stopPropagation();
-    if (e.type === "dragenter" || e.type === "dragover") {
+    if (e.type === 'dragenter' || e.type === 'dragover') {
       setDragActive(true);
-    } else if (e.type === "dragleave") {
+    } else if (e.type === 'dragleave') {
       setDragActive(false);
     }
   };
@@ -102,21 +97,19 @@ const DocumentUploader = ({
     onFilesChange(files.filter((_, i) => i !== index));
   };
 
-  const isPDF = (file: File) => file.type === "application/pdf";
+  const isPDF = (file: File) => file.type === 'application/pdf';
 
   return (
     <div className="space-y-3">
-      <label className="block text-sm font-medium">
-        Documentos (opcional)
-      </label>
+      <label className="block text-sm font-medium">Documentos (opcional)</label>
 
       {/* Drop zone */}
       <div
         className={`relative border-2 border-dashed rounded-lg p-6 text-center transition-colors ${
           dragActive
-            ? "border-primary bg-primary/5"
-            : "border-muted-foreground/25 hover:border-muted-foreground/50"
-        } ${disabled ? "opacity-50 pointer-events-none" : "cursor-pointer"}`}
+            ? 'border-primary bg-primary/5'
+            : 'border-muted-foreground/25 hover:border-muted-foreground/50'
+        } ${disabled ? 'opacity-50 pointer-events-none' : 'cursor-pointer'}`}
         onDragEnter={handleDrag}
         onDragLeave={handleDrag}
         onDragOver={handleDrag}
@@ -127,15 +120,13 @@ const DocumentUploader = ({
           ref={inputRef}
           type="file"
           multiple
-          accept={ALLOWED_TYPES.join(",")}
-          onChange={(e) => handleFiles(e.target.files)}
+          accept={ALLOWED_TYPES.join(',')}
+          onChange={e => handleFiles(e.target.files)}
           className="hidden"
           disabled={disabled}
         />
         <Upload className="h-8 w-8 mx-auto text-muted-foreground mb-2" />
-        <p className="text-sm text-muted-foreground">
-          Arraste ficheiros ou clique para selecionar
-        </p>
+        <p className="text-sm text-muted-foreground">Arraste ficheiros ou clique para selecionar</p>
         <p className="text-xs text-muted-foreground mt-1">
           PDF, JPG, PNG, WEBP • Máx 20MB • Até {maxFiles} ficheiros
         </p>
@@ -145,10 +136,7 @@ const DocumentUploader = ({
       {files.length > 0 && (
         <div className="space-y-2">
           {files.map((item, index) => (
-            <div
-              key={index}
-              className="flex items-center gap-3 p-3 bg-secondary rounded-lg"
-            >
+            <div key={index} className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
               {/* Preview */}
               <div className="w-10 h-10 flex-shrink-0 rounded overflow-hidden bg-muted flex items-center justify-center">
                 {item.preview ? (
@@ -167,9 +155,7 @@ const DocumentUploader = ({
               {/* File info */}
               <div className="flex-1 min-w-0">
                 <p className="text-sm font-medium truncate">{item.file.name}</p>
-                <p className="text-xs text-muted-foreground">
-                  {formatFileSize(item.file.size)}
-                </p>
+                <p className="text-xs text-muted-foreground">{formatFileSize(item.file.size)}</p>
               </div>
 
               {/* Remove button */}
@@ -178,7 +164,7 @@ const DocumentUploader = ({
                 variant="ghost"
                 size="icon"
                 className="h-8 w-8 flex-shrink-0"
-                onClick={(e) => {
+                onClick={e => {
                   e.stopPropagation();
                   handleRemove(index);
                 }}

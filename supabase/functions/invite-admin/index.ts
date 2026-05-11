@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface InviteAdminRequest {
@@ -13,43 +13,43 @@ interface InviteAdminRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const supabaseAnonKey = Deno.env.get("SUPABASE_ANON_KEY")!;
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
-      auth: { autoRefreshToken: false, persistSession: false }
+      auth: { autoRefreshToken: false, persistSession: false },
     });
 
     // Verify the requester is an admin
-    const authHeader = req.headers.get("Authorization");
-    if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return new Response(
-        JSON.stringify({ error: "Não autorizado" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      return new Response(JSON.stringify({ error: 'Não autorizado' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Create client with user's auth context to validate token
     const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } }
+      global: { headers: { Authorization: authHeader } },
     });
 
-    const token = authHeader.replace("Bearer ", "");
+    const token = authHeader.replace('Bearer ', '');
     const { data: userData, error: userError } = await supabaseUser.auth.getUser(token);
-    
+
     if (userError || !userData?.user) {
-      console.error("Token validation error:", userError);
-      return new Response(
-        JSON.stringify({ error: "Token inválido" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.error('Token validation error:', userError);
+      return new Response(JSON.stringify({ error: 'Token inválido' }), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const requesterId = userData.user.id;
@@ -57,16 +57,16 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Check if requester is admin
     const { data: requesterRole } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", requesterId)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', requesterId)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (!requesterRole) {
       return new Response(
-        JSON.stringify({ error: "Apenas administradores podem criar novos admins" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: 'Apenas administradores podem criar novos admins' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -76,8 +76,8 @@ const handler = async (req: Request): Promise<Response> => {
     // Validate password
     if (!password || password.length < 8) {
       return new Response(
-        JSON.stringify({ error: "A palavra-passe deve ter pelo menos 8 caracteres" }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: 'A palavra-passe deve ter pelo menos 8 caracteres' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -85,52 +85,55 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Check if email already exists in employees table - BLOCK if exists
     const { data: existingEmployee } = await supabaseAdmin
-      .from("employees")
-      .select("id")
-      .ilike("email", normalizedEmail)
+      .from('employees')
+      .select('id')
+      .ilike('email', normalizedEmail)
       .maybeSingle();
 
     if (existingEmployee) {
       console.log(`Email already in use by employee: ${normalizedEmail}`);
       return new Response(
-        JSON.stringify({ 
-          error: "Este email já está associado a um colaborador. Por favor utilize um email diferente para o administrador." 
+        JSON.stringify({
+          error:
+            'Este email já está associado a um colaborador. Por favor utilize um email diferente para o administrador.',
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Check if user already exists in auth
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email?.toLowerCase() === normalizedEmail);
+    const existingUser = existingUsers?.users?.find(
+      u => u.email?.toLowerCase() === normalizedEmail
+    );
 
     let userId: string;
-    const displayName = name || normalizedEmail.split("@")[0];
+    const displayName = name || normalizedEmail.split('@')[0];
 
     if (existingUser) {
       // Check if already admin
       const { data: existingRole } = await supabaseAdmin
-        .from("user_roles")
-        .select("role")
-        .eq("user_id", existingUser.id)
-        .eq("role", "admin")
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', existingUser.id)
+        .eq('role', 'admin')
         .maybeSingle();
 
       if (existingRole) {
-        return new Response(
-          JSON.stringify({ error: "Este utilizador já é administrador" }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        return new Response(JSON.stringify({ error: 'Este utilizador já é administrador' }), {
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
 
       // Email exists in auth but not in employees and not admin - this means it's an orphan account
       // Block anyway to ensure clean separation
       console.log(`Email exists in auth but not employees, blocking: ${normalizedEmail}`);
       return new Response(
-        JSON.stringify({ 
-          error: "Este email já está em uso no sistema. Por favor utilize um email diferente." 
+        JSON.stringify({
+          error: 'Este email já está em uso no sistema. Por favor utilize um email diferente.',
         }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -139,16 +142,16 @@ const handler = async (req: Request): Promise<Response> => {
       email: normalizedEmail,
       password: password,
       email_confirm: true,
-      user_metadata: { 
-        name: displayName
-      }
+      user_metadata: {
+        name: displayName,
+      },
     });
 
     if (createError) {
-      console.error("Error creating user:", createError);
+      console.error('Error creating user:', createError);
       return new Response(
         JSON.stringify({ error: `Erro ao criar utilizador: ${createError.message}` }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -157,41 +160,39 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Add admin role
     const { error: roleError } = await supabaseAdmin
-      .from("user_roles")
-      .insert({ user_id: userId, role: "admin" });
+      .from('user_roles')
+      .insert({ user_id: userId, role: 'admin' });
 
     if (roleError) {
-      console.error("Error adding admin role:", roleError);
+      console.error('Error adding admin role:', roleError);
       return new Response(
         JSON.stringify({ error: `Erro ao adicionar role admin: ${roleError.message}` }),
-        { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     console.log(`Added admin role to user ${userId}`);
 
     // Create profile
-    const { error: profileError } = await supabaseAdmin
-      .from("profiles")
-      .insert({
-        user_id: userId,
-        name: displayName,
-        email: normalizedEmail,
-      });
+    const { error: profileError } = await supabaseAdmin.from('profiles').insert({
+      user_id: userId,
+      name: displayName,
+      email: normalizedEmail,
+    });
 
     if (profileError) {
-      console.error("Error creating profile:", profileError);
-      // We don't block here as user and role are already created, 
+      console.error('Error creating profile:', profileError);
+      // We don't block here as user and role are already created,
       // but we log it for troubleshooting
     } else {
       console.log(`Created profile for user ${userId}`);
     }
 
-    const loginUrl = "https://realizeconsultadoria.lovable.app/admin/login";
+    const loginUrl = 'https://realizeconsultadoria.lovable.app/admin/login';
 
     // Send welcome email via Brevo (always new user now)
     if (brevoApiKey) {
-      const emailSubject = "Bem-vindo ao Portal Realize - Dados de Acesso";
+      const emailSubject = 'Bem-vindo ao Portal Realize - Dados de Acesso';
       const emailHtml = `
 <!DOCTYPE html>
 <html>
@@ -254,15 +255,15 @@ const handler = async (req: Request): Promise<Response> => {
       `;
 
       try {
-        const emailResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
-          method: "POST",
+        const emailResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
           headers: {
-            "accept": "application/json",
-            "api-key": brevoApiKey,
-            "content-type": "application/json",
+            accept: 'application/json',
+            'api-key': brevoApiKey,
+            'content-type': 'application/json',
           },
           body: JSON.stringify({
-            sender: { name: "Realize Consultadoria", email: "noreply@dasprent.pt" },
+            sender: { name: 'Realize Consultadoria', email: 'noreply@dasprent.pt' },
             to: [{ email: normalizedEmail, name: displayName }],
             subject: emailSubject,
             htmlContent: emailHtml,
@@ -271,32 +272,31 @@ const handler = async (req: Request): Promise<Response> => {
 
         if (!emailResponse.ok) {
           const errorText = await emailResponse.text();
-          console.error("Brevo API error:", errorText);
+          console.error('Brevo API error:', errorText);
         } else {
           console.log(`Welcome email sent to ${normalizedEmail}`);
         }
       } catch (emailError) {
-        console.error("Error sending email:", emailError);
+        console.error('Error sending email:', emailError);
       }
     } else {
-      console.warn("BREVO_API_KEY not configured, skipping email");
+      console.warn('BREVO_API_KEY not configured, skipping email');
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
-        message: "Novo administrador criado e email enviado",
-        userId 
+      JSON.stringify({
+        success: true,
+        message: 'Novo administrador criado e email enviado',
+        userId,
       }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-
   } catch (error: any) {
-    console.error("Error in invite-admin function:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error('Error in invite-admin function:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 };
 

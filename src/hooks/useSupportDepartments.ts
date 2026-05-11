@@ -1,5 +1,5 @@
-import { useState, useEffect, useCallback } from "react";
-import { supabase } from "@/integrations/supabase/client";
+import { useState, useEffect, useCallback } from 'react';
+import { supabase } from '@/integrations/supabase/client';
 
 export interface SupportDepartment {
   id: string;
@@ -26,7 +26,9 @@ export const useSupportDepartments = (): UseSupportDepartmentsResult => {
 
   const fetchDepartments = useCallback(async () => {
     try {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) {
         setDepartments([]);
         setUserDepartmentIds([]);
@@ -36,21 +38,23 @@ export const useSupportDepartments = (): UseSupportDepartmentsResult => {
 
       // Fetch all active departments
       const { data: allDepartments } = await supabase
-        .from("support_departments")
-        .select("*")
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true });
+        .from('support_departments')
+        .select('*')
+        .eq('is_active', true)
+        .order('sort_order', { ascending: true });
 
       setDepartments(allDepartments || []);
 
       // Check if user is in a super admin group
       const { data: superAdminCheck } = await supabase
-        .from("admin_group_members")
-        .select(`
+        .from('admin_group_members')
+        .select(
+          `
           group_id,
           admin_groups!inner(is_super_admin, is_active)
-        `)
-        .eq("user_id", session.user.id);
+        `
+        )
+        .eq('user_id', session.user.id);
 
       const inSuperAdminGroup = superAdminCheck?.some(
         (m: any) => m.admin_groups?.is_super_admin && m.admin_groups?.is_active
@@ -62,33 +66,31 @@ export const useSupportDepartments = (): UseSupportDepartmentsResult => {
         setUserDepartmentIds((allDepartments || []).map(d => d.id));
       } else {
         setIsSuperAdmin(false);
-        
+
         // Get user's group memberships
         const { data: memberships } = await supabase
-          .from("admin_group_members")
-          .select("group_id")
-          .eq("user_id", session.user.id);
+          .from('admin_group_members')
+          .select('group_id')
+          .eq('user_id', session.user.id);
 
         if (!memberships || memberships.length === 0) {
           setUserDepartmentIds([]);
         } else {
           const groupIds = memberships.map(m => m.group_id);
-          
+
           // Get department access for these groups
           const { data: groupDepartments } = await supabase
-            .from("admin_group_support_departments")
-            .select("department_id")
-            .in("group_id", groupIds);
+            .from('admin_group_support_departments')
+            .select('department_id')
+            .in('group_id', groupIds);
 
-          const departmentIds = [...new Set(
-            (groupDepartments || []).map(gd => gd.department_id)
-          )];
-          
+          const departmentIds = [...new Set((groupDepartments || []).map(gd => gd.department_id))];
+
           setUserDepartmentIds(departmentIds);
         }
       }
     } catch (error) {
-      console.error("Error fetching support departments:", error);
+      console.error('Error fetching support departments:', error);
       setDepartments([]);
       setUserDepartmentIds([]);
     } finally {
@@ -100,11 +102,14 @@ export const useSupportDepartments = (): UseSupportDepartmentsResult => {
     fetchDepartments();
   }, [fetchDepartments]);
 
-  const canAccessDepartment = useCallback((departmentId: string | null): boolean => {
-    if (isSuperAdmin) return true;
-    if (!departmentId) return true; // Tickets without department are accessible
-    return userDepartmentIds.includes(departmentId);
-  }, [isSuperAdmin, userDepartmentIds]);
+  const canAccessDepartment = useCallback(
+    (departmentId: string | null): boolean => {
+      if (isSuperAdmin) return true;
+      if (!departmentId) return true; // Tickets without department are accessible
+      return userDepartmentIds.includes(departmentId);
+    },
+    [isSuperAdmin, userDepartmentIds]
+  );
 
   return {
     departments,

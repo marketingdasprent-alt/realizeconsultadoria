@@ -1,13 +1,32 @@
-import { useState, useEffect } from "react";
-import { Loader2, Users, Plus, X, Shield } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from 'react';
+import { Loader2, Users, Plus, X, Shield } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface AdminUser {
   user_id: string;
@@ -36,14 +55,18 @@ interface AdminGroupMembersManagerProps {
   onRefresh: () => void;
 }
 
-const AdminGroupMembersManager = ({ admins, isLoadingAdmins, onRefresh }: AdminGroupMembersManagerProps) => {
+const AdminGroupMembersManager = ({
+  admins,
+  isLoadingAdmins,
+  onRefresh,
+}: AdminGroupMembersManagerProps) => {
   const { toast } = useToast();
   const [groups, setGroups] = useState<AdminGroup[]>([]);
   const [memberships, setMemberships] = useState<GroupMembership[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [selectedAdmin, setSelectedAdmin] = useState<AdminUser | null>(null);
-  const [selectedGroupId, setSelectedGroupId] = useState<string>("");
+  const [selectedGroupId, setSelectedGroupId] = useState<string>('');
   const [isAdding, setIsAdding] = useState(false);
   const [isRemoving, setIsRemoving] = useState<string | null>(null);
 
@@ -57,19 +80,19 @@ const AdminGroupMembersManager = ({ admins, isLoadingAdmins, onRefresh }: AdminG
           group_id,
           user_id,
           admin_groups (name, is_super_admin)
-        `)
+        `),
       ]);
 
       setGroups(groupsRes.data || []);
-      
+
       const mappedMemberships = (membershipsRes.data || []).map((m: any) => ({
         id: m.id,
         group_id: m.group_id,
         user_id: m.user_id,
         group_name: m.admin_groups?.name || 'Grupo desconhecido',
-        is_super_admin: m.admin_groups?.is_super_admin || false
+        is_super_admin: m.admin_groups?.is_super_admin || false,
       }));
-      
+
       setMemberships(mappedMemberships);
     } catch (error) {
       console.error('Error fetching data:', error);
@@ -87,15 +110,13 @@ const AdminGroupMembersManager = ({ admins, isLoadingAdmins, onRefresh }: AdminG
   };
 
   const getAvailableGroups = (userId: string): AdminGroup[] => {
-    const userGroupIds = memberships
-      .filter(m => m.user_id === userId)
-      .map(m => m.group_id);
+    const userGroupIds = memberships.filter(m => m.user_id === userId).map(m => m.group_id);
     return groups.filter(g => !userGroupIds.includes(g.id));
   };
 
   const handleOpenDialog = (admin: AdminUser) => {
     setSelectedAdmin(admin);
-    setSelectedGroupId("");
+    setSelectedGroupId('');
     setIsDialogOpen(true);
   };
 
@@ -104,23 +125,21 @@ const AdminGroupMembersManager = ({ admins, isLoadingAdmins, onRefresh }: AdminG
 
     setIsAdding(true);
     try {
-      const { error } = await supabase
-        .from('admin_group_members')
-        .insert({
-          group_id: selectedGroupId,
-          user_id: selectedAdmin.user_id
-        });
+      const { error } = await supabase.from('admin_group_members').insert({
+        group_id: selectedGroupId,
+        user_id: selectedAdmin.user_id,
+      });
 
       if (error) throw error;
 
-      toast({ title: "Administrador adicionado ao grupo!" });
+      toast({ title: 'Administrador adicionado ao grupo!' });
       setIsDialogOpen(false);
       fetchData();
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setIsAdding(false);
@@ -130,20 +149,17 @@ const AdminGroupMembersManager = ({ admins, isLoadingAdmins, onRefresh }: AdminG
   const handleRemoveFromGroup = async (membershipId: string) => {
     setIsRemoving(membershipId);
     try {
-      const { error } = await supabase
-        .from('admin_group_members')
-        .delete()
-        .eq('id', membershipId);
+      const { error } = await supabase.from('admin_group_members').delete().eq('id', membershipId);
 
       if (error) throw error;
 
-      toast({ title: "Administrador removido do grupo" });
+      toast({ title: 'Administrador removido do grupo' });
       fetchData();
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setIsRemoving(null);
@@ -185,7 +201,7 @@ const AdminGroupMembersManager = ({ admins, isLoadingAdmins, onRefresh }: AdminG
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {admins.map((admin) => {
+                {admins.map(admin => {
                   const adminGroups = getAdminGroups(admin.user_id);
                   const availableGroups = getAvailableGroups(admin.user_id);
                   const isSuperAdmin = adminGroups.some(g => g.is_super_admin);
@@ -195,23 +211,19 @@ const AdminGroupMembersManager = ({ admins, isLoadingAdmins, onRefresh }: AdminG
                       <TableCell className="font-medium">
                         <div className="flex items-center gap-2">
                           {admin.name}
-                          {isSuperAdmin && (
-                            <Shield className="h-4 w-4 text-primary" />
-                          )}
+                          {isSuperAdmin && <Shield className="h-4 w-4 text-primary" />}
                         </div>
                       </TableCell>
-                      <TableCell className="text-muted-foreground">
-                        {admin.email}
-                      </TableCell>
+                      <TableCell className="text-muted-foreground">{admin.email}</TableCell>
                       <TableCell>
                         <div className="flex flex-wrap gap-1">
                           {adminGroups.length === 0 ? (
                             <span className="text-muted-foreground text-sm">Sem grupos</span>
                           ) : (
-                            adminGroups.map((membership) => (
-                              <Badge 
-                                key={membership.id} 
-                                variant={membership.is_super_admin ? "default" : "secondary"}
+                            adminGroups.map(membership => (
+                              <Badge
+                                key={membership.id}
+                                variant={membership.is_super_admin ? 'default' : 'secondary'}
                                 className="flex items-center gap-1"
                               >
                                 {membership.group_name}
@@ -268,14 +280,15 @@ const AdminGroupMembersManager = ({ admins, isLoadingAdmins, onRefresh }: AdminG
                 <SelectValue placeholder="Selecione um grupo" />
               </SelectTrigger>
               <SelectContent>
-                {selectedAdmin && getAvailableGroups(selectedAdmin.user_id).map((group) => (
-                  <SelectItem key={group.id} value={group.id}>
-                    <div className="flex items-center gap-2">
-                      {group.is_super_admin && <Shield className="h-4 w-4 text-primary" />}
-                      {group.name}
-                    </div>
-                  </SelectItem>
-                ))}
+                {selectedAdmin &&
+                  getAvailableGroups(selectedAdmin.user_id).map(group => (
+                    <SelectItem key={group.id} value={group.id}>
+                      <div className="flex items-center gap-2">
+                        {group.is_super_admin && <Shield className="h-4 w-4 text-primary" />}
+                        {group.name}
+                      </div>
+                    </SelectItem>
+                  ))}
               </SelectContent>
             </Select>
           </div>
@@ -284,9 +297,9 @@ const AdminGroupMembersManager = ({ admins, isLoadingAdmins, onRefresh }: AdminG
             <Button variant="outline" onClick={() => setIsDialogOpen(false)} disabled={isAdding}>
               Cancelar
             </Button>
-            <Button 
-              variant="gold" 
-              onClick={handleAddToGroup} 
+            <Button
+              variant="gold"
+              onClick={handleAddToGroup}
               disabled={isAdding || !selectedGroupId}
             >
               {isAdding ? (
@@ -294,7 +307,7 @@ const AdminGroupMembersManager = ({ admins, isLoadingAdmins, onRefresh }: AdminG
               ) : (
                 <Users className="h-4 w-4 mr-2" />
               )}
-              {isAdding ? "A adicionar..." : "Adicionar ao Grupo"}
+              {isAdding ? 'A adicionar...' : 'Adicionar ao Grupo'}
             </Button>
           </div>
         </DialogContent>

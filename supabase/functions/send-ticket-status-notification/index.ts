@@ -1,8 +1,8 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface TicketStatusNotificationRequest {
@@ -17,60 +17,66 @@ interface TicketStatusNotificationRequest {
 }
 
 const statusLabels: Record<string, string> = {
-  open: "Aberto",
-  in_progress: "Em Progresso",
-  resolved: "Resolvido",
-  closed: "Fechado",
+  open: 'Aberto',
+  in_progress: 'Em Progresso',
+  resolved: 'Resolvido',
+  closed: 'Fechado',
 };
 
 const statusColors: Record<string, string> = {
-  open: "#6b7280",
-  in_progress: "#3b82f6",
-  resolved: "#22c55e",
-  closed: "#ef4444",
+  open: '#6b7280',
+  in_progress: '#3b82f6',
+  resolved: '#22c55e',
+  closed: '#ef4444',
 };
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { 
-      employeeEmail, 
-      employeeName, 
-      ticketSubject, 
+    const {
+      employeeEmail,
+      employeeName,
+      ticketSubject,
       oldStatus,
-      newStatus, 
+      newStatus,
       adminNotes,
-      notificationType 
+      notificationType,
     }: TicketStatusNotificationRequest = await req.json();
 
-    console.log("Processing ticket status notification:", { employeeEmail, newStatus, notificationType });
+    console.log('Processing ticket status notification:', {
+      employeeEmail,
+      newStatus,
+      notificationType,
+    });
 
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
 
     if (!brevoApiKey) {
-      console.error("BREVO_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "Email service not configured" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      console.error('BREVO_API_KEY not configured');
+      return new Response(JSON.stringify({ error: 'Email service not configured' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     const newStatusLabel = statusLabels[newStatus] || newStatus;
-    const newStatusColor = statusColors[newStatus] || "#6b7280";
-    
+    const newStatusColor = statusColors[newStatus] || '#6b7280';
+
     const isStatusChange = notificationType === 'status_change';
-    const emailTitle = isStatusChange 
-      ? "📋 Atualização do seu Ticket de Suporte"
-      : "💬 Nova Resposta no seu Ticket de Suporte";
-    
+    const emailTitle = isStatusChange
+      ? '📋 Atualização do seu Ticket de Suporte'
+      : '💬 Nova Resposta no seu Ticket de Suporte';
+
     const emailSubject = isStatusChange
       ? `📋 Ticket Atualizado: ${ticketSubject} - ${newStatusLabel}`
       : `💬 Nova Resposta: ${ticketSubject}`;
 
-    const statusChangeSection = isStatusChange && oldStatus !== newStatus ? `
+    const statusChangeSection =
+      isStatusChange && oldStatus !== newStatus
+        ? `
       <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         <h2 style="color: #1a1a2e; margin-top: 0; font-size: 18px; border-bottom: 2px solid #d4af37; padding-bottom: 10px;">
           Estado do Ticket
@@ -86,9 +92,11 @@ const handler = async (req: Request): Promise<Response> => {
           </tr>
         </table>
       </div>
-    ` : '';
+    `
+        : '';
 
-    const notesSection = adminNotes ? `
+    const notesSection = adminNotes
+      ? `
       <div style="background: white; padding: 20px; border-radius: 8px; margin-bottom: 20px; box-shadow: 0 2px 4px rgba(0,0,0,0.1);">
         <h2 style="color: #1a1a2e; margin-top: 0; font-size: 18px; border-bottom: 2px solid #d4af37; padding-bottom: 10px;">
           💬 Resposta do Técnico
@@ -97,7 +105,8 @@ const handler = async (req: Request): Promise<Response> => {
           <p style="color: #333; margin: 0; white-space: pre-wrap; line-height: 1.6;">${adminNotes}</p>
         </div>
       </div>
-    ` : '';
+    `
+      : '';
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -138,15 +147,15 @@ const handler = async (req: Request): Promise<Response> => {
 </html>
     `;
 
-    const emailResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
-      method: "POST",
+    const emailResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+      method: 'POST',
       headers: {
-        "Accept": "application/json",
-        "Content-Type": "application/json",
-        "api-key": brevoApiKey,
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'api-key': brevoApiKey,
       },
       body: JSON.stringify({
-        sender: { name: "Realize Gestão", email: "noreply@dasprent.pt" },
+        sender: { name: 'Realize Gestão', email: 'noreply@dasprent.pt' },
         to: [{ email: employeeEmail, name: employeeName }],
         subject: emailSubject,
         htmlContent,
@@ -155,26 +164,26 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (!emailResponse.ok) {
       const errorText = await emailResponse.text();
-      console.error("Brevo API error:", errorText);
-      return new Response(
-        JSON.stringify({ error: "Failed to send email", details: errorText }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      console.error('Brevo API error:', errorText);
+      return new Response(JSON.stringify({ error: 'Failed to send email', details: errorText }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     const responseData = await emailResponse.json();
-    console.log("Ticket status notification sent successfully to:", employeeEmail);
+    console.log('Ticket status notification sent successfully to:', employeeEmail);
 
     return new Response(
-      JSON.stringify({ success: true, message: "Notification sent", data: responseData }),
-      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      JSON.stringify({ success: true, message: 'Notification sent', data: responseData }),
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   } catch (error: any) {
-    console.error("Error in send-ticket-status-notification:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    console.error('Error in send-ticket-status-notification:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 };
 

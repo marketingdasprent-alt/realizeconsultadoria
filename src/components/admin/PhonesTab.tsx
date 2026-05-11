@@ -1,19 +1,19 @@
-import { useState, useMemo } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { 
-  Plus, 
-  Search, 
-  Copy, 
-  Check, 
-  MoreHorizontal, 
-  Pencil, 
+import { useState, useMemo } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import {
+  Plus,
+  Search,
+  Copy,
+  Check,
+  MoreHorizontal,
+  Pencil,
   Trash2,
   Phone,
   User,
-} from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Table,
   TableBody,
@@ -21,14 +21,14 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
+} from '@/components/ui/table';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -36,20 +36,20 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/dialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Label } from "@/components/ui/label";
-import { Textarea } from "@/components/ui/textarea";
-import { Badge } from "@/components/ui/badge";
-import { useToast } from "@/hooks/use-toast";
-import { useIsMobile } from "@/hooks/use-mobile";
-import DeleteConfirmDialog from "@/components/admin/DeleteConfirmDialog";
-import { supabase } from "@/integrations/supabase/client";
+} from '@/components/ui/dropdown-menu';
+import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { useToast } from '@/hooks/use-toast';
+import { useIsMobile } from '@/hooks/use-mobile';
+import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
+import { supabase } from '@/integrations/supabase/client';
 
 interface PhoneRecord {
   id: string;
@@ -79,7 +79,7 @@ interface Employee {
   is_active: boolean;
 }
 
-const OPERATORS = ["VODAFONE", "MEO", "NOS", "NOWO", "Outro"];
+const OPERATORS = ['VODAFONE', 'MEO', 'NOS', 'NOWO', 'Outro'];
 
 interface PhonesTabProps {
   canManage: boolean;
@@ -93,39 +93,41 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
   const queryClient = useQueryClient();
   const isMobile = useIsMobile();
 
-  const [searchTerm, setSearchTerm] = useState("");
+  const [searchTerm, setSearchTerm] = useState('');
   const [copiedField, setCopiedField] = useState<string | null>(null);
-  
+
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editingPhone, setEditingPhone] = useState<PhoneRecord | null>(null);
   const [deletePhone, setDeletePhone] = useState<PhoneRecord | null>(null);
-  
+
   const [formData, setFormData] = useState({
-    phone_number: "",
-    pin: "",
-    puk: "",
-    operator: "",
-    label: "",
-    notes: "",
-    company_id: "",
-    employee_id: "",
+    phone_number: '',
+    pin: '',
+    puk: '',
+    operator: '',
+    label: '',
+    notes: '',
+    company_id: '',
+    employee_id: '',
   });
 
   // Fetch phones
   const { data: phones = [], isLoading } = useQuery({
-    queryKey: ["phones", companyFilter],
+    queryKey: ['phones', companyFilter],
     queryFn: async () => {
       let query = supabase
-        .from("phones")
-        .select(`
+        .from('phones')
+        .select(
+          `
           *,
           companies(name),
           employees(name)
-        `)
-        .order("phone_number");
+        `
+        )
+        .order('phone_number');
 
-      if (companyFilter !== "all") {
-        query = query.eq("company_id", companyFilter);
+      if (companyFilter !== 'all') {
+        query = query.eq('company_id', companyFilter);
       }
 
       const { data, error } = await query;
@@ -136,13 +138,13 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
 
   // Fetch employees
   const { data: employees = [] } = useQuery({
-    queryKey: ["employees-active"],
+    queryKey: ['employees-active'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("employees")
-        .select("id, name, company_id, is_active")
-        .eq("is_active", true)
-        .order("name");
+        .from('employees')
+        .select('id, name, company_id, is_active')
+        .eq('is_active', true)
+        .order('name');
       if (error) throw error;
       return data as Employee[];
     },
@@ -163,71 +165,68 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
       };
 
       if (editingPhone) {
-        const { error } = await supabase
-          .from("phones")
-          .update(payload)
-          .eq("id", editingPhone.id);
+        const { error } = await supabase.from('phones').update(payload).eq('id', editingPhone.id);
         if (error) throw error;
       } else {
-        const { error } = await supabase.from("phones").insert(payload);
+        const { error } = await supabase.from('phones').insert(payload);
         if (error) throw error;
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["phones"] });
+      queryClient.invalidateQueries({ queryKey: ['phones'] });
       setIsDialogOpen(false);
       resetForm();
       toast({
-        title: editingPhone ? "Cartão SIM atualizado" : "Cartão SIM criado",
-        description: editingPhone 
-          ? "O cartão SIM foi atualizado com sucesso."
-          : "O novo cartão SIM foi criado com sucesso.",
+        title: editingPhone ? 'Cartão SIM atualizado' : 'Cartão SIM criado',
+        description: editingPhone
+          ? 'O cartão SIM foi atualizado com sucesso.'
+          : 'O novo cartão SIM foi criado com sucesso.',
       });
     },
-    onError: (error) => {
+    onError: error => {
       toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao guardar o telefone.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Ocorreu um erro ao guardar o telefone.',
+        variant: 'destructive',
       });
-      console.error("Save error:", error);
+      console.error('Save error:', error);
     },
   });
 
   // Delete mutation
   const deleteMutation = useMutation({
     mutationFn: async (id: string) => {
-      const { error } = await supabase.from("phones").delete().eq("id", id);
+      const { error } = await supabase.from('phones').delete().eq('id', id);
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["phones"] });
+      queryClient.invalidateQueries({ queryKey: ['phones'] });
       setDeletePhone(null);
       toast({
-        title: "Cartão SIM eliminado",
-        description: "O cartão SIM foi eliminado com sucesso.",
+        title: 'Cartão SIM eliminado',
+        description: 'O cartão SIM foi eliminado com sucesso.',
       });
     },
-    onError: (error) => {
+    onError: error => {
       toast({
-        title: "Erro",
-        description: "Ocorreu um erro ao eliminar o telefone.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Ocorreu um erro ao eliminar o telefone.',
+        variant: 'destructive',
       });
-      console.error("Delete error:", error);
+      console.error('Delete error:', error);
     },
   });
 
   const resetForm = () => {
     setFormData({
-      phone_number: "",
-      pin: "",
-      puk: "",
-      operator: "",
-      label: "",
-      notes: "",
-      company_id: companyFilter !== "all" ? companyFilter : "",
-      employee_id: "",
+      phone_number: '',
+      pin: '',
+      puk: '',
+      operator: '',
+      label: '',
+      notes: '',
+      company_id: companyFilter !== 'all' ? companyFilter : '',
+      employee_id: '',
     });
     setEditingPhone(null);
   };
@@ -241,17 +240,16 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
     setEditingPhone(phone);
     setFormData({
       phone_number: phone.phone_number,
-      pin: phone.pin || "",
-      puk: phone.puk || "",
-      operator: phone.operator || "",
-      label: phone.label || "",
-      notes: phone.notes || "",
+      pin: phone.pin || '',
+      puk: phone.puk || '',
+      operator: phone.operator || '',
+      label: phone.label || '',
+      notes: phone.notes || '',
       company_id: phone.company_id,
-      employee_id: phone.employee_id || "",
+      employee_id: phone.employee_id || '',
     });
     setIsDialogOpen(true);
   };
-
 
   const copyToClipboard = async (text: string, fieldId: string) => {
     try {
@@ -259,7 +257,7 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
       setCopiedField(fieldId);
       setTimeout(() => setCopiedField(null), 2000);
     } catch (err) {
-      console.error("Failed to copy:", err);
+      console.error('Failed to copy:', err);
     }
   };
 
@@ -267,9 +265,9 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
     e.preventDefault();
     if (!formData.phone_number || !formData.company_id) {
       toast({
-        title: "Campos obrigatórios",
-        description: "Preencha o número de telemóvel e selecione uma empresa.",
-        variant: "destructive",
+        title: 'Campos obrigatórios',
+        description: 'Preencha o número de telemóvel e selecione uma empresa.',
+        variant: 'destructive',
       });
       return;
     }
@@ -278,9 +276,9 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
 
   const filteredPhones = useMemo(() => {
     const searchLower = searchTerm.toLowerCase();
-    return phones.filter((phone) => {
-      const employeeName = phone.employees?.name?.toLowerCase() || "";
-      const label = phone.label?.toLowerCase() || "";
+    return phones.filter(phone => {
+      const employeeName = phone.employees?.name?.toLowerCase() || '';
+      const label = phone.label?.toLowerCase() || '';
       const phoneNumber = phone.phone_number.toLowerCase();
       return (
         employeeName.includes(searchLower) ||
@@ -303,10 +301,7 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
           <Pencil className="h-4 w-4 mr-2" />
           Editar
         </DropdownMenuItem>
-        <DropdownMenuItem
-          onClick={() => setDeletePhone(phone)}
-          className="text-destructive"
-        >
+        <DropdownMenuItem onClick={() => setDeletePhone(phone)} className="text-destructive">
           <Trash2 className="h-4 w-4 mr-2" />
           Eliminar
         </DropdownMenuItem>
@@ -317,12 +312,10 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
   // Renderização de campo com copy
   const renderCopyableField = (value: string | null, fieldId: string) => {
     if (!value) return <span className="text-muted-foreground">-</span>;
-    
+
     return (
       <div className="flex items-center gap-1">
-        <span className="text-sm bg-muted px-2 py-1 rounded font-mono">
-          {value}
-        </span>
+        <span className="text-sm bg-muted px-2 py-1 rounded font-mono">{value}</span>
         <Button
           variant="ghost"
           size="icon"
@@ -342,7 +335,11 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
   // Helper para badge de status
   const getStatusBadge = (phone: PhoneRecord) => {
     if (phone.employee_id || phone.label) {
-      return <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-primary/20">Atribuído</Badge>;
+      return (
+        <Badge className="bg-primary/10 text-primary hover:bg-primary/10 border-primary/20">
+          Atribuído
+        </Badge>
+      );
     }
     return <Badge variant="secondary">Disponível</Badge>;
   };
@@ -357,73 +354,69 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
             <TableHead>PIN</TableHead>
             <TableHead>PUK</TableHead>
             <TableHead>Operadora</TableHead>
-            {companyFilter === "all" && <TableHead>Empresa</TableHead>}
+            {companyFilter === 'all' && <TableHead>Empresa</TableHead>}
             <TableHead>Status</TableHead>
             <TableHead>Atribuído</TableHead>
             {canManage && <TableHead className="w-12"></TableHead>}
           </TableRow>
-      </TableHeader>
-      <TableBody>
-        {filteredPhones.map((phone) => (
-          <TableRow key={phone.id}>
-            <TableCell>
-              <div className="flex items-center gap-2">
-                <span className="text-sm bg-muted px-2 py-1 rounded font-mono">
-                  {phone.phone_number}
-                </span>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  onClick={() => copyToClipboard(phone.phone_number, `phone-${phone.id}`)}
-                >
-                  {copiedField === `phone-${phone.id}` ? (
-                    <Check className="h-3.5 w-3.5 text-primary" />
-                  ) : (
-                    <Copy className="h-3.5 w-3.5" />
-                  )}
-                </Button>
-              </div>
-            </TableCell>
-            <TableCell>{renderCopyableField(phone.pin, `pin-${phone.id}`)}</TableCell>
-            <TableCell>{renderCopyableField(phone.puk, `puk-${phone.id}`)}</TableCell>
-            <TableCell>
-              {phone.operator ? (
-                <Badge variant="outline">{phone.operator}</Badge>
-              ) : (
-                <span className="text-muted-foreground">-</span>
-              )}
-            </TableCell>
-            {companyFilter === "all" && (
-              <TableCell>{phone.companies?.name}</TableCell>
-            )}
-            <TableCell>{getStatusBadge(phone)}</TableCell>
-            <TableCell className="font-medium">
-              <div className="flex items-center gap-2">
-                {phone.employees ? (
-                  <>
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    {phone.employees.name}
-                  </>
+        </TableHeader>
+        <TableBody>
+          {filteredPhones.map(phone => (
+            <TableRow key={phone.id}>
+              <TableCell>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm bg-muted px-2 py-1 rounded font-mono">
+                    {phone.phone_number}
+                  </span>
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-7 w-7"
+                    onClick={() => copyToClipboard(phone.phone_number, `phone-${phone.id}`)}
+                  >
+                    {copiedField === `phone-${phone.id}` ? (
+                      <Check className="h-3.5 w-3.5 text-primary" />
+                    ) : (
+                      <Copy className="h-3.5 w-3.5" />
+                    )}
+                  </Button>
+                </div>
+              </TableCell>
+              <TableCell>{renderCopyableField(phone.pin, `pin-${phone.id}`)}</TableCell>
+              <TableCell>{renderCopyableField(phone.puk, `puk-${phone.id}`)}</TableCell>
+              <TableCell>
+                {phone.operator ? (
+                  <Badge variant="outline">{phone.operator}</Badge>
                 ) : (
-                  <span className="text-muted-foreground">{phone.label || "-"}</span>
+                  <span className="text-muted-foreground">-</span>
                 )}
-              </div>
-            </TableCell>
-            {canManage && (
-              <TableCell>{renderPhoneActions(phone)}</TableCell>
-            )}
-          </TableRow>
-        ))}
-      </TableBody>
-    </Table>
+              </TableCell>
+              {companyFilter === 'all' && <TableCell>{phone.companies?.name}</TableCell>}
+              <TableCell>{getStatusBadge(phone)}</TableCell>
+              <TableCell className="font-medium">
+                <div className="flex items-center gap-2">
+                  {phone.employees ? (
+                    <>
+                      <User className="h-4 w-4 text-muted-foreground" />
+                      {phone.employees.name}
+                    </>
+                  ) : (
+                    <span className="text-muted-foreground">{phone.label || '-'}</span>
+                  )}
+                </div>
+              </TableCell>
+              {canManage && <TableCell>{renderPhoneActions(phone)}</TableCell>}
+            </TableRow>
+          ))}
+        </TableBody>
+      </Table>
     </div>
   );
 
   // Cards mobile
   const renderMobileCards = () => (
     <div className="space-y-3">
-      {filteredPhones.map((phone) => (
+      {filteredPhones.map(phone => (
         <Card key={phone.id} className="p-4 min-w-0 overflow-hidden">
           <div className="flex items-start justify-between gap-2 min-w-0">
             <div className="flex-1 min-w-0">
@@ -434,20 +427,18 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                     <span className="truncate">{phone.employees.name}</span>
                   </>
                 ) : (
-                  <span className="text-muted-foreground truncate">{phone.label || "Sem nome"}</span>
+                  <span className="text-muted-foreground truncate">
+                    {phone.label || 'Sem nome'}
+                  </span>
                 )}
               </h4>
-              {companyFilter === "all" && (
-                <p className="text-xs text-muted-foreground truncate">
-                  {phone.companies?.name}
-                </p>
+              {companyFilter === 'all' && (
+                <p className="text-xs text-muted-foreground truncate">{phone.companies?.name}</p>
               )}
             </div>
-            <div className="shrink-0">
-              {canManage && renderPhoneActions(phone)}
-            </div>
+            <div className="shrink-0">{canManage && renderPhoneActions(phone)}</div>
           </div>
-          
+
           <div className="mt-3 space-y-2">
             <div className="flex items-center gap-2">
               <span className="text-xs text-muted-foreground w-16">Nº:</span>
@@ -467,25 +458,27 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                 )}
               </Button>
             </div>
-            
+
             {phone.pin && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground w-16">PIN:</span>
                 {renderCopyableField(phone.pin, `pin-${phone.id}`)}
               </div>
             )}
-            
+
             {phone.puk && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground w-16">PUK:</span>
                 {renderCopyableField(phone.puk, `puk-${phone.id}`)}
               </div>
             )}
-            
+
             {phone.operator && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground w-16">Oper.:</span>
-                <Badge variant="outline" className="text-xs">{phone.operator}</Badge>
+                <Badge variant="outline" className="text-xs">
+                  {phone.operator}
+                </Badge>
               </div>
             )}
           </div>
@@ -523,7 +516,7 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                 name="search-phones"
                 placeholder="Pesquisar por atribuição ou telefone..."
                 value={searchTerm}
-                onChange={(e) => setSearchTerm(e.target.value)}
+                onChange={e => setSearchTerm(e.target.value)}
                 className="pl-10"
               />
             </div>
@@ -534,7 +527,7 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                 </SelectTrigger>
                 <SelectContent>
                   <SelectItem value="all">Todas as empresas</SelectItem>
-                  {companies.map((company) => (
+                  {companies.map(company => (
                     <SelectItem key={company.id} value={company.id}>
                       {company.name}
                     </SelectItem>
@@ -550,12 +543,14 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
             </div>
           ) : filteredPhones.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
-              {searchTerm || companyFilter !== "all"
-                ? "Nenhum cartão SIM encontrado com os filtros aplicados."
-                : "Ainda não existem cartões SIM registados."}
+              {searchTerm || companyFilter !== 'all'
+                ? 'Nenhum cartão SIM encontrado com os filtros aplicados.'
+                : 'Ainda não existem cartões SIM registados.'}
             </div>
+          ) : isMobile ? (
+            renderMobileCards()
           ) : (
-            isMobile ? renderMobileCards() : renderDesktopTable()
+            renderDesktopTable()
           )}
         </CardContent>
       </Card>
@@ -564,13 +559,11 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="sm:max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>
-              {editingPhone ? "Editar Cartão SIM" : "Novo Cartão SIM"}
-            </DialogTitle>
+            <DialogTitle>{editingPhone ? 'Editar Cartão SIM' : 'Novo Cartão SIM'}</DialogTitle>
             <DialogDescription>
               {editingPhone
-                ? "Atualize os dados do cartão SIM."
-                : "Preencha os dados para adicionar um novo cartão SIM."}
+                ? 'Atualize os dados do cartão SIM.'
+                : 'Preencha os dados para adicionar um novo cartão SIM.'}
             </DialogDescription>
           </DialogHeader>
           <form onSubmit={handleSubmit}>
@@ -579,13 +572,15 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                 <Label htmlFor="company_id">Empresa *</Label>
                 <Select
                   value={formData.company_id}
-                  onValueChange={(value) => setFormData({ ...formData, company_id: value, employee_id: "" })}
+                  onValueChange={value =>
+                    setFormData({ ...formData, company_id: value, employee_id: '' })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione uma empresa" />
                   </SelectTrigger>
                   <SelectContent>
-                    {companies.map((company) => (
+                    {companies.map(company => (
                       <SelectItem key={company.id} value={company.id}>
                         {company.name}
                       </SelectItem>
@@ -597,8 +592,10 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
               <div className="space-y-2">
                 <Label htmlFor="employee_id">Colaborador (opcional)</Label>
                 <Select
-                  value={formData.employee_id || "none"}
-                  onValueChange={(value) => setFormData({ ...formData, employee_id: value === "none" ? "" : value })}
+                  value={formData.employee_id || 'none'}
+                  onValueChange={value =>
+                    setFormData({ ...formData, employee_id: value === 'none' ? '' : value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione um colaborador" />
@@ -607,7 +604,7 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                     <SelectItem value="none">Nenhum (usar label)</SelectItem>
                     {employees
                       .filter(emp => !formData.company_id || emp.company_id === formData.company_id)
-                      .map((employee) => (
+                      .map(employee => (
                         <SelectItem key={employee.id} value={employee.id}>
                           {employee.name}
                         </SelectItem>
@@ -622,7 +619,7 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                   <Input
                     id="label"
                     value={formData.label}
-                    onChange={(e) => setFormData({ ...formData, label: e.target.value })}
+                    onChange={e => setFormData({ ...formData, label: e.target.value })}
                     placeholder="Ex: SINISTRO"
                   />
                 </div>
@@ -633,7 +630,7 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                 <Input
                   id="phone_number"
                   value={formData.phone_number}
-                  onChange={(e) => setFormData({ ...formData, phone_number: e.target.value })}
+                  onChange={e => setFormData({ ...formData, phone_number: e.target.value })}
                   placeholder="Ex: 910 123 456"
                 />
               </div>
@@ -644,7 +641,7 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                   <Input
                     id="pin"
                     value={formData.pin}
-                    onChange={(e) => setFormData({ ...formData, pin: e.target.value })}
+                    onChange={e => setFormData({ ...formData, pin: e.target.value })}
                     placeholder="Ex: 1234"
                   />
                 </div>
@@ -653,7 +650,7 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                   <Input
                     id="puk"
                     value={formData.puk}
-                    onChange={(e) => setFormData({ ...formData, puk: e.target.value })}
+                    onChange={e => setFormData({ ...formData, puk: e.target.value })}
                     placeholder="Ex: 12345678"
                   />
                 </div>
@@ -662,15 +659,17 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
               <div className="space-y-2">
                 <Label htmlFor="operator">Operadora</Label>
                 <Select
-                  value={formData.operator || "none"}
-                  onValueChange={(value) => setFormData({ ...formData, operator: value === "none" ? "" : value })}
+                  value={formData.operator || 'none'}
+                  onValueChange={value =>
+                    setFormData({ ...formData, operator: value === 'none' ? '' : value })
+                  }
                 >
                   <SelectTrigger>
                     <SelectValue placeholder="Selecione a operadora" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="none">Não especificada</SelectItem>
-                    {OPERATORS.map((op) => (
+                    {OPERATORS.map(op => (
                       <SelectItem key={op} value={op}>
                         {op}
                       </SelectItem>
@@ -684,22 +683,18 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                 <Textarea
                   id="notes"
                   value={formData.notes}
-                  onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
+                  onChange={e => setFormData({ ...formData, notes: e.target.value })}
                   placeholder="Notas adicionais..."
                   rows={2}
                 />
               </div>
             </div>
             <DialogFooter>
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setIsDialogOpen(false)}
-              >
+              <Button type="button" variant="outline" onClick={() => setIsDialogOpen(false)}>
                 Cancelar
               </Button>
               <Button type="submit" disabled={saveMutation.isPending}>
-                {saveMutation.isPending ? "A guardar..." : "Guardar"}
+                {saveMutation.isPending ? 'A guardar...' : 'Guardar'}
               </Button>
             </DialogFooter>
           </form>
@@ -709,7 +704,7 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
       {/* Delete Confirmation Dialog */}
       <DeleteConfirmDialog
         open={!!deletePhone}
-        onOpenChange={(open) => !open && setDeletePhone(null)}
+        onOpenChange={open => !open && setDeletePhone(null)}
         onConfirm={async () => {
           if (deletePhone) {
             await deleteMutation.mutateAsync(deletePhone.id);

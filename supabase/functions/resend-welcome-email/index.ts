@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.49.2";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface ResendWelcomeRequest {
@@ -11,8 +11,8 @@ interface ResendWelcomeRequest {
 }
 
 const generateRandomPassword = () => {
-  const chars = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()";
-  let password = "";
+  const chars = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()';
+  let password = '';
   for (let i = 0; i < 10; i++) {
     password += chars.charAt(Math.floor(Math.random() * chars.length));
   }
@@ -20,7 +20,7 @@ const generateRandomPassword = () => {
 };
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
@@ -28,31 +28,31 @@ const handler = async (req: Request): Promise<Response> => {
     const { employee_id }: ResendWelcomeRequest = await req.json();
 
     if (!employee_id) {
-      return new Response(
-        JSON.stringify({ error: "ID do colaborador é obrigatório" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      return new Response(JSON.stringify({ error: 'ID do colaborador é obrigatório' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
     // Get employee details
     const { data: employee, error: employeeError } = await supabaseAdmin
-      .from("employees")
-      .select("name, email")
-      .eq("id", employee_id)
+      .from('employees')
+      .select('name, email')
+      .eq('id', employee_id)
       .single();
 
     if (employeeError || !employee) {
-      console.error("[resend-welcome-email] Error fetching employee:", employeeError);
-      return new Response(
-        JSON.stringify({ error: "Colaborador não encontrado" }),
-        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      console.error('[resend-welcome-email] Error fetching employee:', employeeError);
+      return new Response(JSON.stringify({ error: 'Colaborador não encontrado' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     const newPassword = generateRandomPassword();
@@ -60,37 +60,36 @@ const handler = async (req: Request): Promise<Response> => {
     // Find the user in Auth
     const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
     if (listError) {
-      console.error("[resend-welcome-email] Error listing users:", listError);
+      console.error('[resend-welcome-email] Error listing users:', listError);
       throw listError;
     }
 
     const authUser = users.users.find(u => u.email?.toLowerCase() === employee.email.toLowerCase());
 
     if (!authUser) {
-      return new Response(
-        JSON.stringify({ error: "Utilizador auth não encontrado" }),
-        { status: 404, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      return new Response(JSON.stringify({ error: 'Utilizador auth não encontrado' }), {
+        status: 404,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     // Update password
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      authUser.id,
-      { password: newPassword }
-    );
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(authUser.id, {
+      password: newPassword,
+    });
 
     if (updateError) {
-      console.error("[resend-welcome-email] Error updating password:", updateError);
+      console.error('[resend-welcome-email] Error updating password:', updateError);
       throw updateError;
     }
 
     // Send email via Brevo
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
     let emailSent = false;
     let emailError = null;
 
     if (brevoApiKey) {
-      const loginUrl = "https://realizeconsultadoria.lovable.app/colaborador/login";
+      const loginUrl = 'https://realizeconsultadoria.lovable.app/colaborador/login';
       const emailHtml = `
         <!DOCTYPE html>
         <html>
@@ -115,17 +114,17 @@ const handler = async (req: Request): Promise<Response> => {
       `;
 
       try {
-        const brevoResp = await fetch("https://api.brevo.com/v3/smtp/email", {
-          method: "POST",
+        const brevoResp = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
           headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "api-key": brevoApiKey,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'api-key': brevoApiKey,
           },
           body: JSON.stringify({
-            sender: { name: "Realize Consultadoria", email: "noreply@dasprent.pt" },
+            sender: { name: 'Realize Consultadoria', email: 'noreply@dasprent.pt' },
             to: [{ email: employee.email, name: employee.name }],
-            subject: "Credenciais de Acesso - Realize Consultadoria",
+            subject: 'Credenciais de Acesso - Realize Consultadoria',
             htmlContent: emailHtml,
           }),
         });
@@ -134,30 +133,29 @@ const handler = async (req: Request): Promise<Response> => {
           emailSent = true;
         } else {
           emailError = await brevoResp.text();
-          console.error("[resend-welcome-email] Brevo error:", emailError);
+          console.error('[resend-welcome-email] Brevo error:', emailError);
         }
       } catch (err) {
         emailError = err.message;
-        console.error("[resend-welcome-email] Mail error:", err);
+        console.error('[resend-welcome-email] Mail error:', err);
       }
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         password: newPassword, // Show the generated password to admin
         emailSent,
-        emailError
+        emailError,
       }),
-      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
-
   } catch (error: any) {
-    console.error("[resend-welcome-email] Error:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Erro interno" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    console.error('[resend-welcome-email] Error:', error);
+    return new Response(JSON.stringify({ error: error.message || 'Erro interno' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 };
 

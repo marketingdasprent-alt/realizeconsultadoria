@@ -1,20 +1,20 @@
-import { useNavigate } from "react-router-dom";
-import { useDeviceDetect } from "@/hooks/useDeviceDetect";
-import { usePWAInstall } from "@/hooks/usePWAInstall";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { 
-  Smartphone, 
-  Share, 
-  PlusSquare, 
-  MoreVertical, 
+import { useNavigate } from 'react-router-dom';
+import { useDeviceDetect } from '@/hooks/useDeviceDetect';
+import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Smartphone,
+  Share,
+  PlusSquare,
+  MoreVertical,
   Download,
   CheckCircle2,
   ArrowRight,
   Monitor,
-  Apple
-} from "lucide-react";
-import logoRealize from "@/assets/logo-realize.png";
+  Apple,
+} from 'lucide-react';
+import logoRealize from '@/assets/logo-realize.png';
 
 const InstallPage = () => {
   const navigate = useNavigate();
@@ -26,7 +26,7 @@ const InstallPage = () => {
       const success = await promptInstall();
       if (success) {
         // Redirect to login after successful install
-        setTimeout(() => navigate("/colaborador/login"), 1000);
+        setTimeout(() => navigate('/colaborador/login'), 1000);
       }
     }
   };
@@ -48,7 +48,7 @@ const InstallPage = () => {
             </CardDescription>
           </CardHeader>
           <CardContent>
-            <Button onClick={() => navigate("/colaborador/login")} className="w-full">
+            <Button onClick={() => navigate('/colaborador/login')} className="w-full">
               Ir para Login
               <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
@@ -74,14 +74,14 @@ const InstallPage = () => {
           {/* Device-specific instructions */}
           {device.isIOS && <IOSInstructions browser={device.browser} />}
           {device.isAndroid && (
-            <AndroidInstructions 
-              browser={device.browser} 
+            <AndroidInstructions
+              browser={device.browser}
               canInstall={canInstall}
               onInstall={handleInstallClick}
             />
           )}
           {device.isDesktop && (
-            <DesktopInstructions 
+            <DesktopInstructions
               browser={device.browser}
               canInstall={canInstall}
               onInstall={handleInstallClick}
@@ -108,9 +108,9 @@ const InstallPage = () => {
           </div>
 
           {/* Go to login button */}
-          <Button 
-            variant="outline" 
-            onClick={() => navigate("/colaborador/login")} 
+          <Button
+            variant="outline"
+            onClick={() => navigate('/colaborador/login')}
             className="w-full"
           >
             Continuar para Login
@@ -148,7 +148,7 @@ const IOSInstructions = ({ browser }: { browser: string }) => (
 
     <div className="space-y-3">
       <p className="font-medium text-sm">Passos para instalar:</p>
-      
+
       <div className="flex items-start gap-3 p-3 border rounded-lg">
         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold">
           1
@@ -168,7 +168,8 @@ const IOSInstructions = ({ browser }: { browser: string }) => (
         <div className="flex-1">
           <p className="font-medium">Adicionar ao Ecrã Principal</p>
           <p className="text-sm text-muted-foreground">
-            Deslize para baixo e toque em <PlusSquare className="inline h-4 w-4" /> "Adicionar ao Ecrã Principal"
+            Deslize para baixo e toque em <PlusSquare className="inline h-4 w-4" /> "Adicionar ao
+            Ecrã Principal"
           </p>
         </div>
       </div>
@@ -195,9 +196,11 @@ const AndroidInstructions = ({ browser, canInstall, onInstall }: InstructionsPro
       <div>
         <p className="font-medium">Android</p>
         <p className="text-sm text-muted-foreground">
-          {browser === 'chrome' ? 'Chrome detectado' : 
-           browser === 'samsung' ? 'Samsung Internet detectado' : 
-           'Browser detectado'}
+          {browser === 'chrome'
+            ? 'Chrome detectado'
+            : browser === 'samsung'
+              ? 'Samsung Internet detectado'
+              : 'Browser detectado'}
         </p>
       </div>
     </div>
@@ -212,7 +215,7 @@ const AndroidInstructions = ({ browser, canInstall, onInstall }: InstructionsPro
     {!canInstall && (
       <div className="space-y-3">
         <p className="font-medium text-sm">Passos para instalar:</p>
-        
+
         <div className="flex items-start gap-3 p-3 border rounded-lg">
           <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-primary-foreground text-sm font-bold">
             1
@@ -243,9 +246,7 @@ const AndroidInstructions = ({ browser, canInstall, onInstall }: InstructionsPro
           </div>
           <div className="flex-1">
             <p className="font-medium">Confirmar</p>
-            <p className="text-sm text-muted-foreground">
-              Toque em "Instalar" para confirmar
-            </p>
+            <p className="text-sm text-muted-foreground">Toque em "Instalar" para confirmar</p>
           </div>
         </div>
       </div>
@@ -260,10 +261,13 @@ const DesktopInstructions = ({ browser, canInstall, onInstall }: InstructionsPro
       <div>
         <p className="font-medium">Computador</p>
         <p className="text-sm text-muted-foreground">
-          {browser === 'chrome' ? 'Chrome detectado' : 
-           browser === 'edge' ? 'Edge detectado' :
-           browser === 'firefox' ? 'Firefox detectado' :
-           'Browser detectado'}
+          {browser === 'chrome'
+            ? 'Chrome detectado'
+            : browser === 'edge'
+              ? 'Edge detectado'
+              : browser === 'firefox'
+                ? 'Firefox detectado'
+                : 'Browser detectado'}
         </p>
       </div>
     </div>
@@ -278,7 +282,7 @@ const DesktopInstructions = ({ browser, canInstall, onInstall }: InstructionsPro
     {!canInstall && (
       <div className="space-y-3">
         <p className="font-medium text-sm">Passos para instalar:</p>
-        
+
         {(browser === 'chrome' || browser === 'edge') && (
           <>
             <div className="flex items-start gap-3 p-3 border rounded-lg">
@@ -288,7 +292,8 @@ const DesktopInstructions = ({ browser, canInstall, onInstall }: InstructionsPro
               <div className="flex-1">
                 <p className="font-medium">Procure o ícone de instalação</p>
                 <p className="text-sm text-muted-foreground">
-                  Na barra de endereço, procure o ícone <Download className="inline h-4 w-4" /> ou <PlusSquare className="inline h-4 w-4" />
+                  Na barra de endereço, procure o ícone <Download className="inline h-4 w-4" /> ou{' '}
+                  <PlusSquare className="inline h-4 w-4" />
                 </p>
               </div>
             </div>

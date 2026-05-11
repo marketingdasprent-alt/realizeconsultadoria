@@ -1,16 +1,39 @@
-import { useState, useEffect, useMemo } from "react";
-import { Plus, Trash2, Loader2, Pencil, Check, X, ChevronDown, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect, useMemo } from 'react';
+import { Plus, Trash2, Loader2, Pencil, Check, X, ChevronDown, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface SupportSubject {
   id: string;
@@ -29,17 +52,17 @@ interface SupportDepartment {
 }
 
 const priorityLabels: Record<string, string> = {
-  low: "Baixa",
-  medium: "Média",
-  high: "Alta",
-  urgent: "Urgente",
+  low: 'Baixa',
+  medium: 'Média',
+  high: 'Alta',
+  urgent: 'Urgente',
 };
 
 const priorityColors: Record<string, string> = {
-  low: "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400",
-  medium: "bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400",
-  high: "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400",
-  urgent: "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400",
+  low: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400',
+  medium: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400',
+  high: 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-400',
+  urgent: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-400',
 };
 
 const SupportSubjectsManager = () => {
@@ -47,42 +70,39 @@ const SupportSubjectsManager = () => {
   const [subjects, setSubjects] = useState<SupportSubject[]>([]);
   const [departments, setDepartments] = useState<SupportDepartment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [newSubjectLabel, setNewSubjectLabel] = useState("");
-  const [newSubjectPriority, setNewSubjectPriority] = useState("medium");
-  const [newSubjectDepartment, setNewSubjectDepartment] = useState<string>("none");
+  const [newSubjectLabel, setNewSubjectLabel] = useState('');
+  const [newSubjectPriority, setNewSubjectPriority] = useState('medium');
+  const [newSubjectDepartment, setNewSubjectDepartment] = useState<string>('none');
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editingLabel, setEditingLabel] = useState("");
-  const [editingPriority, setEditingPriority] = useState("medium");
-  const [editingDepartment, setEditingDepartment] = useState<string>("none");
+  const [editingLabel, setEditingLabel] = useState('');
+  const [editingPriority, setEditingPriority] = useState('medium');
+  const [editingDepartment, setEditingDepartment] = useState<string>('none');
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({});
 
   const loadData = async () => {
     const [subjectsRes, departmentsRes] = await Promise.all([
+      supabase.from('support_ticket_subjects').select('*').order('sort_order', { ascending: true }),
       supabase
-        .from("support_ticket_subjects")
-        .select("*")
-        .order("sort_order", { ascending: true }),
-      supabase
-        .from("support_departments")
-        .select("id, name, is_active, sort_order")
-        .order("sort_order", { ascending: true })
+        .from('support_departments')
+        .select('id, name, is_active, sort_order')
+        .order('sort_order', { ascending: true }),
     ]);
 
     if (subjectsRes.error) {
-      console.error("Error loading subjects:", subjectsRes.error);
+      console.error('Error loading subjects:', subjectsRes.error);
       toast({
-        title: "Erro",
-        description: "Não foi possível carregar os assuntos.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Não foi possível carregar os assuntos.',
+        variant: 'destructive',
       });
     } else {
       setSubjects(subjectsRes.data || []);
     }
 
     if (departmentsRes.error) {
-      console.error("Error loading departments:", departmentsRes.error);
+      console.error('Error loading departments:', departmentsRes.error);
     } else {
       setDepartments(departmentsRes.data || []);
       // Initialize all sections as open
@@ -103,13 +123,13 @@ const SupportSubjectsManager = () => {
   // Group subjects by department
   const subjectsByDepartment = useMemo(() => {
     const grouped: Record<string, SupportSubject[]> = {};
-    
+
     // Initialize groups for all departments
     departments.forEach(dept => {
       grouped[dept.id] = [];
     });
     grouped['none'] = []; // Sem departamento
-    
+
     // Distribute subjects
     subjects.forEach(subject => {
       const key = subject.department_id || 'none';
@@ -119,49 +139,46 @@ const SupportSubjectsManager = () => {
         grouped['none'].push(subject);
       }
     });
-    
+
     return grouped;
   }, [subjects, departments]);
 
   const handleAddSubject = async () => {
     if (!newSubjectLabel.trim()) {
       toast({
-        title: "Erro",
-        description: "Por favor introduza o nome do assunto.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Por favor introduza o nome do assunto.',
+        variant: 'destructive',
       });
       return;
     }
 
     setIsAdding(true);
     try {
-      const deptId = newSubjectDepartment === "none" ? null : newSubjectDepartment;
+      const deptId = newSubjectDepartment === 'none' ? null : newSubjectDepartment;
       const deptSubjects = subjects.filter(s => s.department_id === deptId);
-      const maxSortOrder = deptSubjects.length > 0 
-        ? Math.max(...deptSubjects.map(s => s.sort_order)) 
-        : 0;
+      const maxSortOrder =
+        deptSubjects.length > 0 ? Math.max(...deptSubjects.map(s => s.sort_order)) : 0;
 
-      const { error } = await supabase
-        .from("support_ticket_subjects")
-        .insert({
-          label: newSubjectLabel.trim(),
-          sort_order: maxSortOrder + 1,
-          default_priority: newSubjectPriority,
-          department_id: deptId,
-        });
+      const { error } = await supabase.from('support_ticket_subjects').insert({
+        label: newSubjectLabel.trim(),
+        sort_order: maxSortOrder + 1,
+        default_priority: newSubjectPriority,
+        department_id: deptId,
+      });
 
       if (error) throw error;
 
-      toast({ title: "Assunto adicionado com sucesso!" });
-      setNewSubjectLabel("");
-      setNewSubjectPriority("medium");
-      setNewSubjectDepartment("none");
+      toast({ title: 'Assunto adicionado com sucesso!' });
+      setNewSubjectLabel('');
+      setNewSubjectPriority('medium');
+      setNewSubjectDepartment('none');
       loadData();
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setIsAdding(false);
@@ -171,21 +188,19 @@ const SupportSubjectsManager = () => {
   const handleToggleActive = async (subject: SupportSubject) => {
     try {
       const { error } = await supabase
-        .from("support_ticket_subjects")
+        .from('support_ticket_subjects')
         .update({ is_active: !subject.is_active })
-        .eq("id", subject.id);
+        .eq('id', subject.id);
 
       if (error) throw error;
 
-      setSubjects(subjects.map(s => 
-        s.id === subject.id ? { ...s, is_active: !s.is_active } : s
-      ));
-      toast({ title: subject.is_active ? "Assunto desativado" : "Assunto ativado" });
+      setSubjects(subjects.map(s => (s.id === subject.id ? { ...s, is_active: !s.is_active } : s)));
+      toast({ title: subject.is_active ? 'Assunto desativado' : 'Assunto ativado' });
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -194,14 +209,14 @@ const SupportSubjectsManager = () => {
     setEditingId(subject.id);
     setEditingLabel(subject.label);
     setEditingPriority(subject.default_priority);
-    setEditingDepartment(subject.department_id || "none");
+    setEditingDepartment(subject.department_id || 'none');
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setEditingLabel("");
-    setEditingPriority("medium");
-    setEditingDepartment("none");
+    setEditingLabel('');
+    setEditingPriority('medium');
+    setEditingDepartment('none');
   };
 
   const handleSaveEdit = async () => {
@@ -209,33 +224,35 @@ const SupportSubjectsManager = () => {
 
     try {
       const { error } = await supabase
-        .from("support_ticket_subjects")
-        .update({ 
-          label: editingLabel.trim(), 
+        .from('support_ticket_subjects')
+        .update({
+          label: editingLabel.trim(),
           default_priority: editingPriority,
-          department_id: editingDepartment === "none" ? null : editingDepartment,
+          department_id: editingDepartment === 'none' ? null : editingDepartment,
         })
-        .eq("id", editingId);
+        .eq('id', editingId);
 
       if (error) throw error;
 
-      setSubjects(subjects.map(s => 
-        s.id === editingId 
-          ? { 
-              ...s, 
-              label: editingLabel.trim(), 
-              default_priority: editingPriority,
-              department_id: editingDepartment === "none" ? null : editingDepartment,
-            } 
-          : s
-      ));
-      toast({ title: "Assunto atualizado!" });
+      setSubjects(
+        subjects.map(s =>
+          s.id === editingId
+            ? {
+                ...s,
+                label: editingLabel.trim(),
+                default_priority: editingPriority,
+                department_id: editingDepartment === 'none' ? null : editingDepartment,
+              }
+            : s
+        )
+      );
+      toast({ title: 'Assunto atualizado!' });
       handleCancelEdit();
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -243,20 +260,17 @@ const SupportSubjectsManager = () => {
   const handleDelete = async (id: string) => {
     setDeletingId(id);
     try {
-      const { error } = await supabase
-        .from("support_ticket_subjects")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from('support_ticket_subjects').delete().eq('id', id);
 
       if (error) throw error;
 
       setSubjects(subjects.filter(s => s.id !== id));
-      toast({ title: "Assunto eliminado!" });
+      toast({ title: 'Assunto eliminado!' });
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setDeletingId(null);
@@ -272,20 +286,28 @@ const SupportSubjectsManager = () => {
 
     try {
       await Promise.all([
-        supabase.from("support_ticket_subjects").update({ sort_order: prevSortOrder }).eq("id", currentSubject.id),
-        supabase.from("support_ticket_subjects").update({ sort_order: currentSortOrder }).eq("id", prevSubject.id),
+        supabase
+          .from('support_ticket_subjects')
+          .update({ sort_order: prevSortOrder })
+          .eq('id', currentSubject.id),
+        supabase
+          .from('support_ticket_subjects')
+          .update({ sort_order: currentSortOrder })
+          .eq('id', prevSubject.id),
       ]);
 
-      setSubjects(subjects.map(s => {
-        if (s.id === currentSubject.id) return { ...s, sort_order: prevSortOrder };
-        if (s.id === prevSubject.id) return { ...s, sort_order: currentSortOrder };
-        return s;
-      }));
+      setSubjects(
+        subjects.map(s => {
+          if (s.id === currentSubject.id) return { ...s, sort_order: prevSortOrder };
+          if (s.id === prevSubject.id) return { ...s, sort_order: currentSortOrder };
+          return s;
+        })
+      );
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -299,20 +321,28 @@ const SupportSubjectsManager = () => {
 
     try {
       await Promise.all([
-        supabase.from("support_ticket_subjects").update({ sort_order: nextSortOrder }).eq("id", currentSubject.id),
-        supabase.from("support_ticket_subjects").update({ sort_order: currentSortOrder }).eq("id", nextSubject.id),
+        supabase
+          .from('support_ticket_subjects')
+          .update({ sort_order: nextSortOrder })
+          .eq('id', currentSubject.id),
+        supabase
+          .from('support_ticket_subjects')
+          .update({ sort_order: currentSortOrder })
+          .eq('id', nextSubject.id),
       ]);
 
-      setSubjects(subjects.map(s => {
-        if (s.id === currentSubject.id) return { ...s, sort_order: nextSortOrder };
-        if (s.id === nextSubject.id) return { ...s, sort_order: currentSortOrder };
-        return s;
-      }));
+      setSubjects(
+        subjects.map(s => {
+          if (s.id === currentSubject.id) return { ...s, sort_order: nextSortOrder };
+          if (s.id === nextSubject.id) return { ...s, sort_order: currentSortOrder };
+          return s;
+        })
+      );
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -323,7 +353,7 @@ const SupportSubjectsManager = () => {
 
   const renderSubjectsTable = (deptSubjects: SupportSubject[], deptKey: string) => {
     const sortedSubjects = [...deptSubjects].sort((a, b) => a.sort_order - b.sort_order);
-    
+
     if (sortedSubjects.length === 0) {
       return (
         <p className="text-muted-foreground text-sm py-4 px-2">
@@ -373,8 +403,8 @@ const SupportSubjectsManager = () => {
                   <div className="flex gap-2">
                     <Input
                       value={editingLabel}
-                      onChange={(e) => setEditingLabel(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && handleSaveEdit()}
+                      onChange={e => setEditingLabel(e.target.value)}
+                      onKeyDown={e => e.key === 'Enter' && handleSaveEdit()}
                       className="h-8 flex-1"
                       autoFocus
                     />
@@ -384,14 +414,18 @@ const SupportSubjectsManager = () => {
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="none">Sem dept.</SelectItem>
-                        {departments.filter(d => d.is_active).map(dept => (
-                          <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
-                        ))}
+                        {departments
+                          .filter(d => d.is_active)
+                          .map(dept => (
+                            <SelectItem key={dept.id} value={dept.id}>
+                              {dept.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>
                 ) : (
-                  <span className={!subject.is_active ? "text-muted-foreground" : ""}>
+                  <span className={!subject.is_active ? 'text-muted-foreground' : ''}>
                     {subject.label}
                   </span>
                 )}
@@ -410,8 +444,10 @@ const SupportSubjectsManager = () => {
                     </SelectContent>
                   </Select>
                 ) : (
-                  <Badge className={priorityColors[subject.default_priority] || priorityColors.medium}>
-                    {priorityLabels[subject.default_priority] || "Média"}
+                  <Badge
+                    className={priorityColors[subject.default_priority] || priorityColors.medium}
+                  >
+                    {priorityLabels[subject.default_priority] || 'Média'}
                   </Badge>
                 )}
               </TableCell>
@@ -434,11 +470,7 @@ const SupportSubjectsManager = () => {
                     </>
                   ) : (
                     <>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleStartEdit(subject)}
-                      >
+                      <Button variant="ghost" size="sm" onClick={() => handleStartEdit(subject)}>
                         <Pencil className="h-4 w-4" />
                       </Button>
                       <AlertDialog>
@@ -460,8 +492,8 @@ const SupportSubjectsManager = () => {
                           <AlertDialogHeader>
                             <AlertDialogTitle>Eliminar Assunto</AlertDialogTitle>
                             <AlertDialogDescription>
-                              Tem a certeza que deseja eliminar o assunto <strong>"{subject.label}"</strong>?
-                              Esta ação não pode ser revertida.
+                              Tem a certeza que deseja eliminar o assunto{' '}
+                              <strong>"{subject.label}"</strong>? Esta ação não pode ser revertida.
                             </AlertDialogDescription>
                           </AlertDialogHeader>
                           <AlertDialogFooter>
@@ -490,9 +522,7 @@ const SupportSubjectsManager = () => {
     <Card className="shadow-card">
       <CardHeader>
         <CardTitle className="font-display text-xl">Assuntos de Suporte</CardTitle>
-        <CardDescription>
-          Gerir os assuntos disponíveis para tickets de suporte
-        </CardDescription>
+        <CardDescription>Gerir os assuntos disponíveis para tickets de suporte</CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
         {/* Add new subject */}
@@ -500,8 +530,8 @@ const SupportSubjectsManager = () => {
           <Input
             placeholder="Novo assunto..."
             value={newSubjectLabel}
-            onChange={(e) => setNewSubjectLabel(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && handleAddSubject()}
+            onChange={e => setNewSubjectLabel(e.target.value)}
+            onKeyDown={e => e.key === 'Enter' && handleAddSubject()}
             disabled={isAdding}
             className="flex-1"
           />
@@ -511,9 +541,13 @@ const SupportSubjectsManager = () => {
             </SelectTrigger>
             <SelectContent>
               <SelectItem value="none">Sem departamento</SelectItem>
-              {departments.filter(d => d.is_active).map(dept => (
-                <SelectItem key={dept.id} value={dept.id}>{dept.name}</SelectItem>
-              ))}
+              {departments
+                .filter(d => d.is_active)
+                .map(dept => (
+                  <SelectItem key={dept.id} value={dept.id}>
+                    {dept.name}
+                  </SelectItem>
+                ))}
             </SelectContent>
           </Select>
           <Select value={newSubjectPriority} onValueChange={setNewSubjectPriority}>
@@ -527,18 +561,19 @@ const SupportSubjectsManager = () => {
               <SelectItem value="urgent">Urgente</SelectItem>
             </SelectContent>
           </Select>
-          <Button variant="gold" onClick={handleAddSubject} disabled={isAdding || !newSubjectLabel.trim()}>
-            {isAdding ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Plus className="h-4 w-4" />
-            )}
+          <Button
+            variant="gold"
+            onClick={handleAddSubject}
+            disabled={isAdding || !newSubjectLabel.trim()}
+          >
+            {isAdding ? <Loader2 className="h-4 w-4 animate-spin" /> : <Plus className="h-4 w-4" />}
           </Button>
         </div>
 
         {departments.length === 0 && (
           <p className="text-sm text-muted-foreground bg-muted/50 p-3 rounded-lg">
-            💡 Crie departamentos de suporte primeiro para poder associar assuntos a departamentos específicos.
+            💡 Crie departamentos de suporte primeiro para poder associar assuntos a departamentos
+            específicos.
           </p>
         )}
 
@@ -548,9 +583,7 @@ const SupportSubjectsManager = () => {
             <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
           </div>
         ) : subjects.length === 0 ? (
-          <p className="text-muted-foreground text-center py-8">
-            Nenhum assunto cadastrado.
-          </p>
+          <p className="text-muted-foreground text-center py-8">Nenhum assunto cadastrado.</p>
         ) : (
           <div className="space-y-3">
             {/* Departments with subjects */}
@@ -585,10 +618,7 @@ const SupportSubjectsManager = () => {
 
             {/* Subjects without department */}
             {subjectsByDepartment['none']?.length > 0 && (
-              <Collapsible
-                open={openSections['none']}
-                onOpenChange={() => toggleSection('none')}
-              >
+              <Collapsible open={openSections['none']} onOpenChange={() => toggleSection('none')}>
                 <div className="border rounded-lg overflow-hidden border-dashed">
                   <CollapsibleTrigger className="flex items-center gap-2 w-full p-3 bg-muted/30 hover:bg-muted/50 transition-colors text-left">
                     {openSections['none'] ? (

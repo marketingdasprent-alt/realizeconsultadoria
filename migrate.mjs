@@ -4,7 +4,8 @@ import path from 'path';
 
 const ACCESS_TOKEN = 'sbp_1f7d2c31efdf191009f56bc3041e9cf3ee373168';
 const PROJECT_REF = 'jvvnsoasylusbmxfotci';
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dm5zb2FzeWx1c2JteGZvdGNpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTA1MDUyNCwiZXhwIjoyMDkwNjI2NTI0fQ.bSpoekoIJMo4gwZDYNHVCqL7VOauKSryvShBN_p2tog';
+const SERVICE_ROLE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dm5zb2FzeWx1c2JteGZvdGNpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTA1MDUyNCwiZXhwIjoyMDkwNjI2NTI0fQ.bSpoekoIJMo4gwZDYNHVCqL7VOauKSryvShBN_p2tog';
 const SUPABASE_URL = 'https://jvvnsoasylusbmxfotci.supabase.co';
 
 const MIGRATIONS_DIR = './supabase/migrations';
@@ -49,7 +50,7 @@ async function executeSQL(sql) {
   const res = await fetch(`https://api.supabase.com/v1/projects/${PROJECT_REF}/database/query`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${ACCESS_TOKEN}`,
+      Authorization: `Bearer ${ACCESS_TOKEN}`,
       'Content-Type': 'application/json',
     },
     body: JSON.stringify({ query: sql }),
@@ -90,8 +91,8 @@ async function createAuthUsers() {
     const res = await fetch(`${SUPABASE_URL}/auth/v1/admin/users`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-        'apikey': SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        apikey: SERVICE_ROLE_KEY,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -105,7 +106,11 @@ async function createAuthUsers() {
     const data = await res.json();
     if (res.ok) {
       created++;
-    } else if (data.msg?.includes('already been registered') || data.code === 'email_exists' || res.status === 422) {
+    } else if (
+      data.msg?.includes('already been registered') ||
+      data.code === 'email_exists' ||
+      res.status === 422
+    ) {
       skipped++;
     } else {
       console.log(`  ⚠ ${profile.email}: ${data.msg || data.message || res.status}`);
@@ -144,10 +149,10 @@ async function importCSV(table) {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-        'apikey': SERVICE_ROLE_KEY,
+        Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+        apikey: SERVICE_ROLE_KEY,
         'Content-Type': 'application/json',
-        'Prefer': 'resolution=ignore-duplicates,return=minimal',
+        Prefer: 'resolution=ignore-duplicates,return=minimal',
       },
       body: JSON.stringify(cleaned),
     });
@@ -162,7 +167,9 @@ async function importCSV(table) {
   }
 
   if (errors > 0) {
-    console.log(`  ⚠ ${table}: ${inserted} inseridas, ${errors} erros — ${lastError.slice(0, 100)}`);
+    console.log(
+      `  ⚠ ${table}: ${inserted} inseridas, ${errors} erros — ${lastError.slice(0, 100)}`
+    );
   } else {
     console.log(`  ✓ ${table}: ${inserted} linhas inseridas`);
   }

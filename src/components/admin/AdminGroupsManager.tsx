@@ -1,19 +1,54 @@
-import { useState, useEffect } from "react";
-import { Plus, Pencil, Trash2, Loader2, Users, Shield, X, Save, ChevronDown, ChevronRight, Building2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { Switch } from "@/components/ui/switch";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
-import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle, AlertDialogTrigger } from "@/components/ui/alert-dialog";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { PERMISSIONS_CONFIG, MODULE_LABELS, ALL_MODULE_KEYS } from "@/lib/permissions-config";
+import { useState, useEffect } from 'react';
+import {
+  Plus,
+  Pencil,
+  Trash2,
+  Loader2,
+  Users,
+  Shield,
+  X,
+  Save,
+  ChevronDown,
+  ChevronRight,
+  Building2,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { Switch } from '@/components/ui/switch';
+import { Checkbox } from '@/components/ui/checkbox';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+} from '@/components/ui/dialog';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { PERMISSIONS_CONFIG, MODULE_LABELS, ALL_MODULE_KEYS } from '@/lib/permissions-config';
 
 interface AdminGroup {
   id: string;
@@ -49,8 +84,8 @@ const AdminGroupsManager = () => {
   const [expandedModules, setExpandedModules] = useState<Set<string>>(new Set());
 
   // Form state
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
+  const [name, setName] = useState('');
+  const [description, setDescription] = useState('');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
   const [permissions, setPermissions] = useState<TopicPermission[]>([]);
   const [selectedDepartments, setSelectedDepartments] = useState<Set<string>>(new Set());
@@ -64,7 +99,7 @@ const AdminGroupsManager = () => {
           module_key: module.moduleKey,
           topic_key: topic.key,
           can_view: false,
-          can_execute: false
+          can_execute: false,
         });
       });
     });
@@ -83,15 +118,13 @@ const AdminGroupsManager = () => {
         supabase
           .from('support_departments')
           .select('id, name, is_active')
-          .order('sort_order', { ascending: true })
+          .order('sort_order', { ascending: true }),
       ]);
 
       if (groupsRes.error) throw groupsRes.error;
 
       // Get member counts
-      const { data: memberCounts } = await supabase
-        .from('admin_group_members')
-        .select('group_id');
+      const { data: memberCounts } = await supabase.from('admin_group_members').select('group_id');
 
       const countMap = new Map<string, number>();
       memberCounts?.forEach(m => {
@@ -100,7 +133,7 @@ const AdminGroupsManager = () => {
 
       const groupsWithCounts = (groupsRes.data || []).map(g => ({
         ...g,
-        member_count: countMap.get(g.id) || 0
+        member_count: countMap.get(g.id) || 0,
       }));
 
       setGroups(groupsWithCounts);
@@ -108,9 +141,9 @@ const AdminGroupsManager = () => {
     } catch (error: any) {
       console.error('Error fetching groups:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível carregar os grupos",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Não foi possível carregar os grupos',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -122,8 +155,8 @@ const AdminGroupsManager = () => {
   }, []);
 
   const resetForm = () => {
-    setName("");
-    setDescription("");
+    setName('');
+    setDescription('');
     setIsSuperAdmin(false);
     setPermissions(initializePermissions());
     setSelectedDepartments(new Set());
@@ -135,7 +168,7 @@ const AdminGroupsManager = () => {
     if (group) {
       setEditingGroup(group);
       setName(group.name);
-      setDescription(group.description || "");
+      setDescription(group.description || '');
       setIsSuperAdmin(group.is_super_admin);
 
       // Fetch permissions for this group
@@ -155,7 +188,7 @@ const AdminGroupsManager = () => {
         }
       });
       setPermissions(initialPerms);
-      
+
       // Expand modules that have permissions
       const modulesWithPerms = new Set<string>();
       perms?.forEach(p => {
@@ -196,51 +229,62 @@ const AdminGroupsManager = () => {
   };
 
   const handlePermissionChange = (
-    moduleKey: string, 
-    topicKey: string, 
-    field: 'can_view' | 'can_execute', 
+    moduleKey: string,
+    topicKey: string,
+    field: 'can_view' | 'can_execute',
     value: boolean
   ) => {
-    setPermissions(prev => prev.map(p => {
-      if (p.module_key !== moduleKey || p.topic_key !== topicKey) return p;
-      return { ...p, [field]: value };
-    }));
+    setPermissions(prev =>
+      prev.map(p => {
+        if (p.module_key !== moduleKey || p.topic_key !== topicKey) return p;
+        return { ...p, [field]: value };
+      })
+    );
   };
 
-  const handleModuleToggleAll = (moduleKey: string, field: 'can_view' | 'can_execute', value: boolean) => {
-    setPermissions(prev => prev.map(p => {
-      if (p.module_key !== moduleKey) return p;
-      const topic = PERMISSIONS_CONFIG
-        .find(m => m.moduleKey === moduleKey)
-        ?.topics.find(t => t.key === p.topic_key);
-      
-      if (!topic) return p;
-      
-      // Only toggle if the topic supports this field
-      if (field === 'can_view' && !topic.hasView) return p;
-      if (field === 'can_execute' && !topic.hasExecute) return p;
-      
-      return { ...p, [field]: value };
-    }));
+  const handleModuleToggleAll = (
+    moduleKey: string,
+    field: 'can_view' | 'can_execute',
+    value: boolean
+  ) => {
+    setPermissions(prev =>
+      prev.map(p => {
+        if (p.module_key !== moduleKey) return p;
+        const topic = PERMISSIONS_CONFIG.find(m => m.moduleKey === moduleKey)?.topics.find(
+          t => t.key === p.topic_key
+        );
+
+        if (!topic) return p;
+
+        // Only toggle if the topic supports this field
+        if (field === 'can_view' && !topic.hasView) return p;
+        if (field === 'can_execute' && !topic.hasExecute) return p;
+
+        return { ...p, [field]: value };
+      })
+    );
   };
 
-  const getModulePermissionState = (moduleKey: string, field: 'can_view' | 'can_execute'): boolean | 'indeterminate' => {
+  const getModulePermissionState = (
+    moduleKey: string,
+    field: 'can_view' | 'can_execute'
+  ): boolean | 'indeterminate' => {
     const modulePerms = permissions.filter(p => p.module_key === moduleKey);
     const moduleConfig = PERMISSIONS_CONFIG.find(m => m.moduleKey === moduleKey);
-    
+
     if (!moduleConfig) return false;
-    
-    const relevantTopics = moduleConfig.topics.filter(t => 
+
+    const relevantTopics = moduleConfig.topics.filter(t =>
       field === 'can_view' ? t.hasView : t.hasExecute
     );
-    
+
     if (relevantTopics.length === 0) return false;
-    
+
     const checkedCount = modulePerms.filter(p => {
       const topic = relevantTopics.find(t => t.key === p.topic_key);
       return topic && p[field];
     }).length;
-    
+
     if (checkedCount === 0) return false;
     if (checkedCount === relevantTopics.length) return true;
     return 'indeterminate';
@@ -261,9 +305,9 @@ const AdminGroupsManager = () => {
   const handleSave = async () => {
     if (!name.trim()) {
       toast({
-        title: "Erro",
-        description: "O nome do grupo é obrigatório",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'O nome do grupo é obrigatório',
+        variant: 'destructive',
       });
       return;
     }
@@ -277,7 +321,7 @@ const AdminGroupsManager = () => {
           .update({
             name: name.trim(),
             description: description.trim() || null,
-            is_super_admin: isSuperAdmin
+            is_super_admin: isSuperAdmin,
           })
           .eq('id', editingGroup.id);
 
@@ -285,10 +329,7 @@ const AdminGroupsManager = () => {
 
         // Delete old permissions and insert new ones (only if not super admin)
         if (!isSuperAdmin) {
-          await supabase
-            .from('admin_group_permissions')
-            .delete()
-            .eq('group_id', editingGroup.id);
+          await supabase.from('admin_group_permissions').delete().eq('group_id', editingGroup.id);
 
           const permissionsToInsert = permissions
             .filter(p => p.can_view || p.can_execute)
@@ -298,7 +339,7 @@ const AdminGroupsManager = () => {
               topic_key: p.topic_key,
               can_view: p.can_view,
               can_edit: p.can_execute, // Backwards compatibility: can_edit = can_execute for module-level
-              can_execute: p.can_execute
+              can_execute: p.can_execute,
             }));
 
           if (permissionsToInsert.length > 0) {
@@ -318,7 +359,7 @@ const AdminGroupsManager = () => {
           if (selectedDepartments.size > 0) {
             const deptInserts = Array.from(selectedDepartments).map(deptId => ({
               group_id: editingGroup.id,
-              department_id: deptId
+              department_id: deptId,
             }));
 
             const { error: deptError } = await supabase
@@ -329,10 +370,7 @@ const AdminGroupsManager = () => {
           }
         } else {
           // Super admin groups don't need explicit permissions
-          await supabase
-            .from('admin_group_permissions')
-            .delete()
-            .eq('group_id', editingGroup.id);
+          await supabase.from('admin_group_permissions').delete().eq('group_id', editingGroup.id);
 
           await supabase
             .from('admin_group_support_departments')
@@ -340,7 +378,7 @@ const AdminGroupsManager = () => {
             .eq('group_id', editingGroup.id);
         }
 
-        toast({ title: "Grupo atualizado com sucesso!" });
+        toast({ title: 'Grupo atualizado com sucesso!' });
       } else {
         // Create new group
         const { data: newGroup, error: createError } = await supabase
@@ -348,7 +386,7 @@ const AdminGroupsManager = () => {
           .insert({
             name: name.trim(),
             description: description.trim() || null,
-            is_super_admin: isSuperAdmin
+            is_super_admin: isSuperAdmin,
           })
           .select()
           .single();
@@ -365,7 +403,7 @@ const AdminGroupsManager = () => {
               topic_key: p.topic_key,
               can_view: p.can_view,
               can_edit: p.can_execute,
-              can_execute: p.can_execute
+              can_execute: p.can_execute,
             }));
 
           if (permissionsToInsert.length > 0) {
@@ -380,7 +418,7 @@ const AdminGroupsManager = () => {
           if (selectedDepartments.size > 0) {
             const deptInserts = Array.from(selectedDepartments).map(deptId => ({
               group_id: newGroup.id,
-              department_id: deptId
+              department_id: deptId,
             }));
 
             const { error: deptError } = await supabase
@@ -391,7 +429,7 @@ const AdminGroupsManager = () => {
           }
         }
 
-        toast({ title: "Grupo criado com sucesso!" });
+        toast({ title: 'Grupo criado com sucesso!' });
       }
 
       handleCloseDialog();
@@ -399,9 +437,9 @@ const AdminGroupsManager = () => {
     } catch (error: any) {
       console.error('Error saving group:', error);
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setIsSaving(false);
@@ -417,16 +455,14 @@ const AdminGroupsManager = () => {
 
       if (error) throw error;
 
-      setGroups(prev => prev.map(g => 
-        g.id === group.id ? { ...g, is_active: !g.is_active } : g
-      ));
+      setGroups(prev => prev.map(g => (g.id === group.id ? { ...g, is_active: !g.is_active } : g)));
 
-      toast({ title: group.is_active ? "Grupo desativado" : "Grupo ativado" });
+      toast({ title: group.is_active ? 'Grupo desativado' : 'Grupo ativado' });
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -434,20 +470,17 @@ const AdminGroupsManager = () => {
   const handleDelete = async (groupId: string) => {
     setDeletingGroupId(groupId);
     try {
-      const { error } = await supabase
-        .from('admin_groups')
-        .delete()
-        .eq('id', groupId);
+      const { error } = await supabase.from('admin_groups').delete().eq('id', groupId);
 
       if (error) throw error;
 
       setGroups(prev => prev.filter(g => g.id !== groupId));
-      toast({ title: "Grupo eliminado" });
+      toast({ title: 'Grupo eliminado' });
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setDeletingGroupId(null);
@@ -455,8 +488,8 @@ const AdminGroupsManager = () => {
   };
 
   const getPermissionsSummary = (group: AdminGroup) => {
-    if (group.is_super_admin) return "Acesso total";
-    return "Personalizado";
+    if (group.is_super_admin) return 'Acesso total';
+    return 'Personalizado';
   };
 
   const activeDepartments = supportDepartments.filter(d => d.is_active);
@@ -500,7 +533,7 @@ const AdminGroupsManager = () => {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {groups.map((group) => (
+                {groups.map(group => (
                   <TableRow key={group.id}>
                     <TableCell className="font-medium">
                       <div className="flex items-center gap-2">
@@ -509,7 +542,7 @@ const AdminGroupsManager = () => {
                       </div>
                     </TableCell>
                     <TableCell className="text-muted-foreground max-w-xs truncate">
-                      {group.description || "—"}
+                      {group.description || '—'}
                     </TableCell>
                     <TableCell>
                       <Badge variant="secondary">
@@ -543,11 +576,7 @@ const AdminGroupsManager = () => {
                             <Pencil className="h-4 w-4 text-muted-foreground" />
                           </Button>
                         ) : (
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => handleOpenDialog(group)}
-                          >
+                          <Button variant="ghost" size="sm" onClick={() => handleOpenDialog(group)}>
                             <Pencil className="h-4 w-4" />
                           </Button>
                         )}
@@ -571,8 +600,9 @@ const AdminGroupsManager = () => {
                               <AlertDialogHeader>
                                 <AlertDialogTitle>Eliminar Grupo</AlertDialogTitle>
                                 <AlertDialogDescription>
-                                  Tem a certeza que deseja eliminar o grupo <strong>{group.name}</strong>?
-                                  Os membros deste grupo perderão as permissões associadas.
+                                  Tem a certeza que deseja eliminar o grupo{' '}
+                                  <strong>{group.name}</strong>? Os membros deste grupo perderão as
+                                  permissões associadas.
                                 </AlertDialogDescription>
                               </AlertDialogHeader>
                               <AlertDialogFooter>
@@ -601,11 +631,11 @@ const AdminGroupsManager = () => {
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{editingGroup ? "Editar Grupo" : "Novo Grupo de Acesso"}</DialogTitle>
+            <DialogTitle>{editingGroup ? 'Editar Grupo' : 'Novo Grupo de Acesso'}</DialogTitle>
             <DialogDescription>
-              {editingGroup 
-                ? "Altere as configurações e permissões do grupo" 
-                : "Defina o nome e as permissões para o novo grupo"}
+              {editingGroup
+                ? 'Altere as configurações e permissões do grupo'
+                : 'Defina o nome e as permissões para o novo grupo'}
             </DialogDescription>
           </DialogHeader>
 
@@ -616,7 +646,7 @@ const AdminGroupsManager = () => {
                 <Input
                   id="group-name"
                   value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  onChange={e => setName(e.target.value)}
                   placeholder="Ex: Gestão de Pedidos"
                   className="mt-1"
                 />
@@ -626,7 +656,7 @@ const AdminGroupsManager = () => {
                 <Input
                   id="group-description"
                   value={description}
-                  onChange={(e) => setDescription(e.target.value)}
+                  onChange={e => setDescription(e.target.value)}
                   placeholder="Descrição opcional do grupo"
                   className="mt-1"
                 />
@@ -635,7 +665,7 @@ const AdminGroupsManager = () => {
                 <Checkbox
                   id="is-super-admin"
                   checked={isSuperAdmin}
-                  onCheckedChange={(checked) => setIsSuperAdmin(checked === true)}
+                  onCheckedChange={checked => setIsSuperAdmin(checked === true)}
                 />
                 <Label htmlFor="is-super-admin" className="cursor-pointer">
                   Super Admin (acesso total a todos os módulos e funcionalidades)
@@ -648,18 +678,22 @@ const AdminGroupsManager = () => {
                 <div>
                   <Label className="text-base font-medium">Permissões por Funcionalidade</Label>
                   <p className="text-sm text-muted-foreground mb-4">
-                    Selecione quais funcionalidades este grupo pode visualizar e executar em cada módulo
+                    Selecione quais funcionalidades este grupo pode visualizar e executar em cada
+                    módulo
                   </p>
                   <div className="border rounded-lg divide-y">
-                    {PERMISSIONS_CONFIG.map((module) => {
+                    {PERMISSIONS_CONFIG.map(module => {
                       const isExpanded = expandedModules.has(module.moduleKey);
                       const viewState = getModulePermissionState(module.moduleKey, 'can_view');
-                      const executeState = getModulePermissionState(module.moduleKey, 'can_execute');
+                      const executeState = getModulePermissionState(
+                        module.moduleKey,
+                        'can_execute'
+                      );
                       const hasViewTopics = module.topics.some(t => t.hasView);
                       const hasExecuteTopics = module.topics.some(t => t.hasExecute);
-                      
+
                       return (
-                        <Collapsible 
+                        <Collapsible
                           key={module.moduleKey}
                           open={isExpanded}
                           onOpenChange={() => toggleModule(module.moduleKey)}
@@ -677,19 +711,26 @@ const AdminGroupsManager = () => {
                                   {module.topics.length} funcionalidades
                                 </Badge>
                               </div>
-                              <div className="flex items-center gap-6" onClick={(e) => e.stopPropagation()}>
+                              <div
+                                className="flex items-center gap-6"
+                                onClick={e => e.stopPropagation()}
+                              >
                                 {hasViewTopics && (
                                   <div className="flex items-center gap-2">
                                     <span className="text-sm text-muted-foreground">Ver</span>
                                     <Checkbox
                                       checked={viewState === true}
-                                      ref={(el) => {
+                                      ref={el => {
                                         if (el && viewState === 'indeterminate') {
                                           el.dataset.state = 'indeterminate';
                                         }
                                       }}
-                                      onCheckedChange={(checked) => 
-                                        handleModuleToggleAll(module.moduleKey, 'can_view', checked === true)
+                                      onCheckedChange={checked =>
+                                        handleModuleToggleAll(
+                                          module.moduleKey,
+                                          'can_view',
+                                          checked === true
+                                        )
                                       }
                                     />
                                   </div>
@@ -699,13 +740,17 @@ const AdminGroupsManager = () => {
                                     <span className="text-sm text-muted-foreground">Executar</span>
                                     <Checkbox
                                       checked={executeState === true}
-                                      ref={(el) => {
+                                      ref={el => {
                                         if (el && executeState === 'indeterminate') {
                                           el.dataset.state = 'indeterminate';
                                         }
                                       }}
-                                      onCheckedChange={(checked) => 
-                                        handleModuleToggleAll(module.moduleKey, 'can_execute', checked === true)
+                                      onCheckedChange={checked =>
+                                        handleModuleToggleAll(
+                                          module.moduleKey,
+                                          'can_execute',
+                                          checked === true
+                                        )
                                       }
                                     />
                                   </div>
@@ -724,28 +769,32 @@ const AdminGroupsManager = () => {
                                   </TableRow>
                                 </TableHeader>
                                 <TableBody>
-                                  {module.topics.map((topic) => {
+                                  {module.topics.map(topic => {
                                     const perm = permissions.find(
-                                      p => p.module_key === module.moduleKey && p.topic_key === topic.key
+                                      p =>
+                                        p.module_key === module.moduleKey &&
+                                        p.topic_key === topic.key
                                     );
-                                    
+
                                     return (
                                       <TableRow key={topic.key} className="hover:bg-muted/50">
                                         <TableCell className="pl-12">
                                           <div>
                                             <span className="font-medium">{topic.label}</span>
-                                            <p className="text-xs text-muted-foreground">{topic.description}</p>
+                                            <p className="text-xs text-muted-foreground">
+                                              {topic.description}
+                                            </p>
                                           </div>
                                         </TableCell>
                                         <TableCell className="text-center">
                                           {topic.hasView ? (
                                             <Checkbox
                                               checked={perm?.can_view || false}
-                                              onCheckedChange={(checked) => 
+                                              onCheckedChange={checked =>
                                                 handlePermissionChange(
-                                                  module.moduleKey, 
-                                                  topic.key, 
-                                                  'can_view', 
+                                                  module.moduleKey,
+                                                  topic.key,
+                                                  'can_view',
                                                   checked === true
                                                 )
                                               }
@@ -758,11 +807,11 @@ const AdminGroupsManager = () => {
                                           {topic.hasExecute ? (
                                             <Checkbox
                                               checked={perm?.can_execute || false}
-                                              onCheckedChange={(checked) => 
+                                              onCheckedChange={checked =>
                                                 handlePermissionChange(
-                                                  module.moduleKey, 
-                                                  topic.key, 
-                                                  'can_execute', 
+                                                  module.moduleKey,
+                                                  topic.key,
+                                                  'can_execute',
                                                   checked === true
                                                 )
                                               }
@@ -795,26 +844,24 @@ const AdminGroupsManager = () => {
                       Selecione quais departamentos de suporte este grupo pode visualizar e gerir
                     </p>
                     <div className="border rounded-lg p-4 space-y-3">
-                      {activeDepartments.map((dept) => (
+                      {activeDepartments.map(dept => (
                         <div key={dept.id} className="flex items-center gap-3">
                           <Checkbox
                             id={`dept-${dept.id}`}
                             checked={selectedDepartments.has(dept.id)}
-                            onCheckedChange={(checked) => 
+                            onCheckedChange={checked =>
                               handleDepartmentToggle(dept.id, checked === true)
                             }
                           />
-                          <Label 
-                            htmlFor={`dept-${dept.id}`} 
-                            className="cursor-pointer font-normal"
-                          >
+                          <Label htmlFor={`dept-${dept.id}`} className="cursor-pointer font-normal">
                             {dept.name}
                           </Label>
                         </div>
                       ))}
                       {selectedDepartments.size === 0 && (
                         <p className="text-sm text-muted-foreground">
-                          Sem departamentos selecionados - este grupo não terá acesso a tickets de suporte com departamento atribuído
+                          Sem departamentos selecionados - este grupo não terá acesso a tickets de
+                          suporte com departamento atribuído
                         </p>
                       )}
                     </div>
@@ -835,7 +882,7 @@ const AdminGroupsManager = () => {
               ) : (
                 <Save className="h-4 w-4 mr-2" />
               )}
-              {isSaving ? "A guardar..." : "Guardar"}
+              {isSaving ? 'A guardar...' : 'Guardar'}
             </Button>
           </div>
         </DialogContent>

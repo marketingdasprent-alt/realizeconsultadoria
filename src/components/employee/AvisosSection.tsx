@@ -32,7 +32,9 @@ export function AvisosSection({ companyId, employeeId }: AvisosSectionProps) {
       .from('notifications')
       .select('id, title, message, created_at')
       .eq('is_active', true)
-      .or(`and(company_id.is.null,employee_id.is.null),and(company_id.eq.${companyId},employee_id.is.null),employee_id.eq.${employeeId}`)
+      .or(
+        `and(company_id.is.null,employee_id.is.null),and(company_id.eq.${companyId},employee_id.is.null),employee_id.eq.${employeeId}`
+      )
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -44,11 +46,11 @@ export function AvisosSection({ companyId, employeeId }: AvisosSectionProps) {
   };
 
   const handlePrevious = () => {
-    setCurrentIndex((prev) => (prev === 0 ? avisos.length - 1 : prev - 1));
+    setCurrentIndex(prev => (prev === 0 ? avisos.length - 1 : prev - 1));
   };
 
   const handleNext = () => {
-    setCurrentIndex((prev) => (prev === avisos.length - 1 ? 0 : prev + 1));
+    setCurrentIndex(prev => (prev === avisos.length - 1 ? 0 : prev + 1));
   };
 
   if (avisos.length === 0) {
@@ -97,7 +99,9 @@ export function AvisosSection({ companyId, employeeId }: AvisosSectionProps) {
             </Button>
           )}
           <div className="flex-1 p-2 lg:p-3 bg-background border border-red-200 rounded-lg min-w-0">
-            <h4 className="font-semibold text-foreground text-sm lg:text-base">{currentAviso.title}</h4>
+            <h4 className="font-semibold text-foreground text-sm lg:text-base">
+              {currentAviso.title}
+            </h4>
             <p className="text-xs lg:text-sm text-muted-foreground mt-1 whitespace-pre-wrap break-words">
               {currentAviso.message}
             </p>

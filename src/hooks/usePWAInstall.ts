@@ -18,7 +18,8 @@ export function usePWAInstall(): PWAInstallHook {
   useEffect(() => {
     // Check if already installed
     const checkInstalled = () => {
-      const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
+      const isPWA =
+        window.matchMedia('(display-mode: standalone)').matches ||
         (window.navigator as any).standalone === true;
       setIsInstalled(isPWA);
     };
@@ -60,7 +61,7 @@ export function usePWAInstall(): PWAInstallHook {
     try {
       await deferredPrompt.prompt();
       const { outcome } = await deferredPrompt.userChoice;
-      
+
       if (outcome === 'accepted') {
         setDeferredPrompt(null);
         return true;

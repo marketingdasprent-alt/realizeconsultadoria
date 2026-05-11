@@ -1,23 +1,18 @@
-import { useState, useEffect, useRef } from "react";
-import { Loader2, Paperclip, X, FileText, Image } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+import { useState, useEffect, useRef } from 'react';
+import { Loader2, Paperclip, X, FileText, Image } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Textarea } from "@/components/ui/textarea";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { sanitizeFileName } from "@/lib/utils";
+} from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { sanitizeFileName } from '@/lib/utils';
 
 interface SupportSubject {
   id: string;
@@ -44,13 +39,7 @@ interface NewTicketDialogProps {
 
 const MAX_FILES = 5;
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10MB
-const ACCEPTED_TYPES = [
-  "image/jpeg",
-  "image/png",
-  "image/webp",
-  "image/gif",
-  "application/pdf",
-];
+const ACCEPTED_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/pdf'];
 
 const formatFileSize = (bytes: number) => {
   if (bytes < 1024) return `${bytes} B`;
@@ -76,21 +65,21 @@ const NewTicketDialog = ({
   const [isLoadingDepartments, setIsLoadingDepartments] = useState(true);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  const [selectedDepartment, setSelectedDepartment] = useState("");
-  const [subject, setSubject] = useState("");
-  const [message, setMessage] = useState("");
+  const [selectedDepartment, setSelectedDepartment] = useState('');
+  const [subject, setSubject] = useState('');
+  const [message, setMessage] = useState('');
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
   const loadSubjects = async () => {
     setIsLoadingSubjects(true);
     const { data, error } = await supabase
-      .from("support_ticket_subjects")
-      .select("id, label, default_priority, department_id")
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true });
+      .from('support_ticket_subjects')
+      .select('id, label, default_priority, department_id')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
 
     if (error) {
-      console.error("Error loading subjects:", error);
+      console.error('Error loading subjects:', error);
     } else {
       setSubjects(data || []);
     }
@@ -100,13 +89,13 @@ const NewTicketDialog = ({
   const loadDepartments = async () => {
     setIsLoadingDepartments(true);
     const { data, error } = await supabase
-      .from("support_departments")
-      .select("id, name")
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true });
+      .from('support_departments')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('sort_order', { ascending: true });
 
     if (error) {
-      console.error("Error loading departments:", error);
+      console.error('Error loading departments:', error);
     } else {
       setDepartments(data || []);
     }
@@ -120,13 +109,11 @@ const NewTicketDialog = ({
     }
   }, [open]);
 
-  const filteredSubjects = subjects.filter(
-    (s) => s.department_id === selectedDepartment
-  );
+  const filteredSubjects = subjects.filter(s => s.department_id === selectedDepartment);
 
   const handleDepartmentChange = (value: string) => {
     setSelectedDepartment(value);
-    setSubject("");
+    setSubject('');
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -137,17 +124,17 @@ const NewTicketDialog = ({
     for (const file of files.slice(0, remaining)) {
       if (!ACCEPTED_TYPES.includes(file.type)) {
         toast({
-          title: "Tipo de ficheiro não aceite",
+          title: 'Tipo de ficheiro não aceite',
           description: `"${file.name}" não é suportado. Use imagens (JPG, PNG, WebP, GIF) ou PDF.`,
-          variant: "destructive",
+          variant: 'destructive',
         });
         continue;
       }
       if (file.size > MAX_FILE_SIZE) {
         toast({
-          title: "Ficheiro demasiado grande",
+          title: 'Ficheiro demasiado grande',
           description: `"${file.name}" excede o limite de 10MB.`,
-          variant: "destructive",
+          variant: 'destructive',
         });
         continue;
       }
@@ -156,42 +143,50 @@ const NewTicketDialog = ({
 
     if (files.length > remaining) {
       toast({
-        title: "Limite de ficheiros",
+        title: 'Limite de ficheiros',
         description: `Máximo ${MAX_FILES} ficheiros por ticket.`,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
 
-    setSelectedFiles((prev) => [...prev, ...validFiles]);
-    if (fileInputRef.current) fileInputRef.current.value = "";
+    setSelectedFiles(prev => [...prev, ...validFiles]);
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const removeFile = (index: number) => {
-    setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
   };
 
   const handleSubmit = async () => {
     if (!selectedDepartment) {
-      toast({ title: "Erro", description: "Por favor selecione o departamento.", variant: "destructive" });
+      toast({
+        title: 'Erro',
+        description: 'Por favor selecione o departamento.',
+        variant: 'destructive',
+      });
       return;
     }
     if (!subject.trim()) {
-      toast({ title: "Erro", description: "Por favor indique o assunto.", variant: "destructive" });
+      toast({ title: 'Erro', description: 'Por favor indique o assunto.', variant: 'destructive' });
       return;
     }
     if (!message.trim()) {
-      toast({ title: "Erro", description: "Por favor descreva o seu problema.", variant: "destructive" });
+      toast({
+        title: 'Erro',
+        description: 'Por favor descreva o seu problema.',
+        variant: 'destructive',
+      });
       return;
     }
 
     setIsSubmitting(true);
 
-    const selectedSubject = subjects.find((s) => s.label === subject);
-    const priority = selectedSubject?.default_priority || "medium";
+    const selectedSubject = subjects.find(s => s.label === subject);
+    const priority = selectedSubject?.default_priority || 'medium';
 
     try {
       const { data: ticketData, error } = await supabase
-        .from("support_tickets")
+        .from('support_tickets')
         .insert({
           employee_id: employeeId,
           company_id: companyId,
@@ -200,7 +195,7 @@ const NewTicketDialog = ({
           priority,
           department_id: selectedDepartment,
         })
-        .select("id")
+        .select('id')
         .single();
 
       if (error) throw error;
@@ -209,20 +204,22 @@ const NewTicketDialog = ({
 
       // Upload attachments
       if (selectedFiles.length > 0) {
-        const { data: { session } } = await supabase.auth.getSession();
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
         if (session) {
           for (const file of selectedFiles) {
             const filePath = `${ticketId}/${Date.now()}_${sanitizeFileName(file.name)}`;
             const { error: uploadError } = await supabase.storage
-              .from("ticket-attachments")
+              .from('ticket-attachments')
               .upload(filePath, file);
 
             if (uploadError) {
-              console.error("Upload error:", uploadError);
+              console.error('Upload error:', uploadError);
               continue;
             }
 
-            await supabase.from("support_ticket_attachments").insert({
+            await supabase.from('support_ticket_attachments').insert({
               ticket_id: ticketId,
               file_name: file.name,
               file_path: filePath,
@@ -236,7 +233,7 @@ const NewTicketDialog = ({
 
       // Send notification email
       const { error: notificationError } = await supabase.functions.invoke(
-        "send-ticket-notification",
+        'send-ticket-notification',
         {
           body: {
             employeeName,
@@ -251,18 +248,18 @@ const NewTicketDialog = ({
       );
 
       if (notificationError) {
-        console.error("Ticket notification failed:", notificationError);
+        console.error('Ticket notification failed:', notificationError);
       }
 
-      toast({ title: "Ticket criado com sucesso!" });
+      toast({ title: 'Ticket criado com sucesso!' });
       onOpenChange(false);
-      setSelectedDepartment("");
-      setSubject("");
-      setMessage("");
+      setSelectedDepartment('');
+      setSubject('');
+      setMessage('');
       setSelectedFiles([]);
       onSuccess?.();
     } catch (error: any) {
-      toast({ title: "Erro", description: error.message, variant: "destructive" });
+      toast({ title: 'Erro', description: error.message, variant: 'destructive' });
     } finally {
       setIsSubmitting(false);
     }
@@ -270,9 +267,9 @@ const NewTicketDialog = ({
 
   const handleClose = () => {
     onOpenChange(false);
-    setSelectedDepartment("");
-    setSubject("");
-    setMessage("");
+    setSelectedDepartment('');
+    setSubject('');
+    setMessage('');
     setSelectedFiles([]);
   };
 
@@ -294,16 +291,24 @@ const NewTicketDialog = ({
               </div>
             ) : departments.length === 0 ? (
               <div className="h-11 sm:h-10 px-3 border border-input rounded-md bg-muted flex items-center">
-                <span className="text-sm text-muted-foreground">Nenhum departamento disponível.</span>
+                <span className="text-sm text-muted-foreground">
+                  Nenhum departamento disponível.
+                </span>
               </div>
             ) : (
-              <Select value={selectedDepartment} onValueChange={handleDepartmentChange} disabled={isSubmitting}>
+              <Select
+                value={selectedDepartment}
+                onValueChange={handleDepartmentChange}
+                disabled={isSubmitting}
+              >
                 <SelectTrigger className="h-11 sm:h-10">
                   <SelectValue placeholder="Selecione um departamento" />
                 </SelectTrigger>
                 <SelectContent>
-                  {departments.map((d) => (
-                    <SelectItem key={d.id} value={d.id}>{d.name}</SelectItem>
+                  {departments.map(d => (
+                    <SelectItem key={d.id} value={d.id}>
+                      {d.name}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -314,7 +319,9 @@ const NewTicketDialog = ({
             <label className="block text-sm font-medium mb-2">Assunto *</label>
             {!selectedDepartment ? (
               <div className="h-11 sm:h-10 px-3 border border-input rounded-md bg-muted flex items-center">
-                <span className="text-sm text-muted-foreground">Selecione primeiro um departamento</span>
+                <span className="text-sm text-muted-foreground">
+                  Selecione primeiro um departamento
+                </span>
               </div>
             ) : isLoadingSubjects ? (
               <div className="flex items-center gap-2 h-11 sm:h-10 px-3 border border-input rounded-md bg-muted">
@@ -323,7 +330,9 @@ const NewTicketDialog = ({
               </div>
             ) : filteredSubjects.length === 0 ? (
               <div className="h-11 sm:h-10 px-3 border border-input rounded-md bg-muted flex items-center">
-                <span className="text-sm text-muted-foreground">Nenhum assunto disponível para este departamento.</span>
+                <span className="text-sm text-muted-foreground">
+                  Nenhum assunto disponível para este departamento.
+                </span>
               </div>
             ) : (
               <Select value={subject} onValueChange={setSubject} disabled={isSubmitting}>
@@ -331,8 +340,10 @@ const NewTicketDialog = ({
                   <SelectValue placeholder="Selecione um assunto" />
                 </SelectTrigger>
                 <SelectContent>
-                  {filteredSubjects.map((s) => (
-                    <SelectItem key={s.id} value={s.label}>{s.label}</SelectItem>
+                  {filteredSubjects.map(s => (
+                    <SelectItem key={s.id} value={s.label}>
+                      {s.label}
+                    </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
@@ -343,7 +354,7 @@ const NewTicketDialog = ({
             <label className="block text-sm font-medium mb-2">Descrição *</label>
             <Textarea
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={e => setMessage(e.target.value)}
               placeholder="Descreva o problema em detalhe..."
               rows={5}
               disabled={isSubmitting}
@@ -354,7 +365,10 @@ const NewTicketDialog = ({
           {/* File Attachments */}
           <div>
             <label className="block text-sm font-medium mb-2">
-              Anexos <span className="text-muted-foreground font-normal">(opcional, máx. {MAX_FILES} ficheiros, 10MB cada)</span>
+              Anexos{' '}
+              <span className="text-muted-foreground font-normal">
+                (opcional, máx. {MAX_FILES} ficheiros, 10MB cada)
+              </span>
             </label>
             <input
               ref={fileInputRef}
@@ -384,7 +398,7 @@ const NewTicketDialog = ({
                     key={index}
                     className="flex items-center gap-2 p-2 border border-border rounded-md bg-muted/30"
                   >
-                    {file.type.startsWith("image/") ? (
+                    {file.type.startsWith('image/') ? (
                       <Image className="h-4 w-4 text-muted-foreground shrink-0" />
                     ) : (
                       <FileText className="h-4 w-4 text-muted-foreground shrink-0" />
@@ -410,11 +424,21 @@ const NewTicketDialog = ({
           </div>
 
           <div className="flex flex-col-reverse sm:flex-row justify-end gap-3 pt-4">
-            <Button variant="outline" onClick={handleClose} disabled={isSubmitting} className="w-full sm:w-auto h-11 sm:h-10">
+            <Button
+              variant="outline"
+              onClick={handleClose}
+              disabled={isSubmitting}
+              className="w-full sm:w-auto h-11 sm:h-10"
+            >
               Cancelar
             </Button>
-            <Button variant="gold" onClick={handleSubmit} disabled={isSubmitting} className="w-full sm:w-auto h-11 sm:h-10">
-              {isSubmitting ? "A enviar..." : "Enviar Ticket"}
+            <Button
+              variant="gold"
+              onClick={handleSubmit}
+              disabled={isSubmitting}
+              className="w-full sm:w-auto h-11 sm:h-10"
+            >
+              {isSubmitting ? 'A enviar...' : 'Enviar Ticket'}
             </Button>
           </div>
         </div>

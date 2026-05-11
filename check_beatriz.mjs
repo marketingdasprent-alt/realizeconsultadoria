@@ -1,13 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = "https://jvvnsoasylusbmxfotci.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dm5zb2FzeWx1c2JteGZvdGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNTA1MjQsImV4cCI6MjA5MDYyNjUyNH0.uTsDGNYrin5bemer5vciSYV14IaWC74kQ3L2l6zUalg";
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('❌ ERRO: Configure as variáveis de ambiente:');
+  console.error('  set SUPABASE_URL=your_url');
+  console.error('  set SUPABASE_SERVICE_ROLE_KEY=your_key');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function checkBeatrizAdmin() {
   console.log('Checking Beatriz Veloso (beatrizveloso@dasprent.pt) roles...');
-  
+
   // 1. Find profile
   const { data: profile, error: pError } = await supabase
     .from('profiles')
@@ -33,7 +40,7 @@ async function checkBeatrizAdmin() {
   } else {
     console.log('Roles:', JSON.stringify(roles, null, 2));
   }
-  
+
   // 3. Find if she is also an employee
   const { data: employee, error: eError } = await supabase
     .from('employees')
@@ -42,10 +49,10 @@ async function checkBeatrizAdmin() {
     .maybeSingle();
 
   if (eError) {
-     console.log('Error fetching employee:', eError.message);
+    console.log('Error fetching employee:', eError.message);
   } else {
-     console.log('Is also employee?', !!employee);
-     if (employee) console.log('Employee record:', JSON.stringify(employee, null, 2));
+    console.log('Is also employee?', !!employee);
+    if (employee) console.log('Employee record:', JSON.stringify(employee, null, 2));
   }
 }
 

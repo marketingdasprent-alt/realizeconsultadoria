@@ -1,7 +1,7 @@
-import { motion } from "framer-motion";
-import { ArrowRight } from "lucide-react";
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
+import { motion } from 'framer-motion';
+import { ArrowRight } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
 
 const HeroSection = () => {
   return (
@@ -29,9 +29,7 @@ const HeroSection = () => {
             transition={{ duration: 0.6, delay: 0.1 }}
             className="font-display text-5xl md:text-7xl font-semibold text-background leading-tight mb-6"
           >
-            Realize os seus{" "}
-            <span className="text-gold">objetivos</span>{" "}
-            em Portugal
+            Realize os seus <span className="text-gold">objetivos</span> em Portugal
           </motion.h1>
 
           <motion.p
@@ -40,8 +38,9 @@ const HeroSection = () => {
             transition={{ duration: 0.6, delay: 0.2 }}
             className="text-lg md:text-xl text-background/70 max-w-2xl mb-10 leading-relaxed"
           >
-            Consultoria especializada em gestão de recursos humanos e apoio à imigração. 
-            Acompanhamos empresas e colaboradores em todo o processo de integração e desenvolvimento profissional.
+            Consultoria especializada em gestão de recursos humanos e apoio à imigração.
+            Acompanhamos empresas e colaboradores em todo o processo de integração e desenvolvimento
+            profissional.
           </motion.p>
 
           <motion.div

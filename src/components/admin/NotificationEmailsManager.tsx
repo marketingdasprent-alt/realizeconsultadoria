@@ -1,13 +1,13 @@
-import { useState, useEffect } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Switch } from "@/components/ui/switch";
-import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "@/components/ui/collapsible";
-import { Skeleton } from "@/components/ui/skeleton";
-import { toast } from "sonner";
-import { Mail, Plus, Trash2, ChevronDown, Building2 } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Switch } from '@/components/ui/switch';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { Skeleton } from '@/components/ui/skeleton';
+import { toast } from 'sonner';
+import { Mail, Plus, Trash2, ChevronDown, Building2 } from 'lucide-react';
 
 interface EmailEntry {
   id: string;
@@ -29,7 +29,7 @@ export function NotificationEmailsManager() {
   const [absenceEmails, setAbsenceEmails] = useState<EmailEntry[]>([]);
   const [departments, setDepartments] = useState<SupportDepartment[]>([]);
   const [supportEmails, setSupportEmails] = useState<DepartmentEmails>({});
-  const [newAbsenceEmail, setNewAbsenceEmail] = useState("");
+  const [newAbsenceEmail, setNewAbsenceEmail] = useState('');
   const [newSupportEmails, setNewSupportEmails] = useState<{ [deptId: string]: string }>({});
   const [openDepartments, setOpenDepartments] = useState<string[]>([]);
 
@@ -42,28 +42,28 @@ export function NotificationEmailsManager() {
     try {
       // Fetch absence notification emails
       const { data: absenceData, error: absenceError } = await supabase
-        .from("notification_emails_absences")
-        .select("id, email, is_active")
-        .order("created_at");
+        .from('notification_emails_absences')
+        .select('id, email, is_active')
+        .order('created_at');
 
       if (absenceError) throw absenceError;
       setAbsenceEmails(absenceData || []);
 
       // Fetch departments
       const { data: deptData, error: deptError } = await supabase
-        .from("support_departments")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("sort_order");
+        .from('support_departments')
+        .select('id, name')
+        .eq('is_active', true)
+        .order('sort_order');
 
       if (deptError) throw deptError;
       setDepartments(deptData || []);
 
       // Fetch support notification emails
       const { data: supportData, error: supportError } = await supabase
-        .from("notification_emails_support")
-        .select("id, department_id, email, is_active")
-        .order("created_at");
+        .from('notification_emails_support')
+        .select('id, department_id, email, is_active')
+        .order('created_at');
 
       if (supportError) throw supportError;
 
@@ -77,14 +77,11 @@ export function NotificationEmailsManager() {
       setSupportEmails(grouped);
 
       // Open all departments by default if they have emails
-      const deptWithEmails = (deptData || [])
-        .filter(d => grouped[d.id]?.length > 0)
-        .map(d => d.id);
+      const deptWithEmails = (deptData || []).filter(d => grouped[d.id]?.length > 0).map(d => d.id);
       setOpenDepartments(deptWithEmails);
-
     } catch (error: any) {
-      console.error("Error fetching notification emails:", error);
-      toast.error("Erro ao carregar configurações de notificação");
+      console.error('Error fetching notification emails:', error);
+      toast.error('Erro ao carregar configurações de notificação');
     } finally {
       setIsLoading(false);
     }
@@ -100,18 +97,18 @@ export function NotificationEmailsManager() {
     if (!email) return;
 
     if (!validateEmail(email)) {
-      toast.error("Email inválido");
+      toast.error('Email inválido');
       return;
     }
 
     if (absenceEmails.some(e => e.email.toLowerCase() === email)) {
-      toast.error("Este email já está configurado");
+      toast.error('Este email já está configurado');
       return;
     }
 
     try {
       const { data, error } = await supabase
-        .from("notification_emails_absences")
+        .from('notification_emails_absences')
         .insert({ email })
         .select()
         .single();
@@ -119,68 +116,63 @@ export function NotificationEmailsManager() {
       if (error) throw error;
 
       setAbsenceEmails([...absenceEmails, data]);
-      setNewAbsenceEmail("");
-      toast.success("Email adicionado com sucesso");
+      setNewAbsenceEmail('');
+      toast.success('Email adicionado com sucesso');
     } catch (error: any) {
-      console.error("Error adding absence email:", error);
-      toast.error("Erro ao adicionar email");
+      console.error('Error adding absence email:', error);
+      toast.error('Erro ao adicionar email');
     }
   };
 
   const handleToggleAbsenceEmail = async (id: string, isActive: boolean) => {
     try {
       const { error } = await supabase
-        .from("notification_emails_absences")
+        .from('notification_emails_absences')
         .update({ is_active: isActive })
-        .eq("id", id);
+        .eq('id', id);
 
       if (error) throw error;
 
-      setAbsenceEmails(absenceEmails.map(e => 
-        e.id === id ? { ...e, is_active: isActive } : e
-      ));
+      setAbsenceEmails(absenceEmails.map(e => (e.id === id ? { ...e, is_active: isActive } : e)));
     } catch (error: any) {
-      console.error("Error toggling absence email:", error);
-      toast.error("Erro ao atualizar email");
+      console.error('Error toggling absence email:', error);
+      toast.error('Erro ao atualizar email');
     }
   };
 
   const handleDeleteAbsenceEmail = async (id: string) => {
     try {
-      const { error } = await supabase
-        .from("notification_emails_absences")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from('notification_emails_absences').delete().eq('id', id);
 
       if (error) throw error;
 
       setAbsenceEmails(absenceEmails.filter(e => e.id !== id));
-      toast.success("Email removido");
+      toast.success('Email removido');
     } catch (error: any) {
-      console.error("Error deleting absence email:", error);
-      toast.error("Erro ao remover email");
+      console.error('Error deleting absence email:', error);
+      toast.error('Erro ao remover email');
     }
   };
 
   // Support email handlers
   const handleAddSupportEmail = async (departmentId: string) => {
-    const email = (newSupportEmails[departmentId] || "").trim().toLowerCase();
+    const email = (newSupportEmails[departmentId] || '').trim().toLowerCase();
     if (!email) return;
 
     if (!validateEmail(email)) {
-      toast.error("Email inválido");
+      toast.error('Email inválido');
       return;
     }
 
     const deptEmails = supportEmails[departmentId] || [];
     if (deptEmails.some(e => e.email.toLowerCase() === email)) {
-      toast.error("Este email já está configurado para este departamento");
+      toast.error('Este email já está configurado para este departamento');
       return;
     }
 
     try {
       const { data, error } = await supabase
-        .from("notification_emails_support")
+        .from('notification_emails_support')
         .insert({ department_id: departmentId, email })
         .select()
         .single();
@@ -189,22 +181,25 @@ export function NotificationEmailsManager() {
 
       setSupportEmails({
         ...supportEmails,
-        [departmentId]: [...deptEmails, { id: data.id, email: data.email, is_active: data.is_active }]
+        [departmentId]: [
+          ...deptEmails,
+          { id: data.id, email: data.email, is_active: data.is_active },
+        ],
       });
-      setNewSupportEmails({ ...newSupportEmails, [departmentId]: "" });
-      toast.success("Email adicionado com sucesso");
+      setNewSupportEmails({ ...newSupportEmails, [departmentId]: '' });
+      toast.success('Email adicionado com sucesso');
     } catch (error: any) {
-      console.error("Error adding support email:", error);
-      toast.error("Erro ao adicionar email");
+      console.error('Error adding support email:', error);
+      toast.error('Erro ao adicionar email');
     }
   };
 
   const handleToggleSupportEmail = async (departmentId: string, id: string, isActive: boolean) => {
     try {
       const { error } = await supabase
-        .from("notification_emails_support")
+        .from('notification_emails_support')
         .update({ is_active: isActive })
-        .eq("id", id);
+        .eq('id', id);
 
       if (error) throw error;
 
@@ -212,39 +207,34 @@ export function NotificationEmailsManager() {
         ...supportEmails,
         [departmentId]: (supportEmails[departmentId] || []).map(e =>
           e.id === id ? { ...e, is_active: isActive } : e
-        )
+        ),
       });
     } catch (error: any) {
-      console.error("Error toggling support email:", error);
-      toast.error("Erro ao atualizar email");
+      console.error('Error toggling support email:', error);
+      toast.error('Erro ao atualizar email');
     }
   };
 
   const handleDeleteSupportEmail = async (departmentId: string, id: string) => {
     try {
-      const { error } = await supabase
-        .from("notification_emails_support")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from('notification_emails_support').delete().eq('id', id);
 
       if (error) throw error;
 
       setSupportEmails({
         ...supportEmails,
-        [departmentId]: (supportEmails[departmentId] || []).filter(e => e.id !== id)
+        [departmentId]: (supportEmails[departmentId] || []).filter(e => e.id !== id),
       });
-      toast.success("Email removido");
+      toast.success('Email removido');
     } catch (error: any) {
-      console.error("Error deleting support email:", error);
-      toast.error("Erro ao remover email");
+      console.error('Error deleting support email:', error);
+      toast.error('Erro ao remover email');
     }
   };
 
   const toggleDepartment = (deptId: string) => {
     setOpenDepartments(prev =>
-      prev.includes(deptId)
-        ? prev.filter(id => id !== deptId)
-        : [...prev, deptId]
+      prev.includes(deptId) ? prev.filter(id => id !== deptId) : [...prev, deptId]
     );
   };
 
@@ -275,21 +265,21 @@ export function NotificationEmailsManager() {
             <p className="text-sm text-muted-foreground">Nenhum email configurado</p>
           ) : (
             <div className="space-y-2">
-              {absenceEmails.map((entry) => (
+              {absenceEmails.map(entry => (
                 <div
                   key={entry.id}
                   className="flex items-center justify-between gap-4 rounded-lg border p-3"
                 >
                   <div className="flex items-center gap-3">
                     <Mail className="h-4 w-4 text-muted-foreground" />
-                    <span className={entry.is_active ? "" : "text-muted-foreground line-through"}>
+                    <span className={entry.is_active ? '' : 'text-muted-foreground line-through'}>
                       {entry.email}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
                     <Switch
                       checked={entry.is_active}
-                      onCheckedChange={(checked) => handleToggleAbsenceEmail(entry.id, checked)}
+                      onCheckedChange={checked => handleToggleAbsenceEmail(entry.id, checked)}
                     />
                     <Button
                       variant="ghost"
@@ -309,8 +299,8 @@ export function NotificationEmailsManager() {
               placeholder="Adicionar email..."
               type="email"
               value={newAbsenceEmail}
-              onChange={(e) => setNewAbsenceEmail(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleAddAbsenceEmail()}
+              onChange={e => setNewAbsenceEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddAbsenceEmail()}
             />
             <Button onClick={handleAddAbsenceEmail} disabled={!newAbsenceEmail.trim()}>
               <Plus className="h-4 w-4 mr-1" />
@@ -335,7 +325,7 @@ export function NotificationEmailsManager() {
           {departments.length === 0 ? (
             <p className="text-sm text-muted-foreground">Nenhum departamento configurado</p>
           ) : (
-            departments.map((dept) => {
+            departments.map(dept => {
               const deptEmailsList = supportEmails[dept.id] || [];
               const isOpen = openDepartments.includes(dept.id);
 
@@ -351,11 +341,11 @@ export function NotificationEmailsManager() {
                         <Building2 className="h-4 w-4" />
                         <span className="font-medium">{dept.name}</span>
                         <span className="text-xs text-muted-foreground">
-                          ({deptEmailsList.length} email{deptEmailsList.length !== 1 ? "s" : ""})
+                          ({deptEmailsList.length} email{deptEmailsList.length !== 1 ? 's' : ''})
                         </span>
                       </div>
                       <ChevronDown
-                        className={`h-4 w-4 transition-transform ${isOpen ? "rotate-180" : ""}`}
+                        className={`h-4 w-4 transition-transform ${isOpen ? 'rotate-180' : ''}`}
                       />
                     </button>
                   </CollapsibleTrigger>
@@ -365,21 +355,25 @@ export function NotificationEmailsManager() {
                         Nenhum email configurado para este departamento
                       </p>
                     ) : (
-                      deptEmailsList.map((entry) => (
+                      deptEmailsList.map(entry => (
                         <div
                           key={entry.id}
                           className="flex items-center justify-between gap-4 rounded-lg border p-3"
                         >
                           <div className="flex items-center gap-3">
                             <Mail className="h-4 w-4 text-muted-foreground" />
-                            <span className={entry.is_active ? "" : "text-muted-foreground line-through"}>
+                            <span
+                              className={
+                                entry.is_active ? '' : 'text-muted-foreground line-through'
+                              }
+                            >
                               {entry.email}
                             </span>
                           </div>
                           <div className="flex items-center gap-2">
                             <Switch
                               checked={entry.is_active}
-                              onCheckedChange={(checked) =>
+                              onCheckedChange={checked =>
                                 handleToggleSupportEmail(dept.id, entry.id, checked)
                               }
                             />
@@ -399,15 +393,15 @@ export function NotificationEmailsManager() {
                       <Input
                         placeholder="Adicionar email..."
                         type="email"
-                        value={newSupportEmails[dept.id] || ""}
-                        onChange={(e) =>
+                        value={newSupportEmails[dept.id] || ''}
+                        onChange={e =>
                           setNewSupportEmails({ ...newSupportEmails, [dept.id]: e.target.value })
                         }
-                        onKeyDown={(e) => e.key === "Enter" && handleAddSupportEmail(dept.id)}
+                        onKeyDown={e => e.key === 'Enter' && handleAddSupportEmail(dept.id)}
                       />
                       <Button
                         onClick={() => handleAddSupportEmail(dept.id)}
-                        disabled={!(newSupportEmails[dept.id] || "").trim()}
+                        disabled={!(newSupportEmails[dept.id] || '').trim()}
                       >
                         <Plus className="h-4 w-4 mr-1" />
                         Adicionar

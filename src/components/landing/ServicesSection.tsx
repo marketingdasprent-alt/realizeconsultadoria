@@ -1,36 +1,41 @@
-import { motion } from "framer-motion";
-import { Users, Globe, FileText, Calendar, Shield, HeartHandshake } from "lucide-react";
+import { motion } from 'framer-motion';
+import { Users, Globe, FileText, Calendar, Shield, HeartHandshake } from 'lucide-react';
 
 const services = [
   {
     icon: Users,
-    title: "Gestão de RH",
-    description: "Gestão completa de recursos humanos, desde o recrutamento até ao desenvolvimento de talento.",
+    title: 'Gestão de RH',
+    description:
+      'Gestão completa de recursos humanos, desde o recrutamento até ao desenvolvimento de talento.',
   },
   {
     icon: Globe,
-    title: "Apoio à Imigração",
-    description: "Acompanhamento em todos os processos de visto, autorização de residência e legalização.",
+    title: 'Apoio à Imigração',
+    description:
+      'Acompanhamento em todos os processos de visto, autorização de residência e legalização.',
   },
   {
     icon: FileText,
-    title: "Documentação",
-    description: "Tratamento e organização de toda a documentação necessária para empresas e colaboradores.",
+    title: 'Documentação',
+    description:
+      'Tratamento e organização de toda a documentação necessária para empresas e colaboradores.',
   },
   {
     icon: Calendar,
-    title: "Gestão de Férias",
-    description: "Plataforma digital para marcação e gestão de férias e ausências dos colaboradores.",
+    title: 'Gestão de Férias',
+    description:
+      'Plataforma digital para marcação e gestão de férias e ausências dos colaboradores.',
   },
   {
     icon: Shield,
-    title: "Conformidade Legal",
-    description: "Garantimos o cumprimento de todas as obrigações legais e regulamentares em Portugal.",
+    title: 'Conformidade Legal',
+    description:
+      'Garantimos o cumprimento de todas as obrigações legais e regulamentares em Portugal.',
   },
   {
     icon: HeartHandshake,
-    title: "Integração Cultural",
-    description: "Apoio na adaptação cultural e integração de colaboradores internacionais.",
+    title: 'Integração Cultural',
+    description: 'Apoio na adaptação cultural e integração de colaboradores internacionais.',
   },
 ];
 
@@ -52,8 +57,8 @@ const ServicesSection = () => {
             Soluções Completas para a sua Empresa
           </h2>
           <p className="text-muted-foreground leading-relaxed">
-            Oferecemos um conjunto integrado de serviços que simplificam a gestão de recursos humanos 
-            e facilitam os processos de imigração.
+            Oferecemos um conjunto integrado de serviços que simplificam a gestão de recursos
+            humanos e facilitam os processos de imigração.
           </p>
         </motion.div>
 
@@ -70,12 +75,8 @@ const ServicesSection = () => {
               <div className="w-14 h-14 bg-gold/10 rounded-lg flex items-center justify-center mb-6 group-hover:bg-gold/20 transition-colors">
                 <service.icon className="h-7 w-7 text-gold" />
               </div>
-              <h3 className="font-display text-2xl font-semibold mb-3">
-                {service.title}
-              </h3>
-              <p className="text-muted-foreground leading-relaxed">
-                {service.description}
-              </p>
+              <h3 className="font-display text-2xl font-semibold mb-3">{service.title}</h3>
+              <p className="text-muted-foreground leading-relaxed">{service.description}</p>
             </motion.div>
           ))}
         </div>

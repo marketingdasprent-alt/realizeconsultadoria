@@ -1,14 +1,10 @@
-import { useState } from "react";
-import { Link } from "react-router-dom";
-import { Button } from "@/components/ui/button";
-import { Menu, X } from "lucide-react";
-import logo from "@/assets/logo-realize.png";
+import { useState } from 'react';
+import { Link } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { Menu, X } from 'lucide-react';
+import logo from '@/assets/logo-realize.png';
 
-const navLinks = [
-  { label: "Serviços" },
-  { label: "Sobre Nós" },
-  { label: "Contacto" },
-];
+const navLinks = [{ label: 'Serviços' }, { label: 'Sobre Nós' }, { label: 'Contacto' }];
 
 const ComingSoonHeader = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -19,16 +15,12 @@ const ComingSoonHeader = () => {
         <div className="flex items-center justify-between h-16 md:h-20">
           {/* Logo */}
           <div className="flex-shrink-0">
-            <img 
-              src={logo} 
-              alt="Realize" 
-              className="h-10 md:h-12 w-auto"
-            />
+            <img src={logo} alt="Realize" className="h-10 md:h-12 w-auto" />
           </div>
 
           {/* Desktop Navigation - Disabled Links */}
           <nav className="hidden md:flex items-center space-x-8">
-            {navLinks.map((link) => (
+            {navLinks.map(link => (
               <span
                 key={link.label}
                 className="text-sm font-medium text-muted-foreground/50 cursor-default select-none"
@@ -70,7 +62,7 @@ const ComingSoonHeader = () => {
         {isMenuOpen && (
           <div className="md:hidden py-4 border-t border-border/40">
             <nav className="flex flex-col space-y-4">
-              {navLinks.map((link) => (
+              {navLinks.map(link => (
                 <span
                   key={link.label}
                   className="text-sm font-medium text-muted-foreground/50 cursor-default select-none px-2"

@@ -1,10 +1,10 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { encode } from "https://deno.land/std@0.190.0/encoding/base64.ts";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { encode } from 'https://deno.land/std@0.190.0/encoding/base64.ts';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface Attachment {
@@ -24,28 +24,28 @@ interface MarketingEmailRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const payload: MarketingEmailRequest = await req.json();
-    
-    console.log("Processando envio de e-mail de marketing:", payload.subject);
+
+    console.log('Processando envio de e-mail de marketing:', payload.subject);
 
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
     if (!brevoApiKey) {
-      console.error("BREVO_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "Configuração de email em falta" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      console.error('BREVO_API_KEY not configured');
+      return new Response(JSON.stringify({ error: 'Configuração de email em falta' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     // Process attachments
@@ -53,24 +53,23 @@ const handler = async (req: Request): Promise<Response> => {
     if (payload.attachments && payload.attachments.length > 0) {
       console.log(`Processando ${payload.attachments.length} anexos...`);
       for (const att of payload.attachments) {
-        const { data: fileData, error: fileError } = await supabaseAdmin
-          .storage
+        const { data: fileData, error: fileError } = await supabaseAdmin.storage
           .from('marketing-emails')
           .download(att.path);
-          
+
         if (fileError) {
           console.error(`Erro ao fazer download do anexo ${att.path}:`, fileError);
           continue;
         }
-        
+
         const arrayBuffer = await fileData.arrayBuffer();
         const base64Content = encode(new Uint8Array(arrayBuffer));
-        
+
         emailAttachments.push({
           content: base64Content,
-          name: att.name
+          name: att.name,
         });
-        
+
         // Remove file from bucket after downloading to clean up space
         // We can optionally keep them if the user wants them stored, but the instructions
         // imply they are temporary and only kept for the history metadata (not the file itself).
@@ -124,15 +123,15 @@ const handler = async (req: Request): Promise<Response> => {
     // Brevo `to` can take multiple, but they see each other. Let's send individually to avoid exposing personal emails.
     // Wait, the prompt says "Comunicação Interna". If we send to all, `to` is fine, or we can use `bcc`.
     // Let's send individual emails to avoid exposing personal emails to everyone.
-    
+
     let successCount = 0;
-    
+
     // Send emails
     const emailPromises = payload.recipients.map(email => {
       const emailPayload: any = {
         sender: {
-          name: payload.senderName || "Marketing Dasprent",
-          email: "marketing@dasprent.pt",
+          name: payload.senderName || 'Marketing Dasprent',
+          email: 'marketing@dasprent.pt',
         },
         to: [{ email }],
         subject: payload.subject,
@@ -143,12 +142,12 @@ const handler = async (req: Request): Promise<Response> => {
         emailPayload.attachment = emailAttachments;
       }
 
-      return fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
+      return fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
         headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "api-key": brevoApiKey,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'api-key': brevoApiKey,
         },
         body: JSON.stringify(emailPayload),
       });
@@ -164,26 +163,25 @@ const handler = async (req: Request): Promise<Response> => {
       const firstError = results.find(r => r.status === 'fulfilled' && !(r.value as Response).ok);
       if (firstError && firstError.status === 'fulfilled') {
         const errorText = await (firstError.value as Response).text();
-        console.error("Exemplo de erro Brevo:", errorText);
+        console.error('Exemplo de erro Brevo:', errorText);
       }
     }
 
     console.log(`Emails enviados com sucesso para ${successCount} destinatários`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: `Comunicação enviada para ${successCount} destinatário(s)`,
-        successCount 
+        successCount,
       }),
-      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
-
   } catch (error: any) {
-    console.error("Error in send-marketing-email function:", error);
+    console.error('Error in send-marketing-email function:', error);
     return new Response(
-      JSON.stringify({ error: error.message || "Erro interno ao processar e-mail" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      JSON.stringify({ error: error.message || 'Erro interno ao processar e-mail' }),
+      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   }
 };

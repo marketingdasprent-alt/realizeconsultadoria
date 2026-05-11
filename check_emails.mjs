@@ -41,12 +41,12 @@ async function checkEmails() {
 
   for (const emp of employees) {
     let authUser = null;
-    
+
     // Tentar achar pelo user_id
     if (emp.user_id) {
       authUser = authUsers.find(u => u.id === emp.user_id);
-    } 
-    
+    }
+
     // Fallback: tentar achar pelo email se user_id nulas (devido a migrações manuais)
     if (!authUser) {
       authUser = authUsers.find(u => u.email === emp.email);
@@ -56,7 +56,9 @@ async function checkEmails() {
       console.log(`⚠️ ${emp.name} (${emp.email}): Conta Auth NÃO ENCONTRADA!`);
       badCount++;
     } else if (authUser.email !== emp.email) {
-      console.log(`❌ ${emp.name}:\n   - Email na Ficha: ${emp.email}\n   - Email no Login (Auth): ${authUser.email}`);
+      console.log(
+        `❌ ${emp.name}:\n   - Email na Ficha: ${emp.email}\n   - Email no Login (Auth): ${authUser.email}`
+      );
       badCount++;
     }
   }

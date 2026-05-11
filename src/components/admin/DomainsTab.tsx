@@ -1,8 +1,8 @@
-import { useState, useEffect } from "react";
-import { Plus, Globe, Search, Trash2, Pencil, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
+import { useState, useEffect } from 'react';
+import { Plus, Globe, Search, Trash2, Pencil, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
 import {
   Table,
   TableBody,
@@ -10,12 +10,12 @@ import {
   TableHead,
   TableHeader,
   TableRow,
-} from "@/components/ui/table";
-import { Badge } from "@/components/ui/badge";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { differenceInDays, format, parseISO } from "date-fns";
-import { DomainModal, DomainData } from "@/components/admin/domains/DomainModal";
+} from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { differenceInDays, format, parseISO } from 'date-fns';
+import { DomainModal, DomainData } from '@/components/admin/domains/DomainModal';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -25,33 +25,33 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 
 export default function DomainsTab() {
   const { toast } = useToast();
   const [domains, setDomains] = useState<DomainData[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [searchQuery, setSearchQuery] = useState("");
+  const [searchQuery, setSearchQuery] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedDomain, setSelectedDomain] = useState<DomainData | null>(null);
-  
+
   const [domainToDelete, setDomainToDelete] = useState<string | null>(null);
 
   const fetchDomains = async (silent = false) => {
     if (!silent) setIsLoading(true);
     try {
       const { data, error } = await supabase
-        .from("site_domains")
-        .select("*")
-        .order("creation_date", { ascending: true });
+        .from('site_domains')
+        .select('*')
+        .order('creation_date', { ascending: true });
 
       if (error) throw error;
       setDomains(data || []);
     } catch (error: any) {
       toast({
-        title: "Erro ao carregar domínios",
+        title: 'Erro ao carregar domínios',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       if (!silent) setIsLoading(false);
@@ -66,20 +66,17 @@ export default function DomainsTab() {
     if (!domainToDelete) return;
 
     try {
-      const { error } = await supabase
-        .from("site_domains")
-        .delete()
-        .eq("id", domainToDelete);
+      const { error } = await supabase.from('site_domains').delete().eq('id', domainToDelete);
 
       if (error) throw error;
 
-      toast({ title: "Domínio removido com sucesso!" });
+      toast({ title: 'Domínio removido com sucesso!' });
       fetchDomains();
     } catch (error: any) {
       toast({
-        title: "Erro ao remover",
+        title: 'Erro ao remover',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setDomainToDelete(null);
@@ -91,25 +88,25 @@ export default function DomainsTab() {
     today.setHours(0, 0, 0, 0);
     const currentYear = today.getFullYear();
     const creation = parseISO(domain.creation_date);
-    
+
     const targetYear = domain.last_paid_year ? domain.last_paid_year + 1 : currentYear;
     const targetAnniversary = new Date(targetYear, creation.getMonth(), creation.getDate());
-    
+
     const daysUntil = differenceInDays(targetAnniversary, today);
     const isPaidThisYear = (domain.last_paid_year || 0) >= currentYear;
 
-    let label = "Regular";
-    let className = "bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300";
+    let label = 'Regular';
+    let className = 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
 
     if (daysUntil < 0) {
-      label = "Expirado";
-      className = "bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300";
+      label = 'Expirado';
+      className = 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
     } else if (daysUntil <= 7) {
       label = `Renova em ${daysUntil} dias`;
-      className = "bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300";
+      className = 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
     } else if (isPaidThisYear) {
-      label = "Pago";
-      className = "bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300";
+      label = 'Pago';
+      className = 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
     }
 
     return { label, className, isPaidThisYear, targetAnniversary };
@@ -118,30 +115,30 @@ export default function DomainsTab() {
   const handleTogglePaid = async (domain: DomainData, currentPaid: boolean) => {
     const currentYear = new Date().getFullYear();
     const newYear = currentPaid ? currentYear - 1 : currentYear;
-    
+
     // Optimistic UI update
-    setDomains(prev => prev.map(d => d.id === domain.id ? { ...d, last_paid_year: newYear } : d));
-    
+    setDomains(prev => prev.map(d => (d.id === domain.id ? { ...d, last_paid_year: newYear } : d)));
+
     try {
       const { error } = await supabase
-        .from("site_domains")
+        .from('site_domains')
         .update({ last_paid_year: newYear })
-        .eq("id", domain.id);
-        
+        .eq('id', domain.id);
+
       if (error) throw error;
-      
+
       fetchDomains(true);
     } catch (error: any) {
       fetchDomains(true); // Revert on error
       toast({
-        title: "Erro ao atualizar estado",
+        title: 'Erro ao atualizar estado',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
 
-  const filteredDomains = domains.filter((domain) =>
+  const filteredDomains = domains.filter(domain =>
     domain.domain_name.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
@@ -177,7 +174,7 @@ export default function DomainsTab() {
             <Input
               placeholder="Pesquisar domínio..."
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
+              onChange={e => setSearchQuery(e.target.value)}
               className="pl-9 bg-background"
             />
           </div>
@@ -210,12 +207,15 @@ export default function DomainsTab() {
                   </TableRow>
                 ) : filteredDomains.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center text-muted-foreground bg-muted/5">
+                    <TableCell
+                      colSpan={7}
+                      className="h-32 text-center text-muted-foreground bg-muted/5"
+                    >
                       Nenhum domínio encontrado.
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filteredDomains.map((domain) => {
+                  filteredDomains.map(domain => {
                     const info = getCycleInfo(domain);
                     return (
                       <TableRow key={domain.id} className="hover:bg-muted/30 transition-colors">
@@ -223,7 +223,10 @@ export default function DomainsTab() {
                           {domain.domain_name}
                         </TableCell>
                         <TableCell className="text-center">
-                          {new Intl.NumberFormat('pt-PT', { style: 'currency', currency: 'EUR' }).format(domain.renewal_value)}
+                          {new Intl.NumberFormat('pt-PT', {
+                            style: 'currency',
+                            currency: 'EUR',
+                          }).format(domain.renewal_value)}
                         </TableCell>
                         <TableCell className="text-center">
                           {format(parseISO(domain.creation_date), 'dd/MM/yyyy')}
@@ -232,7 +235,9 @@ export default function DomainsTab() {
                           {format(info.targetAnniversary, 'dd/MM/yyyy')}
                         </TableCell>
                         <TableCell className="text-center">
-                          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${info.className}`}>
+                          <span
+                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${info.className}`}
+                          >
                             {info.label}
                           </span>
                         </TableCell>
@@ -242,7 +247,19 @@ export default function DomainsTab() {
                               className="cursor-pointer hover:bg-opacity-80 transition-colors"
                               variant="outline"
                               onClick={() => handleTogglePaid(domain, info.isPaidThisYear)}
-                              style={info.isPaidThisYear ? { backgroundColor: '#dcfce7', color: '#166534', borderColor: '#bbf7d0' } : { backgroundColor: '#fef3c7', color: '#92400e', borderColor: '#fde68a' }}
+                              style={
+                                info.isPaidThisYear
+                                  ? {
+                                      backgroundColor: '#dcfce7',
+                                      color: '#166534',
+                                      borderColor: '#bbf7d0',
+                                    }
+                                  : {
+                                      backgroundColor: '#fef3c7',
+                                      color: '#92400e',
+                                      borderColor: '#fde68a',
+                                    }
+                              }
                             >
                               {info.isPaidThisYear ? 'Pago' : 'Pendente'}
                             </Badge>

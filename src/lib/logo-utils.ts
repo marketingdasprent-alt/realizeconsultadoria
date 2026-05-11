@@ -1,14 +1,14 @@
-import logoRealize from "@/assets/logo-realize.png";
+import logoRealize from '@/assets/logo-realize.png';
 
 let cachedBase64: string | null = null;
 
 export const getLogoBase64 = async (): Promise<string> => {
   if (cachedBase64) return cachedBase64;
-  
+
   const response = await fetch(logoRealize);
   const blob = await response.blob();
-  
-  return new Promise((resolve) => {
+
+  return new Promise(resolve => {
     const reader = new FileReader();
     reader.onloadend = () => {
       cachedBase64 = reader.result as string;

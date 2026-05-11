@@ -1,11 +1,11 @@
-import { useState, useEffect } from "react";
-import { Link, useNavigate } from "react-router-dom";
-import { supabase } from "@/integrations/supabase/client";
-import { motion } from "framer-motion";
-import { Rocket, Sparkles, Loader2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import ComingSoonHeader from "@/components/layout/ComingSoonHeader";
-import Footer from "@/components/layout/Footer";
+import { useState, useEffect } from 'react';
+import { Link, useNavigate } from 'react-router-dom';
+import { supabase } from '@/integrations/supabase/client';
+import { motion } from 'framer-motion';
+import { Rocket, Sparkles, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import ComingSoonHeader from '@/components/layout/ComingSoonHeader';
+import Footer from '@/components/layout/Footer';
 
 const ComingSoonPage = () => {
   const navigate = useNavigate();
@@ -13,43 +13,45 @@ const ComingSoonPage = () => {
 
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+
       if (session) {
-        let preference = localStorage.getItem("auth_preference");
-        
+        let preference = localStorage.getItem('auth_preference');
+
         // Always verify admin role to prevent incorrect redirection even if a preference exists
-        const { data: hasAdminRole } = await supabase.rpc("has_role", {
+        const { data: hasAdminRole } = await supabase.rpc('has_role', {
           _user_id: session.user.id,
-          _role: "admin",
+          _role: 'admin',
         });
 
         if (hasAdminRole) {
-          preference = "admin";
-          localStorage.setItem("auth_preference", "admin");
+          preference = 'admin';
+          localStorage.setItem('auth_preference', 'admin');
         } else if (!preference) {
           // If not admin and no preference, check if it's an employee
           const { data: employee } = await supabase
-            .from("employees")
-            .select("id")
-            .eq("user_id", session.user.id)
+            .from('employees')
+            .select('id')
+            .eq('user_id', session.user.id)
             .maybeSingle();
-          
+
           if (employee) {
-            preference = "employee";
-            localStorage.setItem("auth_preference", "employee");
+            preference = 'employee';
+            localStorage.setItem('auth_preference', 'employee');
           }
         }
 
-        if (preference === "admin") {
-          navigate("/admin");
+        if (preference === 'admin') {
+          navigate('/admin');
           return;
-        } else if (preference === "employee") {
-          navigate("/colaborador");
+        } else if (preference === 'employee') {
+          navigate('/colaborador');
           return;
         }
       }
-      
+
       setIsRedirecting(false);
     };
 
@@ -70,7 +72,7 @@ const ComingSoonPage = () => {
   return (
     <div className="min-h-screen flex flex-col bg-gradient-to-br from-background via-background to-primary/5">
       <ComingSoonHeader />
-      
+
       <main className="flex-1 flex flex-col items-center justify-center px-6 sm:px-8 py-12 mt-16">
         {/* Decorative elements */}
         <div className="absolute inset-0 overflow-hidden pointer-events-none">
@@ -83,7 +85,7 @@ const ComingSoonPage = () => {
             transition={{
               duration: 8,
               repeat: Infinity,
-              ease: "easeInOut",
+              ease: 'easeInOut',
             }}
           />
           <motion.div
@@ -95,7 +97,7 @@ const ComingSoonPage = () => {
             transition={{
               duration: 10,
               repeat: Infinity,
-              ease: "easeInOut",
+              ease: 'easeInOut',
             }}
           />
         </div>
@@ -104,13 +106,13 @@ const ComingSoonPage = () => {
           {/* Animated Icon */}
           <motion.div
             className="mb-8 inline-flex items-center justify-center"
-            animate={{ 
+            animate={{
               y: [0, -10, 0],
             }}
             transition={{
               duration: 3,
               repeat: Infinity,
-              ease: "easeInOut",
+              ease: 'easeInOut',
             }}
           >
             <div className="relative">
@@ -124,7 +126,7 @@ const ComingSoonPage = () => {
                 transition={{
                   duration: 2,
                   repeat: Infinity,
-                  ease: "easeInOut",
+                  ease: 'easeInOut',
                 }}
               >
                 <Sparkles className="h-6 w-6 sm:h-8 sm:w-8 text-gold" />
@@ -139,8 +141,7 @@ const ComingSoonPage = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.6 }}
           >
-            Estamos a construir algo{" "}
-            <span className="text-primary">incrível</span>
+            Estamos a construir algo <span className="text-primary">incrível</span>
           </motion.h1>
 
           {/* Subtitle */}

@@ -1,13 +1,23 @@
-import { useState, useMemo } from "react";
-import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, addMonths, subMonths, isSameDay, parseISO } from "date-fns";
-import { pt } from "date-fns/locale";
-import { ChevronLeft, ChevronRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
-import { Holiday, isWeekend, isHoliday } from "@/lib/vacation-utils";
-import { cn } from "@/lib/utils";
-import { absenceTypeLabels } from "@/lib/absence-types";
+import { useState, useMemo } from 'react';
+import {
+  format,
+  startOfMonth,
+  endOfMonth,
+  eachDayOfInterval,
+  isSameMonth,
+  addMonths,
+  subMonths,
+  isSameDay,
+  parseISO,
+} from 'date-fns';
+import { pt } from 'date-fns/locale';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import { Holiday, isWeekend, isHoliday } from '@/lib/vacation-utils';
+import { cn } from '@/lib/utils';
+import { absenceTypeLabels } from '@/lib/absence-types';
 
 interface AbsencePeriod {
   id: string;
@@ -36,8 +46,8 @@ interface EmployeeCalendarProps {
 }
 
 // Abbreviated weekday labels for mobile
-const weekdaysFull = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
-const weekdaysShort = ["D", "S", "T", "Q", "Q", "S", "S"];
+const weekdaysFull = ['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'];
+const weekdaysShort = ['D', 'S', 'T', 'Q', 'Q', 'S', 'S'];
 
 const EmployeeCalendar = ({ absences, holidays }: EmployeeCalendarProps) => {
   const [currentMonth, setCurrentMonth] = useState(new Date());
@@ -50,7 +60,9 @@ const EmployeeCalendar = ({ absences, holidays }: EmployeeCalendarProps) => {
 
   const startDayOfWeek = startOfMonth(currentMonth).getDay();
 
-  const getAbsenceForDay = (day: Date): { absence: Absence; dayStatus: string; period?: AbsencePeriod } | null => {
+  const getAbsenceForDay = (
+    day: Date
+  ): { absence: Absence; dayStatus: string; period?: AbsencePeriod } | null => {
     // Skip weekends and holidays
     if (isWeekend(day) || isHoliday(day, holidays)) {
       return null;
@@ -62,15 +74,15 @@ const EmployeeCalendar = ({ absences, holidays }: EmployeeCalendarProps) => {
         for (const period of absence.absence_periods) {
           const pStart = parseISO(period.start_date);
           const pEnd = parseISO(period.end_date);
-          
+
           if (day >= pStart && day <= pEnd) {
             let dayStatus = period.status || absence.status;
-            
+
             // Fallback: if still partially_approved, show as pending
-            if (dayStatus === "partially_approved") {
-              dayStatus = "pending";
+            if (dayStatus === 'partially_approved') {
+              dayStatus = 'pending';
             }
-            
+
             return { absence, dayStatus, period };
           }
         }
@@ -81,11 +93,11 @@ const EmployeeCalendar = ({ absences, holidays }: EmployeeCalendarProps) => {
 
         if (day >= start && day <= end) {
           let dayStatus = absence.status;
-          
-          if (dayStatus === "partially_approved") {
-            dayStatus = "pending";
+
+          if (dayStatus === 'partially_approved') {
+            dayStatus = 'pending';
           }
-          
+
           return { absence, dayStatus };
         }
       }
@@ -104,35 +116,35 @@ const EmployeeCalendar = ({ absences, holidays }: EmployeeCalendarProps) => {
     const absenceInfo = getAbsenceForDay(day);
 
     if (holiday) {
-      return "bg-primary/10 text-primary border border-primary/20";
+      return 'bg-primary/10 text-primary border border-primary/20';
     }
 
     if (weekend) {
-      return "bg-muted/50 text-muted-foreground";
+      return 'bg-muted/50 text-muted-foreground';
     }
 
     if (absenceInfo) {
       const isPartial = absenceInfo.period?.period_type === 'partial';
-      
+
       switch (absenceInfo.dayStatus) {
-        case "approved":
-          return isPartial 
-            ? "bg-gradient-to-b from-green-500 to-background text-green-700 border border-green-300" 
-            : "bg-green-500 text-white";
-        case "pending":
-          return isPartial 
-            ? "bg-gradient-to-b from-orange-500 to-background text-orange-700 border border-orange-300" 
-            : "bg-orange-500 text-white";
-        case "rejected":
-          return isPartial 
-            ? "bg-gradient-to-b from-red-500 to-background text-red-700 border border-red-300" 
-            : "bg-red-500 text-white";
+        case 'approved':
+          return isPartial
+            ? 'bg-gradient-to-b from-green-500 to-background text-green-700 border border-green-300'
+            : 'bg-green-500 text-white';
+        case 'pending':
+          return isPartial
+            ? 'bg-gradient-to-b from-orange-500 to-background text-orange-700 border border-orange-300'
+            : 'bg-orange-500 text-white';
+        case 'rejected':
+          return isPartial
+            ? 'bg-gradient-to-b from-red-500 to-background text-red-700 border border-red-300'
+            : 'bg-red-500 text-white';
         default:
-          return "";
+          return '';
       }
     }
 
-    return "";
+    return '';
   };
 
   return (
@@ -150,7 +162,7 @@ const EmployeeCalendar = ({ absences, holidays }: EmployeeCalendarProps) => {
               <ChevronLeft className="h-4 w-4 lg:h-5 lg:w-5" />
             </Button>
             <span className="font-medium text-sm lg:text-base min-w-[100px] lg:min-w-[140px] text-center capitalize">
-              {format(currentMonth, "MMM yyyy", { locale: pt })}
+              {format(currentMonth, 'MMM yyyy', { locale: pt })}
             </span>
             <Button
               variant="ghost"
@@ -186,27 +198,32 @@ const EmployeeCalendar = ({ absences, holidays }: EmployeeCalendarProps) => {
             ))}
 
             {/* Days of the month */}
-            {days.map((day) => {
+            {days.map(day => {
               const holiday = getHolidayForDay(day);
               const absenceInfo = getAbsenceForDay(day);
 
               const getTooltipContent = () => {
                 if (holiday) return holiday.name;
                 if (!absenceInfo) return null;
-                
-                const statusText = absenceInfo.dayStatus === "approved"
-                  ? "Aprovado"
-                  : absenceInfo.dayStatus === "pending"
-                  ? "Pendente"
-                  : "Rejeitado";
-                
+
+                const statusText =
+                  absenceInfo.dayStatus === 'approved'
+                    ? 'Aprovado'
+                    : absenceInfo.dayStatus === 'pending'
+                      ? 'Pendente'
+                      : 'Rejeitado';
+
                 const typeLabel = absenceTypeLabels[absenceInfo.absence.absence_type];
-                
+
                 // Check if it's a partial period
-                if (absenceInfo.period?.period_type === 'partial' && absenceInfo.period.start_time && absenceInfo.period.end_time) {
+                if (
+                  absenceInfo.period?.period_type === 'partial' &&
+                  absenceInfo.period.start_time &&
+                  absenceInfo.period.end_time
+                ) {
                   return `${typeLabel} (${absenceInfo.period.start_time}-${absenceInfo.period.end_time}) - ${statusText}`;
                 }
-                
+
                 return `${typeLabel} - ${statusText}`;
               };
 
@@ -215,12 +232,12 @@ const EmployeeCalendar = ({ absences, holidays }: EmployeeCalendarProps) => {
               const dayElement = (
                 <div
                   className={cn(
-                    "h-10 lg:h-10 flex items-center justify-center rounded-md text-xs lg:text-sm transition-colors font-medium",
+                    'h-10 lg:h-10 flex items-center justify-center rounded-md text-xs lg:text-sm transition-colors font-medium',
                     getDayClasses(day),
-                    !isSameMonth(day, currentMonth) && "opacity-30"
+                    !isSameMonth(day, currentMonth) && 'opacity-30'
                   )}
                 >
-                  {format(day, "d")}
+                  {format(day, 'd')}
                 </div>
               );
 

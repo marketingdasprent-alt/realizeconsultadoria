@@ -1,9 +1,9 @@
-import { useState, useEffect } from "react";
-import { FileText, Download, Loader2, FolderOpen } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from 'react';
+import { FileText, Download, Loader2, FolderOpen } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface EmployeeDocument {
   id: string;
@@ -17,12 +17,12 @@ interface EmployeeDocument {
 }
 
 const DOCUMENT_CATEGORIES = [
-  { value: "contrato", label: "Contrato" },
-  { value: "ficha_admissao", label: "Ficha de Admissão" },
-  { value: "certificado", label: "Certificado" },
-  { value: "documento_identificacao", label: "Documento de Identificação" },
-  { value: "comunicado", label: "Comunicado" },
-  { value: "outro", label: "Outro" },
+  { value: 'contrato', label: 'Contrato' },
+  { value: 'ficha_admissao', label: 'Ficha de Admissão' },
+  { value: 'certificado', label: 'Certificado' },
+  { value: 'documento_identificacao', label: 'Documento de Identificação' },
+  { value: 'comunicado', label: 'Comunicado' },
+  { value: 'outro', label: 'Outro' },
 ];
 
 interface EmployeeDocumentsSectionProps {
@@ -42,15 +42,15 @@ const EmployeeDocumentsSection = ({ employeeId }: EmployeeDocumentsSectionProps)
     setIsLoading(true);
     try {
       const { data, error } = await supabase
-        .from("employee_documents")
-        .select("*")
-        .eq("employee_id", employeeId)
-        .order("created_at", { ascending: false });
+        .from('employee_documents')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setDocuments(data || []);
     } catch (error) {
-      console.error("Error fetching documents:", error);
+      console.error('Error fetching documents:', error);
     } finally {
       setIsLoading(false);
     }
@@ -59,18 +59,23 @@ const EmployeeDocumentsSection = ({ employeeId }: EmployeeDocumentsSectionProps)
   const handleDownload = async (doc: EmployeeDocument) => {
     try {
       const cleanPath = doc.file_path.startsWith('/') ? doc.file_path.substring(1) : doc.file_path;
-      const buckets = ["employee-files", "absence-documents", "equipment_invoices", "legal_documents", "employees", "documents"];
-      
+      const buckets = [
+        'employee-files',
+        'absence-documents',
+        'equipment_invoices',
+        'legal_documents',
+        'employees',
+        'documents',
+      ];
+
       let signedUrl = null;
       let finalError = null;
 
       for (const bucket of buckets) {
         console.log(`A tentar bucket '${bucket}':`, cleanPath);
-        
+
         // Tentativa 1: URL Assinada (Privado)
-        const { data, error } = await supabase.storage
-          .from(bucket)
-          .createSignedUrl(cleanPath, 60);
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(cleanPath, 60);
 
         if (!error && data?.signedUrl) {
           signedUrl = data.signedUrl;
@@ -79,10 +84,8 @@ const EmployeeDocumentsSection = ({ employeeId }: EmployeeDocumentsSectionProps)
         }
 
         // Tentativa 2: URL Pública (Caso o bucket seja público)
-        const { data: publicData } = supabase.storage
-          .from(bucket)
-          .getPublicUrl(cleanPath);
-        
+        const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(cleanPath);
+
         if (publicData?.publicUrl) {
           try {
             const resp = await fetch(publicData.publicUrl, { method: 'HEAD' });
@@ -95,29 +98,28 @@ const EmployeeDocumentsSection = ({ employeeId }: EmployeeDocumentsSectionProps)
             // Ignorar erro de fetch head
           }
         }
-        
+
         if (error) {
           finalError = error;
         }
       }
 
       if (!signedUrl) {
-        throw finalError || new Error("Ficheiro não encontrado em nenhum local de armazenamento.");
+        throw finalError || new Error('Ficheiro não encontrado em nenhum local de armazenamento.');
       }
 
-      const a = document.createElement("a");
+      const a = document.createElement('a');
       a.href = signedUrl;
       a.download = doc.file_name;
       document.body.appendChild(a);
       a.click();
       document.body.removeChild(a);
-      
     } catch (error: any) {
-      console.error("Erro crítico no download:", error);
+      console.error('Erro crítico no download:', error);
       toast({
-        title: "Erro ao descarregar",
+        title: 'Erro ao descarregar',
         description: `Não foi possível encontrar o ficheiro. (Caminho: ${doc.file_path})`,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -129,16 +131,16 @@ const EmployeeDocumentsSection = ({ employeeId }: EmployeeDocumentsSectionProps)
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString("pt-PT", {
-      day: "2-digit",
-      month: "2-digit",
-      year: "numeric",
+    return new Date(dateString).toLocaleDateString('pt-PT', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
     });
   };
 
   const getCategoryLabel = (value: string | null) => {
     if (!value) return null;
-    return DOCUMENT_CATEGORIES.find((c) => c.value === value)?.label || value;
+    return DOCUMENT_CATEGORIES.find(c => c.value === value)?.label || value;
   };
 
   if (isLoading) {
@@ -164,7 +166,7 @@ const EmployeeDocumentsSection = ({ employeeId }: EmployeeDocumentsSectionProps)
 
   return (
     <div className="space-y-3 lg:space-y-4">
-      {documents.map((doc) => {
+      {documents.map(doc => {
         const category = getCategoryLabel(doc.category);
         return (
           <Card key={doc.id} className="shadow-card">
@@ -174,9 +176,7 @@ const EmployeeDocumentsSection = ({ employeeId }: EmployeeDocumentsSectionProps)
                   <FileText className="h-5 w-5 text-gold" />
                 </div>
                 <div className="flex-1 min-w-0">
-                  <p className="font-medium text-sm lg:text-base truncate">
-                    {doc.file_name}
-                  </p>
+                  <p className="font-medium text-sm lg:text-base truncate">{doc.file_name}</p>
                   {doc.description && (
                     <p className="text-xs lg:text-sm text-muted-foreground mt-0.5 line-clamp-2">
                       {doc.description}

@@ -1,4 +1,4 @@
-import { isSaturday, isSunday, eachDayOfInterval, format } from "date-fns";
+import { isSaturday, isSunday, eachDayOfInterval, format } from 'date-fns';
 
 export type PeriodType = 'full_day' | 'partial';
 
@@ -7,7 +7,7 @@ export interface DatePeriod {
   to: Date;
   periodType: PeriodType;
   startTime?: string; // HH:MM format, e.g. "09:00"
-  endTime?: string;   // HH:MM format, e.g. "13:00"
+  endTime?: string; // HH:MM format, e.g. "13:00"
   businessDays?: number; // Pre-calculated for partial periods
 }
 
@@ -23,10 +23,27 @@ export interface Holiday {
  * Available hours for time selection (hourly intervals)
  */
 export const AVAILABLE_HOURS = [
-  "08:00", "08:30", "09:00", "09:30", "10:00", "10:30",
-  "11:00", "11:30", "12:00", "12:30", "13:00", "13:30",
-  "14:00", "14:30", "15:00", "15:30", "16:00", "16:30",
-  "17:00", "17:30", "18:00"
+  '08:00',
+  '08:30',
+  '09:00',
+  '09:30',
+  '10:00',
+  '10:30',
+  '11:00',
+  '11:30',
+  '12:00',
+  '12:30',
+  '13:00',
+  '13:30',
+  '14:00',
+  '14:30',
+  '15:00',
+  '15:30',
+  '16:00',
+  '16:30',
+  '17:00',
+  '17:30',
+  '18:00',
 ];
 
 /**
@@ -67,7 +84,7 @@ export const isWeekend = (date: Date): boolean => {
  * Check if a date is a holiday
  */
 export const isHoliday = (date: Date, holidays: Holiday[]): Holiday | undefined => {
-  const dateStr = format(date, "yyyy-MM-dd");
+  const dateStr = format(date, 'yyyy-MM-dd');
   return holidays.find(h => h.date === dateStr);
 };
 
@@ -81,11 +98,7 @@ export const isBusinessDay = (date: Date, holidays: Holiday[]): boolean => {
 /**
  * Count business days between two dates (inclusive)
  */
-export const countBusinessDays = (
-  startDate: Date,
-  endDate: Date,
-  holidays: Holiday[]
-): number => {
+export const countBusinessDays = (startDate: Date, endDate: Date, holidays: Holiday[]): number => {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
   return days.filter(day => isBusinessDay(day, holidays)).length;
 };
@@ -93,10 +106,7 @@ export const countBusinessDays = (
 /**
  * Count total business days for multiple periods
  */
-export const countTotalBusinessDays = (
-  periods: DatePeriod[],
-  holidays: Holiday[]
-): number => {
+export const countTotalBusinessDays = (periods: DatePeriod[], holidays: Holiday[]): number => {
   return periods.reduce((total, period) => {
     return total + countBusinessDays(period.from, period.to, holidays);
   }, 0);
@@ -111,11 +121,11 @@ export const getBusinessDaysBreakdown = (
   holidays: Holiday[]
 ): { total: number; weekends: number; holidays: number; businessDays: number } => {
   const days = eachDayOfInterval({ start: startDate, end: endDate });
-  
+
   let weekends = 0;
   let holidayCount = 0;
   let businessDays = 0;
-  
+
   days.forEach(day => {
     if (isWeekend(day)) {
       weekends++;
@@ -125,7 +135,7 @@ export const getBusinessDaysBreakdown = (
       businessDays++;
     }
   });
-  
+
   return {
     total: days.length,
     weekends,

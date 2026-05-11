@@ -1,7 +1,7 @@
-import React, { Component, ErrorInfo, ReactNode } from "react";
-import { AlertTriangle, RefreshCw, Copy, Check } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { AlertTriangle, RefreshCw, Copy, Check } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 
 interface Props {
   children: ReactNode;
@@ -27,7 +27,7 @@ class GlobalErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error("Uncaught error:", error, errorInfo);
+    console.error('Uncaught error:', error, errorInfo);
     this.setState({ errorInfo });
   }
 
@@ -38,9 +38,9 @@ class GlobalErrorBoundary extends Component<Props, State> {
   private handleCopyError = async () => {
     const { error, errorInfo } = this.state;
     const errorDetails = `
-Error: ${error?.message || "Unknown error"}
-Stack: ${error?.stack || "No stack trace"}
-Component Stack: ${errorInfo?.componentStack || "No component stack"}
+Error: ${error?.message || 'Unknown error'}
+Stack: ${error?.stack || 'No stack trace'}
+Component Stack: ${errorInfo?.componentStack || 'No component stack'}
 URL: ${window.location.href}
 User Agent: ${navigator.userAgent}
 Timestamp: ${new Date().toISOString()}
@@ -51,7 +51,7 @@ Timestamp: ${new Date().toISOString()}
       this.setState({ copied: true });
       setTimeout(() => this.setState({ copied: false }), 2000);
     } catch (err) {
-      console.error("Failed to copy error details:", err);
+      console.error('Failed to copy error details:', err);
     }
   };
 
@@ -75,11 +75,7 @@ Timestamp: ${new Date().toISOString()}
                   <RefreshCw className="h-4 w-4 mr-2" />
                   Recarregar página
                 </Button>
-                <Button
-                  variant="outline"
-                  onClick={this.handleCopyError}
-                  className="w-full"
-                >
+                <Button variant="outline" onClick={this.handleCopyError} className="w-full">
                   {this.state.copied ? (
                     <>
                       <Check className="h-4 w-4 mr-2" />
@@ -93,7 +89,7 @@ Timestamp: ${new Date().toISOString()}
                   )}
                 </Button>
               </div>
-              
+
               {this.state.error && (
                 <div className="mt-4 p-3 bg-muted rounded-md">
                   <p className="text-xs text-muted-foreground font-mono break-all">
@@ -111,4 +107,5 @@ Timestamp: ${new Date().toISOString()}
   }
 }
 
+export { GlobalErrorBoundary };
 export default GlobalErrorBoundary;

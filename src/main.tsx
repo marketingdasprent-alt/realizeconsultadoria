@@ -1,8 +1,8 @@
-import { createRoot } from "react-dom/client";
-import App from "./App.tsx";
-import "./index.css";
+import { createRoot } from 'react-dom/client';
+import App from './App.tsx';
+import './index.css';
 import { registerSW } from 'virtual:pwa-register';
-import GlobalErrorBoundary from "./components/GlobalErrorBoundary";
+import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 
 // Register service worker with auto-update
 registerSW({
@@ -19,7 +19,7 @@ registerSW({
   },
 });
 
-createRoot(document.getElementById("root")!).render(
+createRoot(document.getElementById('root')!).render(
   <GlobalErrorBoundary>
     <App />
   </GlobalErrorBoundary>

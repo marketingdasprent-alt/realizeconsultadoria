@@ -1,7 +1,12 @@
 # Environment variables
 .env
-.env.*
+.env.local
+.env.*.local
 !.env.example
+
+# Secret keys and credentials
+.service_role_key
+*.key
 
 # Logs
 logs

@@ -4,7 +4,8 @@ on:
   push:
     branches: [main, develop]
   pull_request:
-    branches: [main]
+    branches: [main, develop, staging]
+  workflow_dispatch:
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -12,54 +13,50 @@ concurrency:
 
 jobs:
   quality:
-    name: 🧪 Code Quality
+    name: 🎨 Quality & Build
     runs-on: ubuntu-latest
-
+    timeout-minutes: 15
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: ⚙️ Setup Node.js
+      - name: ⚙️ Prepare pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate
+
+      - name: 🛠️ Setup Node.js & pnpm cache
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: 📦 Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+          node-version: '22'
+          cache: 'pnpm'
 
       - name: 📚 Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: 🧹 Lint (ESLint)
-        run: pnpm lint
+      - name: 🧹 Quality Checks (Lint & Type-check)
+        run: |
+          pnpm run lint
+          pnpm run type-check
 
-      - name: 🎨 Format check (Prettier)
-        run: pnpm format:check
-
-      - name: 🔎 Type check (TypeScript)
-        run: pnpm type-check
-
+      - name: 🏗️ Build Application
+        run: pnpm run build
 
   test:
-    name: 🧪 Unit / Component Tests
+    name: 🧪 Unit & Component Tests
     runs-on: ubuntu-latest
     needs: quality
-
+    timeout-minutes: 15
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: ⚙️ Setup Node.js
+      - name: ⚙️ Prepare pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate
+
+      - name: 🛠️ Setup Node.js & pnpm cache
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: 📦 Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+          node-version: '22'
+          cache: 'pnpm'
 
       - name: 📚 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -67,25 +64,23 @@ jobs:
       - name: 🧪 Run unit tests
         run: pnpm test
 
-
   e2e:
-    name: 🚀 End-to-End Tests (Playwright)
+    name: 🎭 End-to-End Tests (Playwright)
     runs-on: ubuntu-latest
     needs: test
-
+    timeout-minutes: 25
     steps:
       - name: 📥 Checkout code
         uses: actions/checkout@v4
 
-      - name: ⚙️ Setup Node.js
+      - name: ⚙️ Prepare pnpm
+        run: corepack enable && corepack prepare pnpm@latest --activate
+
+      - name: 🛠️ Setup Node.js & pnpm cache
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-
-      - name: 📦 Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: 10
+          node-version: '22'
+          cache: 'pnpm'
 
       - name: 📚 Install dependencies
         run: pnpm install --frozen-lockfile
@@ -93,8 +88,11 @@ jobs:
       - name: 🎭 Install Playwright browsers
         run: npx playwright install --with-deps
 
-      - name: 🧪 Run E2E tests
-        run: pnpm test:e2e
+      - name: 🚀 Run E2E tests
         env:
+          # Variáveis do Supabase vindas dos Secrets do GitHub
           VITE_SUPABASE_URL: ${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_ANON_KEY: ${{ secrets.VITE_SUPABASE_ANON_KEY }}
+          # Adicione outras envs necessárias para o teste rodar
+          NODE_ENV: test
+        run: pnpm test:e2e

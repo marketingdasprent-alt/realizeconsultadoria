@@ -24,13 +24,8 @@ jobs:
         with:
           node-version: '22'
           cache: 'pnpm'
-      - name: Install dependencies
       - run: pnpm install --frozen-lockfile
-
-      - name: Generate Prisma Client
-      - run: pnpm --filter backend exec prisma generate
-
-
+      - run: pnpm run format:check
 
   lint:
     name: 🧹 Lint
@@ -42,8 +37,8 @@ jobs:
         with:
           node-version: '22'
           cache: 'pnpm'
-      - name: Run Quality Checks (Lint, Type-Check, Build)
-      - run: pnpm turbo run lint type-check build
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm run lint
 
   type-check:
     name: 🔎 Type Check
@@ -56,9 +51,7 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-     
-      - name: Check Formatting
-      - run: pnpm run format:check
+      - run: pnpm run type-check
 
   build:
     name: 🏗️ Build

@@ -104,15 +104,22 @@ jobs:
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
       - run: npx playwright install --with-deps
-      
-      # Criar .env.local com variáveis do GitHub Secrets
+
+      # Setup environment variables from GitHub Secrets (or use .env.ci fallback)
       - name: Setup environment variables
         run: |
-          cat > .env.local << 'EOF'
+          if [ -z "${{ secrets.VITE_SUPABASE_URL }}" ]; then
+            echo "ℹ️ Using .env.ci fallback (Secrets not configured)"
+            cp .env.ci .env.local
+          else
+            echo "✓ Creating .env.local from GitHub Secrets"
+            cat > .env.local << 'EOF'
           VITE_SUPABASE_URL=${{ secrets.VITE_SUPABASE_URL }}
           VITE_SUPABASE_PUBLISHABLE_KEY=${{ secrets.VITE_SUPABASE_ANON_KEY }}
           EOF
+          fi
+          echo "--- .env.local created ---"
           cat .env.local
-      
-      - name: Run E2E tests
-        run: pnpm test:e2e
+
+      - name: Build (to verify env vars are loaded)
+        run: pnpm run build

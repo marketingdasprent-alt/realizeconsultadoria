@@ -970,17 +970,69 @@ BOM PRATICAR:
 
 ## Variáveis de ambiente
 
+### Setup Geral
+
 ```bash
-# .env.local (nunca commitar — está no .gitignore)
-VITE_SUPABASE_URL=https://xxxx.supabase.co
-VITE_SUPABASE_ANON_KEY=eyJ...
+# 1. DESENVOLVIMENTO LOCAL
+# Copiar template e editar com suas credenciais
+cp .env.example .env.local
 
-# Aceder no código
-const url = import.meta.env.VITE_SUPABASE_URL;
-
-# ❌ Nunca
-const key = 'eyJ...'; // hardcoded
+# Editar .env.local com credenciais reais (NUNCA commitar)
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
+VITE_SUPABASE_PUBLISHABLE_KEY=sb_public_xxxx
+SUPABASE_SERVICE_ROLE_KEY=sb_secret_xxxx
 ```
+
+### Fluxo de Ambientes
+
+| Ambiente | Ficheiro | Método | Uso |
+|----------|----------|--------|-----|
+| **Local Dev** | `.env.local` | Manual (git ignored) | `pnpm run dev` |
+| **CI/CD (Tests)** | GitHub Secrets | Automático (workflow) | GitHub Actions |
+| **Produção** | Vercel Dashboard | Variáveis de ambiente | Deployment |
+
+### GitHub Actions (CI/CD)
+
+O workflow automático:
+1. Lê `VITE_SUPABASE_URL` e `VITE_SUPABASE_ANON_KEY` de GitHub Secrets
+2. Cria `.env.local` temporário no runner
+3. Executa testes com credenciais reais
+
+**Configuração necessária em GitHub:**
+```
+Settings > Secrets and variables > Actions > New repository secret
+- Name: VITE_SUPABASE_URL
+- Value: https://seu-projeto.supabase.co
+
+- Name: VITE_SUPABASE_ANON_KEY
+- Value: sb_anon_xxxx
+```
+
+### Acesso no Código
+
+```typescript
+// ✅ CORRETO - Variáveis públicas (cliente)
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const anonKey = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY;
+
+// ✅ CORRETO - Scripts de servidor (.mjs)
+const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+// ❌ ERRADO - Hardcoded
+const key = 'sb_anon_xxxxx'; // NUNCA!
+
+// ❌ ERRADO - API Key em cliente
+const secret = import.meta.env.SUPABASE_SERVICE_ROLE_KEY; // Só em scripts!
+```
+
+### Nomes Padronizados
+
+**Use SEMPRE estes nomes:**
+- `VITE_SUPABASE_URL` — URL do projeto Supabase
+- `VITE_SUPABASE_PUBLISHABLE_KEY` — Anon key (cliente)
+- `SUPABASE_SERVICE_ROLE_KEY` — Service role (scripts apenas)
+
+Nomes consistentes garantem que funcione em local, CI e produção.
 
 ---
 

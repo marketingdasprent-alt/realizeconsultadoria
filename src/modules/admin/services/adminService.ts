@@ -105,14 +105,29 @@ export const adminService = {
   // Verificar se user é admin
   checkAdminRole: async (userId: string) => {
     try {
-      const { data, error } = await supabase.rpc('has_role', {
+      // 1. Verificar na tabela user_roles
+      const { data: roleData } = await supabase
+        .from('user_roles')
+        .select('role')
+        .eq('user_id', userId)
+        .maybeSingle();
+
+      if (roleData?.role === 'admin') {
+        return { isAdmin: true, error: null };
+      }
+
+      // 2. Fallback: Verificar pelos grupos
+      const { data: permissions, error: permError } = await supabase.rpc('get_admin_permissions', {
         _user_id: userId,
-        _role: 'admin',
       });
 
-      if (error) throw error;
-      return { isAdmin: data || false, error: null };
+      if (!permError && permissions && permissions.length > 0) {
+        return { isAdmin: true, error: null };
+      }
+
+      return { isAdmin: false, error: null };
     } catch (error) {
+      console.error('Erro em checkAdminRole:', error);
       return { isAdmin: false, error };
     }
   },

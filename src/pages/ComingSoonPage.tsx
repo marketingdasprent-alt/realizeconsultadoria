@@ -13,46 +13,72 @@ const ComingSoonPage = () => {
 
   useEffect(() => {
     const checkAuthAndRedirect = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
 
-      if (session) {
-        let preference = localStorage.getItem('auth_preference');
+        if (session) {
+          let preference = localStorage.getItem('auth_preference');
 
-        // Always verify admin role to prevent incorrect redirection even if a preference exists
-        const { data: hasAdminRole } = await supabase.rpc('has_role', {
-          _user_id: session.user.id,
-          _role: 'admin',
-        });
-
-        if (hasAdminRole) {
-          preference = 'admin';
-          localStorage.setItem('auth_preference', 'admin');
-        } else if (!preference) {
-          // If not admin and no preference, check if it's an employee
-          const { data: employee } = await supabase
-            .from('employees')
-            .select('id')
+          // 1. Check if user has an admin role (via user_roles or admin groups)
+          const { data: roleData } = await supabase
+            .from('user_roles')
+            .select('role')
             .eq('user_id', session.user.id)
             .maybeSingle();
 
-          if (employee) {
-            preference = 'employee';
-            localStorage.setItem('auth_preference', 'employee');
+          let isAdmin = roleData?.role === 'admin';
+
+          if (!isAdmin) {
+            // Fallback to groups check via SECURITY DEFINER RPC
+            const { data: permissions } = await supabase.rpc('get_admin_permissions', {
+              _user_id: session.user.id,
+            });
+            if (permissions && permissions.length > 0) {
+              isAdmin = true;
+            }
+          }
+
+          if (isAdmin) {
+            preference = 'admin';
+            localStorage.setItem('auth_preference', 'admin');
+          } else if (!preference) {
+            // 2. If not admin and no preference, check if it's an employee
+            // First check user_roles for employee role
+            if (roleData?.role === 'employee') {
+              preference = 'employee';
+            } else {
+              // Fallback to employees table
+              const { data: employee } = await supabase
+                .from('employees')
+                .select('id')
+                .eq('user_id', session.user.id)
+                .maybeSingle();
+
+              if (employee) {
+                preference = 'employee';
+              }
+            }
+            
+            if (preference === 'employee') {
+              localStorage.setItem('auth_preference', 'employee');
+            }
+          }
+
+          if (preference === 'admin') {
+            navigate('/admin');
+            return;
+          } else if (preference === 'employee') {
+            navigate('/colaborador');
+            return;
           }
         }
-
-        if (preference === 'admin') {
-          navigate('/admin');
-          return;
-        } else if (preference === 'employee') {
-          navigate('/colaborador');
-          return;
-        }
+      } catch (error) {
+        console.error('Error in checkAuthAndRedirect:', error);
+      } finally {
+        setIsRedirecting(false);
       }
-
-      setIsRedirecting(false);
     };
 
     checkAuthAndRedirect();

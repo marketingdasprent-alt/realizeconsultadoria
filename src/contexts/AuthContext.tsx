@@ -1,13 +1,20 @@
 // src/contexts/AuthContext.tsx
 // Contexto centralizado de autenticação
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
-import { User } from '@supabase/supabase-js';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
+import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { authService } from '@/modules/auth/services/authService';
 import { accessService } from '@/modules/admin/services/accessService';
 
 export type UserRole = 'admin' | 'company_admin' | 'employee';
+
+const VALID_ROLES: readonly UserRole[] = ['admin', 'company_admin', 'employee'];
+
+const normalizeRole = (raw: unknown): UserRole | null => {
+  if (typeof raw !== 'string') return null;
+  return (VALID_ROLES as readonly string[]).includes(raw) ? (raw as UserRole) : null;
+};
 
 export interface AuthUser extends User {
   role?: UserRole;
@@ -33,49 +40,47 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [role, setRole] = useState<UserRole | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  // Monotonic counter that lets us discard role lookups whose result
+  // arrives after a newer auth event has already updated the state.
+  const lookupGenerationRef = useRef(0);
 
-  // Verificar role do usuário
-  const fetchUserRole = async (userId: string): Promise<UserRole | null> => {
-    const { role: userRole } = await accessService.getUserRole(userId);
-    return userRole as UserRole;
+  const applySession = async (session: Session | null) => {
+    const generation = ++lookupGenerationRef.current;
+
+    if (!session?.user) {
+      setUser(null);
+      setRole(null);
+      return;
+    }
+
+    const { role: rawRole } = await accessService.getUserRole(session.user.id);
+    if (generation !== lookupGenerationRef.current) return;
+
+    const normalized = normalizeRole(rawRole);
+    if (!normalized) {
+      setUser(null);
+      setRole(null);
+      setError('Sua conta ainda não está habilitada. Contate o administrador.');
+      return;
+    }
+
+    setUser({ ...session.user, role: normalized } as AuthUser);
+    setRole(normalized);
+    setError(null);
   };
 
-  // Verificar autenticação ao carregar
   const checkAuth = async () => {
     try {
-      const {
-        data: { session },
-      } = await authService.getSession();
-
-      if (session?.user) {
-        const { role: userRole } = await accessService.getUserRole(session.user.id);
-
-        if (!userRole) {
-          // Usuário autenticado mas sem role: trate como acesso negado
-          setUser(null);
-          setRole(null);
-          setError('Sua conta ainda não está habilitada. Contate o administrador.');
-          return;
-        }
-
-        setUser({
-          ...session.user,
-          role: userRole,
-        } as AuthUser);
-        setRole(userRole);
-      } else {
-        setUser(null);
-        setRole(null);
-      }
-    } catch (error) {
-      console.error('Error checking auth:', error);
+      const { data } = await authService.getSession();
+      await applySession(data?.session ?? null);
+    } catch (err) {
+      console.error('Error checking auth:', err);
       setError('Erro ao verificar autenticação');
     } finally {
       setIsLoading(false);
     }
   };
 
-  // Login
   const login = async (email: string, password: string) => {
     try {
       setError(null);
@@ -87,16 +92,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         throw new Error(signInError.message);
       }
 
-      if (data.user) {
-        const userRole = await fetchUserRole(data.user.id);
-        setUser({
-          ...data.user,
-          role: userRole || undefined,
-        } as AuthUser);
-        setRole(userRole);
-      }
-    } catch (error: any) {
-      const errorMessage = error.message || 'Erro ao fazer login';
+      // Apply session synchronously so the caller can react to the role state
+      // before navigating. onAuthStateChange will see SIGNED_IN but we ignore
+      // it via the generation counter to avoid a duplicate role lookup.
+      await applySession(data?.session ?? null);
+    } catch (err: any) {
+      const errorMessage = err.message || 'Erro ao fazer login';
       setError(errorMessage);
       throw new Error(errorMessage);
     } finally {
@@ -104,44 +105,39 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
-  // Logout
   const logout = async () => {
     try {
       setError(null);
       await authService.logout();
       setUser(null);
       setRole(null);
-    } catch (error: any) {
+    } catch (err) {
       setError('Erro ao fazer logout');
-      console.error('Logout error:', error);
+      console.error('Logout error:', err);
     }
   };
 
-  // Limpar erro
   const clearError = () => setError(null);
 
-  // Verificar autenticação ao carregar o contexto
   useEffect(() => {
+    let active = true;
+
     checkAuth();
 
-    // Listener para mudanças de autenticação
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (session?.user) {
-        const userRole = await fetchUserRole(session.user.id);
-        setUser({
-          ...session.user,
-          role: userRole || undefined,
-        } as AuthUser);
-        setRole(userRole);
-      } else {
-        setUser(null);
-        setRole(null);
-      }
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!active) return;
+      // INITIAL_SESSION is already handled by checkAuth above — skipping it
+      // prevents a race where two concurrent role lookups overwrite each other.
+      if (event === 'INITIAL_SESSION') return;
+      applySession(session);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      active = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const isAuthenticated = !!user;

@@ -1,90 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
 import { Rocket, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ComingSoonHeader from '@/components/layout/ComingSoonHeader';
 import Footer from '@/components/layout/Footer';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ComingSoonPage = () => {
   const navigate = useNavigate();
-  const [isRedirecting, setIsRedirecting] = useState(true);
+  const { isLoading, isAuthenticated, role } = useAuth();
 
   useEffect(() => {
-    const checkAuthAndRedirect = async () => {
-      try {
-        const {
-          data: { session },
-        } = await supabase.auth.getSession();
+    if (isLoading) return;
+    if (!isAuthenticated || !role) return;
 
-        if (session) {
-          let preference = localStorage.getItem('auth_preference');
+    if (role === 'admin') {
+      navigate('/admin', { replace: true });
+    } else if (role === 'employee' || role === 'company_admin') {
+      navigate('/colaborador', { replace: true });
+    }
+  }, [isLoading, isAuthenticated, role, navigate]);
 
-          // 1. Check if user has an admin role (via user_roles or admin groups)
-          const { data: roleData } = await supabase
-            .from('user_roles')
-            .select('role')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-
-          let isAdmin = roleData?.role === 'admin';
-
-          if (!isAdmin) {
-            // Fallback to groups check via SECURITY DEFINER RPC
-            const { data: permissions } = await supabase.rpc('get_admin_permissions', {
-              _user_id: session.user.id,
-            });
-            if (permissions && permissions.length > 0) {
-              isAdmin = true;
-            }
-          }
-
-          if (isAdmin) {
-            preference = 'admin';
-            localStorage.setItem('auth_preference', 'admin');
-          } else if (!preference) {
-            // 2. If not admin and no preference, check if it's an employee
-            // First check user_roles for employee role
-            if (roleData?.role === 'employee') {
-              preference = 'employee';
-            } else {
-              // Fallback to employees table
-              const { data: employee } = await supabase
-                .from('employees')
-                .select('id')
-                .eq('user_id', session.user.id)
-                .maybeSingle();
-
-              if (employee) {
-                preference = 'employee';
-              }
-            }
-
-            if (preference === 'employee') {
-              localStorage.setItem('auth_preference', 'employee');
-            }
-          }
-
-          if (preference === 'admin') {
-            navigate('/admin');
-            return;
-          } else if (preference === 'employee') {
-            navigate('/colaborador');
-            return;
-          }
-        }
-      } catch (error) {
-        console.error('Error in checkAuthAndRedirect:', error);
-      } finally {
-        setIsRedirecting(false);
-      }
-    };
-
-    checkAuthAndRedirect();
-  }, [navigate]);
-
-  if (isRedirecting) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">

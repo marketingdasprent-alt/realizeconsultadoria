@@ -1,23 +1,18 @@
-import { useState } from "react";
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Label } from "@/components/ui/label";
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Label } from '@/components/ui/label';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
+} from '@/components/ui/select';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,58 +22,49 @@ import {
   AlertDialogFooter,
   AlertDialogHeader,
   AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
+} from '@/components/ui/alert-dialog';
 import {
   Accordion,
   AccordionContent,
   AccordionItem,
   AccordionTrigger,
-} from "@/components/ui/accordion";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
-import { useAdminPermissions } from "@/hooks/useAdminPermissions";
-import { getLogoBase64, getLogoHeaderHtml } from "@/lib/logo-utils";
-import {
-  Plus,
-  Search,
-  FileText,
-  Printer,
-  CheckCircle,
-  Edit,
-  Key,
-  X,
-} from "lucide-react";
+} from '@/components/ui/accordion';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { getLogoBase64, getLogoHeaderHtml } from '@/lib/logo-utils';
+import { Plus, Search, FileText, Printer, CheckCircle, Edit, Key, X } from 'lucide-react';
 
 const AssignmentsTab = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const { canExecuteTopic } = useAdminPermissions();
-  const canManage = canExecuteTopic("accesses", "assignments");
+  const canManage = canExecuteTopic('accesses', 'assignments');
 
   const [open, setOpen] = useState(false);
   const [editingAssignment, setEditingAssignment] = useState<any>(null);
-  const [selectedEmployee, setSelectedEmployee] = useState("");
+  const [selectedEmployee, setSelectedEmployee] = useState('');
   const [selectedEquipment, setSelectedEquipment] = useState<string[]>([]);
   const [selectedPhones, setSelectedPhones] = useState<Record<string, string>>({});
   const [accessories, setAccessories] = useState<Record<string, any>>({});
   const [returnConfirmOpen, setReturnConfirmOpen] = useState(false);
   const [finalConfirmOpen, setFinalConfirmOpen] = useState(false);
   const [selectedAssignmentForReturn, setSelectedAssignmentForReturn] = useState<any>(null);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [statusFilter, setStatusFilter] = useState<"all" | "active" | "returned">("active");
-  const [keysCount, setKeysCount] = useState<string>("");
+  const [searchTerm, setSearchTerm] = useState('');
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'returned'>('active');
+  const [keysCount, setKeysCount] = useState<string>('');
   const [keysLocations, setKeysLocations] = useState<string[]>([]);
 
   // Fetch employees
   const { data: employees = [] } = useQuery({
-    queryKey: ["employees-active"],
+    queryKey: ['employees-active'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("employees")
-        .select("id, name, email, company_id, is_active, document_number")
-        .eq("is_active", true)
-        .order("name");
+        .from('employees')
+        .select('id, name, email, company_id, is_active, document_number')
+        .eq('is_active', true)
+        .order('name');
       if (error) throw error;
       return data;
     },
@@ -86,13 +72,13 @@ const AssignmentsTab = () => {
 
   // Fetch companies
   const { data: companies = [] } = useQuery({
-    queryKey: ["companies-list"],
+    queryKey: ['companies-list'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("companies")
-        .select("id, name, nif")
-        .eq("is_active", true)
-        .order("name");
+        .from('companies')
+        .select('id, name, nif')
+        .eq('is_active', true)
+        .order('name');
       if (error) throw error;
       return data;
     },
@@ -100,26 +86,24 @@ const AssignmentsTab = () => {
 
   // Fetch available equipment (when dialog is open)
   const { data: availableEquipment = [] } = useQuery({
-    queryKey: ["available-equipment-assignments", editingAssignment?.id],
+    queryKey: ['available-equipment-assignments', editingAssignment?.id],
     queryFn: async () => {
-      let query = supabase
-        .from("equipments")
-        .select("*, equipment_categories(name)");
+      let query = supabase.from('equipments').select('*, equipment_categories(name)');
 
       if (editingAssignment) {
         // Include already assigned items for this assignment
         const { data: assignedItems } = await supabase
-          .from("assignment_items")
-          .select("equipment_id")
-          .eq("assignment_id", editingAssignment.id);
+          .from('assignment_items')
+          .select('equipment_id')
+          .eq('assignment_id', editingAssignment.id);
         const assignedIds = assignedItems?.map((i: any) => i.equipment_id) || [];
         if (assignedIds.length > 0) {
-          query = query.or(`status.eq.available,id.in.(${assignedIds.join(",")})`);
+          query = query.or(`status.eq.available,id.in.(${assignedIds.join(',')})`);
         } else {
-          query = query.eq("status", "available");
+          query = query.eq('status', 'available');
         }
       } else {
-        query = query.eq("status", "available");
+        query = query.eq('status', 'available');
       }
 
       const { data, error } = await query;
@@ -131,26 +115,26 @@ const AssignmentsTab = () => {
 
   // Fetch available phones (SIM cards)
   const { data: availablePhones = [] } = useQuery({
-    queryKey: ["available-phones-assignments", editingAssignment?.id],
+    queryKey: ['available-phones-assignments', editingAssignment?.id],
     queryFn: async () => {
       // Get all phones, we'll filter by availability
       const { data: allPhones, error } = await supabase
-        .from("phones")
-        .select("*")
-        .order("phone_number");
+        .from('phones')
+        .select('*')
+        .order('phone_number');
       if (error) throw error;
 
       if (editingAssignment) {
         const { data: assignedItems } = await supabase
-          .from("assignment_items")
-          .select("phone_id")
-          .eq("assignment_id", editingAssignment.id)
-          .not("phone_id", "is", null);
+          .from('assignment_items')
+          .select('phone_id')
+          .eq('assignment_id', editingAssignment.id)
+          .not('phone_id', 'is', null);
         const assignedPhoneIds = assignedItems?.map((i: any) => i.phone_id) || [];
         // Show phones not assigned to other employees OR assigned to this assignment
-        return allPhones?.filter(
-          (p: any) => !p.employee_id || assignedPhoneIds.includes(p.id)
-        ) || [];
+        return (
+          allPhones?.filter((p: any) => !p.employee_id || assignedPhoneIds.includes(p.id)) || []
+        );
       }
       // Show phones without employee_id (available)
       return allPhones?.filter((p: any) => !p.employee_id) || [];
@@ -160,11 +144,12 @@ const AssignmentsTab = () => {
 
   // Fetch assignments
   const { data: assignments = [] } = useQuery({
-    queryKey: ["assignments"],
+    queryKey: ['assignments'],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from("assignments")
-        .select(`
+        .from('assignments')
+        .select(
+          `
           *,
           employees(name, document_number),
           companies(name, nif),
@@ -173,13 +158,14 @@ const AssignmentsTab = () => {
             equipments:equipment_id(*, equipment_categories(name)),
             phones:phone_id(*)
           )
-        `)
-        .order("created_at", { ascending: false });
+        `
+        )
+        .order('created_at', { ascending: false });
       if (error) throw error;
       return (data || []).sort((a: any, b: any) => {
-        const nameA = a.employees?.name?.toLowerCase() || "";
-        const nameB = b.employees?.name?.toLowerCase() || "";
-        return nameA.localeCompare(nameB, "pt-PT");
+        const nameA = a.employees?.name?.toLowerCase() || '';
+        const nameB = b.employees?.name?.toLowerCase() || '';
+        return nameA.localeCompare(nameB, 'pt-PT');
       });
     },
   });
@@ -187,24 +173,24 @@ const AssignmentsTab = () => {
   // Create mutation
   const createMutation = useMutation({
     mutationFn: async () => {
-      const employee = employees.find((e) => e.id === selectedEmployee);
-      if (!employee) throw new Error("Colaborador não encontrado");
+      const employee = employees.find(e => e.id === selectedEmployee);
+      if (!employee) throw new Error('Colaborador não encontrado');
 
       const { data: assignment, error: assignmentError } = await supabase
-        .from("assignments")
+        .from('assignments')
         .insert({
           employee_id: selectedEmployee,
           company_id: employee.company_id,
-          status: "active",
+          status: 'active',
           keys_count: keysCount ? parseInt(keysCount) : null,
-          keys_locations: keysLocations.filter((loc) => loc.trim() !== ""),
+          keys_locations: keysLocations.filter(loc => loc.trim() !== ''),
         })
         .select()
         .single();
 
       if (assignmentError) throw assignmentError;
 
-      const items = selectedEquipment.map((equipId) => {
+      const items = selectedEquipment.map(equipId => {
         const equip = availableEquipment.find((e: any) => e.id === equipId);
         const categoryName = equip?.equipment_categories?.name;
 
@@ -213,20 +199,20 @@ const AssignmentsTab = () => {
           equipment_id: equipId,
         };
 
-        if (categoryName === "Telemóvel") {
+        if (categoryName === 'Telemóvel') {
           item.phone_id = selectedPhones[equipId] || null;
           item.has_charger = accessories[equipId]?.charger || false;
           item.has_case = accessories[equipId]?.case || false;
           item.has_screen_protector = accessories[equipId]?.screen_protector || false;
         }
-        if (categoryName === "Portátil") {
+        if (categoryName === 'Portátil') {
           item.has_charger = accessories[equipId]?.charger || false;
           item.has_bag = accessories[equipId]?.bag || false;
           item.has_mouse_pad = accessories[equipId]?.mouse_pad || false;
           item.has_keyboard = accessories[equipId]?.keyboard || false;
           item.has_mouse = accessories[equipId]?.mouse || false;
         }
-        if (categoryName === "Tablet") {
+        if (categoryName === 'Tablet') {
           item.has_charger = accessories[equipId]?.charger || false;
           item.has_case = accessories[equipId]?.case || false;
           item.has_screen_protector = accessories[equipId]?.screen_protector || false;
@@ -236,38 +222,33 @@ const AssignmentsTab = () => {
         return item;
       });
 
-      const { error: itemsError } = await supabase
-        .from("assignment_items")
-        .insert(items);
+      const { error: itemsError } = await supabase.from('assignment_items').insert(items);
       if (itemsError) throw itemsError;
 
       // Update equipment status and employee_id to assigned
       await supabase
-        .from("equipments")
-        .update({ 
-          status: "assigned",
-          employee_id: selectedEmployee 
+        .from('equipments')
+        .update({
+          status: 'assigned',
+          employee_id: selectedEmployee,
         })
-        .in("id", selectedEquipment);
+        .in('id', selectedEquipment);
 
       // Update phones employee_id
       const phoneIds = Object.values(selectedPhones).filter(Boolean);
       if (phoneIds.length > 0) {
-        await supabase
-          .from("phones")
-          .update({ employee_id: selectedEmployee })
-          .in("id", phoneIds);
+        await supabase.from('phones').update({ employee_id: selectedEmployee }).in('id', phoneIds);
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["assignments"] });
-      queryClient.invalidateQueries({ queryKey: ["available-equipment-assignments"] });
-      queryClient.invalidateQueries({ queryKey: ["equipments"] });
-      toast({ title: "Atribuição criada com sucesso!" });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['available-equipment-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['equipments'] });
+      toast({ title: 'Atribuição criada com sucesso!' });
       resetDialogState();
     },
     onError: () => {
-      toast({ title: "Erro ao criar atribuição", variant: "destructive" });
+      toast({ title: 'Erro ao criar atribuição', variant: 'destructive' });
     },
   });
 
@@ -277,34 +258,35 @@ const AssignmentsTab = () => {
       const assignmentId = editingAssignment.id;
       const oldItems = editingAssignment.assignment_items || [];
       const oldEquipmentIds = oldItems.map((i: any) => i.equipment_id);
-      const removedEquipmentIds = oldEquipmentIds.filter((id: string) => !selectedEquipment.includes(id));
-      const newEquipmentIds = selectedEquipment.filter((id: string) => !oldEquipmentIds.includes(id));
+      const removedEquipmentIds = oldEquipmentIds.filter(
+        (id: string) => !selectedEquipment.includes(id)
+      );
+      const newEquipmentIds = selectedEquipment.filter(
+        (id: string) => !oldEquipmentIds.includes(id)
+      );
 
       // Free removed equipment
       if (removedEquipmentIds.length > 0) {
         await supabase
-          .from("assignment_items")
+          .from('assignment_items')
           .delete()
-          .eq("assignment_id", assignmentId)
-          .in("equipment_id", removedEquipmentIds);
+          .eq('assignment_id', assignmentId)
+          .in('equipment_id', removedEquipmentIds);
 
         await supabase
-          .from("equipments")
-          .update({ 
-            status: "available",
-            employee_id: null
+          .from('equipments')
+          .update({
+            status: 'available',
+            employee_id: null,
           })
-          .in("id", removedEquipmentIds);
+          .in('id', removedEquipmentIds);
 
         // Free removed phones
         const removedPhoneIds = oldItems
           .filter((i: any) => removedEquipmentIds.includes(i.equipment_id) && i.phone_id)
           .map((i: any) => i.phone_id);
         if (removedPhoneIds.length > 0) {
-          await supabase
-            .from("phones")
-            .update({ employee_id: null })
-            .in("id", removedPhoneIds);
+          await supabase.from('phones').update({ employee_id: null }).in('id', removedPhoneIds);
         }
       }
 
@@ -315,20 +297,20 @@ const AssignmentsTab = () => {
           const categoryName = equip?.equipment_categories?.name;
           const item: any = { assignment_id: assignmentId, equipment_id: equipId };
 
-          if (categoryName === "Telemóvel") {
+          if (categoryName === 'Telemóvel') {
             item.phone_id = selectedPhones[equipId] || null;
             item.has_charger = accessories[equipId]?.charger || false;
             item.has_case = accessories[equipId]?.case || false;
             item.has_screen_protector = accessories[equipId]?.screen_protector || false;
           }
-          if (categoryName === "Portátil") {
+          if (categoryName === 'Portátil') {
             item.has_charger = accessories[equipId]?.charger || false;
             item.has_bag = accessories[equipId]?.bag || false;
             item.has_mouse_pad = accessories[equipId]?.mouse_pad || false;
             item.has_keyboard = accessories[equipId]?.keyboard || false;
             item.has_mouse = accessories[equipId]?.mouse || false;
           }
-          if (categoryName === "Tablet") {
+          if (categoryName === 'Tablet') {
             item.has_charger = accessories[equipId]?.charger || false;
             item.has_case = accessories[equipId]?.case || false;
             item.has_screen_protector = accessories[equipId]?.screen_protector || false;
@@ -337,14 +319,14 @@ const AssignmentsTab = () => {
           return item;
         });
 
-        await supabase.from("assignment_items").insert(newItems);
+        await supabase.from('assignment_items').insert(newItems);
         await supabase
-          .from("equipments")
-          .update({ 
-            status: "assigned",
-            employee_id: editingAssignment.employee_id
+          .from('equipments')
+          .update({
+            status: 'assigned',
+            employee_id: editingAssignment.employee_id,
           })
-          .in("id", newEquipmentIds);
+          .in('id', newEquipmentIds);
 
         const newPhoneIds = Object.entries(selectedPhones)
           .filter(([equipId]) => newEquipmentIds.includes(equipId))
@@ -352,28 +334,36 @@ const AssignmentsTab = () => {
           .filter(Boolean);
         if (newPhoneIds.length > 0) {
           await supabase
-            .from("phones")
+            .from('phones')
             .update({ employee_id: editingAssignment.employee_id })
-            .in("id", newPhoneIds);
+            .in('id', newPhoneIds);
         }
       }
 
       // Update existing items accessories
-      const existingEquipmentIds = selectedEquipment.filter((id: string) => oldEquipmentIds.includes(id));
+      const existingEquipmentIds = selectedEquipment.filter((id: string) =>
+        oldEquipmentIds.includes(id)
+      );
       for (const equipId of existingEquipmentIds) {
         const equip = availableEquipment.find((e: any) => e.id === equipId);
         const categoryName = equip?.equipment_categories?.name;
         const updateData: any = {};
 
-        if (categoryName === "Telemóvel") {
+        if (categoryName === 'Telemóvel') {
           const oldItem = oldItems.find((i: any) => i.equipment_id === equipId);
           const newPhoneId = selectedPhones[equipId];
           if (oldItem?.phone_id !== newPhoneId) {
             if (oldItem?.phone_id) {
-              await supabase.from("phones").update({ employee_id: null }).eq("id", oldItem.phone_id);
+              await supabase
+                .from('phones')
+                .update({ employee_id: null })
+                .eq('id', oldItem.phone_id);
             }
             if (newPhoneId) {
-              await supabase.from("phones").update({ employee_id: editingAssignment.employee_id }).eq("id", newPhoneId);
+              await supabase
+                .from('phones')
+                .update({ employee_id: editingAssignment.employee_id })
+                .eq('id', newPhoneId);
             }
             updateData.phone_id = newPhoneId || null;
           }
@@ -381,14 +371,14 @@ const AssignmentsTab = () => {
           updateData.has_case = accessories[equipId]?.case || false;
           updateData.has_screen_protector = accessories[equipId]?.screen_protector || false;
         }
-        if (categoryName === "Portátil") {
+        if (categoryName === 'Portátil') {
           updateData.has_charger = accessories[equipId]?.charger || false;
           updateData.has_bag = accessories[equipId]?.bag || false;
           updateData.has_mouse_pad = accessories[equipId]?.mouse_pad || false;
           updateData.has_keyboard = accessories[equipId]?.keyboard || false;
           updateData.has_mouse = accessories[equipId]?.mouse || false;
         }
-        if (categoryName === "Tablet") {
+        if (categoryName === 'Tablet') {
           updateData.has_charger = accessories[equipId]?.charger || false;
           updateData.has_case = accessories[equipId]?.case || false;
           updateData.has_screen_protector = accessories[equipId]?.screen_protector || false;
@@ -397,30 +387,30 @@ const AssignmentsTab = () => {
 
         if (Object.keys(updateData).length > 0) {
           await supabase
-            .from("assignment_items")
+            .from('assignment_items')
             .update(updateData)
-            .eq("assignment_id", assignmentId)
-            .eq("equipment_id", equipId);
+            .eq('assignment_id', assignmentId)
+            .eq('equipment_id', equipId);
         }
       }
 
       await supabase
-        .from("assignments")
+        .from('assignments')
         .update({
           keys_count: keysCount ? parseInt(keysCount) : null,
-          keys_locations: keysLocations.filter((loc) => loc.trim() !== ""),
+          keys_locations: keysLocations.filter(loc => loc.trim() !== ''),
         })
-        .eq("id", assignmentId);
+        .eq('id', assignmentId);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["assignments"] });
-      queryClient.invalidateQueries({ queryKey: ["available-equipment-assignments"] });
-      queryClient.invalidateQueries({ queryKey: ["equipments"] });
-      toast({ title: "Atribuição atualizada com sucesso!" });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['available-equipment-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['equipments'] });
+      toast({ title: 'Atribuição atualizada com sucesso!' });
       resetDialogState();
     },
     onError: () => {
-      toast({ title: "Erro ao atualizar atribuição", variant: "destructive" });
+      toast({ title: 'Erro ao atualizar atribuição', variant: 'destructive' });
     },
   });
 
@@ -430,47 +420,46 @@ const AssignmentsTab = () => {
       const assignment = assignments.find((a: any) => a.id === assignmentId);
 
       await supabase
-        .from("assignments")
-        .update({ status: "returned", return_date: new Date().toISOString().split("T")[0] })
-        .eq("id", assignmentId);
+        .from('assignments')
+        .update({ status: 'returned', return_date: new Date().toISOString().split('T')[0] })
+        .eq('id', assignmentId);
 
       const equipmentIds = assignment?.assignment_items?.map((i: any) => i.equipment_id) || [];
       if (equipmentIds.length > 0) {
         await supabase
-          .from("equipments")
-          .update({ 
-            status: "available",
-            employee_id: null 
+          .from('equipments')
+          .update({
+            status: 'available',
+            employee_id: null,
           })
-          .in("id", equipmentIds);
+          .in('id', equipmentIds);
       }
 
-      const phoneIds = assignment?.assignment_items
-        ?.map((i: any) => i.phone_id)
-        .filter(Boolean) || [];
+      const phoneIds =
+        assignment?.assignment_items?.map((i: any) => i.phone_id).filter(Boolean) || [];
       if (phoneIds.length > 0) {
-        await supabase.from("phones").update({ employee_id: null }).in("id", phoneIds);
+        await supabase.from('phones').update({ employee_id: null }).in('id', phoneIds);
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["assignments"] });
-      queryClient.invalidateQueries({ queryKey: ["available-equipment-assignments"] });
-      queryClient.invalidateQueries({ queryKey: ["equipments"] });
-      toast({ title: "Atribuição devolvida com sucesso!" });
+      queryClient.invalidateQueries({ queryKey: ['assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['available-equipment-assignments'] });
+      queryClient.invalidateQueries({ queryKey: ['equipments'] });
+      toast({ title: 'Atribuição devolvida com sucesso!' });
     },
     onError: () => {
-      toast({ title: "Erro ao devolver atribuição", variant: "destructive" });
+      toast({ title: 'Erro ao devolver atribuição', variant: 'destructive' });
     },
   });
 
   const resetDialogState = () => {
     setOpen(false);
     setEditingAssignment(null);
-    setSelectedEmployee("");
+    setSelectedEmployee('');
     setSelectedEquipment([]);
     setSelectedPhones({});
     setAccessories({});
-    setKeysCount("");
+    setKeysCount('');
     setKeysLocations([]);
   };
 
@@ -497,7 +486,7 @@ const AssignmentsTab = () => {
     });
     setSelectedPhones(phones);
     setAccessories(acc);
-    setKeysCount(assignment.keys_count?.toString() || "");
+    setKeysCount(assignment.keys_count?.toString() || '');
     setKeysLocations(assignment.keys_locations || []);
     setOpen(true);
   };
@@ -510,7 +499,7 @@ const AssignmentsTab = () => {
     }
   };
 
-  const addKeyLocation = () => setKeysLocations([...keysLocations, ""]);
+  const addKeyLocation = () => setKeysLocations([...keysLocations, '']);
   const removeKeyLocation = (index: number) =>
     setKeysLocations(keysLocations.filter((_, i) => i !== index));
   const updateKeyLocation = (index: number, value: string) => {
@@ -519,21 +508,24 @@ const AssignmentsTab = () => {
     setKeysLocations(updated);
   };
 
-  const showKeysLocations = keysCount !== "" && keysCount.length > 0;
+  const showKeysLocations = keysCount !== '' && keysCount.length > 0;
 
   // Group equipment by category
-  const groupedEquipment = availableEquipment.reduce((acc: any, equip: any) => {
-    const categoryName = equip.equipment_categories?.name || "Outro";
-    if (!acc[categoryName]) acc[categoryName] = [];
-    acc[categoryName].push(equip);
-    return acc;
-  }, {} as Record<string, any[]>);
+  const groupedEquipment = availableEquipment.reduce(
+    (acc: any, equip: any) => {
+      const categoryName = equip.equipment_categories?.name || 'Outro';
+      if (!acc[categoryName]) acc[categoryName] = [];
+      acc[categoryName].push(equip);
+      return acc;
+    },
+    {} as Record<string, any[]>
+  );
 
   const sortedCategories = Object.keys(groupedEquipment).sort();
 
   const formatPhoneNumber = (num: string) => {
-    if (!num) return "";
-    const clean = num.replace(/\D/g, "");
+    if (!num) return '';
+    const clean = num.replace(/\D/g, '');
     if (clean.length === 9) return `${clean.slice(0, 3)} ${clean.slice(3, 6)} ${clean.slice(6)}`;
     return num;
   };
@@ -541,9 +533,13 @@ const AssignmentsTab = () => {
   // Print functions
   const handlePrint = async (assignment: any, isReturn = false) => {
     try {
-      const printWindow = window.open("", "_blank");
+      const printWindow = window.open('', '_blank');
       if (!printWindow) {
-        toast({ title: "Erro ao imprimir", description: "Verifique se pop-ups estão bloqueados.", variant: "destructive" });
+        toast({
+          title: 'Erro ao imprimir',
+          description: 'Verifique se pop-ups estão bloqueados.',
+          variant: 'destructive',
+        });
         return;
       }
 
@@ -552,76 +548,89 @@ const AssignmentsTab = () => {
       const company = assignment.companies;
       const items = assignment.assignment_items || [];
 
-      const mobileItems = items.filter((i: any) => i.equipments?.equipment_categories?.name === "Telemóvel");
-      const laptopItems = items.filter((i: any) => i.equipments?.equipment_categories?.name === "Portátil");
-      const tabletItems = items.filter((i: any) => i.equipments?.equipment_categories?.name === "Tablet");
-      const monitorItems = items.filter((i: any) => i.equipments?.equipment_categories?.name === "Monitor");
+      const mobileItems = items.filter(
+        (i: any) => i.equipments?.equipment_categories?.name === 'Telemóvel'
+      );
+      const laptopItems = items.filter(
+        (i: any) => i.equipments?.equipment_categories?.name === 'Portátil'
+      );
+      const tabletItems = items.filter(
+        (i: any) => i.equipments?.equipment_categories?.name === 'Tablet'
+      );
+      const monitorItems = items.filter(
+        (i: any) => i.equipments?.equipment_categories?.name === 'Monitor'
+      );
 
       const buildTable = (categoryItems: any[], category: string) => {
-        if (categoryItems.length === 0) return "";
-        return `<div class="category-title">${category}:</div>` + categoryItems.map((item: any) => {
-          const equip = item.equipments;
-          const phone = item.phones;
-          if (category === "Telemóvel") {
-            return `<table><tr>
-              <td><strong>Marca:</strong> ${equip?.brand || ""} ${equip?.model || ""}</td>
-              <td><strong>Nº:</strong> ${phone?.phone_number ? formatPhoneNumber(phone.phone_number) : "N/A"}</td>
-              <td><strong>PIN:</strong> ${phone?.pin || "N/A"}</td>
+        if (categoryItems.length === 0) return '';
+        return (
+          `<div class="category-title">${category}:</div>` +
+          categoryItems
+            .map((item: any) => {
+              const equip = item.equipments;
+              const phone = item.phones;
+              if (category === 'Telemóvel') {
+                return `<table><tr>
+              <td><strong>Marca:</strong> ${equip?.brand || ''} ${equip?.model || ''}</td>
+              <td><strong>Nº:</strong> ${phone?.phone_number ? formatPhoneNumber(phone.phone_number) : 'N/A'}</td>
+              <td><strong>PIN:</strong> ${phone?.pin || 'N/A'}</td>
             </tr><tr>
-              <td><strong>Passe:</strong> ${equip?.pass_year || "N/A"}</td>
-              <td><strong>Nº Série:</strong> ${equip?.serial_number || "N/A"}</td>
-              <td><strong>PUK:</strong> ${phone?.puk || "N/A"}</td>
+              <td><strong>Passe:</strong> ${equip?.pass_year || 'N/A'}</td>
+              <td><strong>Nº Série:</strong> ${equip?.serial_number || 'N/A'}</td>
+              <td><strong>PUK:</strong> ${phone?.puk || 'N/A'}</td>
             </tr><tr>
-              <td><strong>CAPA:</strong> ${item.has_case ? "SIM" : "NÃO"}</td>
-              <td><strong>CARREGADOR:</strong> ${item.has_charger ? "SIM" : "NÃO"}</td>
-              <td><strong>PELÍCULA:</strong> ${item.has_screen_protector ? "SIM" : "NÃO"}</td>
+              <td><strong>CAPA:</strong> ${item.has_case ? 'SIM' : 'NÃO'}</td>
+              <td><strong>CARREGADOR:</strong> ${item.has_charger ? 'SIM' : 'NÃO'}</td>
+              <td><strong>PELÍCULA:</strong> ${item.has_screen_protector ? 'SIM' : 'NÃO'}</td>
             </tr></table>`;
-          }
-          if (category === "Portátil") {
-            return `<table><tr>
-              <td><strong>Marca:</strong> ${equip?.brand || ""} ${equip?.model || ""}</td>
-              <td><strong>PASSE:</strong> ${equip?.pass_year || "Sem"}</td>
-              <td><strong>Nº Série:</strong> ${equip?.serial_number || "N/A"}</td>
+              }
+              if (category === 'Portátil') {
+                return `<table><tr>
+              <td><strong>Marca:</strong> ${equip?.brand || ''} ${equip?.model || ''}</td>
+              <td><strong>PASSE:</strong> ${equip?.pass_year || 'Sem'}</td>
+              <td><strong>Nº Série:</strong> ${equip?.serial_number || 'N/A'}</td>
             </tr><tr>
-              <td><strong>RATO:</strong> ${item.has_mouse ? "SIM" : "NÃO"}</td>
-              <td><strong>TAPETE:</strong> ${item.has_mouse_pad ? "SIM" : "NÃO"}</td>
-              <td><strong>TECLADO:</strong> ${item.has_keyboard ? "SIM" : "NÃO"}</td>
+              <td><strong>RATO:</strong> ${item.has_mouse ? 'SIM' : 'NÃO'}</td>
+              <td><strong>TAPETE:</strong> ${item.has_mouse_pad ? 'SIM' : 'NÃO'}</td>
+              <td><strong>TECLADO:</strong> ${item.has_keyboard ? 'SIM' : 'NÃO'}</td>
             </tr><tr>
-              <td><strong>MALA:</strong> ${item.has_bag ? "SIM" : "NÃO"}</td>
-              <td><strong>CARREGADOR:</strong> ${item.has_charger ? "SIM" : "NÃO"}</td>
+              <td><strong>MALA:</strong> ${item.has_bag ? 'SIM' : 'NÃO'}</td>
+              <td><strong>CARREGADOR:</strong> ${item.has_charger ? 'SIM' : 'NÃO'}</td>
               <td></td>
             </tr></table>`;
-          }
-          if (category === "Tablet") {
-            return `<table><tr>
-              <td><strong>Marca:</strong> ${equip?.brand || ""} ${equip?.model || ""}</td>
-              <td><strong>PASSE:</strong> ${equip?.pass_year || "N/A"}</td>
-              <td><strong>Nº Série:</strong> ${equip?.serial_number || "N/A"}</td>
+              }
+              if (category === 'Tablet') {
+                return `<table><tr>
+              <td><strong>Marca:</strong> ${equip?.brand || ''} ${equip?.model || ''}</td>
+              <td><strong>PASSE:</strong> ${equip?.pass_year || 'N/A'}</td>
+              <td><strong>Nº Série:</strong> ${equip?.serial_number || 'N/A'}</td>
             </tr><tr>
-              <td><strong>CAPA:</strong> ${item.has_case ? "SIM" : "NÃO"}</td>
-              <td><strong>CARREGADOR:</strong> ${item.has_charger ? "SIM" : "NÃO"}</td>
-              <td><strong>PELÍCULA:</strong> ${item.has_screen_protector ? "SIM" : "NÃO"}</td>
+              <td><strong>CAPA:</strong> ${item.has_case ? 'SIM' : 'NÃO'}</td>
+              <td><strong>CARREGADOR:</strong> ${item.has_charger ? 'SIM' : 'NÃO'}</td>
+              <td><strong>PELÍCULA:</strong> ${item.has_screen_protector ? 'SIM' : 'NÃO'}</td>
             </tr><tr>
-              <td><strong>CANETA:</strong> ${item.has_pen ? "SIM" : "NÃO"}</td>
+              <td><strong>CANETA:</strong> ${item.has_pen ? 'SIM' : 'NÃO'}</td>
               <td></td><td></td>
             </tr></table>`;
-          }
-          // Monitor or other
-          return `<table><tr>
-            <td><strong>Marca:</strong> ${equip?.brand || ""} ${equip?.model || ""}</td>
-            <td><strong>Nº Série:</strong> ${equip?.serial_number || "N/A"}</td>
-            <td><strong>CARREGADOR:</strong> ${item.has_charger ? "SIM" : "NÃO"}</td>
+              }
+              // Monitor or other
+              return `<table><tr>
+            <td><strong>Marca:</strong> ${equip?.brand || ''} ${equip?.model || ''}</td>
+            <td><strong>Nº Série:</strong> ${equip?.serial_number || 'N/A'}</td>
+            <td><strong>CARREGADOR:</strong> ${item.has_charger ? 'SIM' : 'NÃO'}</td>
           </tr></table>`;
-        }).join("");
+            })
+            .join('')
+        );
       };
 
       const title = isReturn
-        ? "DECLARAÇÃO DE DEVOLUÇÃO DE EQUIPAMENTOS"
-        : "DECLARAÇÃO DE ENTREGA DE EQUIPAMENTOS";
+        ? 'DECLARAÇÃO DE DEVOLUÇÃO DE EQUIPAMENTOS'
+        : 'DECLARAÇÃO DE ENTREGA DE EQUIPAMENTOS';
 
       const declarationText = isReturn
-        ? `Eu, ${employee?.name}, portador(a) do documento nº ${employee?.document_number || "N/A"}, declaro que para todos os efeitos que devolvi os equipamentos acima mencionados, em bom estado, para empresa ${company?.name || "N/A"}, com o NIPC ${company?.nif || "N/A"}.`
-        : `Eu, ${employee?.name}, portador(a) do documento nº ${employee?.document_number || "N/A"}, declaro que para todos os efeitos, RECEBI os equipamentos acima mencionados, em bom estado, da empresa ${company?.name || "N/A"}, com o NIPC ${company?.nif || "N/A"}.<br/><br/>Importa referir que, comprometo-me a devolver os equipamentos acima citados, com uma hora de antecedência de data de término da atividade laboral, de modo que os serviços informáticos verifiquem as funcionalidades dos mesmos.`;
+        ? `Eu, ${employee?.name}, portador(a) do documento nº ${employee?.document_number || 'N/A'}, declaro que para todos os efeitos que devolvi os equipamentos acima mencionados, em bom estado, para empresa ${company?.name || 'N/A'}, com o NIPC ${company?.nif || 'N/A'}.`
+        : `Eu, ${employee?.name}, portador(a) do documento nº ${employee?.document_number || 'N/A'}, declaro que para todos os efeitos, RECEBI os equipamentos acima mencionados, em bom estado, da empresa ${company?.name || 'N/A'}, com o NIPC ${company?.nif || 'N/A'}.<br/><br/>Importa referir que, comprometo-me a devolver os equipamentos acima citados, com uma hora de antecedência de data de término da atividade laboral, de modo que os serviços informáticos verifiquem as funcionalidades dos mesmos.`;
 
       const html = `<!DOCTYPE html><html><head><title>${title}</title>
         <style>
@@ -645,26 +654,30 @@ const AssignmentsTab = () => {
           <h1>${title}</h1>
           <div class="employee-info">
             <strong>Nome do Colaborador:</strong> ${employee?.name} &nbsp;&nbsp;&nbsp;&nbsp;&nbsp;
-            <strong>Documento:</strong> ${employee?.document_number || "N/A"}
+            <strong>Documento:</strong> ${employee?.document_number || 'N/A'}
           </div>
-          ${buildTable(mobileItems, "Telemóvel")}
-          ${buildTable(laptopItems, "Portátil")}
-          ${buildTable(tabletItems, "Tablet")}
-          ${buildTable(monitorItems, "Monitor")}
-          ${assignment.keys_count && assignment.keys_count > 0 ? `
+          ${buildTable(mobileItems, 'Telemóvel')}
+          ${buildTable(laptopItems, 'Portátil')}
+          ${buildTable(tabletItems, 'Tablet')}
+          ${buildTable(monitorItems, 'Monitor')}
+          ${
+            assignment.keys_count && assignment.keys_count > 0
+              ? `
             <div class="category-title">Chaves:</div>
             <table><tr>
               <td><strong>Quantidade:</strong> ${assignment.keys_count}</td>
-              <td><strong>Locais:</strong> ${assignment.keys_locations?.join(", ") || "N/A"}</td>
+              <td><strong>Locais:</strong> ${assignment.keys_locations?.join(', ') || 'N/A'}</td>
             </tr></table>
-          ` : ""}
+          `
+              : ''
+          }
           <div class="declaration">${declarationText}</div>
           <div class="signature">
             <div class="signature-line"></div>
             <div style="margin-top: 15px;">
-              Leiria, ${new Date().toLocaleDateString("pt-PT", { day: "numeric", month: "long", year: "numeric" })}
+              Leiria, ${new Date().toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' })}
             </div>
-            ${isReturn ? `<div style="margin-top: 30px; font-weight: bold;">RECEBIDO POR:_____________________</div>` : ""}
+            ${isReturn ? `<div style="margin-top: 30px; font-weight: bold;">RECEBIDO POR:_____________________</div>` : ''}
           </div>
           <script>
             setTimeout(function() { window.print(); window.onafterprint = function() { window.close(); }; }, 300);
@@ -674,14 +687,14 @@ const AssignmentsTab = () => {
       printWindow.document.write(html);
       printWindow.document.close();
     } catch (error) {
-      console.error("Erro ao gerar impressão:", error);
-      toast({ title: "Erro ao imprimir", variant: "destructive" });
+      console.error('Erro ao gerar impressão:', error);
+      toast({ title: 'Erro ao imprimir', variant: 'destructive' });
     }
   };
 
   // Filter assignments
   const filteredAssignments = assignments.filter((assignment: any) => {
-    if (statusFilter !== "all" && assignment.status !== statusFilter) return false;
+    if (statusFilter !== 'all' && assignment.status !== statusFilter) return false;
     if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
     if (assignment.employees?.name?.toLowerCase().includes(search)) return true;
@@ -700,23 +713,23 @@ const AssignmentsTab = () => {
   // Render accessory checkboxes
   const renderAccessories = (equipId: string, category: string) => {
     const accessoryConfigs: Record<string, { key: string; label: string }[]> = {
-      "Telemóvel": [
-        { key: "charger", label: "Carregador" },
-        { key: "case", label: "Capa" },
-        { key: "screen_protector", label: "Película" },
+      Telemóvel: [
+        { key: 'charger', label: 'Carregador' },
+        { key: 'case', label: 'Capa' },
+        { key: 'screen_protector', label: 'Película' },
       ],
-      "Portátil": [
-        { key: "charger", label: "Carregador" },
-        { key: "bag", label: "Mala" },
-        { key: "mouse_pad", label: "Tapete do Rato" },
-        { key: "keyboard", label: "Teclado" },
-        { key: "mouse", label: "Rato" },
+      Portátil: [
+        { key: 'charger', label: 'Carregador' },
+        { key: 'bag', label: 'Mala' },
+        { key: 'mouse_pad', label: 'Tapete do Rato' },
+        { key: 'keyboard', label: 'Teclado' },
+        { key: 'mouse', label: 'Rato' },
       ],
-      "Tablet": [
-        { key: "charger", label: "Carregador" },
-        { key: "case", label: "Capa" },
-        { key: "screen_protector", label: "Película" },
-        { key: "pen", label: "Caneta (Stylus)" },
+      Tablet: [
+        { key: 'charger', label: 'Carregador' },
+        { key: 'case', label: 'Capa' },
+        { key: 'screen_protector', label: 'Película' },
+        { key: 'pen', label: 'Caneta (Stylus)' },
       ],
     };
 
@@ -732,14 +745,16 @@ const AssignmentsTab = () => {
               <Checkbox
                 id={`${key}-${equipId}`}
                 checked={accessories[equipId]?.[key] || false}
-                onCheckedChange={(checked) =>
+                onCheckedChange={checked =>
                   setAccessories({
                     ...accessories,
                     [equipId]: { ...accessories[equipId], [key]: checked },
                   })
                 }
               />
-              <label htmlFor={`${key}-${equipId}`} className="text-sm">{label}</label>
+              <label htmlFor={`${key}-${equipId}`} className="text-sm">
+                {label}
+              </label>
             </div>
           ))}
         </div>
@@ -751,7 +766,12 @@ const AssignmentsTab = () => {
     <div className="space-y-4">
       {canManage && (
         <div className="flex justify-end">
-          <Button onClick={() => { resetDialogState(); setOpen(true); }}>
+          <Button
+            onClick={() => {
+              resetDialogState();
+              setOpen(true);
+            }}
+          >
             <Plus className="h-4 w-4 mr-2" />
             Nova Atribuição
           </Button>
@@ -765,7 +785,7 @@ const AssignmentsTab = () => {
           <Input
             placeholder="Pesquisar por colaborador ou equipamento..."
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={e => setSearchTerm(e.target.value)}
             className="pl-9"
           />
         </div>
@@ -784,9 +804,7 @@ const AssignmentsTab = () => {
       {/* Assignment cards */}
       <div className="space-y-4">
         {filteredAssignments.length === 0 ? (
-          <p className="text-center text-muted-foreground py-8">
-            Nenhuma atribuição encontrada.
-          </p>
+          <p className="text-center text-muted-foreground py-8">Nenhuma atribuição encontrada.</p>
         ) : (
           filteredAssignments.map((assignment: any) => (
             <Card key={assignment.id}>
@@ -800,11 +818,11 @@ const AssignmentsTab = () => {
                     {assignment.keys_count > 0 && (
                       <Badge variant="outline" className="flex items-center gap-1">
                         <Key className="h-3 w-3" />
-                        {assignment.keys_count} {assignment.keys_count === 1 ? "chave" : "chaves"}
+                        {assignment.keys_count} {assignment.keys_count === 1 ? 'chave' : 'chaves'}
                       </Badge>
                     )}
-                    <Badge variant={assignment.status === "active" ? "default" : "secondary"}>
-                      {assignment.status === "active" ? "Ativa" : "Devolvida"}
+                    <Badge variant={assignment.status === 'active' ? 'default' : 'secondary'}>
+                      {assignment.status === 'active' ? 'Ativa' : 'Devolvida'}
                     </Badge>
                   </div>
                 </div>
@@ -812,13 +830,13 @@ const AssignmentsTab = () => {
               <CardContent>
                 <div className="space-y-2">
                   <p className="text-sm">
-                    <span className="font-medium">Data:</span>{" "}
-                    {new Date(assignment.assigned_date).toLocaleDateString("pt-PT")}
+                    <span className="font-medium">Data:</span>{' '}
+                    {new Date(assignment.assigned_date).toLocaleDateString('pt-PT')}
                   </p>
                   {assignment.return_date && (
                     <p className="text-sm">
-                      <span className="font-medium">Data Devolução:</span>{" "}
-                      {new Date(assignment.return_date).toLocaleDateString("pt-PT")}
+                      <span className="font-medium">Data Devolução:</span>{' '}
+                      {new Date(assignment.return_date).toLocaleDateString('pt-PT')}
                     </p>
                   )}
                   <p className="text-sm font-medium">Equipamentos:</p>
@@ -828,7 +846,7 @@ const AssignmentsTab = () => {
                         {item.equipments?.equipment_categories?.name}
                         {item.equipments?.brand && ` - ${item.equipments.brand}`}
                         {item.equipments?.model && ` ${item.equipments.model}`}
-                        {item.equipments?.equipment_categories?.name === "Telemóvel" &&
+                        {item.equipments?.equipment_categories?.name === 'Telemóvel' &&
                           item.phones?.phone_number && (
                             <span className="text-muted-foreground ml-2">
                               ({formatPhoneNumber(item.phones.phone_number)})
@@ -838,17 +856,21 @@ const AssignmentsTab = () => {
                     ))}
                   </ul>
                   <div className="flex flex-wrap gap-2 mt-4">
-                    {assignment.status === "active" && canManage && (
+                    {assignment.status === 'active' && canManage && (
                       <Button size="sm" variant="outline" onClick={() => handleEdit(assignment)}>
                         <Edit className="h-4 w-4 mr-2" />
                         Editar
                       </Button>
                     )}
-                    <Button size="sm" variant="outline" onClick={() => handlePrint(assignment, false)}>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handlePrint(assignment, false)}
+                    >
                       <Printer className="h-4 w-4 mr-2" />
                       Imprimir
                     </Button>
-                    {assignment.status === "active" && canManage && (
+                    {assignment.status === 'active' && canManage && (
                       <Button
                         size="sm"
                         variant="destructive"
@@ -870,13 +892,19 @@ const AssignmentsTab = () => {
       </div>
 
       {/* Create/Edit Dialog */}
-      <Dialog open={open} onOpenChange={(isOpen) => { if (!isOpen) resetDialogState(); else setOpen(true); }}>
+      <Dialog
+        open={open}
+        onOpenChange={isOpen => {
+          if (!isOpen) resetDialogState();
+          else setOpen(true);
+        }}
+      >
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle>
               {editingAssignment
                 ? `Editar Atribuição - ${editingAssignment.employees?.name}`
-                : "Criar Atribuição"}
+                : 'Criar Atribuição'}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -896,7 +924,7 @@ const AssignmentsTab = () => {
                     <SelectValue placeholder="Selecionar colaborador" />
                   </SelectTrigger>
                   <SelectContent>
-                    {employees.map((emp) => (
+                    {employees.map(emp => (
                       <SelectItem key={emp.id} value={emp.id}>
                         {emp.name}
                       </SelectItem>
@@ -911,7 +939,7 @@ const AssignmentsTab = () => {
               <Label>Equipamentos Disponíveis</Label>
               <div className="max-h-96 overflow-y-auto border rounded-md">
                 <Accordion type="multiple" className="w-full">
-                  {sortedCategories.map((category) => {
+                  {sortedCategories.map(category => {
                     const equips = groupedEquipment[category] || [];
                     return (
                       <AccordionItem key={category} value={category}>
@@ -928,11 +956,13 @@ const AssignmentsTab = () => {
                                 <div className="flex items-center space-x-2">
                                   <Checkbox
                                     checked={selectedEquipment.includes(equip.id)}
-                                    onCheckedChange={(checked) => {
+                                    onCheckedChange={checked => {
                                       if (checked) {
                                         setSelectedEquipment([...selectedEquipment, equip.id]);
                                       } else {
-                                        setSelectedEquipment(selectedEquipment.filter((id) => id !== equip.id));
+                                        setSelectedEquipment(
+                                          selectedEquipment.filter(id => id !== equip.id)
+                                        );
                                       }
                                     }}
                                   />
@@ -950,13 +980,16 @@ const AssignmentsTab = () => {
                                 {selectedEquipment.includes(equip.id) && (
                                   <>
                                     {/* SIM card for mobile */}
-                                    {equip.equipment_categories?.name === "Telemóvel" && (
+                                    {equip.equipment_categories?.name === 'Telemóvel' && (
                                       <div className="ml-6 space-y-2">
                                         <Label className="text-sm font-medium">Cartão SIM</Label>
                                         <Select
-                                          value={selectedPhones[equip.id] || ""}
-                                          onValueChange={(value) =>
-                                            setSelectedPhones({ ...selectedPhones, [equip.id]: value })
+                                          value={selectedPhones[equip.id] || ''}
+                                          onValueChange={value =>
+                                            setSelectedPhones({
+                                              ...selectedPhones,
+                                              [equip.id]: value,
+                                            })
                                           }
                                         >
                                           <SelectTrigger>
@@ -998,7 +1031,7 @@ const AssignmentsTab = () => {
                 min="0"
                 placeholder="Quantidade de chaves"
                 value={keysCount}
-                onChange={(e) => setKeysCount(e.target.value)}
+                onChange={e => setKeysCount(e.target.value)}
               />
               {showKeysLocations && (
                 <div className="space-y-2 ml-4">
@@ -1008,10 +1041,15 @@ const AssignmentsTab = () => {
                       <Input
                         placeholder={`Local ${index + 1}`}
                         value={location}
-                        onChange={(e) => updateKeyLocation(index, e.target.value)}
+                        onChange={e => updateKeyLocation(index, e.target.value)}
                         className="flex-1"
                       />
-                      <Button type="button" variant="ghost" size="icon" onClick={() => removeKeyLocation(index)}>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        onClick={() => removeKeyLocation(index)}
+                      >
                         <X className="h-4 w-4" />
                       </Button>
                     </div>
@@ -1035,8 +1073,12 @@ const AssignmentsTab = () => {
               className="w-full"
             >
               {editingAssignment
-                ? updateMutation.isPending ? "A atualizar..." : "Atualizar Atribuição"
-                : createMutation.isPending ? "A criar..." : "Criar Atribuição"}
+                ? updateMutation.isPending
+                  ? 'A atualizar...'
+                  : 'Atualizar Atribuição'
+                : createMutation.isPending
+                  ? 'A criar...'
+                  : 'Criar Atribuição'}
             </Button>
           </div>
         </DialogContent>
@@ -1072,7 +1114,8 @@ const AssignmentsTab = () => {
           <AlertDialogHeader>
             <AlertDialogTitle>Confirmar Devolução Final</AlertDialogTitle>
             <AlertDialogDescription>
-              Vai mesmo devolver os equipamentos? Esta ação irá atualizar o status para "disponível".
+              Vai mesmo devolver os equipamentos? Esta ação irá atualizar o status para
+              "disponível".
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

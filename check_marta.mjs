@@ -1,13 +1,20 @@
 import { createClient } from '@supabase/supabase-js';
 
-const SUPABASE_URL = "https://jvvnsoasylusbmxfotci.supabase.co";
-const SUPABASE_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dm5zb2FzeWx1c2JteGZvdGNpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzUwNTA1MjQsImV4cCI6MjA5MDYyNjUyNH0.uTsDGNYrin5bemer5vciSYV14IaWC74kQ3L2l6zUalg";
+const SUPABASE_URL = process.env.SUPABASE_URL;
+const SUPABASE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+if (!SUPABASE_URL || !SUPABASE_KEY) {
+  console.error('❌ ERRO: Configure as variáveis de ambiente:');
+  console.error('  set SUPABASE_URL=your_url');
+  console.error('  set SUPABASE_SERVICE_ROLE_KEY=your_key');
+  process.exit(1);
+}
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
 async function checkMarta() {
   console.log('Searching for Marta in employees table...');
-  
+
   const { data, error } = await supabase
     .from('employees')
     .select('id, name, email, created_at, user_id')

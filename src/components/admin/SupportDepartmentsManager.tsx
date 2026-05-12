@@ -1,12 +1,29 @@
-import { useState, useEffect } from "react";
-import { Plus, Trash2, Loader2, GripVertical, Pencil, X, Check, ArrowUp, ArrowDown } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Switch } from "@/components/ui/switch";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from 'react';
+import {
+  Plus,
+  Trash2,
+  Loader2,
+  GripVertical,
+  Pencil,
+  X,
+  Check,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Switch } from '@/components/ui/switch';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface SupportDepartment {
   id: string;
@@ -21,25 +38,25 @@ const SupportDepartmentsManager = () => {
   const [departments, setDepartments] = useState<SupportDepartment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isAdding, setIsAdding] = useState(false);
-  const [newName, setNewName] = useState("");
-  const [newDescription, setNewDescription] = useState("");
+  const [newName, setNewName] = useState('');
+  const [newDescription, setNewDescription] = useState('');
   const [editingId, setEditingId] = useState<string | null>(null);
-  const [editName, setEditName] = useState("");
-  const [editDescription, setEditDescription] = useState("");
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
   const [deletingId, setDeletingId] = useState<string | null>(null);
 
   const loadDepartments = async () => {
     const { data, error } = await supabase
-      .from("support_departments")
-      .select("*")
-      .order("sort_order", { ascending: true });
+      .from('support_departments')
+      .select('*')
+      .order('sort_order', { ascending: true });
 
     if (error) {
-      console.error("Error loading departments:", error);
+      console.error('Error loading departments:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível carregar os departamentos",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Não foi possível carregar os departamentos',
+        variant: 'destructive',
       });
     } else {
       setDepartments(data || []);
@@ -54,20 +71,19 @@ const SupportDepartmentsManager = () => {
   const handleAddDepartment = async () => {
     if (!newName.trim()) {
       toast({
-        title: "Erro",
-        description: "O nome do departamento é obrigatório",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'O nome do departamento é obrigatório',
+        variant: 'destructive',
       });
       return;
     }
 
     setIsAdding(true);
     try {
-      const maxSortOrder = departments.length > 0 
-        ? Math.max(...departments.map(d => d.sort_order)) + 1 
-        : 0;
+      const maxSortOrder =
+        departments.length > 0 ? Math.max(...departments.map(d => d.sort_order)) + 1 : 0;
 
-      const { error } = await supabase.from("support_departments").insert({
+      const { error } = await supabase.from('support_departments').insert({
         name: newName.trim(),
         description: newDescription.trim() || null,
         sort_order: maxSortOrder,
@@ -75,15 +91,15 @@ const SupportDepartmentsManager = () => {
 
       if (error) throw error;
 
-      toast({ title: "Departamento criado com sucesso!" });
-      setNewName("");
-      setNewDescription("");
+      toast({ title: 'Departamento criado com sucesso!' });
+      setNewName('');
+      setNewDescription('');
       loadDepartments();
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setIsAdding(false);
@@ -93,24 +109,24 @@ const SupportDepartmentsManager = () => {
   const handleToggleActive = async (department: SupportDepartment) => {
     try {
       const { error } = await supabase
-        .from("support_departments")
+        .from('support_departments')
         .update({ is_active: !department.is_active })
-        .eq("id", department.id);
+        .eq('id', department.id);
 
       if (error) throw error;
 
-      setDepartments(departments.map(d =>
-        d.id === department.id ? { ...d, is_active: !d.is_active } : d
-      ));
+      setDepartments(
+        departments.map(d => (d.id === department.id ? { ...d, is_active: !d.is_active } : d))
+      );
 
-      toast({ 
-        title: department.is_active ? "Departamento desativado" : "Departamento ativado" 
+      toast({
+        title: department.is_active ? 'Departamento desativado' : 'Departamento ativado',
       });
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -118,49 +134,51 @@ const SupportDepartmentsManager = () => {
   const handleStartEdit = (department: SupportDepartment) => {
     setEditingId(department.id);
     setEditName(department.name);
-    setEditDescription(department.description || "");
+    setEditDescription(department.description || '');
   };
 
   const handleCancelEdit = () => {
     setEditingId(null);
-    setEditName("");
-    setEditDescription("");
+    setEditName('');
+    setEditDescription('');
   };
 
   const handleSaveEdit = async () => {
     if (!editName.trim()) {
       toast({
-        title: "Erro",
-        description: "O nome do departamento é obrigatório",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'O nome do departamento é obrigatório',
+        variant: 'destructive',
       });
       return;
     }
 
     try {
       const { error } = await supabase
-        .from("support_departments")
-        .update({ 
+        .from('support_departments')
+        .update({
           name: editName.trim(),
           description: editDescription.trim() || null,
         })
-        .eq("id", editingId);
+        .eq('id', editingId);
 
       if (error) throw error;
 
-      setDepartments(departments.map(d =>
-        d.id === editingId 
-          ? { ...d, name: editName.trim(), description: editDescription.trim() || null } 
-          : d
-      ));
+      setDepartments(
+        departments.map(d =>
+          d.id === editingId
+            ? { ...d, name: editName.trim(), description: editDescription.trim() || null }
+            : d
+        )
+      );
 
-      toast({ title: "Departamento atualizado!" });
+      toast({ title: 'Departamento atualizado!' });
       handleCancelEdit();
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     }
   };
@@ -168,20 +186,17 @@ const SupportDepartmentsManager = () => {
   const handleDelete = async (id: string) => {
     setDeletingId(id);
     try {
-      const { error } = await supabase
-        .from("support_departments")
-        .delete()
-        .eq("id", id);
+      const { error } = await supabase.from('support_departments').delete().eq('id', id);
 
       if (error) throw error;
 
       setDepartments(departments.filter(d => d.id !== id));
-      toast({ title: "Departamento eliminado!" });
+      toast({ title: 'Departamento eliminado!' });
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setDeletingId(null);
@@ -190,50 +205,62 @@ const SupportDepartmentsManager = () => {
 
   const handleMoveUp = async (index: number) => {
     if (index === 0) return;
-    
+
     const current = departments[index];
     const previous = departments[index - 1];
-    
+
     try {
       await Promise.all([
-        supabase.from("support_departments").update({ sort_order: previous.sort_order }).eq("id", current.id),
-        supabase.from("support_departments").update({ sort_order: current.sort_order }).eq("id", previous.id),
+        supabase
+          .from('support_departments')
+          .update({ sort_order: previous.sort_order })
+          .eq('id', current.id),
+        supabase
+          .from('support_departments')
+          .update({ sort_order: current.sort_order })
+          .eq('id', previous.id),
       ]);
-      
+
       const newDepartments = [...departments];
       newDepartments[index] = { ...previous, sort_order: current.sort_order };
       newDepartments[index - 1] = { ...current, sort_order: previous.sort_order };
       setDepartments(newDepartments);
     } catch (error: any) {
       toast({
-        title: "Erro",
-        description: "Não foi possível reordenar",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Não foi possível reordenar',
+        variant: 'destructive',
       });
     }
   };
 
   const handleMoveDown = async (index: number) => {
     if (index === departments.length - 1) return;
-    
+
     const current = departments[index];
     const next = departments[index + 1];
-    
+
     try {
       await Promise.all([
-        supabase.from("support_departments").update({ sort_order: next.sort_order }).eq("id", current.id),
-        supabase.from("support_departments").update({ sort_order: current.sort_order }).eq("id", next.id),
+        supabase
+          .from('support_departments')
+          .update({ sort_order: next.sort_order })
+          .eq('id', current.id),
+        supabase
+          .from('support_departments')
+          .update({ sort_order: current.sort_order })
+          .eq('id', next.id),
       ]);
-      
+
       const newDepartments = [...departments];
       newDepartments[index] = { ...next, sort_order: current.sort_order };
       newDepartments[index + 1] = { ...current, sort_order: next.sort_order };
       setDepartments(newDepartments);
     } catch (error: any) {
       toast({
-        title: "Erro",
-        description: "Não foi possível reordenar",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Não foi possível reordenar',
+        variant: 'destructive',
       });
     }
   };
@@ -252,13 +279,13 @@ const SupportDepartmentsManager = () => {
           <div className="flex-1 space-y-2">
             <Input
               value={newName}
-              onChange={(e) => setNewName(e.target.value)}
+              onChange={e => setNewName(e.target.value)}
               placeholder="Nome do departamento (ex: RH, TI)"
               disabled={isAdding}
             />
             <Input
               value={newDescription}
-              onChange={(e) => setNewDescription(e.target.value)}
+              onChange={e => setNewDescription(e.target.value)}
               placeholder="Descrição (opcional)"
               disabled={isAdding}
             />
@@ -327,7 +354,7 @@ const SupportDepartmentsManager = () => {
                     {editingId === department.id ? (
                       <Input
                         value={editName}
-                        onChange={(e) => setEditName(e.target.value)}
+                        onChange={e => setEditName(e.target.value)}
                         className="h-8"
                       />
                     ) : (
@@ -338,13 +365,13 @@ const SupportDepartmentsManager = () => {
                     {editingId === department.id ? (
                       <Input
                         value={editDescription}
-                        onChange={(e) => setEditDescription(e.target.value)}
+                        onChange={e => setEditDescription(e.target.value)}
                         placeholder="Descrição"
                         className="h-8"
                       />
                     ) : (
                       <span className="text-muted-foreground text-sm">
-                        {department.description || "—"}
+                        {department.description || '—'}
                       </span>
                     )}
                   </TableCell>

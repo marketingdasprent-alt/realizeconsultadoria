@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface Employee {
@@ -16,42 +16,42 @@ interface Employee {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    console.log("Starting safety checkup reminders check...");
+    console.log('Starting safety checkup reminders check...');
 
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
     if (!brevoApiKey) {
-      console.error("BREVO_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "Email service not configured" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      console.error('BREVO_API_KEY not configured');
+      return new Response(JSON.stringify({ error: 'Email service not configured' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     // Get notification recipients
     const { data: emailRecords } = await supabaseAdmin
-      .from("notification_emails_absences")
-      .select("email")
-      .eq("is_active", true);
+      .from('notification_emails_absences')
+      .select('email')
+      .eq('is_active', true);
 
     let recipientEmails: string[] = emailRecords?.map(r => r.email) || [];
 
     // Fallback to system_settings
     if (recipientEmails.length === 0) {
       const { data: setting } = await supabaseAdmin
-        .from("system_settings")
-        .select("value")
-        .eq("key", "notification_email")
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'notification_email')
         .single();
 
       const fallbackEmail = setting?.value?.trim();
@@ -61,10 +61,10 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     if (recipientEmails.length === 0) {
-      console.log("No notification recipients configured");
+      console.log('No notification recipients configured');
       return new Response(
-        JSON.stringify({ success: true, message: "Sem destinatários configurados" }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        JSON.stringify({ success: true, message: 'Sem destinatários configurados' }),
+        { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
@@ -72,7 +72,7 @@ const handler = async (req: Request): Promise<Response> => {
     const today = new Date();
     const tomorrow = new Date(today);
     tomorrow.setDate(tomorrow.getDate() + 1);
-    
+
     const todayStr = today.toISOString().split('T')[0];
     const tomorrowStr = tomorrow.toISOString().split('T')[0];
 
@@ -80,20 +80,22 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Get all active employees with safety checkup data
     const { data: employees, error: empError } = await supabaseAdmin
-      .from("employees")
-      .select(`
+      .from('employees')
+      .select(
+        `
         id,
         name,
         email,
         safety_checkup_date,
         safety_checkup_renewal_months,
         company:companies(name)
-      `)
-      .eq("is_active", true)
-      .not("safety_checkup_date", "is", null);
+      `
+      )
+      .eq('is_active', true)
+      .not('safety_checkup_date', 'is', null);
 
     if (empError) {
-      console.error("Error fetching employees:", empError);
+      console.error('Error fetching employees:', empError);
       throw empError;
     }
 
@@ -108,7 +110,7 @@ const handler = async (req: Request): Promise<Response> => {
     sevenDaysFromNow.setDate(sevenDaysFromNow.getDate() + 7);
     const sevenDaysStr = sevenDaysFromNow.toISOString().split('T')[0];
 
-    for (const emp of (employees || [])) {
+    for (const emp of employees || []) {
       if (!emp.safety_checkup_date) continue;
 
       // Check for checkups today/tomorrow
@@ -132,7 +134,9 @@ const handler = async (req: Request): Promise<Response> => {
       }
     }
 
-    console.log(`Checkups today: ${checkupsToday.length}, tomorrow: ${checkupsTomorrow.length}, renewals in 7 days: ${renewalsIn7Days.length}`);
+    console.log(
+      `Checkups today: ${checkupsToday.length}, tomorrow: ${checkupsTomorrow.length}, renewals in 7 days: ${renewalsIn7Days.length}`
+    );
 
     const emailsSent: string[] = [];
 
@@ -141,12 +145,12 @@ const handler = async (req: Request): Promise<Response> => {
       const success = await sendReminderEmail(
         brevoApiKey,
         recipientEmails,
-        "🏥 Consultas de Higiene e Segurança - HOJE",
-        "Consultas Agendadas para Hoje",
+        '🏥 Consultas de Higiene e Segurança - HOJE',
+        'Consultas Agendadas para Hoje',
         checkupsToday,
-        "hoje"
+        'hoje'
       );
-      if (success) emailsSent.push("checkups_today");
+      if (success) emailsSent.push('checkups_today');
     }
 
     // Send email for checkups tomorrow
@@ -154,12 +158,12 @@ const handler = async (req: Request): Promise<Response> => {
       const success = await sendReminderEmail(
         brevoApiKey,
         recipientEmails,
-        "🏥 Consultas de Higiene e Segurança - AMANHÃ",
-        "Consultas Agendadas para Amanhã",
+        '🏥 Consultas de Higiene e Segurança - AMANHÃ',
+        'Consultas Agendadas para Amanhã',
         checkupsTomorrow,
-        "amanhã"
+        'amanhã'
       );
-      if (success) emailsSent.push("checkups_tomorrow");
+      if (success) emailsSent.push('checkups_tomorrow');
     }
 
     // Send email for renewals in 7 days
@@ -167,14 +171,14 @@ const handler = async (req: Request): Promise<Response> => {
       const success = await sendRenewalReminderEmail(
         brevoApiKey,
         recipientEmails,
-        "🔄 Renovações de Consulta - 7 Dias",
-        "Renovações de Consulta em 7 Dias",
+        '🔄 Renovações de Consulta - 7 Dias',
+        'Renovações de Consulta em 7 Dias',
         renewalsIn7Days
       );
-      if (success) emailsSent.push("renewals_7_days");
+      if (success) emailsSent.push('renewals_7_days');
     }
 
-    console.log(`Emails sent: ${emailsSent.join(", ") || "none"}`);
+    console.log(`Emails sent: ${emailsSent.join(', ') || 'none'}`);
 
     return new Response(
       JSON.stringify({
@@ -184,18 +188,17 @@ const handler = async (req: Request): Promise<Response> => {
           checkupsToday: checkupsToday.length,
           checkupsTomorrow: checkupsTomorrow.length,
           renewalsIn7Days: renewalsIn7Days.length,
-          emailsSent
-        }
+          emailsSent,
+        },
       }),
-      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
-
   } catch (error: any) {
-    console.error("Error in send-safety-checkup-reminders:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Erro interno" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    console.error('Error in send-safety-checkup-reminders:', error);
+    return new Response(JSON.stringify({ error: error.message || 'Erro interno' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 };
 
@@ -207,13 +210,17 @@ async function sendReminderEmail(
   employees: Employee[],
   when: string
 ): Promise<boolean> {
-  const employeeRows = employees.map(emp => `
+  const employeeRows = employees
+    .map(
+      emp => `
     <tr>
       <td style="padding: 12px; border-bottom: 1px solid #eee;">${emp.name}</td>
-      <td style="padding: 12px; border-bottom: 1px solid #eee;">${emp.company?.name || "N/A"}</td>
+      <td style="padding: 12px; border-bottom: 1px solid #eee;">${emp.company?.name || 'N/A'}</td>
       <td style="padding: 12px; border-bottom: 1px solid #eee;">${formatDate(emp.safety_checkup_date!)}</td>
     </tr>
-  `).join("");
+  `
+    )
+    .join('');
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -283,18 +290,20 @@ async function sendRenewalReminderEmail(
   title: string,
   employees: Employee[]
 ): Promise<boolean> {
-  const employeeRows = employees.map(emp => {
-    const renewalDate = new Date(emp.safety_checkup_date!);
-    renewalDate.setMonth(renewalDate.getMonth() + (emp.safety_checkup_renewal_months || 0));
-    
-    return `
+  const employeeRows = employees
+    .map(emp => {
+      const renewalDate = new Date(emp.safety_checkup_date!);
+      renewalDate.setMonth(renewalDate.getMonth() + (emp.safety_checkup_renewal_months || 0));
+
+      return `
       <tr>
         <td style="padding: 12px; border-bottom: 1px solid #eee;">${emp.name}</td>
-        <td style="padding: 12px; border-bottom: 1px solid #eee;">${emp.company?.name || "N/A"}</td>
+        <td style="padding: 12px; border-bottom: 1px solid #eee;">${emp.company?.name || 'N/A'}</td>
         <td style="padding: 12px; border-bottom: 1px solid #eee;">${formatDate(renewalDate.toISOString().split('T')[0])}</td>
       </tr>
     `;
-  }).join("");
+    })
+    .join('');
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -371,17 +380,17 @@ async function sendEmail(
 ): Promise<boolean> {
   try {
     const emailPromises = recipients.map(email =>
-      fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
+      fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
         headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "api-key": apiKey,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'api-key': apiKey,
         },
         body: JSON.stringify({
           sender: {
-            name: "Realize Consultadoria",
-            email: "noreply@dasprent.pt",
+            name: 'Realize Consultadoria',
+            email: 'noreply@dasprent.pt',
           },
           to: [{ email }],
           subject,
@@ -391,22 +400,24 @@ async function sendEmail(
     );
 
     const results = await Promise.allSettled(emailPromises);
-    const successCount = results.filter(r => r.status === 'fulfilled' && (r.value as Response).ok).length;
-    
+    const successCount = results.filter(
+      r => r.status === 'fulfilled' && (r.value as Response).ok
+    ).length;
+
     console.log(`Email "${subject}" sent to ${successCount}/${recipients.length} recipients`);
     return successCount > 0;
   } catch (error) {
-    console.error("Error sending email:", error);
+    console.error('Error sending email:', error);
     return false;
   }
 }
 
 function formatDate(dateStr: string): string {
   const date = new Date(dateStr);
-  return date.toLocaleDateString("pt-PT", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
+  return date.toLocaleDateString('pt-PT', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
   });
 }
 

@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Eye, EyeOff, Loader2, RefreshCw } from "lucide-react";
+import { useState } from 'react';
+import { Eye, EyeOff, Loader2, RefreshCw } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -7,13 +7,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ChangeEmployeePasswordDialogProps {
   open: boolean;
@@ -23,13 +23,13 @@ interface ChangeEmployeePasswordDialogProps {
 }
 
 const generatePassword = (): string => {
-  const lower = "abcdefghijkmnopqrstuvwxyz";
-  const upper = "ABCDEFGHJKLMNPQRSTUVWXYZ";
-  const digits = "23456789";
-  const symbols = "!@#$%&*";
+  const lower = 'abcdefghijkmnopqrstuvwxyz';
+  const upper = 'ABCDEFGHJKLMNPQRSTUVWXYZ';
+  const digits = '23456789';
+  const symbols = '!@#$%&*';
   const all = lower + upper + digits + symbols;
 
-  let password = "";
+  let password = '';
   // Guarantee at least one of each
   password += lower[Math.floor(Math.random() * lower.length)];
   password += upper[Math.floor(Math.random() * upper.length)];
@@ -42,9 +42,9 @@ const generatePassword = (): string => {
 
   // Shuffle
   return password
-    .split("")
+    .split('')
     .sort(() => Math.random() - 0.5)
-    .join("");
+    .join('');
 };
 
 const ChangeEmployeePasswordDialog = ({
@@ -54,8 +54,8 @@ const ChangeEmployeePasswordDialog = ({
   employeeName,
 }: ChangeEmployeePasswordDialogProps) => {
   const { toast } = useToast();
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [sendEmail, setSendEmail] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
@@ -70,27 +70,27 @@ const ChangeEmployeePasswordDialog = ({
   const handleSubmit = async () => {
     if (!newPassword || !confirmPassword) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: "Preencha todos os campos ou clique em 'Gerar'",
-        variant: "destructive",
+        variant: 'destructive',
       });
       return;
     }
 
     if (newPassword !== confirmPassword) {
       toast({
-        title: "Erro",
-        description: "As palavras-passe não coincidem",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'As palavras-passe não coincidem',
+        variant: 'destructive',
       });
       return;
     }
 
     if (newPassword.length < 8) {
       toast({
-        title: "Erro",
-        description: "A palavra-passe deve ter pelo menos 8 caracteres",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'A palavra-passe deve ter pelo menos 8 caracteres',
+        variant: 'destructive',
       });
       return;
     }
@@ -99,7 +99,7 @@ const ChangeEmployeePasswordDialog = ({
     try {
       const { data: sessionData } = await supabase.auth.getSession();
 
-      const response = await supabase.functions.invoke("change-employee-password", {
+      const response = await supabase.functions.invoke('change-employee-password', {
         body: {
           employee_id: employeeId,
           new_password: newPassword,
@@ -111,7 +111,7 @@ const ChangeEmployeePasswordDialog = ({
       });
 
       if (response.error) {
-        throw new Error(response.error.message || "Erro ao alterar palavra-passe");
+        throw new Error(response.error.message || 'Erro ao alterar palavra-passe');
       }
 
       const data = response.data;
@@ -122,34 +122,34 @@ const ChangeEmployeePasswordDialog = ({
       if (sendEmail) {
         if (data?.email_success) {
           toast({
-            title: "Palavra-passe alterada",
-            description: "O colaborador recebeu o email com as novas credenciais.",
+            title: 'Palavra-passe alterada',
+            description: 'O colaborador recebeu o email com as novas credenciais.',
           });
         } else {
           toast({
-            title: "Palavra-passe alterada (SEM EMAIL)",
-            description: `A senha foi alterada, mas o email falhou: ${data?.email_error || "Erro desconhecido"}`,
-            variant: "destructive",
+            title: 'Palavra-passe alterada (SEM EMAIL)',
+            description: `A senha foi alterada, mas o email falhou: ${data?.email_error || 'Erro desconhecido'}`,
+            variant: 'destructive',
           });
         }
       } else {
         toast({
-          title: "Palavra-passe alterada",
-          description: "A palavra-passe foi alterada com sucesso.",
+          title: 'Palavra-passe alterada',
+          description: 'A palavra-passe foi alterada com sucesso.',
         });
       }
 
-      setNewPassword("");
-      setConfirmPassword("");
+      setNewPassword('');
+      setConfirmPassword('');
       setSendEmail(true);
       setShowPassword(false);
       onOpenChange(false);
     } catch (error: any) {
-      console.error("Error changing password:", error);
+      console.error('Error changing password:', error);
       toast({
-        title: "Erro",
-        description: error.message || "Não foi possível alterar a palavra-passe",
-        variant: "destructive",
+        title: 'Erro',
+        description: error.message || 'Não foi possível alterar a palavra-passe',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -158,8 +158,8 @@ const ChangeEmployeePasswordDialog = ({
 
   const handleClose = (open: boolean) => {
     if (!open) {
-      setNewPassword("");
-      setConfirmPassword("");
+      setNewPassword('');
+      setConfirmPassword('');
       setSendEmail(true);
       setShowPassword(false);
     }
@@ -178,7 +178,8 @@ const ChangeEmployeePasswordDialog = ({
 
         <div className="space-y-4 py-4">
           <p className="text-sm text-muted-foreground">
-            Não é possível recuperar a palavra-passe atual. Ao guardar, será definida uma nova palavra-passe.
+            Não é possível recuperar a palavra-passe atual. Ao guardar, será definida uma nova
+            palavra-passe.
           </p>
 
           <div className="flex justify-end">
@@ -193,9 +194,9 @@ const ChangeEmployeePasswordDialog = ({
             <div className="relative">
               <Input
                 id="new-password"
-                type={showPassword ? "text" : "password"}
+                type={showPassword ? 'text' : 'password'}
                 value={newPassword}
-                onChange={(e) => setNewPassword(e.target.value)}
+                onChange={e => setNewPassword(e.target.value)}
                 placeholder="Mínimo 8 caracteres"
                 autoComplete="new-password"
               />
@@ -219,9 +220,9 @@ const ChangeEmployeePasswordDialog = ({
             <Label htmlFor="confirm-password">Confirmar Palavra-passe</Label>
             <Input
               id="confirm-password"
-              type={showPassword ? "text" : "password"}
+              type={showPassword ? 'text' : 'password'}
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={e => setConfirmPassword(e.target.value)}
               placeholder="Repetir palavra-passe"
               autoComplete="new-password"
             />
@@ -231,7 +232,7 @@ const ChangeEmployeePasswordDialog = ({
             <Checkbox
               id="send-email"
               checked={sendEmail}
-              onCheckedChange={(checked) => setSendEmail(checked === true)}
+              onCheckedChange={checked => setSendEmail(checked === true)}
             />
             <Label htmlFor="send-email" className="text-sm font-normal cursor-pointer">
               Enviar email com as novas credenciais
@@ -246,11 +247,10 @@ const ChangeEmployeePasswordDialog = ({
           <Button variant="gold" onClick={handleSubmit} disabled={isLoading}>
             {isLoading ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                A guardar...
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />A guardar...
               </>
             ) : (
-              "Guardar"
+              'Guardar'
             )}
           </Button>
         </DialogFooter>

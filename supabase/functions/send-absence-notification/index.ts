@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface NotificationRequest {
@@ -20,49 +20,49 @@ interface NotificationRequest {
 }
 
 const absenceTypeLabels: Record<string, string> = {
-  vacation: "Férias",
-  sick_leave: "Baixa Médica",
-  personal_leave: "Licença Pessoal",
-  maternity: "Licença Maternidade",
-  paternity: "Licença Paternidade",
-  other: "Outro",
+  vacation: 'Férias',
+  sick_leave: 'Baixa Médica',
+  personal_leave: 'Licença Pessoal',
+  maternity: 'Licença Maternidade',
+  paternity: 'Licença Paternidade',
+  other: 'Outro',
 };
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const payload: NotificationRequest = await req.json();
-    
-    console.log("Processing absence notification for:", payload.employeeName);
+
+    console.log('Processing absence notification for:', payload.employeeName);
 
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
     // Get active emails from notification_emails_absences
     const { data: emailRecords, error: emailsError } = await supabaseAdmin
-      .from("notification_emails_absences")
-      .select("email")
-      .eq("is_active", true);
+      .from('notification_emails_absences')
+      .select('email')
+      .eq('is_active', true);
 
     if (emailsError) {
-      console.error("Error fetching absence notification emails:", emailsError);
+      console.error('Error fetching absence notification emails:', emailsError);
     }
 
     let recipientEmails: string[] = emailRecords?.map(r => r.email) || [];
 
     // Fallback to system_settings if no emails configured
     if (recipientEmails.length === 0) {
-      console.log("No absence emails configured, checking fallback");
+      console.log('No absence emails configured, checking fallback');
       const { data: setting } = await supabaseAdmin
-        .from("system_settings")
-        .select("value")
-        .eq("key", "notification_email")
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'notification_email')
         .single();
 
       const fallbackEmail = setting?.value?.trim();
@@ -70,32 +70,42 @@ const handler = async (req: Request): Promise<Response> => {
         recipientEmails = [fallbackEmail];
       }
     }
-    
+
     if (recipientEmails.length === 0) {
-      console.log("No notification recipients configured");
+      console.log('No notification recipients configured');
       return new Response(
-        JSON.stringify({ success: true, message: "Sem destinatários configurados" }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        JSON.stringify({ success: true, message: 'Sem destinatários configurados' }),
+        { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
-    console.log("Sending notification to:", recipientEmails);
+    console.log('Sending notification to:', recipientEmails);
 
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
     if (!brevoApiKey) {
-      console.error("BREVO_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "Configuração de email em falta" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      console.error('BREVO_API_KEY not configured');
+      return new Response(JSON.stringify({ error: 'Configuração de email em falta' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     // Format periods for email
-    const periodsHtml = payload.periods.map(p => {
-      const start = new Date(p.startDate).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" });
-      const end = new Date(p.endDate).toLocaleDateString("pt-PT", { day: "2-digit", month: "short", year: "numeric" });
-      return `<li style="margin-bottom: 8px;">${start} - ${end} <span style="color: #888;">(${p.businessDays} dias úteis)</span></li>`;
-    }).join("");
+    const periodsHtml = payload.periods
+      .map(p => {
+        const start = new Date(p.startDate).toLocaleDateString('pt-PT', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        });
+        const end = new Date(p.endDate).toLocaleDateString('pt-PT', {
+          day: '2-digit',
+          month: 'short',
+          year: 'numeric',
+        });
+        return `<li style="margin-bottom: 8px;">${start} - ${end} <span style="color: #888;">(${p.businessDays} dias úteis)</span></li>`;
+      })
+      .join('');
 
     const totalDays = payload.periods.reduce((sum, p) => sum + p.businessDays, 0);
     const absenceTypeLabel = absenceTypeLabels[payload.absenceType] || payload.absenceType;
@@ -159,12 +169,16 @@ const handler = async (req: Request): Promise<Response> => {
                 ${periodsHtml}
               </ul>
 
-              ${payload.notes ? `
+              ${
+                payload.notes
+                  ? `
               <p style="color: #666666; font-size: 14px; margin: 0 0 10px 0;"><strong>Observações:</strong></p>
               <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 0 0 25px 0; padding: 15px; background-color: #f9f9f9; border-radius: 6px;">
                 ${payload.notes}
               </p>
-              ` : ""}
+              `
+                  : ''
+              }
 
               <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                 <tr>
@@ -190,18 +204,18 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     // Send email to all recipients
-    const emailPromises = recipientEmails.map(email => 
-      fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
+    const emailPromises = recipientEmails.map(email =>
+      fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
         headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "api-key": brevoApiKey,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'api-key': brevoApiKey,
         },
         body: JSON.stringify({
           sender: {
-            name: "Realize Consultadoria",
-            email: "noreply@dasprent.pt",
+            name: 'Realize Consultadoria',
+            email: 'noreply@dasprent.pt',
           },
           to: [{ email }],
           subject: `Novo Pedido de Ausência - ${payload.employeeName}`,
@@ -211,7 +225,9 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
     const results = await Promise.allSettled(emailPromises);
-    const successCount = results.filter(r => r.status === 'fulfilled' && (r.value as Response).ok).length;
+    const successCount = results.filter(
+      r => r.status === 'fulfilled' && (r.value as Response).ok
+    ).length;
     const failCount = results.length - successCount;
 
     if (failCount > 0) {
@@ -221,20 +237,19 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Emails sent successfully to ${successCount} recipients`);
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         message: `Notificação enviada para ${successCount} destinatário(s)`,
-        recipientCount: successCount
+        recipientCount: successCount,
       }),
-      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
-
   } catch (error: any) {
-    console.error("Error in send-absence-notification function:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Erro interno" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    console.error('Error in send-absence-notification function:', error);
+    return new Response(JSON.stringify({ error: error.message || 'Erro interno' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 };
 

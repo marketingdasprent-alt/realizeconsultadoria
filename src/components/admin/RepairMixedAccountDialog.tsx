@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { AlertTriangle, Loader2, Wrench } from "lucide-react";
+import { useState } from 'react';
+import { AlertTriangle, Loader2, Wrench } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -7,12 +7,12 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface RepairMixedAccountDialogProps {
   open: boolean;
@@ -33,8 +33,8 @@ const RepairMixedAccountDialog = ({
   onSuccess,
 }: RepairMixedAccountDialogProps) => {
   const { toast } = useToast();
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [password, setPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [isRepairing, setIsRepairing] = useState(false);
 
   const handleRepair = async () => {
@@ -42,25 +42,25 @@ const RepairMixedAccountDialog = ({
 
     if (password.length < 8) {
       toast({
-        title: "Erro",
-        description: "A senha deve ter pelo menos 8 caracteres",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'A senha deve ter pelo menos 8 caracteres',
+        variant: 'destructive',
       });
       return;
     }
 
     if (password !== confirmPassword) {
       toast({
-        title: "Erro",
-        description: "As senhas não coincidem",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'As senhas não coincidem',
+        variant: 'destructive',
       });
       return;
     }
 
     setIsRepairing(true);
     try {
-      const { data, error } = await supabase.functions.invoke("repair-mixed-account", {
+      const { data, error } = await supabase.functions.invoke('repair-mixed-account', {
         body: {
           admin_user_id: admin.user_id,
           employee_password: password,
@@ -71,19 +71,19 @@ const RepairMixedAccountDialog = ({
       if (data?.error) throw new Error(data.error);
 
       toast({
-        title: "Conta reparada!",
-        description: data.message || "A conta foi separada com sucesso.",
+        title: 'Conta reparada!',
+        description: data.message || 'A conta foi separada com sucesso.',
       });
 
-      setPassword("");
-      setConfirmPassword("");
+      setPassword('');
+      setConfirmPassword('');
       onOpenChange(false);
       onSuccess();
     } catch (error: any) {
       toast({
-        title: "Erro",
-        description: error.message || "Não foi possível reparar a conta",
-        variant: "destructive",
+        title: 'Erro',
+        description: error.message || 'Não foi possível reparar a conta',
+        variant: 'destructive',
       });
     } finally {
       setIsRepairing(false);
@@ -91,8 +91,8 @@ const RepairMixedAccountDialog = ({
   };
 
   const handleClose = () => {
-    setPassword("");
-    setConfirmPassword("");
+    setPassword('');
+    setConfirmPassword('');
     onOpenChange(false);
   };
 
@@ -116,16 +116,14 @@ const RepairMixedAccountDialog = ({
             <div className="flex items-start gap-2">
               <AlertTriangle className="h-5 w-5 text-amber-600 mt-0.5 shrink-0" />
               <div className="text-sm space-y-2">
-                <p className="font-medium text-amber-800 dark:text-amber-200">
-                  Conflito detetado:
-                </p>
+                <p className="font-medium text-amber-800 dark:text-amber-200">Conflito detetado:</p>
                 <div className="text-amber-700 dark:text-amber-300 space-y-1">
                   <p>
-                    <strong>Login atual:</strong>{" "}
+                    <strong>Login atual:</strong>{' '}
                     <span className="font-mono text-xs">{admin.auth_email}</span>
                   </p>
                   <p>
-                    <strong>Email admin:</strong>{" "}
+                    <strong>Email admin:</strong>{' '}
                     <span className="font-mono text-xs">{admin.email}</span>
                   </p>
                 </div>
@@ -136,23 +134,25 @@ const RepairMixedAccountDialog = ({
           <div className="rounded-lg bg-muted p-4 text-sm space-y-2">
             <p className="font-medium">A reparação irá:</p>
             <ol className="list-decimal list-inside space-y-1 text-muted-foreground">
-              <li>Restaurar o login de admin para <strong>{admin.email}</strong></li>
-              <li>Criar conta de colaborador com <strong>{admin.auth_email}</strong></li>
+              <li>
+                Restaurar o login de admin para <strong>{admin.email}</strong>
+              </li>
+              <li>
+                Criar conta de colaborador com <strong>{admin.auth_email}</strong>
+              </li>
               <li>Enviar email com credenciais ao colaborador</li>
             </ol>
           </div>
 
           <div className="space-y-3">
-            <p className="text-sm font-medium">
-              Defina a senha para a nova conta de colaborador:
-            </p>
+            <p className="text-sm font-medium">Defina a senha para a nova conta de colaborador:</p>
             <div className="space-y-2">
               <Label htmlFor="repair-password">Senha do colaborador</Label>
               <Input
                 id="repair-password"
                 type="password"
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={e => setPassword(e.target.value)}
                 placeholder="Mínimo 8 caracteres"
               />
             </div>
@@ -162,7 +162,7 @@ const RepairMixedAccountDialog = ({
                 id="repair-confirm-password"
                 type="password"
                 value={confirmPassword}
-                onChange={(e) => setConfirmPassword(e.target.value)}
+                onChange={e => setConfirmPassword(e.target.value)}
                 placeholder="Repita a senha"
               />
             </div>
@@ -179,12 +179,13 @@ const RepairMixedAccountDialog = ({
           <Button
             variant="gold"
             onClick={handleRepair}
-            disabled={isRepairing || !password || password.length < 8 || password !== confirmPassword}
+            disabled={
+              isRepairing || !password || password.length < 8 || password !== confirmPassword
+            }
           >
             {isRepairing ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                A reparar...
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />A reparar...
               </>
             ) : (
               <>

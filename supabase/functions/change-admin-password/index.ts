@@ -1,10 +1,9 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface ChangePasswordRequest {
@@ -14,14 +13,14 @@ interface ChangePasswordRequest {
 }
 
 serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -30,59 +29,58 @@ serve(async (req: Request) => {
     const { user_id, new_password, send_email }: ChangePasswordRequest = await req.json();
 
     if (!user_id || !new_password) {
-      return new Response(
-        JSON.stringify({ error: "user_id e new_password são obrigatórios" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: 'user_id e new_password são obrigatórios' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     if (new_password.length < 8) {
       return new Response(
-        JSON.stringify({ error: "A palavra-passe deve ter pelo menos 8 caracteres" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({ error: 'A palavra-passe deve ter pelo menos 8 caracteres' }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     // Verify user is an admin
     const { data: roleData, error: roleError } = await supabaseAdmin
-      .from("user_roles")
-      .select("role")
-      .eq("user_id", user_id)
-      .eq("role", "admin")
+      .from('user_roles')
+      .select('role')
+      .eq('user_id', user_id)
+      .eq('role', 'admin')
       .maybeSingle();
 
     if (roleError || !roleData) {
-      return new Response(
-        JSON.stringify({ error: "Utilizador não é um administrador" }),
-        { status: 403, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: 'Utilizador não é um administrador' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Update password
-    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(
-      user_id,
-      { password: new_password }
-    );
+    const { error: updateError } = await supabaseAdmin.auth.admin.updateUserById(user_id, {
+      password: new_password,
+    });
 
     if (updateError) {
-      console.error("Error updating password:", updateError);
-      return new Response(
-        JSON.stringify({ error: updateError.message }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.error('Error updating password:', updateError);
+      return new Response(JSON.stringify({ error: updateError.message }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Send email if requested
     if (send_email && brevoApiKey) {
       // Get user profile
       const { data: profile } = await supabaseAdmin
-        .from("profiles")
-        .select("name, email")
-        .eq("user_id", user_id)
+        .from('profiles')
+        .select('name, email')
+        .eq('user_id', user_id)
         .maybeSingle();
 
       if (profile?.email) {
-        const baseUrl = "https://realizeconsultadoria.lovable.app";
+        const baseUrl = 'https://realize.dasprent.pt';
 
         const emailHtml = `
           <!DOCTYPE html>
@@ -149,42 +147,42 @@ serve(async (req: Request) => {
         `;
 
         try {
-          const emailResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
-            method: "POST",
+          const emailResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+            method: 'POST',
             headers: {
-              "accept": "application/json",
-              "api-key": brevoApiKey,
-              "content-type": "application/json",
+              accept: 'application/json',
+              'api-key': brevoApiKey,
+              'content-type': 'application/json',
             },
             body: JSON.stringify({
               sender: {
-                name: "Realize Consultoria",
-                email: "noreply@dasprent.pt",
+                name: 'Realize Consultoria',
+                email: 'noreply@dasprent.pt',
               },
               to: [{ email: profile.email, name: profile.name || profile.email }],
-              subject: "Realize - A sua palavra-passe foi alterada",
+              subject: 'Realize - A sua palavra-passe foi alterada',
               htmlContent: emailHtml,
             }),
           });
 
           if (!emailResponse.ok) {
-            console.error("Brevo email error:", await emailResponse.text());
+            console.error('Brevo email error:', await emailResponse.text());
           }
         } catch (emailError) {
-          console.error("Error sending email:", emailError);
+          console.error('Error sending email:', emailError);
         }
       }
     }
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error: any) {
-    console.error("Error in change-admin-password:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error('Error in change-admin-password:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

@@ -4,7 +4,8 @@ import fs from 'fs';
 const CSV_DIR = './Importar';
 const TOKEN = 'sbp_1f7d2c31efdf191009f56bc3041e9cf3ee373168';
 const REF = 'jvvnsoasylusbmxfotci';
-const SERVICE_ROLE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dm5zb2FzeWx1c2JteGZvdGNpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTA1MDUyNCwiZXhwIjoyMDkwNjI2NTI0fQ.bSpoekoIJMo4gwZDYNHVCqL7VOauKSryvShBN_p2tog';
+const SERVICE_ROLE_KEY =
+  'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imp2dm5zb2FzeWx1c2JteGZvdGNpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NTA1MDUyNCwiZXhwIjoyMDkwNjI2NTI0fQ.bSpoekoIJMo4gwZDYNHVCqL7VOauKSryvShBN_p2tog';
 const SUPABASE_URL = 'https://jvvnsoasylusbmxfotci.supabase.co';
 
 async function sqlQuery(query) {
@@ -25,10 +26,10 @@ async function insertBatch(table, rows) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/${table}`, {
     method: 'POST',
     headers: {
-      'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-      'apikey': SERVICE_ROLE_KEY,
+      Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+      apikey: SERVICE_ROLE_KEY,
       'Content-Type': 'application/json',
-      'Prefer': 'resolution=ignore-duplicates,return=minimal',
+      Prefer: 'resolution=ignore-duplicates,return=minimal',
     },
     body: JSON.stringify(cleaned),
   });
@@ -41,13 +42,16 @@ async function insertBatch(table, rows) {
 
 function readCSV(table) {
   return parse(fs.readFileSync(`${CSV_DIR}/${table}.csv`, 'utf8'), {
-    columns: true, skip_empty_lines: true, relaxQuotes: true, relaxColumnCount: true
+    columns: true,
+    skip_empty_lines: true,
+    relaxQuotes: true,
+    relaxColumnCount: true,
   });
 }
 
 // ── DIAGNOSTICS ──────────────────────────────────────────────────────────────
 console.log('🔍 Verificando contagens...\n');
-const tables = ['absences','accesses','notifications','support_tickets'];
+const tables = ['absences', 'accesses', 'notifications', 'support_tickets'];
 const issues = [];
 
 for (const t of tables) {
@@ -70,7 +74,8 @@ console.log('\n🔧 A corrigir...\n');
 for (const { table, rows } of issues) {
   if (table === 'accesses') {
     // password NOT NULL — fill empty password with placeholder
-    let ok = 0, fail = 0;
+    let ok = 0,
+      fail = 0;
     for (const row of rows) {
       const cleaned = Object.fromEntries(
         Object.entries(row).map(([k, v]) => [k, v === '' ? null : v])
@@ -79,20 +84,23 @@ for (const { table, rows } of issues) {
       const res = await fetch(`${SUPABASE_URL}/rest/v1/accesses`, {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${SERVICE_ROLE_KEY}`,
-          'apikey': SERVICE_ROLE_KEY,
+          Authorization: `Bearer ${SERVICE_ROLE_KEY}`,
+          apikey: SERVICE_ROLE_KEY,
           'Content-Type': 'application/json',
-          'Prefer': 'resolution=ignore-duplicates,return=minimal',
+          Prefer: 'resolution=ignore-duplicates,return=minimal',
         },
         body: JSON.stringify([cleaned]),
       });
-      if (res.ok) ok++; else fail++;
+      if (res.ok) ok++;
+      else fail++;
     }
     console.log(`  ✓ accesses: ${ok} inseridas, ${fail} erros`);
   } else {
     // For absences, notifications, support_tickets — retry full table
     const BATCH = 50;
-    let inserted = 0, errors = 0, lastErr = '';
+    let inserted = 0,
+      errors = 0,
+      lastErr = '';
     for (let i = 0; i < rows.length; i += BATCH) {
       try {
         inserted += await insertBatch(table, rows.slice(i, i + BATCH));
@@ -115,5 +123,7 @@ for (const t of tables) {
   const rows = readCSV(t);
   const [{ count }] = await sqlQuery(`SELECT COUNT(*) FROM public."${t}"`);
   const diff = rows.length - Number(count);
-  console.log(`  ${t.padEnd(25)} CSV: ${rows.length}  DB: ${count}  ${diff === 0 ? '✅' : `❌ faltam ${diff}`}`);
+  console.log(
+    `  ${t.padEnd(25)} CSV: ${rows.length}  DB: ${count}  ${diff === 0 ? '✅' : `❌ faltam ${diff}`}`
+  );
 }

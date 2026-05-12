@@ -1,7 +1,7 @@
-import { useEffect, useState } from "react";
-import { Calendar, Sun, User, Building2 } from "lucide-react";
-import { Card, CardContent } from "@/components/ui/card";
-import { supabase } from "@/integrations/supabase/client";
+import { useEffect, useState } from 'react';
+import { Calendar, Sun, User, Building2 } from 'lucide-react';
+import { Card, CardContent } from '@/components/ui/card';
+import { supabase } from '@/integrations/supabase/client';
 
 interface VacationBalance {
   total_days: number;
@@ -29,34 +29,34 @@ const VacationBalanceCard = ({ employeeId }: VacationBalanceCardProps) => {
   useEffect(() => {
     const fetchBalance = async () => {
       try {
-        console.log("[VacationBalanceCard] Fetching balance for:", { employeeId, currentYear });
-        
+        console.log('[VacationBalanceCard] Fetching balance for:', { employeeId, currentYear });
+
         // Fetch vacation balance for current year
         const { data: balanceData, error: balanceError } = await supabase
-          .from("employee_vacation_balances")
-          .select("total_days, used_days, self_schedulable_days")
-          .eq("employee_id", employeeId)
-          .eq("year", currentYear)
+          .from('employee_vacation_balances')
+          .select('total_days, used_days, self_schedulable_days')
+          .eq('employee_id', employeeId)
+          .eq('year', currentYear)
           .maybeSingle();
 
-        console.log("[VacationBalanceCard] Balance result:", { balanceData, balanceError });
+        console.log('[VacationBalanceCard] Balance result:', { balanceData, balanceError });
         setBalance(balanceData);
 
         // Fetch pending vacation days
         const { data: pendingAbsences } = await supabase
-          .from("absences")
-          .select("id")
-          .eq("employee_id", employeeId)
-          .eq("absence_type", "vacation")
-          .eq("status", "pending");
+          .from('absences')
+          .select('id')
+          .eq('employee_id', employeeId)
+          .eq('absence_type', 'vacation')
+          .eq('status', 'pending');
 
         if (pendingAbsences && pendingAbsences.length > 0) {
           // Get absence periods for pending absences
           const absenceIds = pendingAbsences.map(a => a.id);
           const { data: periods } = await supabase
-            .from("absence_periods")
-            .select("business_days")
-            .in("absence_id", absenceIds);
+            .from('absence_periods')
+            .select('business_days')
+            .in('absence_id', absenceIds);
 
           const totalPending = periods?.reduce((sum, p) => sum + p.business_days, 0) || 0;
           setPendingDays(totalPending);
@@ -65,26 +65,26 @@ const VacationBalanceCard = ({ employeeId }: VacationBalanceCardProps) => {
         // Fetch days scheduled by employee (not admin) for self_schedulable_days calculation
         if (balanceData?.self_schedulable_days !== null) {
           const { data: employeeAbsences } = await supabase
-            .from("absences")
-            .select("id")
-            .eq("employee_id", employeeId)
-            .eq("absence_type", "vacation")
-            .eq("created_by_role", "employee")
-            .in("status", ["pending", "approved"]);
+            .from('absences')
+            .select('id')
+            .eq('employee_id', employeeId)
+            .eq('absence_type', 'vacation')
+            .eq('created_by_role', 'employee')
+            .in('status', ['pending', 'approved']);
 
           if (employeeAbsences && employeeAbsences.length > 0) {
             const absenceIds = employeeAbsences.map(a => a.id);
             const { data: periods } = await supabase
-              .from("absence_periods")
-              .select("business_days")
-              .in("absence_id", absenceIds);
+              .from('absence_periods')
+              .select('business_days')
+              .in('absence_id', absenceIds);
 
             const totalScheduled = periods?.reduce((sum, p) => sum + p.business_days, 0) || 0;
             setEmployeeScheduledDays(totalScheduled);
           }
         }
       } catch (error) {
-        console.error("Error fetching vacation balance:", error);
+        console.error('Error fetching vacation balance:', error);
       } finally {
         setIsLoading(false);
       }
@@ -125,10 +125,10 @@ const VacationBalanceCard = ({ employeeId }: VacationBalanceCardProps) => {
 
   const availableDays = balance.total_days - balance.used_days;
   const hasSelfSchedulableLimit = balance.self_schedulable_days !== null;
-  const remainingSelfSchedulable = hasSelfSchedulableLimit 
+  const remainingSelfSchedulable = hasSelfSchedulableLimit
     ? Math.max(0, balance.self_schedulable_days! - employeeScheduledDays)
     : null;
-  const adminReservedDays = hasSelfSchedulableLimit 
+  const adminReservedDays = hasSelfSchedulableLimit
     ? balance.total_days - balance.self_schedulable_days!
     : 0;
 
@@ -142,9 +142,12 @@ const VacationBalanceCard = ({ employeeId }: VacationBalanceCardProps) => {
           <div className="flex-1 min-w-0">
             <p className="text-sm text-muted-foreground">Saldo de Férias {currentYear}</p>
             <p className="font-display text-xl lg:text-2xl font-semibold text-foreground mt-1">
-              {formatDays(availableDays)} <span className="text-base lg:text-lg font-normal text-muted-foreground">dias disponíveis</span>
+              {formatDays(availableDays)}{' '}
+              <span className="text-base lg:text-lg font-normal text-muted-foreground">
+                dias disponíveis
+              </span>
             </p>
-            
+
             <div className="flex flex-wrap gap-x-3 lg:gap-x-4 gap-y-1 mt-2 text-xs lg:text-sm text-muted-foreground">
               <span>{formatDays(balance.used_days)} dias utilizados</span>
               {pendingDays > 0 && (
@@ -158,8 +161,13 @@ const VacationBalanceCard = ({ employeeId }: VacationBalanceCardProps) => {
                 <div className="flex items-center gap-2 text-xs lg:text-sm">
                   <User className="h-3.5 w-3.5 lg:h-4 lg:w-4 text-gold shrink-0" />
                   <span>
-                    <strong className="text-foreground">{formatDays(remainingSelfSchedulable!)}</strong>
-                    <span className="text-muted-foreground"> de {formatDays(balance.self_schedulable_days!)} dias que pode marcar</span>
+                    <strong className="text-foreground">
+                      {formatDays(remainingSelfSchedulable!)}
+                    </strong>
+                    <span className="text-muted-foreground">
+                      {' '}
+                      de {formatDays(balance.self_schedulable_days!)} dias que pode marcar
+                    </span>
                   </span>
                 </div>
                 <div className="flex items-center gap-2 text-xs lg:text-sm">

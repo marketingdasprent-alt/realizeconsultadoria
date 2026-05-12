@@ -1,16 +1,11 @@
-import { useState, useEffect } from "react";
-import { format } from "date-fns";
-import { pt } from "date-fns/locale";
-import { Download, ExternalLink, FileText, Image as ImageIcon, Loader2, X } from "lucide-react";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from 'react';
+import { format } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import { Download, ExternalLink, FileText, Image as ImageIcon, Loader2, X } from 'lucide-react';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface AbsenceDocument {
   id: string;
@@ -59,23 +54,23 @@ const AbsenceDocumentsDialog = ({
 
   const fetchDocuments = async () => {
     if (!absenceId) return;
-    
+
     setIsLoading(true);
     try {
       const { data, error } = await supabase
-        .from("absence_documents")
-        .select("*")
-        .eq("absence_id", absenceId)
-        .order("created_at", { ascending: false });
+        .from('absence_documents')
+        .select('*')
+        .eq('absence_id', absenceId)
+        .order('created_at', { ascending: false });
 
       if (error) throw error;
       setDocuments(data || []);
     } catch (error: any) {
-      console.error("Error fetching documents:", error);
+      console.error('Error fetching documents:', error);
       toast({
-        title: "Erro",
-        description: "Não foi possível carregar os documentos.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Não foi possível carregar os documentos.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -84,32 +79,28 @@ const AbsenceDocumentsDialog = ({
 
   const handleDownload = async (doc: AbsenceDocument) => {
     setLoadingFile(doc.id);
-    console.log("Iniciando download robusto para:", doc.file_name);
-    
+    console.log('Iniciando download robusto para:', doc.file_name);
+
     try {
       let signedUrl = null;
-      let finalBucket = "absence-documents";
-      
+      let finalBucket = 'absence-documents';
+
       // Lista de buckets para tentar encontrar o ficheiro
       const buckets = [
-        "absence-documents",
-        "employee-files",
-        "employees",
-        "documents",
-        "legal_documents"
+        'absence-documents',
+        'employee-files',
+        'employees',
+        'documents',
+        'legal_documents',
       ];
 
       // Limpar o caminho do ficheiro (remover slash inicial se existir)
-      const cleanPath = doc.file_path.startsWith('/') 
-        ? doc.file_path.substring(1) 
-        : doc.file_path;
+      const cleanPath = doc.file_path.startsWith('/') ? doc.file_path.substring(1) : doc.file_path;
 
       // 1. Tentar obter Signed URL em cada bucket
       for (const bucket of buckets) {
         console.log(`A tentar bucket: ${bucket}...`);
-        const { data, error } = await supabase.storage
-          .from(bucket)
-          .createSignedUrl(cleanPath, 60);
+        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(cleanPath, 60);
 
         if (data?.signedUrl) {
           signedUrl = data.signedUrl;
@@ -121,7 +112,7 @@ const AbsenceDocumentsDialog = ({
 
       // 2. Se falhar Signed URL, tentar URL Público como fallback
       if (!signedUrl) {
-        console.log("Signed URL falhou em todos os buckets. A tentar URL público...");
+        console.log('Signed URL falhou em todos os buckets. A tentar URL público...');
         for (const bucket of buckets) {
           const { data } = supabase.storage.from(bucket).getPublicUrl(cleanPath);
           if (data?.publicUrl) {
@@ -144,27 +135,27 @@ const AbsenceDocumentsDialog = ({
         const response = await fetch(signedUrl);
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
+        const a = document.createElement('a');
         a.href = url;
         a.download = doc.file_name;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-        
+
         toast({
-          title: "Download concluído",
+          title: 'Download concluído',
           description: `Ficheiro recuperado de: ${finalBucket}`,
         });
       } else {
-        throw new Error("Ficheiro não encontrado em nenhum local conhecido.");
+        throw new Error('Ficheiro não encontrado em nenhum local conhecido.');
       }
     } catch (error: any) {
-      console.error("Download error:", error);
+      console.error('Download error:', error);
       toast({
-        title: "Erro no download",
-        description: error.message || "Não foi possível descarregar o ficheiro.",
-        variant: "destructive",
+        title: 'Erro no download',
+        description: error.message || 'Não foi possível descarregar o ficheiro.',
+        variant: 'destructive',
       });
     } finally {
       setLoadingFile(null);
@@ -175,7 +166,7 @@ const AbsenceDocumentsDialog = ({
     setLoadingFile(doc.id);
     try {
       // Usar a mesma lógica de busca para o preview
-      const buckets = ["absence-documents", "employee-files", "employees", "documents"];
+      const buckets = ['absence-documents', 'employee-files', 'employees', 'documents'];
       const cleanPath = doc.file_path.startsWith('/') ? doc.file_path.substring(1) : doc.file_path;
       let previewUrl = null;
 
@@ -188,28 +179,28 @@ const AbsenceDocumentsDialog = ({
       }
 
       if (previewUrl) {
-        if (doc.mime_type === "application/pdf") {
-          window.open(previewUrl, "_blank");
+        if (doc.mime_type === 'application/pdf') {
+          window.open(previewUrl, '_blank');
         } else {
           setPreviewUrl(previewUrl);
           setPreviewType(doc.mime_type);
         }
       } else {
         toast({
-          title: "Erro na pré-visualização",
-          description: "Não foi possível localizar o ficheiro para visualização.",
-          variant: "destructive",
+          title: 'Erro na pré-visualização',
+          description: 'Não foi possível localizar o ficheiro para visualização.',
+          variant: 'destructive',
         });
       }
     } catch (error) {
-      console.error("Preview error:", error);
+      console.error('Preview error:', error);
     } finally {
       setLoadingFile(null);
     }
   };
 
-  const isImage = (mimeType: string) => mimeType.startsWith("image/");
-  const isPDF = (mimeType: string) => mimeType === "application/pdf";
+  const isImage = (mimeType: string) => mimeType.startsWith('image/');
+  const isPDF = (mimeType: string) => mimeType === 'application/pdf';
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -256,11 +247,8 @@ const AbsenceDocumentsDialog = ({
               <p>Nenhum documento anexado.</p>
             </div>
           ) : (
-            documents.map((doc) => (
-              <div
-                key={doc.id}
-                className="flex items-center gap-3 p-3 bg-secondary rounded-lg"
-              >
+            documents.map(doc => (
+              <div key={doc.id} className="flex items-center gap-3 p-3 bg-secondary rounded-lg">
                 {/* Icon */}
                 <div className="w-10 h-10 flex-shrink-0 rounded bg-muted flex items-center justify-center">
                   {isPDF(doc.mime_type) ? (
@@ -274,8 +262,8 @@ const AbsenceDocumentsDialog = ({
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate">{doc.file_name}</p>
                   <p className="text-xs text-muted-foreground">
-                    {formatFileSize(doc.file_size)} •{" "}
-                    {format(new Date(doc.created_at), "dd MMM yyyy", { locale: pt })}
+                    {formatFileSize(doc.file_size)} •{' '}
+                    {format(new Date(doc.created_at), 'dd MMM yyyy', { locale: pt })}
                   </p>
                 </div>
 
@@ -287,7 +275,7 @@ const AbsenceDocumentsDialog = ({
                     className="h-8 w-8"
                     onClick={() => handlePreview(doc)}
                     disabled={loadingFile === doc.id}
-                    title={isPDF(doc.mime_type) ? "Abrir" : "Pré-visualizar"}
+                    title={isPDF(doc.mime_type) ? 'Abrir' : 'Pré-visualizar'}
                   >
                     {loadingFile === doc.id ? (
                       <Loader2 className="h-4 w-4 animate-spin" />

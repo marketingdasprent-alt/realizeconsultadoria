@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface TicketNotificationRequest {
@@ -17,60 +17,68 @@ interface TicketNotificationRequest {
 }
 
 const priorityLabels: Record<string, string> = {
-  low: "Baixa",
-  medium: "Média",
-  high: "Alta",
-  urgent: "Urgente",
+  low: 'Baixa',
+  medium: 'Média',
+  high: 'Alta',
+  urgent: 'Urgente',
 };
 
 const priorityColors: Record<string, string> = {
-  low: "#6b7280",
-  medium: "#3b82f6",
-  high: "#f97316",
-  urgent: "#ef4444",
+  low: '#6b7280',
+  medium: '#3b82f6',
+  high: '#f97316',
+  urgent: '#ef4444',
 };
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { employeeName, employeeEmail, companyName, subject, priority, message, departmentId }: TicketNotificationRequest = await req.json();
+    const {
+      employeeName,
+      employeeEmail,
+      companyName,
+      subject,
+      priority,
+      message,
+      departmentId,
+    }: TicketNotificationRequest = await req.json();
 
     // Initialize Supabase client
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get active notification emails for this department
     const { data: emailRecords, error: emailsError } = await supabase
-      .from("notification_emails_support")
-      .select("email")
-      .eq("department_id", departmentId)
-      .eq("is_active", true);
+      .from('notification_emails_support')
+      .select('email')
+      .eq('department_id', departmentId)
+      .eq('is_active', true);
 
     if (emailsError) {
-      console.error("Error fetching notification emails:", emailsError);
+      console.error('Error fetching notification emails:', emailsError);
     }
 
     let recipientEmails: string[] = emailRecords?.map(r => r.email).filter(Boolean) || [];
 
     // Fallback to system_settings if no emails configured for this department
     if (recipientEmails.length === 0) {
-      console.log("No department emails found, checking fallback email");
+      console.log('No department emails found, checking fallback email');
       const { data: settingsData, error: settingsError } = await supabase
-        .from("system_settings")
-        .select("value")
-        .eq("key", "notification_email")
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'notification_email')
         .maybeSingle();
 
       if (settingsError) {
-        console.error("Error fetching notification email:", settingsError);
-        return new Response(
-          JSON.stringify({ error: "Failed to fetch notification email" }),
-          { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-        );
+        console.error('Error fetching notification email:', settingsError);
+        return new Response(JSON.stringify({ error: 'Failed to fetch notification email' }), {
+          status: 500,
+          headers: { 'Content-Type': 'application/json', ...corsHeaders },
+        });
       }
 
       const fallbackEmail = settingsData?.value?.trim();
@@ -80,27 +88,27 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     if (recipientEmails.length === 0) {
-      console.log("No notification recipients configured");
+      console.log('No notification recipients configured');
       return new Response(
-        JSON.stringify({ message: "No notification recipients configured, skipping" }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        JSON.stringify({ message: 'No notification recipients configured, skipping' }),
+        { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
-    console.log("Sending ticket notification to:", recipientEmails);
+    console.log('Sending ticket notification to:', recipientEmails);
 
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
 
     if (!brevoApiKey) {
-      console.error("BREVO_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "Email service not configured" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      console.error('BREVO_API_KEY not configured');
+      return new Response(JSON.stringify({ error: 'Email service not configured' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     const priorityLabel = priorityLabels[priority] || priority;
-    const priorityColor = priorityColors[priority] || "#6b7280";
+    const priorityColor = priorityColors[priority] || '#6b7280';
 
     const htmlContent = `
 <!DOCTYPE html>
@@ -178,15 +186,15 @@ const handler = async (req: Request): Promise<Response> => {
 
     // Send email to all recipients
     const emailPromises = recipientEmails.map(email =>
-      fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
+      fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
         headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "api-key": brevoApiKey,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'api-key': brevoApiKey,
         },
         body: JSON.stringify({
-          sender: { name: "Realize Gestão", email: "noreply@dasprent.pt" },
+          sender: { name: 'Realize Gestão', email: 'noreply@dasprent.pt' },
           to: [{ email }],
           subject: `🎫 Novo Ticket de Suporte: ${subject} [${priorityLabel}]`,
           htmlContent,
@@ -195,17 +203,19 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
     const results = await Promise.allSettled(emailPromises);
-    const successCount = results.filter(r => r.status === 'fulfilled' && (r.value as Response).ok).length;
+    const successCount = results.filter(
+      r => r.status === 'fulfilled' && (r.value as Response).ok
+    ).length;
     const failCount = results.length - successCount;
 
     if (failCount > 0) {
       console.warn(`Email sending: ${successCount} succeeded, ${failCount} failed`);
       for (const result of results) {
         if (result.status === 'rejected') {
-          console.error("Email send error:", result.reason);
+          console.error('Email send error:', result.reason);
         } else if (!(result.value as Response).ok) {
           const errorText = await (result.value as Response).text();
-          console.error("Brevo API error:", errorText);
+          console.error('Brevo API error:', errorText);
         }
       }
     }
@@ -213,15 +223,18 @@ const handler = async (req: Request): Promise<Response> => {
     console.log(`Ticket notification emails sent to ${successCount} recipients`);
 
     return new Response(
-      JSON.stringify({ success: true, message: `Notification sent to ${successCount} recipient(s)` }),
-      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      JSON.stringify({
+        success: true,
+        message: `Notification sent to ${successCount} recipient(s)`,
+      }),
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   } catch (error: any) {
-    console.error("Error in send-ticket-notification:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    console.error('Error in send-ticket-notification:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 };
 

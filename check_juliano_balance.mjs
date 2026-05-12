@@ -53,15 +53,22 @@ async function checkJuliano() {
     const { data: periods, error: perErr } = await supabase
       .from('absence_periods')
       .select('id, absence_id, start_date, end_date, business_days, status')
-      .in('absence_id', absences.map(a => a.id));
+      .in(
+        'absence_id',
+        absences.map(a => a.id)
+      );
 
     console.log('\n--- Períodos ---');
     console.table(periods || []);
-    
+
     // Calcular o que o TRIGGER deveria estar a calcular
     const filteredPeriods = (periods || []).filter(p => {
-        const abs = absences.find(a => a.id === p.absence_id);
-        return abs && abs.status === 'approved' && (abs.absence_type === 'vacation' || abs.absence_type === 'ferias');
+      const abs = absences.find(a => a.id === p.absence_id);
+      return (
+        abs &&
+        abs.status === 'approved' &&
+        (abs.absence_type === 'vacation' || abs.absence_type === 'ferias')
+      );
     });
 
     const totalBusinessDays = filteredPeriods.reduce((sum, p) => sum + p.business_days, 0);

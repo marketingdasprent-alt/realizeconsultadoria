@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface CreateEmployeeRequest {
@@ -24,50 +24,65 @@ interface CreateEmployeeRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
     const requestData: CreateEmployeeRequest = await req.json();
-    const { name, email, password, phone, position, department, company_id, nationality, document_number, vacation_days, self_schedulable_days, iban, cartao_da, cartao_refeicao } = requestData;
+    const {
+      name,
+      email,
+      password,
+      phone,
+      position,
+      department,
+      company_id,
+      nationality,
+      document_number,
+      vacation_days,
+      self_schedulable_days,
+      iban,
+      cartao_da,
+      cartao_refeicao,
+    } = requestData;
 
-    console.log("[create-employee-with-password] Processing request for:", email);
+    console.log('[create-employee-with-password] Processing request for:', email);
 
     // Validate required fields
     if (!name || !email || !password || !company_id) {
       return new Response(
-        JSON.stringify({ error: "Nome, email, senha e empresa são obrigatórios" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        JSON.stringify({ error: 'Nome, email, senha e empresa são obrigatórios' }),
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
     if (password.length < 8) {
-      return new Response(
-        JSON.stringify({ error: "A senha deve ter pelo menos 8 caracteres" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      return new Response(JSON.stringify({ error: 'A senha deve ter pelo menos 8 caracteres' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     // Create Supabase admin client
     const supabaseAdmin = createClient(
-      Deno.env.get("SUPABASE_URL") ?? "",
-      Deno.env.get("SUPABASE_SERVICE_ROLE_KEY") ?? "",
+      Deno.env.get('SUPABASE_URL') ?? '',
+      Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
 
     // Check if email already exists in employees
     const { data: existingEmployee } = await supabaseAdmin
-      .from("employees")
-      .select("id")
-      .eq("email", email.toLowerCase())
+      .from('employees')
+      .select('id')
+      .eq('email', email.toLowerCase())
       .maybeSingle();
 
     if (existingEmployee) {
-      return new Response(
-        JSON.stringify({ error: "Já existe um colaborador com este email" }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      return new Response(JSON.stringify({ error: 'Já existe um colaborador com este email' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     // Check if user already exists in auth - BLOCK if exists (separate accounts required)
@@ -78,12 +93,13 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (existingAuthUser) {
       // BLOCK: Email already in use by another account (admin or other employee)
-      console.log("[create-employee-with-password] Email already in use in auth.users:", email);
+      console.log('[create-employee-with-password] Email already in use in auth.users:', email);
       return new Response(
-        JSON.stringify({ 
-          error: "Este email já está em uso no sistema. Por favor utilize um email diferente para o colaborador." 
+        JSON.stringify({
+          error:
+            'Este email já está em uso no sistema. Por favor utilize um email diferente para o colaborador.',
         }),
-        { status: 400, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
@@ -96,19 +112,19 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (createError) {
-      console.error("[create-employee-with-password] Error creating user:", createError);
+      console.error('[create-employee-with-password] Error creating user:', createError);
       return new Response(
-        JSON.stringify({ error: "Erro ao criar utilizador: " + createError.message }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        JSON.stringify({ error: 'Erro ao criar utilizador: ' + createError.message }),
+        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
     const userId = newUser.user.id;
-    console.log("[create-employee-with-password] Created new user:", userId);
+    console.log('[create-employee-with-password] Created new user:', userId);
 
     // Create employee record
     const { data: employee, error: employeeError } = await supabaseAdmin
-      .from("employees")
+      .from('employees')
       .insert({
         name,
         email: email.toLowerCase(),
@@ -128,54 +144,60 @@ const handler = async (req: Request): Promise<Response> => {
       .single();
 
     if (employeeError) {
-      console.error("[create-employee-with-password] Error creating employee:", employeeError);
+      console.error('[create-employee-with-password] Error creating employee:', employeeError);
       // Try to clean up the created user
       await supabaseAdmin.auth.admin.deleteUser(userId);
       return new Response(
-        JSON.stringify({ error: "Erro ao criar colaborador: " + employeeError.message }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
+        JSON.stringify({ error: 'Erro ao criar colaborador: ' + employeeError.message }),
+        { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
-    console.log("[create-employee-with-password] Employee created:", employee.id);
+    console.log('[create-employee-with-password] Employee created:', employee.id);
 
     // Add employee role
     const { error: roleError } = await supabaseAdmin
-      .from("user_roles")
-      .upsert({ user_id: userId, role: "employee" }, { onConflict: "user_id,role" });
+      .from('user_roles')
+      .upsert({ user_id: userId, role: 'employee' }, { onConflict: 'user_id,role' });
 
     if (roleError) {
-      console.error("[create-employee-with-password] Error adding role:", roleError);
+      console.error('[create-employee-with-password] Error adding role:', roleError);
     }
 
     // Create vacation balance for current year
     const currentYear = new Date().getFullYear();
     const vacationDays = vacation_days ?? 22;
 
-    const { error: vacationError } = await supabaseAdmin
-      .from("employee_vacation_balances")
-      .insert({
-        employee_id: employee.id,
-        year: currentYear,
-        total_days: vacationDays,
-        used_days: 0,
-        self_schedulable_days: self_schedulable_days ?? null,
-      });
+    const { error: vacationError } = await supabaseAdmin.from('employee_vacation_balances').insert({
+      employee_id: employee.id,
+      year: currentYear,
+      total_days: vacationDays,
+      used_days: 0,
+      self_schedulable_days: self_schedulable_days ?? null,
+    });
 
     if (vacationError) {
-      console.error("[create-employee-with-password] Error creating vacation balance:", vacationError);
+      console.error(
+        '[create-employee-with-password] Error creating vacation balance:',
+        vacationError
+      );
     } else {
-      console.log("[create-employee-with-password] Vacation balance created:", vacationDays, "days for year", currentYear);
+      console.log(
+        '[create-employee-with-password] Vacation balance created:',
+        vacationDays,
+        'days for year',
+        currentYear
+      );
     }
 
     let emailSent = false;
     let emailErrorMessage = null;
 
     // Send welcome email with credentials via Brevo
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
     if (brevoApiKey) {
-      const loginUrl = "https://realizeconsultadoria.lovable.app/colaborador/login";
-      
+      const loginUrl = 'https://realize.dasprent.pt/colaborador/login';
+
       const emailHtml = `
         <!DOCTYPE html>
         <html>
@@ -232,60 +254,59 @@ const handler = async (req: Request): Promise<Response> => {
       `;
 
       try {
-        const brevoResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
-          method: "POST",
+        const brevoResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
           headers: {
-            "Accept": "application/json",
-            "Content-Type": "application/json",
-            "api-key": brevoApiKey,
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'api-key': brevoApiKey,
           },
           body: JSON.stringify({
             sender: {
-              name: "Realize Consultadoria",
-              email: "noreply@dasprent.pt",
+              name: 'Realize Consultadoria',
+              email: 'noreply@dasprent.pt',
             },
             to: [{ email: email.toLowerCase(), name: name }],
-            subject: "Bem-vindo ao Portal Realize Consultadoria",
+            subject: 'Bem-vindo ao Portal Realize Consultadoria',
             htmlContent: emailHtml,
           }),
         });
 
         if (!brevoResponse.ok) {
           const brevoError = await brevoResponse.text();
-          console.error("[create-employee-with-password] Brevo error:", brevoError);
-          emailErrorMessage = "Erro no serviço de email (Brevo)";
+          console.error('[create-employee-with-password] Brevo error:', brevoError);
+          emailErrorMessage = 'Erro no serviço de email (Brevo)';
         } else {
-          console.log("[create-employee-with-password] Welcome email sent to:", email);
+          console.log('[create-employee-with-password] Welcome email sent to:', email);
           emailSent = true;
         }
       } catch (emailError) {
-        console.error("[create-employee-with-password] Error sending email:", emailError);
-        emailErrorMessage = "Falha na conexão com serviço de email";
+        console.error('[create-employee-with-password] Error sending email:', emailError);
+        emailErrorMessage = 'Falha na conexão com serviço de email';
       }
     } else {
-      emailErrorMessage = "Configuração de API de email ausente";
+      emailErrorMessage = 'Configuração de API de email ausente';
     }
 
     return new Response(
-      JSON.stringify({ 
-        success: true, 
+      JSON.stringify({
+        success: true,
         employee: employee,
         employeeId: employee.id,
         emailSent,
         emailError: emailErrorMessage,
-        message: emailSent 
-          ? "Colaborador criado com sucesso" 
-          : `Colaborador criado, mas houve uma falha no email: ${emailErrorMessage}`
+        message: emailSent
+          ? 'Colaborador criado com sucesso'
+          : `Colaborador criado, mas houve uma falha no email: ${emailErrorMessage}`,
       }),
-      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
-
   } catch (error: any) {
-    console.error("[create-employee-with-password] Error:", error);
-    return new Response(
-      JSON.stringify({ error: error.message || "Erro interno" }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    console.error('[create-employee-with-password] Error:', error);
+    return new Response(JSON.stringify({ error: error.message || 'Erro interno' }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 };
 

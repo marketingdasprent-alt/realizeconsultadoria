@@ -1,15 +1,10 @@
-import { useState, useEffect } from "react";
-import { Calendar, User, Building2 } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from "@/components/ui/dialog";
-import { Input } from "@/components/ui/input";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
+import { useState, useEffect } from 'react';
+import { Calendar, User, Building2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
 
 interface VacationBalance {
   id?: string;
@@ -38,14 +33,14 @@ const VacationDaysDialog = ({
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
   const [balance, setBalance] = useState<VacationBalance | null>(null);
-  const [totalDaysInput, setTotalDaysInput] = useState("22");
-  const [selfSchedulableDaysInput, setSelfSchedulableDaysInput] = useState("");
+  const [totalDaysInput, setTotalDaysInput] = useState('22');
+  const [selfSchedulableDaysInput, setSelfSchedulableDaysInput] = useState('');
 
   const currentYear = new Date().getFullYear();
 
   // Format days to show decimals only when needed
   const formatDays = (days: number) => {
-    if (isNaN(days)) return "0";
+    if (isNaN(days)) return '0';
     return days % 1 === 0 ? days.toString() : days.toFixed(1);
   };
 
@@ -59,23 +54,23 @@ const VacationDaysDialog = ({
     setIsLoading(true);
     try {
       const { data } = await supabase
-        .from("employee_vacation_balances")
-        .select("*")
-        .eq("employee_id", employeeId)
-        .eq("year", currentYear)
+        .from('employee_vacation_balances')
+        .select('*')
+        .eq('employee_id', employeeId)
+        .eq('year', currentYear)
         .maybeSingle();
 
       if (data) {
         setBalance(data);
         setTotalDaysInput(data.total_days.toString());
-        setSelfSchedulableDaysInput(data.self_schedulable_days?.toString() || "");
+        setSelfSchedulableDaysInput(data.self_schedulable_days?.toString() || '');
       } else {
         setBalance(null);
-        setTotalDaysInput("22");
-        setSelfSchedulableDaysInput("");
+        setTotalDaysInput('22');
+        setSelfSchedulableDaysInput('');
       }
     } catch (error) {
-      console.error("Error fetching balance:", error);
+      console.error('Error fetching balance:', error);
     } finally {
       setIsLoading(false);
     }
@@ -83,31 +78,33 @@ const VacationDaysDialog = ({
 
   const handleSave = async () => {
     const totalDays = parseFloat(totalDaysInput);
-    const selfSchedulableDays = selfSchedulableDaysInput ? parseFloat(selfSchedulableDaysInput) : null;
-    
+    const selfSchedulableDays = selfSchedulableDaysInput
+      ? parseFloat(selfSchedulableDaysInput)
+      : null;
+
     if (isNaN(totalDays) || totalDays < 0) {
       toast({
-        title: "Erro",
-        description: "Por favor insira um valor válido para os dias totais.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Por favor insira um valor válido para os dias totais.',
+        variant: 'destructive',
       });
       return;
     }
 
     if (selfSchedulableDays !== null && (isNaN(selfSchedulableDays) || selfSchedulableDays < 0)) {
       toast({
-        title: "Erro",
-        description: "Por favor insira um valor válido para os dias que pode marcar.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Por favor insira um valor válido para os dias que pode marcar.',
+        variant: 'destructive',
       });
       return;
     }
 
     if (selfSchedulableDays !== null && selfSchedulableDays > totalDays) {
       toast({
-        title: "Erro",
-        description: "Os dias que pode marcar não podem exceder os dias totais.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'Os dias que pode marcar não podem exceder os dias totais.',
+        variant: 'destructive',
       });
       return;
     }
@@ -117,37 +114,35 @@ const VacationDaysDialog = ({
       if (balance?.id) {
         // Update existing
         const { error } = await supabase
-          .from("employee_vacation_balances")
-          .update({ 
+          .from('employee_vacation_balances')
+          .update({
             total_days: totalDays,
             self_schedulable_days: selfSchedulableDays,
           })
-          .eq("id", balance.id);
+          .eq('id', balance.id);
 
         if (error) throw error;
       } else {
         // Create new
-        const { error } = await supabase
-          .from("employee_vacation_balances")
-          .insert({
-            employee_id: employeeId,
-            year: currentYear,
-            total_days: totalDays,
-            used_days: 0,
-            self_schedulable_days: selfSchedulableDays,
-          });
+        const { error } = await supabase.from('employee_vacation_balances').insert({
+          employee_id: employeeId,
+          year: currentYear,
+          total_days: totalDays,
+          used_days: 0,
+          self_schedulable_days: selfSchedulableDays,
+        });
 
         if (error) throw error;
       }
 
-      toast({ title: "Dias de férias atualizados com sucesso!" });
+      toast({ title: 'Dias de férias atualizados com sucesso!' });
       onOpenChange(false);
       onSaved?.();
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -155,7 +150,9 @@ const VacationDaysDialog = ({
   };
 
   const totalDays = parseFloat(totalDaysInput) || 0;
-  const selfSchedulableDays = selfSchedulableDaysInput ? parseFloat(selfSchedulableDaysInput) : null;
+  const selfSchedulableDays = selfSchedulableDaysInput
+    ? parseFloat(selfSchedulableDaysInput)
+    : null;
   const adminReservedDays = selfSchedulableDays !== null ? totalDays - selfSchedulableDays : 0;
 
   return (
@@ -180,16 +177,14 @@ const VacationDaysDialog = ({
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-2">
-              Dias de férias totais
-            </label>
+            <label className="block text-sm font-medium mb-2">Dias de férias totais</label>
             <Input
               type="number"
               min={0}
               max={365}
               step={0.5}
               value={totalDaysInput}
-              onChange={(e) => setTotalDaysInput(e.target.value)}
+              onChange={e => setTotalDaysInput(e.target.value)}
               disabled={isLoading}
             />
           </div>
@@ -204,7 +199,7 @@ const VacationDaysDialog = ({
               max={totalDays}
               step={0.5}
               value={selfSchedulableDaysInput}
-              onChange={(e) => setSelfSchedulableDaysInput(e.target.value)}
+              onChange={e => setSelfSchedulableDaysInput(e.target.value)}
               placeholder="Todos (sem limite)"
               disabled={isLoading}
             />
@@ -221,14 +216,16 @@ const VacationDaysDialog = ({
               </span>
               <span className="font-medium">{formatDays(totalDays)} dias</span>
             </div>
-            
+
             {selfSchedulableDays !== null && (
               <>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground flex items-center gap-2">
                     <User className="h-4 w-4" /> Colaborador pode marcar:
                   </span>
-                  <span className="font-medium text-gold">{formatDays(selfSchedulableDays)} dias</span>
+                  <span className="font-medium text-gold">
+                    {formatDays(selfSchedulableDays)} dias
+                  </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground flex items-center gap-2">
@@ -264,12 +261,8 @@ const VacationDaysDialog = ({
             >
               Cancelar
             </Button>
-            <Button
-              variant="gold"
-              onClick={handleSave}
-              disabled={isLoading}
-            >
-              {isLoading ? "A guardar..." : "Guardar"}
+            <Button variant="gold" onClick={handleSave} disabled={isLoading}>
+              {isLoading ? 'A guardar...' : 'Guardar'}
             </Button>
           </div>
         </div>

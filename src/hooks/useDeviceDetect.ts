@@ -25,18 +25,20 @@ export function useDeviceDetect(): DeviceInfo {
 
   useEffect(() => {
     const userAgent = navigator.userAgent.toLowerCase();
-    
+
     // Detect iOS
-    const isIOS = /iphone|ipad|ipod/.test(userAgent) || 
+    const isIOS =
+      /iphone|ipad|ipod/.test(userAgent) ||
       (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
-    
+
     // Detect Android
     const isAndroid = /android/.test(userAgent);
-    
+
     // Detect if running as PWA
-    const isPWA = window.matchMedia('(display-mode: standalone)').matches ||
+    const isPWA =
+      window.matchMedia('(display-mode: standalone)').matches ||
       (window.navigator as any).standalone === true;
-    
+
     // Detect browser
     let browser: DeviceInfo['browser'] = 'other';
     if (/samsungbrowser/.test(userAgent)) {

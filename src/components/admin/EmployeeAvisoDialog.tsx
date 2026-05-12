@@ -3,12 +3,7 @@ import { Plus, Trash2, ToggleLeft, ToggleRight, Pencil, Check, X } from 'lucide-
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 
@@ -72,7 +67,9 @@ export default function EmployeeAvisoDialog({
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase.from('notifications').insert({
@@ -192,9 +189,7 @@ export default function EmployeeAvisoDialog({
     <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">
-            Avisos de {employeeName}
-          </DialogTitle>
+          <DialogTitle className="font-display text-2xl">Avisos de {employeeName}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">
@@ -206,12 +201,12 @@ export default function EmployeeAvisoDialog({
             <Input
               placeholder="Título do aviso"
               value={title}
-              onChange={(e) => setTitle(e.target.value)}
+              onChange={e => setTitle(e.target.value)}
             />
             <Textarea
               placeholder="Mensagem do aviso"
               value={message}
-              onChange={(e) => setMessage(e.target.value)}
+              onChange={e => setMessage(e.target.value)}
               rows={3}
             />
             <div className="flex gap-2">
@@ -241,12 +236,10 @@ export default function EmployeeAvisoDialog({
             {isLoading ? (
               <p className="text-sm text-muted-foreground">A carregar...</p>
             ) : avisos.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                Sem avisos para este colaborador.
-              </p>
+              <p className="text-sm text-muted-foreground">Sem avisos para este colaborador.</p>
             ) : (
               <div className="space-y-2">
-                {avisos.map((aviso) => (
+                {avisos.map(aviso => (
                   <div
                     key={aviso.id}
                     className={`p-3 border rounded-lg flex items-start justify-between gap-3 ${
@@ -257,9 +250,7 @@ export default function EmployeeAvisoDialog({
                   >
                     <div className="flex-1 min-w-0">
                       <p className="font-medium text-sm truncate">{aviso.title}</p>
-                      <p className="text-xs text-muted-foreground line-clamp-2">
-                        {aviso.message}
-                      </p>
+                      <p className="text-xs text-muted-foreground line-clamp-2">{aviso.message}</p>
                     </div>
                     <div className="flex items-center gap-1 shrink-0">
                       <Button

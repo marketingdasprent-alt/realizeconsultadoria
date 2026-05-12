@@ -1,9 +1,9 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
 interface ReplyNotificationRequest {
@@ -17,15 +17,22 @@ interface ReplyNotificationRequest {
 }
 
 const handler = async (req: Request): Promise<Response> => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const { employeeName, employeeEmail, companyName, subject, message, departmentId }: ReplyNotificationRequest = await req.json();
+    const {
+      employeeName,
+      employeeEmail,
+      companyName,
+      subject,
+      message,
+      departmentId,
+    }: ReplyNotificationRequest = await req.json();
 
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
     // Get notification emails for the department
@@ -33,39 +40,39 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (departmentId) {
       const { data: emailRecords } = await supabase
-        .from("notification_emails_support")
-        .select("email")
-        .eq("department_id", departmentId)
-        .eq("is_active", true);
+        .from('notification_emails_support')
+        .select('email')
+        .eq('department_id', departmentId)
+        .eq('is_active', true);
       recipientEmails = emailRecords?.map(r => r.email).filter(Boolean) || [];
     }
 
     // Fallback to system_settings
     if (recipientEmails.length === 0) {
       const { data: settingsData } = await supabase
-        .from("system_settings")
-        .select("value")
-        .eq("key", "notification_email")
+        .from('system_settings')
+        .select('value')
+        .eq('key', 'notification_email')
         .maybeSingle();
       const fallbackEmail = settingsData?.value?.trim();
       if (fallbackEmail) recipientEmails = [fallbackEmail];
     }
 
     if (recipientEmails.length === 0) {
-      console.log("No notification recipients configured, skipping");
-      return new Response(
-        JSON.stringify({ message: "No recipients configured" }),
-        { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      console.log('No notification recipients configured, skipping');
+      return new Response(JSON.stringify({ message: 'No recipients configured' }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
     if (!brevoApiKey) {
-      console.error("BREVO_API_KEY not configured");
-      return new Response(
-        JSON.stringify({ error: "Email service not configured" }),
-        { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-      );
+      console.error('BREVO_API_KEY not configured');
+      return new Response(JSON.stringify({ error: 'Email service not configured' }), {
+        status: 500,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
     }
 
     const htmlContent = `
@@ -129,15 +136,15 @@ const handler = async (req: Request): Promise<Response> => {
     `;
 
     const emailPromises = recipientEmails.map(email =>
-      fetch("https://api.brevo.com/v3/smtp/email", {
-        method: "POST",
+      fetch('https://api.brevo.com/v3/smtp/email', {
+        method: 'POST',
         headers: {
-          "Accept": "application/json",
-          "Content-Type": "application/json",
-          "api-key": brevoApiKey,
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'api-key': brevoApiKey,
         },
         body: JSON.stringify({
-          sender: { name: "Realize Gestão", email: "noreply@dasprent.pt" },
+          sender: { name: 'Realize Gestão', email: 'noreply@dasprent.pt' },
           to: [{ email }],
           subject: `💬 Nova Resposta: ${subject} - ${employeeName}`,
           htmlContent,
@@ -146,19 +153,21 @@ const handler = async (req: Request): Promise<Response> => {
     );
 
     const results = await Promise.allSettled(emailPromises);
-    const successCount = results.filter(r => r.status === 'fulfilled' && (r.value as Response).ok).length;
+    const successCount = results.filter(
+      r => r.status === 'fulfilled' && (r.value as Response).ok
+    ).length;
     console.log(`Reply notification sent to ${successCount}/${recipientEmails.length} recipients`);
 
     return new Response(
       JSON.stringify({ success: true, message: `Sent to ${successCount} recipient(s)` }),
-      { status: 200, headers: { "Content-Type": "application/json", ...corsHeaders } }
+      { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   } catch (error: any) {
-    console.error("Error in send-ticket-reply-notification:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { "Content-Type": "application/json", ...corsHeaders } }
-    );
+    console.error('Error in send-ticket-reply-notification:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', ...corsHeaders },
+    });
   }
 };
 

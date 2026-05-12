@@ -1,10 +1,10 @@
-import { motion } from "framer-motion";
-import { Mail, Phone, MapPin, Send } from "lucide-react";
-import { useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { useToast } from "@/hooks/use-toast";
+import { motion } from 'framer-motion';
+import { Mail, Phone, MapPin, Send } from 'lucide-react';
+import { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
+import { useToast } from '@/hooks/use-toast';
 
 const ContactSection = () => {
   const { toast } = useToast();
@@ -13,15 +13,15 @@ const ContactSection = () => {
   const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setIsLoading(true);
-    
+
     // Simular envio
     await new Promise(resolve => setTimeout(resolve, 1000));
-    
+
     toast({
-      title: "Mensagem enviada!",
-      description: "Entraremos em contacto consigo brevemente.",
+      title: 'Mensagem enviada!',
+      description: 'Entraremos em contacto consigo brevemente.',
     });
-    
+
     setIsLoading(false);
     (e.target as HTMLFormElement).reset();
   };
@@ -43,8 +43,8 @@ const ContactSection = () => {
             Estamos aqui para ajudar
           </h2>
           <p className="text-muted-foreground leading-relaxed">
-            Tem questões? Entre em contacto connosco. A nossa equipa terá todo o gosto 
-            em esclarecer as suas dúvidas.
+            Tem questões? Entre em contacto connosco. A nossa equipa terá todo o gosto em esclarecer
+            as suas dúvidas.
           </p>
         </motion.div>
 
@@ -84,7 +84,8 @@ const ContactSection = () => {
               <div>
                 <h4 className="font-display text-xl font-semibold mb-1">Morada</h4>
                 <p className="text-muted-foreground">
-                  Avenida da Liberdade, 110<br />
+                  Avenida da Liberdade, 110
+                  <br />
                   1250-146 Lisboa, Portugal
                 </p>
               </div>
@@ -104,12 +105,7 @@ const ContactSection = () => {
                   <label htmlFor="name" className="block text-sm font-medium mb-2">
                     Nome *
                   </label>
-                  <Input
-                    id="name"
-                    name="name"
-                    required
-                    placeholder="O seu nome"
-                  />
+                  <Input id="name" name="name" required placeholder="O seu nome" />
                 </div>
                 <div>
                   <label htmlFor="email" className="block text-sm font-medium mb-2">
@@ -129,12 +125,7 @@ const ContactSection = () => {
                 <label htmlFor="phone" className="block text-sm font-medium mb-2">
                   Telefone
                 </label>
-                <Input
-                  id="phone"
-                  name="phone"
-                  type="tel"
-                  placeholder="+351 900 000 000"
-                />
+                <Input id="phone" name="phone" type="tel" placeholder="+351 900 000 000" />
               </div>
 
               <div className="mb-6">
@@ -150,9 +141,15 @@ const ContactSection = () => {
                 />
               </div>
 
-              <Button type="submit" variant="gold" size="lg" className="w-full" disabled={isLoading}>
+              <Button
+                type="submit"
+                variant="gold"
+                size="lg"
+                className="w-full"
+                disabled={isLoading}
+              >
                 {isLoading ? (
-                  "A enviar..."
+                  'A enviar...'
                 ) : (
                   <>
                     Enviar Mensagem
@@ -162,10 +159,11 @@ const ContactSection = () => {
               </Button>
 
               <p className="text-xs text-muted-foreground text-center mt-4">
-                Ao submeter este formulário, concorda com a nossa{" "}
+                Ao submeter este formulário, concorda com a nossa{' '}
                 <a href="/politica-privacidade" className="text-gold hover:underline">
                   Política de Privacidade
-                </a>.
+                </a>
+                .
               </p>
             </form>
           </motion.div>

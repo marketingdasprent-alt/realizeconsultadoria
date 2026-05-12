@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Key, Loader2, Mail } from "lucide-react";
+import { useState } from 'react';
+import { Key, Loader2, Mail } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -7,13 +7,13 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Checkbox } from "@/components/ui/checkbox";
-import { useToast } from "@/hooks/use-toast";
-import { supabase } from "@/integrations/supabase/client";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Checkbox } from '@/components/ui/checkbox';
+import { useToast } from '@/hooks/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 interface ChangeAdminPasswordDialogProps {
   admin: {
@@ -31,8 +31,8 @@ const ChangeAdminPasswordDialog = ({
   onOpenChange,
 }: ChangeAdminPasswordDialogProps) => {
   const { toast } = useToast();
-  const [newPassword, setNewPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
   const [sendEmail, setSendEmail] = useState(true);
   const [isLoading, setIsLoading] = useState(false);
 
@@ -41,25 +41,25 @@ const ChangeAdminPasswordDialog = ({
 
     if (newPassword.length < 8) {
       toast({
-        title: "Erro",
-        description: "A palavra-passe deve ter pelo menos 8 caracteres.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'A palavra-passe deve ter pelo menos 8 caracteres.',
+        variant: 'destructive',
       });
       return;
     }
 
     if (newPassword !== confirmPassword) {
       toast({
-        title: "Erro",
-        description: "As palavras-passe não coincidem.",
-        variant: "destructive",
+        title: 'Erro',
+        description: 'As palavras-passe não coincidem.',
+        variant: 'destructive',
       });
       return;
     }
 
     setIsLoading(true);
     try {
-      const { data, error } = await supabase.functions.invoke("change-admin-password", {
+      const { data, error } = await supabase.functions.invoke('change-admin-password', {
         body: {
           user_id: admin.user_id,
           new_password: newPassword,
@@ -71,22 +71,22 @@ const ChangeAdminPasswordDialog = ({
       if (data?.error) throw new Error(data.error);
 
       toast({
-        title: "Palavra-passe alterada!",
+        title: 'Palavra-passe alterada!',
         description: sendEmail
-          ? "A nova palavra-passe foi enviada por email."
-          : "A palavra-passe foi alterada com sucesso.",
+          ? 'A nova palavra-passe foi enviada por email.'
+          : 'A palavra-passe foi alterada com sucesso.',
       });
 
       // Reset form and close dialog
-      setNewPassword("");
-      setConfirmPassword("");
+      setNewPassword('');
+      setConfirmPassword('');
       setSendEmail(true);
       onOpenChange(false);
     } catch (error: any) {
       toast({
-        title: "Erro",
+        title: 'Erro',
         description: error.message,
-        variant: "destructive",
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -94,8 +94,8 @@ const ChangeAdminPasswordDialog = ({
   };
 
   const handleClose = () => {
-    setNewPassword("");
-    setConfirmPassword("");
+    setNewPassword('');
+    setConfirmPassword('');
     setSendEmail(true);
     onOpenChange(false);
   };
@@ -120,7 +120,7 @@ const ChangeAdminPasswordDialog = ({
               id="new-password"
               type="password"
               value={newPassword}
-              onChange={(e) => setNewPassword(e.target.value)}
+              onChange={e => setNewPassword(e.target.value)}
               placeholder="Mínimo 8 caracteres"
             />
           </div>
@@ -131,7 +131,7 @@ const ChangeAdminPasswordDialog = ({
               id="confirm-password"
               type="password"
               value={confirmPassword}
-              onChange={(e) => setConfirmPassword(e.target.value)}
+              onChange={e => setConfirmPassword(e.target.value)}
               placeholder="Repetir palavra-passe"
             />
           </div>
@@ -140,7 +140,7 @@ const ChangeAdminPasswordDialog = ({
             <Checkbox
               id="send-email"
               checked={sendEmail}
-              onCheckedChange={(checked) => setSendEmail(checked === true)}
+              onCheckedChange={checked => setSendEmail(checked === true)}
             />
             <Label htmlFor="send-email" className="text-sm flex items-center gap-2 cursor-pointer">
               <Mail className="h-4 w-4" />
@@ -160,11 +160,10 @@ const ChangeAdminPasswordDialog = ({
           >
             {isLoading ? (
               <>
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                A guardar...
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />A guardar...
               </>
             ) : (
-              "Guardar"
+              'Guardar'
             )}
           </Button>
         </DialogFooter>

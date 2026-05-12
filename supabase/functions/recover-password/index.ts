@@ -1,10 +1,10 @@
-import { serve } from "https://deno.land/std@0.190.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers':
+    'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
 };
 
 interface RecoverPasswordRequest {
@@ -13,14 +13,14 @@ interface RecoverPasswordRequest {
 }
 
 serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
+  if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
-    const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
-    const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-    const brevoApiKey = Deno.env.get("BREVO_API_KEY");
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const brevoApiKey = Deno.env.get('BREVO_API_KEY');
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
@@ -29,10 +29,10 @@ serve(async (req: Request) => {
     const { email, redirectTo }: RecoverPasswordRequest = await req.json();
 
     if (!email) {
-      return new Response(
-        JSON.stringify({ error: "Email é obrigatório" }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      return new Response(JSON.stringify({ error: 'Email é obrigatório' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     const normalizedEmail = email.toLowerCase().trim();
@@ -43,7 +43,7 @@ serve(async (req: Request) => {
     let { data, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'recovery',
       email: normalizedEmail,
-      options: { redirectTo }
+      options: { redirectTo },
     });
 
     // If not found, look up the auth email via employees table (personal email fallback)
@@ -51,14 +51,16 @@ serve(async (req: Request) => {
       console.log(`Direct lookup failed, searching employees table for: ${normalizedEmail}`);
 
       const { data: empData, error: empError } = await supabaseAdmin
-        .from("employees")
-        .select("user_id, email")
-        .eq("email", normalizedEmail)
+        .from('employees')
+        .select('user_id, email')
+        .eq('email', normalizedEmail)
         .maybeSingle();
 
       if (!empError && empData?.user_id) {
         // Get the auth user by user_id to find their auth email
-        const { data: authUser, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(empData.user_id);
+        const { data: authUser, error: authUserError } = await supabaseAdmin.auth.admin.getUserById(
+          empData.user_id
+        );
 
         if (!authUserError && authUser?.user?.email) {
           authEmail = authUser.user.email;
@@ -68,7 +70,7 @@ serve(async (req: Request) => {
           const result = await supabaseAdmin.auth.admin.generateLink({
             type: 'recovery',
             email: authEmail,
-            options: { redirectTo }
+            options: { redirectTo },
           });
           data = result.data;
           linkError = result.error;
@@ -77,10 +79,12 @@ serve(async (req: Request) => {
     }
 
     if (linkError || !data) {
-      console.error("Error generating link:", linkError);
+      console.error('Error generating link:', linkError);
       return new Response(
-        JSON.stringify({ error: "Não foi possível processar o pedido. Verifique o email inserido." }),
-        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        JSON.stringify({
+          error: 'Não foi possível processar o pedido. Verifique o email inserido.',
+        }),
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
@@ -146,53 +150,53 @@ serve(async (req: Request) => {
       `;
 
       try {
-        const emailResponse = await fetch("https://api.brevo.com/v3/smtp/email", {
-          method: "POST",
+        const emailResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
           headers: {
-            "accept": "application/json",
-            "api-key": brevoApiKey,
-            "content-type": "application/json",
+            accept: 'application/json',
+            'api-key': brevoApiKey,
+            'content-type': 'application/json',
           },
           body: JSON.stringify({
-            sender: { name: "Realize Consultadoria", email: "noreply@dasprent.pt" },
+            sender: { name: 'Realize Consultadoria', email: 'noreply@dasprent.pt' },
             to: [{ email: sendToEmail }],
-            subject: "Recuperação de Palavra-passe - Realize Consultadoria",
+            subject: 'Recuperação de Palavra-passe - Realize Consultadoria',
             htmlContent: emailHtml,
           }),
         });
 
         if (!emailResponse.ok) {
           const emailError = await emailResponse.text();
-          console.error("Brevo email error:", emailError);
-          return new Response(
-            JSON.stringify({ error: "Erro ao enviar email de recuperação" }),
-            { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-          );
+          console.error('Brevo email error:', emailError);
+          return new Response(JSON.stringify({ error: 'Erro ao enviar email de recuperação' }), {
+            status: 500,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          });
         }
       } catch (err: any) {
-        console.error("Error sending email:", err);
-        return new Response(
-          JSON.stringify({ error: err.message }),
-          { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-        );
+        console.error('Error sending email:', err);
+        return new Response(JSON.stringify({ error: err.message }), {
+          status: 500,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
       }
     } else {
-      console.error("Brevo API key missing");
-      return new Response(
-        JSON.stringify({ error: "Configuração de email ausente" }),
-        { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-      );
+      console.error('Brevo API key missing');
+      return new Response(JSON.stringify({ error: 'Configuração de email ausente' }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
-    return new Response(
-      JSON.stringify({ success: true }),
-      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   } catch (error: any) {
-    console.error("Unexpected error:", error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } }
-    );
+    console.error('Unexpected error:', error);
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });

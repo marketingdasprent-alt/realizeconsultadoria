@@ -1,7 +1,7 @@
-import { useState, useEffect } from "react";
-import { format, eachDayOfInterval, parseISO } from "date-fns";
-import { pt } from "date-fns/locale";
-import { Check, X, AlertTriangle } from "lucide-react";
+import { useState, useEffect } from 'react';
+import { format, eachDayOfInterval, parseISO } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import { Check, X, AlertTriangle } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -9,15 +9,15 @@ import {
   DialogFooter,
   DialogHeader,
   DialogTitle,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Calendar } from "@/components/ui/calendar";
-import { Label } from "@/components/ui/label";
-import { supabase } from "@/integrations/supabase/client";
-import { useToast } from "@/hooks/use-toast";
-import { isWeekend, isHoliday, Holiday } from "@/lib/vacation-utils";
-import { absenceTypeLabels } from "@/lib/absence-types";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { Textarea } from '@/components/ui/textarea';
+import { Calendar } from '@/components/ui/calendar';
+import { Label } from '@/components/ui/label';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { isWeekend, isHoliday, Holiday } from '@/lib/vacation-utils';
+import { absenceTypeLabels } from '@/lib/absence-types';
 
 interface AbsencePeriod {
   id: string;
@@ -51,7 +51,7 @@ interface AbsenceApprovalDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   request: AbsenceRequest | null;
-  mode: "approve" | "partial" | "reject";
+  mode: 'approve' | 'partial' | 'reject';
   onSuccess: () => void;
 }
 
@@ -64,7 +64,7 @@ const AbsenceApprovalDialog = ({
 }: AbsenceApprovalDialogProps) => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
-  const [rejectionReason, setRejectionReason] = useState("");
+  const [rejectionReason, setRejectionReason] = useState('');
   const [selectedDates, setSelectedDates] = useState<Date[]>([]);
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [allRequestedDates, setAllRequestedDates] = useState<Date[]>([]);
@@ -79,10 +79,10 @@ const AbsenceApprovalDialog = ({
   const fetchHolidays = async () => {
     const currentYear = new Date().getFullYear();
     const { data } = await supabase
-      .from("holidays")
-      .select("*")
-      .in("year", [currentYear, currentYear + 1]);
-    
+      .from('holidays')
+      .select('*')
+      .in('year', [currentYear, currentYear + 1]);
+
     if (data) {
       setHolidays(data);
     }
@@ -90,17 +90,17 @@ const AbsenceApprovalDialog = ({
 
   const calculateRequestedDates = () => {
     if (!request) return;
-    
+
     const dates: Date[] = [];
     const hasPeriods = request.periods && request.periods.length > 0;
-    
+
     if (hasPeriods) {
-      request.periods.forEach((period) => {
+      request.periods.forEach(period => {
         const days = eachDayOfInterval({
           start: parseISO(period.start_date),
           end: parseISO(period.end_date),
         });
-        days.forEach((day) => {
+        days.forEach(day => {
           if (!isWeekend(day) && !isHoliday(day, holidays)) {
             dates.push(day);
           }
@@ -112,13 +112,13 @@ const AbsenceApprovalDialog = ({
         start: parseISO(request.start_date),
         end: parseISO(request.end_date),
       });
-      days.forEach((day) => {
+      days.forEach(day => {
         if (!isWeekend(day) && !isHoliday(day, holidays)) {
           dates.push(day);
         }
       });
     }
-    
+
     setAllRequestedDates(dates);
     setSelectedDates(dates);
   };
@@ -126,78 +126,84 @@ const AbsenceApprovalDialog = ({
   useEffect(() => {
     if (allRequestedDates.length > 0 && holidays.length >= 0) {
       const businessDays = allRequestedDates.filter(
-        (day) => !isWeekend(day) && !isHoliday(day, holidays)
+        day => !isWeekend(day) && !isHoliday(day, holidays)
       );
       setSelectedDates(businessDays);
     }
   }, [allRequestedDates, holidays]);
 
-  const copyAbsenceDocumentsToAttachments = async (absenceId: string, employeeId: string, userId: string) => {
+  const copyAbsenceDocumentsToAttachments = async (
+    absenceId: string,
+    employeeId: string,
+    userId: string
+  ) => {
     try {
       // Fetch absence documents
       const { data: docs, error: fetchError } = await supabase
-        .from("absence_documents")
-        .select("*")
-        .eq("absence_id", absenceId);
+        .from('absence_documents')
+        .select('*')
+        .eq('absence_id', absenceId);
 
       if (fetchError || !docs || docs.length === 0) return;
 
       // Get absence details for description
       const { data: absence } = await supabase
-        .from("absences")
-        .select("absence_type, start_date, end_date")
-        .eq("id", absenceId)
+        .from('absences')
+        .select('absence_type, start_date, end_date')
+        .eq('id', absenceId)
         .single();
 
-      const absenceTypeLabel = absence ? (absenceTypeLabels[absence.absence_type] || absence.absence_type) : "Ausência";
-      const dateRange = absence 
-        ? `${format(parseISO(absence.start_date), "dd/MM/yyyy", { locale: pt })} - ${format(parseISO(absence.end_date), "dd/MM/yyyy", { locale: pt })}`
-        : "";
+      const absenceTypeLabel = absence
+        ? absenceTypeLabels[absence.absence_type] || absence.absence_type
+        : 'Ausência';
+      const dateRange = absence
+        ? `${format(parseISO(absence.start_date), 'dd/MM/yyyy', { locale: pt })} - ${format(parseISO(absence.end_date), 'dd/MM/yyyy', { locale: pt })}`
+        : '';
 
       for (const doc of docs) {
         // Copy file in storage from absence-documents to employee-files
         const { data: fileData, error: downloadError } = await supabase.storage
-          .from("absence-documents")
+          .from('absence-documents')
           .download(doc.file_path);
 
         if (downloadError || !fileData) {
-          console.error("Error downloading absence document:", downloadError);
+          console.error('Error downloading absence document:', downloadError);
           continue;
         }
 
         // Sanitize filename for new path
         const sanitizedName = doc.file_name
-          .normalize("NFD")
-          .replace(/[\u0300-\u036f]/g, "")
-          .replace(/\s+/g, "_")
-          .replace(/[^a-zA-Z0-9_.-]/g, "");
+          .normalize('NFD')
+          .replace(/[\u0300-\u036f]/g, '')
+          .replace(/\s+/g, '_')
+          .replace(/[^a-zA-Z0-9_.-]/g, '');
 
         const newPath = `${employeeId}/attachments/${Date.now()}_${sanitizedName}`;
 
         // Upload to employee-files bucket
         const { error: uploadError } = await supabase.storage
-          .from("employee-files")
+          .from('employee-files')
           .upload(newPath, fileData);
 
         if (uploadError) {
-          console.error("Error uploading to employee-files:", uploadError);
+          console.error('Error uploading to employee-files:', uploadError);
           continue;
         }
 
         // Create attachment record
-        await supabase.from("employee_attachments").insert({
+        await supabase.from('employee_attachments').insert({
           employee_id: employeeId,
           file_name: doc.file_name,
           file_path: newPath,
           file_size: doc.file_size,
           mime_type: doc.mime_type,
-          source: "absence",
+          source: 'absence',
           description: `${absenceTypeLabel} (${dateRange})`,
           uploaded_by: userId,
         });
       }
     } catch (error) {
-      console.error("Error copying absence documents to attachments:", error);
+      console.error('Error copying absence documents to attachments:', error);
     }
   };
 
@@ -206,48 +212,54 @@ const AbsenceApprovalDialog = ({
     setIsLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Não autenticado");
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
 
       const hasPeriods = request.periods && request.periods.length > 0;
-      const daysToApprove = mode === "partial" 
-        ? selectedDates.length 
-        : hasPeriods 
-          ? request.periods.reduce((sum, p) => sum + p.business_days, 0)
-          : (request.total_business_days || allRequestedDates.length);
+      const daysToApprove =
+        mode === 'partial'
+          ? selectedDates.length
+          : hasPeriods
+            ? request.periods.reduce((sum, p) => sum + p.business_days, 0)
+            : request.total_business_days || allRequestedDates.length;
 
       // Update absence status
       const { error: absenceError } = await supabase
-        .from("absences")
+        .from('absences')
         .update({
-          status: mode === "partial" ? "partially_approved" : "approved",
+          status: mode === 'partial' ? 'partially_approved' : 'approved',
           approved_by: session.user.id,
           approved_at: new Date().toISOString(),
         })
-        .eq("id", request.id);
+        .eq('id', request.id);
 
       if (absenceError) throw absenceError;
 
       // Update period statuses for partial approval - recreate periods by day decision
-      if (mode === "partial") {
+      if (mode === 'partial') {
         // Delete existing periods
-        await supabase
-          .from("absence_periods")
-          .delete()
-          .eq("absence_id", request.id);
+        await supabase.from('absence_periods').delete().eq('absence_id', request.id);
 
         // Build decisions per day
-        const dayDecisions = allRequestedDates.map((day) => ({
+        const dayDecisions = allRequestedDates.map(day => ({
           date: day,
-          dateStr: format(day, "yyyy-MM-dd"),
-          status: selectedDates.some(
-            (d) => format(d, "yyyy-MM-dd") === format(day, "yyyy-MM-dd")
-          ) ? "approved" : "rejected"
+          dateStr: format(day, 'yyyy-MM-dd'),
+          status: selectedDates.some(d => format(d, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'))
+            ? 'approved'
+            : 'rejected',
         }));
 
         // Group consecutive days by status
-        const newPeriods: { start: string; end: string; status: string; businessDays: number }[] = [];
-        let currentGroup: { start: string; end: string; status: string; businessDays: number } | null = null;
+        const newPeriods: { start: string; end: string; status: string; businessDays: number }[] =
+          [];
+        let currentGroup: {
+          start: string;
+          end: string;
+          status: string;
+          businessDays: number;
+        } | null = null;
 
         for (const decision of dayDecisions) {
           if (!currentGroup || currentGroup.status !== decision.status) {
@@ -258,7 +270,7 @@ const AbsenceApprovalDialog = ({
               start: decision.dateStr,
               end: decision.dateStr,
               status: decision.status,
-              businessDays: 1
+              businessDays: 1,
             };
           } else {
             currentGroup.end = decision.dateStr;
@@ -271,23 +283,18 @@ const AbsenceApprovalDialog = ({
 
         // Insert new periods
         for (const period of newPeriods) {
-          await supabase
-            .from("absence_periods")
-            .insert({
-              absence_id: request.id,
-              start_date: period.start,
-              end_date: period.end,
-              business_days: period.businessDays,
-              status: period.status
-            });
+          await supabase.from('absence_periods').insert({
+            absence_id: request.id,
+            start_date: period.start,
+            end_date: period.end,
+            business_days: period.businessDays,
+            status: period.status,
+          });
         }
-      } else if (mode === "approve" && request.periods && request.periods.length > 0) {
+      } else if (mode === 'approve' && request.periods && request.periods.length > 0) {
         // Mark all periods as approved
         for (const period of request.periods) {
-          await supabase
-            .from("absence_periods")
-            .update({ status: "approved" })
-            .eq("id", period.id);
+          await supabase.from('absence_periods').update({ status: 'approved' }).eq('id', period.id);
         }
       }
 
@@ -297,18 +304,18 @@ const AbsenceApprovalDialog = ({
       // O saldo de férias é atualizado automaticamente via database trigger
 
       toast({
-        title: mode === "partial" ? "Pedido parcialmente aprovado" : "Pedido aprovado",
+        title: mode === 'partial' ? 'Pedido parcialmente aprovado' : 'Pedido aprovado',
         description: `${daysToApprove} dias úteis aprovados para ${request.employee.name}`,
       });
 
       onSuccess();
       onOpenChange(false);
     } catch (error) {
-      console.error("Error approving absence:", error);
+      console.error('Error approving absence:', error);
       toast({
-        title: "Erro ao aprovar",
-        description: "Ocorreu um erro ao processar o pedido.",
-        variant: "destructive",
+        title: 'Erro ao aprovar',
+        description: 'Ocorreu um erro ao processar o pedido.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -321,45 +328,44 @@ const AbsenceApprovalDialog = ({
     setIsLoading(true);
 
     try {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session) throw new Error("Não autenticado");
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error('Não autenticado');
 
       const { error } = await supabase
-        .from("absences")
-      .update({
-        status: "rejected",
-        rejection_reason: rejectionReason.trim() || null,
-        approved_by: session.user.id,
+        .from('absences')
+        .update({
+          status: 'rejected',
+          rejection_reason: rejectionReason.trim() || null,
+          approved_by: session.user.id,
           approved_at: new Date().toISOString(),
         })
-        .eq("id", request.id);
+        .eq('id', request.id);
 
       if (error) throw error;
 
       // Atualizar todos os períodos para rejected
       if (request.periods && request.periods.length > 0) {
         for (const period of request.periods) {
-          await supabase
-            .from("absence_periods")
-            .update({ status: "rejected" })
-            .eq("id", period.id);
+          await supabase.from('absence_periods').update({ status: 'rejected' }).eq('id', period.id);
         }
       }
 
       toast({
-        title: "Pedido rejeitado",
+        title: 'Pedido rejeitado',
         description: `O pedido de ${request.employee.name} foi rejeitado.`,
       });
 
       onSuccess();
       onOpenChange(false);
-      setRejectionReason("");
+      setRejectionReason('');
     } catch (error) {
-      console.error("Error rejecting absence:", error);
+      console.error('Error rejecting absence:', error);
       toast({
-        title: "Erro ao rejeitar",
-        description: "Ocorreu um erro ao processar o pedido.",
-        variant: "destructive",
+        title: 'Erro ao rejeitar',
+        description: 'Ocorreu um erro ao processar o pedido.',
+        variant: 'destructive',
       });
     } finally {
       setIsLoading(false);
@@ -367,46 +373,38 @@ const AbsenceApprovalDialog = ({
   };
 
   const toggleDate = (date: Date) => {
-    setSelectedDates((prev) => {
-      const exists = prev.some(
-        (d) => format(d, "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
-      );
+    setSelectedDates(prev => {
+      const exists = prev.some(d => format(d, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
       if (exists) {
-        return prev.filter(
-          (d) => format(d, "yyyy-MM-dd") !== format(date, "yyyy-MM-dd")
-        );
+        return prev.filter(d => format(d, 'yyyy-MM-dd') !== format(date, 'yyyy-MM-dd'));
       }
       return [...prev, date];
     });
   };
 
   const isDateSelected = (date: Date) => {
-    return selectedDates.some(
-      (d) => format(d, "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
-    );
+    return selectedDates.some(d => format(d, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
   };
 
   const isDateRequested = (date: Date) => {
-    return allRequestedDates.some(
-      (d) => format(d, "yyyy-MM-dd") === format(date, "yyyy-MM-dd")
-    );
+    return allRequestedDates.some(d => format(d, 'yyyy-MM-dd') === format(date, 'yyyy-MM-dd'));
   };
 
   if (!request) return null;
 
   const hasPeriods = request.periods && request.periods.length > 0;
-  const totalRequested = hasPeriods 
+  const totalRequested = hasPeriods
     ? request.periods.reduce((sum, p) => sum + p.business_days, 0)
-    : (request.total_business_days || allRequestedDates.length);
+    : request.total_business_days || allRequestedDates.length;
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {mode === "approve" && "Aprovar Pedido"}
-            {mode === "partial" && "Aprovar Parcialmente"}
-            {mode === "reject" && "Rejeitar Pedido"}
+            {mode === 'approve' && 'Aprovar Pedido'}
+            {mode === 'partial' && 'Aprovar Parcialmente'}
+            {mode === 'reject' && 'Rejeitar Pedido'}
           </DialogTitle>
           <DialogDescription>
             Pedido de {request.employee.name} - {totalRequested} dias úteis solicitados
@@ -414,7 +412,7 @@ const AbsenceApprovalDialog = ({
         </DialogHeader>
 
         <div className="space-y-4">
-          {mode === "approve" && (
+          {mode === 'approve' && (
             <div className="bg-primary/10 rounded-lg p-4 flex items-start gap-3">
               <Check className="h-5 w-5 text-primary mt-0.5" />
               <div>
@@ -429,12 +427,13 @@ const AbsenceApprovalDialog = ({
             </div>
           )}
 
-          {mode === "partial" && (
+          {mode === 'partial' && (
             <div className="space-y-4">
               <div className="bg-secondary rounded-lg p-4">
                 <p className="font-medium mb-2">Selecione os dias a aprovar</p>
                 <p className="text-sm text-muted-foreground">
-                  Clique nos dias para selecionar/desselecionar. Fins de semana e feriados estão desativados.
+                  Clique nos dias para selecionar/desselecionar. Fins de semana e feriados estão
+                  desativados.
                 </p>
               </div>
 
@@ -444,27 +443,25 @@ const AbsenceApprovalDialog = ({
                   selected={selectedDates}
                   onSelect={() => {}}
                   locale={pt}
-                  disabled={(date) => 
-                    isWeekend(date) || 
-                    !!isHoliday(date, holidays) || 
-                    !isDateRequested(date)
+                  disabled={date =>
+                    isWeekend(date) || !!isHoliday(date, holidays) || !isDateRequested(date)
                   }
                   modifiers={{
-                    requested: (date) => isDateRequested(date),
-                    selected: (date) => isDateSelected(date),
+                    requested: date => isDateRequested(date),
+                    selected: date => isDateSelected(date),
                   }}
                   modifiersStyles={{
-                    requested: { 
-                      backgroundColor: "hsl(var(--secondary))",
-                      borderRadius: "0.375rem",
+                    requested: {
+                      backgroundColor: 'hsl(var(--secondary))',
+                      borderRadius: '0.375rem',
                     },
-                    selected: { 
-                      backgroundColor: "hsl(var(--primary))",
-                      color: "hsl(var(--primary-foreground))",
-                      borderRadius: "0.375rem",
+                    selected: {
+                      backgroundColor: 'hsl(var(--primary))',
+                      color: 'hsl(var(--primary-foreground))',
+                      borderRadius: '0.375rem',
                     },
                   }}
-                  onDayClick={(date) => {
+                  onDayClick={date => {
                     if (!isWeekend(date) && !isHoliday(date, holidays) && isDateRequested(date)) {
                       toggleDate(date);
                     }
@@ -492,7 +489,7 @@ const AbsenceApprovalDialog = ({
             </div>
           )}
 
-          {mode === "reject" && (
+          {mode === 'reject' && (
             <div className="space-y-4">
               <div className="bg-destructive/10 rounded-lg p-4 flex items-start gap-3">
                 <X className="h-5 w-5 text-destructive mt-0.5" />
@@ -510,7 +507,7 @@ const AbsenceApprovalDialog = ({
                   id="rejection-reason"
                   placeholder="Indique o motivo da rejeição..."
                   value={rejectionReason}
-                  onChange={(e) => setRejectionReason(e.target.value)}
+                  onChange={e => setRejectionReason(e.target.value)}
                   rows={4}
                 />
               </div>
@@ -522,22 +519,20 @@ const AbsenceApprovalDialog = ({
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancelar
           </Button>
-          {mode === "reject" ? (
-            <Button 
-              variant="destructive" 
-              onClick={handleReject} 
-              disabled={isLoading}
-            >
-              {isLoading ? "A processar..." : "Rejeitar Pedido"}
+          {mode === 'reject' ? (
+            <Button variant="destructive" onClick={handleReject} disabled={isLoading}>
+              {isLoading ? 'A processar...' : 'Rejeitar Pedido'}
             </Button>
           ) : (
-            <Button 
-              onClick={handleApprove} 
-              disabled={isLoading || (mode === "partial" && selectedDates.length === 0)}
+            <Button
+              onClick={handleApprove}
+              disabled={isLoading || (mode === 'partial' && selectedDates.length === 0)}
             >
-              {isLoading ? "A processar..." : mode === "partial" 
-                ? `Aprovar ${selectedDates.length} Dias` 
-                : "Aprovar Tudo"}
+              {isLoading
+                ? 'A processar...'
+                : mode === 'partial'
+                  ? `Aprovar ${selectedDates.length} Dias`
+                  : 'Aprovar Tudo'}
             </Button>
           )}
         </DialogFooter>

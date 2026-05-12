@@ -5,10 +5,10 @@ import {
   DialogTitle,
   DialogDescription,
   DialogFooter,
-} from "@/components/ui/dialog";
-import { Button } from "@/components/ui/button";
-import { CheckCircle2, Copy } from "lucide-react";
-import { useToast } from "@/hooks/use-toast";
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
+import { CheckCircle2, Copy } from 'lucide-react';
+import { useToast } from '@/hooks/use-toast';
 
 interface ResendInviteSuccessDialogProps {
   open: boolean;
@@ -28,8 +28,8 @@ const ResendInviteSuccessDialog = ({
   const handleCopy = () => {
     navigator.clipboard.writeText(newPassword);
     toast({
-      title: "Copiado!",
-      description: "Senha copiada para a área de transferência.",
+      title: 'Copiado!',
+      description: 'Senha copiada para a área de transferência.',
     });
   };
 
@@ -45,7 +45,7 @@ const ResendInviteSuccessDialog = ({
             Um novo email de boas-vindas foi enviado para <strong>{employeeName}</strong>.
           </DialogDescription>
         </DialogHeader>
-        
+
         <div className="bg-muted p-4 rounded-lg my-4 space-y-2 border-l-4 border-gold">
           <p className="text-sm font-medium text-muted-foreground">Nova Senha Gerada:</p>
           <div className="flex items-center justify-between gap-2">

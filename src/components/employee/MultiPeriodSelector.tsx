@@ -1,37 +1,33 @@
-import { useState } from "react";
-import { format, parseISO, isSameDay } from "date-fns";
-import { pt } from "date-fns/locale";
-import { Plus, Trash2, Calendar as CalendarIcon, AlertCircle, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Calendar } from "@/components/ui/calendar";
-import { Card, CardContent } from "@/components/ui/card";
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover";
+import { useState } from 'react';
+import { format, parseISO, isSameDay } from 'date-fns';
+import { pt } from 'date-fns/locale';
+import { Plus, Trash2, Calendar as CalendarIcon, AlertCircle, Clock } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Calendar } from '@/components/ui/calendar';
+import { Card, CardContent } from '@/components/ui/card';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "@/components/ui/select";
-import { Badge } from "@/components/ui/badge";
-import { cn } from "@/lib/utils";
-import { 
-  DatePeriod, 
-  Holiday, 
+} from '@/components/ui/select';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
+import {
+  DatePeriod,
+  Holiday,
   PeriodType,
   AVAILABLE_HOURS,
-  isWeekend, 
-  isHoliday, 
+  isWeekend,
+  isHoliday,
   countBusinessDays,
   countTotalBusinessDays,
   calculateHoursBetween,
   calculateBusinessDaysFromHours,
   formatTimeRange,
-} from "@/lib/vacation-utils";
+} from '@/lib/vacation-utils';
 
 interface ExistingAbsence {
   id: string;
@@ -63,14 +59,14 @@ const MultiPeriodSelector = ({
     from: Date | undefined;
     to: Date | undefined;
   }>({ from: undefined, to: undefined });
-  
+
   const [periodType, setPeriodType] = useState<PeriodType>('full_day');
-  const [startTime, setStartTime] = useState<string>("09:00");
-  const [endTime, setEndTime] = useState<string>("13:00");
+  const [startTime, setStartTime] = useState<string>('09:00');
+  const [endTime, setEndTime] = useState<string>('13:00');
 
   // Check if single day is selected
-  const isSingleDay = currentPeriod.from && 
-    (!currentPeriod.to || isSameDay(currentPeriod.from, currentPeriod.to));
+  const isSingleDay =
+    currentPeriod.from && (!currentPeriod.to || isSameDay(currentPeriod.from, currentPeriod.to));
 
   // Calculate business days for current partial period
   const partialHours = calculateHoursBetween(startTime, endTime);
@@ -95,14 +91,14 @@ const MultiPeriodSelector = ({
   const isDateDisabled = (date: Date) => {
     if (isWeekend(date)) return true;
     if (isHoliday(date, holidays)) return true;
-    
+
     // Admins can select any date — skip the 48h notice restriction
     if (adminMode) return false;
-    
+
     const today = new Date(new Date().setHours(0, 0, 0, 0));
     const minNoticeDate = new Date(today);
     minNoticeDate.setDate(minNoticeDate.getDate() + 2);
-    
+
     return date < minNoticeDate;
   };
 
@@ -112,17 +108,19 @@ const MultiPeriodSelector = ({
         from: currentPeriod.from,
         to: currentPeriod.to || currentPeriod.from,
         periodType: isSingleDay ? periodType : 'full_day',
-        ...(isSingleDay && periodType === 'partial' ? {
-          startTime,
-          endTime,
-          businessDays: partialBusinessDays,
-        } : {}),
+        ...(isSingleDay && periodType === 'partial'
+          ? {
+              startTime,
+              endTime,
+              businessDays: partialBusinessDays,
+            }
+          : {}),
       };
       onPeriodsChange([...periods, newPeriod]);
       setCurrentPeriod({ from: undefined, to: undefined });
       setPeriodType('full_day');
-      setStartTime("09:00");
-      setEndTime("13:00");
+      setStartTime('09:00');
+      setEndTime('13:00');
     }
   };
 
@@ -139,12 +137,12 @@ const MultiPeriodSelector = ({
 
   const formatPeriodDisplay = (period: DatePeriod): string => {
     if (period.periodType === 'partial' && period.startTime && period.endTime) {
-      return `${format(period.from, "dd MMM yyyy", { locale: pt })} (${formatTimeRange(period.startTime, period.endTime)})`;
+      return `${format(period.from, 'dd MMM yyyy', { locale: pt })} (${formatTimeRange(period.startTime, period.endTime)})`;
     }
     if (isSameDay(period.from, period.to)) {
-      return format(period.from, "dd MMM yyyy", { locale: pt });
+      return format(period.from, 'dd MMM yyyy', { locale: pt });
     }
-    return `${format(period.from, "dd MMM", { locale: pt })} - ${format(period.to, "dd MMM yyyy", { locale: pt })}`;
+    return `${format(period.from, 'dd MMM', { locale: pt })} - ${format(period.to, 'dd MMM yyyy', { locale: pt })}`;
   };
 
   return (
@@ -164,11 +162,9 @@ const MultiPeriodSelector = ({
                     ) : (
                       <CalendarIcon className="h-4 w-4 text-gold" />
                     )}
-                    <span className="text-sm font-medium">
-                      {formatPeriodDisplay(period)}
-                    </span>
+                    <span className="text-sm font-medium">{formatPeriodDisplay(period)}</span>
                     <Badge variant="outline" className="text-xs">
-                      {businessDays} {businessDays === 1 ? "dia útil" : "dias úteis"}
+                      {businessDays} {businessDays === 1 ? 'dia útil' : 'dias úteis'}
                     </Badge>
                   </div>
                   <Button
@@ -190,30 +186,31 @@ const MultiPeriodSelector = ({
       {/* Add New Period */}
       <div className="space-y-3">
         <label className="block text-sm font-medium">
-          {periods.length > 0 ? "Adicionar outro período" : "Selecionar período *"}
+          {periods.length > 0 ? 'Adicionar outro período' : 'Selecionar período *'}
         </label>
-        
+
         {/* Date Selection */}
         <Popover>
           <PopoverTrigger asChild>
             <Button
               variant="outline"
               className={cn(
-                "w-full justify-start text-left font-normal",
-                !currentPeriod.from && "text-muted-foreground"
+                'w-full justify-start text-left font-normal',
+                !currentPeriod.from && 'text-muted-foreground'
               )}
             >
               <CalendarIcon className="mr-2 h-4 w-4" />
               {currentPeriod.from ? (
                 currentPeriod.to && !isSameDay(currentPeriod.from, currentPeriod.to) ? (
                   <>
-                    {format(currentPeriod.from, "dd/MM/yyyy")} - {format(currentPeriod.to, "dd/MM/yyyy")}
+                    {format(currentPeriod.from, 'dd/MM/yyyy')} -{' '}
+                    {format(currentPeriod.to, 'dd/MM/yyyy')}
                   </>
                 ) : (
-                  format(currentPeriod.from, "dd/MM/yyyy")
+                  format(currentPeriod.from, 'dd/MM/yyyy')
                 )
               ) : (
-                "Selecionar datas"
+                'Selecionar datas'
               )}
             </Button>
           </PopoverTrigger>
@@ -221,7 +218,7 @@ const MultiPeriodSelector = ({
             <Calendar
               mode="range"
               selected={currentPeriod}
-              onSelect={(range) => {
+              onSelect={range => {
                 setCurrentPeriod({ from: range?.from, to: range?.to });
                 // Reset to full day when selecting new dates
                 setPeriodType('full_day');
@@ -233,10 +230,10 @@ const MultiPeriodSelector = ({
                 holiday: holidays.map(h => new Date(h.date)),
               }}
               modifiersStyles={{
-                holiday: { 
-                  backgroundColor: "hsl(var(--primary) / 0.1)",
-                  color: "hsl(var(--primary))",
-                  fontWeight: "bold",
+                holiday: {
+                  backgroundColor: 'hsl(var(--primary) / 0.1)',
+                  color: 'hsl(var(--primary))',
+                  fontWeight: 'bold',
                 },
               }}
               className="pointer-events-auto"
@@ -282,20 +279,25 @@ const MultiPeriodSelector = ({
               <div className="space-y-3 pt-2">
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <label className="block text-xs font-medium mb-1.5 text-muted-foreground">Das</label>
-                    <Select value={startTime} onValueChange={(value) => {
-                      setStartTime(value);
-                      // Ensure end time is after start time
-                      if (value >= endTime) {
-                        const nextTime = AVAILABLE_HOURS.find(t => t > value);
-                        if (nextTime) setEndTime(nextTime);
-                      }
-                    }}>
+                    <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
+                      Das
+                    </label>
+                    <Select
+                      value={startTime}
+                      onValueChange={value => {
+                        setStartTime(value);
+                        // Ensure end time is after start time
+                        if (value >= endTime) {
+                          const nextTime = AVAILABLE_HOURS.find(t => t > value);
+                          if (nextTime) setEndTime(nextTime);
+                        }
+                      }}
+                    >
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {AVAILABLE_HOURS.slice(0, -1).map((time) => (
+                        {AVAILABLE_HOURS.slice(0, -1).map(time => (
                           <SelectItem key={time} value={time}>
                             {time}
                           </SelectItem>
@@ -304,13 +306,15 @@ const MultiPeriodSelector = ({
                     </Select>
                   </div>
                   <div>
-                    <label className="block text-xs font-medium mb-1.5 text-muted-foreground">Às</label>
+                    <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
+                      Às
+                    </label>
                     <Select value={endTime} onValueChange={setEndTime}>
                       <SelectTrigger>
                         <SelectValue />
                       </SelectTrigger>
                       <SelectContent>
-                        {availableEndTimes.map((time) => (
+                        {availableEndTimes.map(time => (
                           <SelectItem key={time} value={time}>
                             {time}
                           </SelectItem>
@@ -319,10 +323,13 @@ const MultiPeriodSelector = ({
                     </Select>
                   </div>
                 </div>
-                
+
                 <div className="flex items-center gap-2 text-sm text-muted-foreground bg-background p-2 rounded">
                   <Clock className="h-4 w-4" />
-                  <span>{partialHours} horas = <strong className="text-foreground">{partialBusinessDays} dia útil</strong></span>
+                  <span>
+                    {partialHours} horas ={' '}
+                    <strong className="text-foreground">{partialBusinessDays} dia útil</strong>
+                  </span>
                 </div>
               </div>
             )}
@@ -344,30 +351,27 @@ const MultiPeriodSelector = ({
 
       {/* Summary */}
       {periods.length > 0 && (
-        <div className={cn(
-          "p-4 rounded-lg border",
-          exceedsMax ? "bg-destructive/10 border-destructive/30" : "bg-gold/5 border-gold/20"
-        )}>
+        <div
+          className={cn(
+            'p-4 rounded-lg border',
+            exceedsMax ? 'bg-destructive/10 border-destructive/30' : 'bg-gold/5 border-gold/20'
+          )}
+        >
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               {exceedsMax && <AlertCircle className="h-4 w-4 text-destructive" />}
               <span className="font-medium">Total:</span>
             </div>
-            <span className={cn(
-              "font-display text-xl font-semibold",
-              exceedsMax && "text-destructive"
-            )}>
-              {totalBusinessDays} {totalBusinessDays === 1 ? "dia útil" : "dias úteis"}
+            <span
+              className={cn('font-display text-xl font-semibold', exceedsMax && 'text-destructive')}
+            >
+              {totalBusinessDays} {totalBusinessDays === 1 ? 'dia útil' : 'dias úteis'}
             </span>
           </div>
           {exceedsMax && maxDays && (
-            <p className="text-sm text-destructive mt-2">
-              Excede os {maxDays} dias disponíveis
-            </p>
+            <p className="text-sm text-destructive mt-2">Excede os {maxDays} dias disponíveis</p>
           )}
-          <p className="text-xs text-muted-foreground mt-2">
-            Exclui fins de semana e feriados
-          </p>
+          <p className="text-xs text-muted-foreground mt-2">Exclui fins de semana e feriados</p>
         </div>
       )}
     </div>

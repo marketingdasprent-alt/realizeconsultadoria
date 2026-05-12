@@ -60,7 +60,7 @@ const ComingSoonPage = () => {
                 preference = 'employee';
               }
             }
-            
+
             if (preference === 'employee') {
               localStorage.setItem('auth_preference', 'employee');
             }

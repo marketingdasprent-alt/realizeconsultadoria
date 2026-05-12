@@ -65,7 +65,11 @@ serve(async req => {
       );
 
       if (banError) {
-        console.warn('[delete-employee] Could not ban auth user:', employee.user_id, banError.message);
+        console.warn(
+          '[delete-employee] Could not ban auth user:',
+          employee.user_id,
+          banError.message
+        );
       } else {
         console.log('[delete-employee] Auth user banned:', employee.user_id);
       }

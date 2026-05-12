@@ -139,7 +139,7 @@ export const employeeService = {
         try {
           const body = await (error as any).context?.json();
           if (body?.error) errorMessage = body.error;
-        } catch {}
+        } catch { /* response body is not JSON — use original message */ }
         throw new Error(errorMessage);
       }
 
@@ -207,7 +207,7 @@ export const employeeService = {
         try {
           const body = await (error as any).context?.json();
           if (body?.error) errorMessage = body.error;
-        } catch {}
+        } catch { /* response body is not JSON — use original message */ }
         throw new Error(errorMessage);
       }
       return { data, error: null };
@@ -233,7 +233,7 @@ export const employeeService = {
         try {
           const body = await (error as any).context?.json();
           if (body?.error) errorMessage = body.error;
-        } catch {}
+        } catch { /* response body is not JSON — use original message */ }
         throw new Error(errorMessage);
       }
       return { data, error: null };

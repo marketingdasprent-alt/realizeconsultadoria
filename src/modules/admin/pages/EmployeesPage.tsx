@@ -42,6 +42,7 @@ import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import BulkDocumentUploadDialog from '@/components/admin/BulkDocumentUploadDialog';
 import ResendInviteSuccessDialog from '@/components/admin/ResendInviteSuccessDialog';
 import { useEmployees } from '@/hooks/useEmployees';
+import EmployeeFinancialTab from '@/modules/admin/components/employee/EmployeeFinancialTab';
 import type { Employee } from '@/modules/admin/services/employeeService';
 
 const EmployeesPage = () => {
@@ -450,99 +451,11 @@ const EmployeesPage = () => {
 
           {/* Informações Financeiras */}
           <TabsContent value="financial" className="mt-4">
-            <Card className="shadow-card">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead
-                        className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => handleSort('name')}
-                      >
-                        <div className="flex items-center gap-1">
-                          Nome
-                          <SortIcon field="name" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => handleSort('iban')}
-                      >
-                        <div className="flex items-center gap-1">
-                          IBAN
-                          <SortIcon field="iban" />
-                        </div>
-                      </TableHead>
-                      <TableHead className="h-8 py-1 px-2 text-muted-foreground">
-                        Campo 1
-                      </TableHead>
-                      <TableHead className="h-8 py-1 px-2 text-muted-foreground">
-                        Campo 2
-                      </TableHead>
-                      <TableHead className="h-8 py-1 px-2 text-muted-foreground">
-                        Campo 3
-                      </TableHead>
-                      <TableHead className="h-8 py-1 px-2 text-muted-foreground">
-                        Campo 4
-                      </TableHead>
-                      <TableHead className="w-[40px] h-8 py-1 px-2"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={7} className="text-center py-4 text-sm">
-                          <div className="flex justify-center items-center">
-                            <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : sortedEmployees.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={7}
-                          className="text-center py-4 text-sm text-muted-foreground"
-                        >
-                          Nenhum colaborador encontrado
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      sortedEmployees.map(employee => (
-                        <TableRow
-                          key={employee.id}
-                          className={`h-8 ${canEdit ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                          onClick={() =>
-                            canEdit && navigate(`/admin/colaboradores/${employee.id}`)
-                          }
-                        >
-                          <TableCell className="py-1 px-2">
-                            <span className="font-medium">{employee.name}</span>
-                          </TableCell>
-                          <TableCell className="py-1 px-2 text-sm font-mono">
-                            {employee.iban || '-'}
-                          </TableCell>
-                          <TableCell className="py-1 px-2 text-sm text-muted-foreground">
-                            -
-                          </TableCell>
-                          <TableCell className="py-1 px-2 text-sm text-muted-foreground">
-                            -
-                          </TableCell>
-                          <TableCell className="py-1 px-2 text-sm text-muted-foreground">
-                            -
-                          </TableCell>
-                          <TableCell className="py-1 px-2 text-sm text-muted-foreground">
-                            -
-                          </TableCell>
-                          <TableCell className="py-1 px-2" onClick={e => e.stopPropagation()}>
-                            {renderRowActions(employee)}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
+            <EmployeeFinancialTab
+              employees={sortedEmployees}
+              isLoading={isLoading}
+              searchTerm={searchTerm}
+            />
           </TabsContent>
         </Tabs>
 

@@ -11,18 +11,24 @@ type EmployeeUpdate = Database['public']['Tables']['employees']['Update'];
 
 export const employeeService = {
   /**
-   * Obter colaboradores com paginação e nome da empresa
+   * Obter colaboradores e nome da empresa.
+   * Sem `page` definido, devolve todos os registos (sem paginação) — usado
+   * pela vista admin que mostra a tabela completa.
    */
-  getAll: async (page = 1, pageSize = PAGE_SIZES.DEFAULT) => {
+  getAll: async (page?: number, pageSize: number = PAGE_SIZES.DEFAULT) => {
     try {
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-
-      const { data, error, count } = await supabase
+      let query = supabase
         .from('employees')
         .select('*, companies(id, name)', { count: 'exact' })
-        .order('name')
-        .range(from, to);
+        .order('name');
+
+      if (page !== undefined) {
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+        query = query.range(from, to);
+      }
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
       return { data, error: null, count };

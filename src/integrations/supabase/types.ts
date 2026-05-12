@@ -811,6 +811,7 @@ export type Database = {
       };
       employees: {
         Row: {
+          birth_date: string | null;
           cartao_da: string | null;
           cartao_refeicao: string | null;
           company_id: string;
@@ -833,6 +834,7 @@ export type Database = {
           user_id: string | null;
         };
         Insert: {
+          birth_date?: string | null;
           cartao_da?: string | null;
           cartao_refeicao?: string | null;
           company_id: string;
@@ -855,6 +857,7 @@ export type Database = {
           user_id?: string | null;
         };
         Update: {
+          birth_date?: string | null;
           cartao_da?: string | null;
           cartao_refeicao?: string | null;
           company_id?: string;

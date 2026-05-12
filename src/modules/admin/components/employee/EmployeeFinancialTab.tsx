@@ -129,11 +129,7 @@ interface EmployeeFinancialTabProps {
   searchTerm: string;
 }
 
-const EmployeeFinancialTab = ({
-  employees,
-  isLoading,
-  searchTerm,
-}: EmployeeFinancialTabProps) => {
+const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFinancialTabProps) => {
   const { toast } = useToast();
   const { isRhMember } = useIsRhMember();
   const canEditFinancial = isRhMember;
@@ -155,11 +151,7 @@ const EmployeeFinancialTab = ({
       valor_descontado: 0,
     };
 
-  const updateFinance = async (
-    employeeId: string,
-    field: keyof FinanceFields,
-    value: number
-  ) => {
+  const updateFinance = async (employeeId: string, field: keyof FinanceFields, value: number) => {
     if (!canEditFinancial) return;
     const result = await updateField(employeeId, field, value);
     if (!result.success) {
@@ -326,7 +318,8 @@ const EmployeeFinancialTab = ({
                 ) : (
                   filtered.map(employee => {
                     const f = getFinance(employee.id);
-                    const transferido = (f.valor_recebido || 0) - (f.valor_subsidio_alimentacao || 0);
+                    const transferido =
+                      (f.valor_recebido || 0) - (f.valor_subsidio_alimentacao || 0);
                     return (
                       <TableRow key={employee.id} className="h-8">
                         <TableCell className="py-1 px-2">
@@ -396,9 +389,7 @@ const EmployeeFinancialTab = ({
                       cx="50%"
                       cy="50%"
                       outerRadius="80%"
-                      label={({ name, percent }) =>
-                        `${name}: ${(percent! * 100).toFixed(1)}%`
-                      }
+                      label={({ name, percent }) => `${name}: ${(percent! * 100).toFixed(1)}%`}
                     >
                       {chartData.map(entry => (
                         <Cell key={entry.name} fill={entry.color} />

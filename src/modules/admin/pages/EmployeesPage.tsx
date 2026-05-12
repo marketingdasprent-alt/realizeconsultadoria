@@ -237,10 +237,7 @@ const EmployeesPage = () => {
               <Key className="h-4 w-4 mr-2" />
               Definir Nova Senha
             </DropdownMenuItem>
-            <DropdownMenuItem
-              onClick={() => handleResendInvite(employee)}
-              disabled={!!isResending}
-            >
+            <DropdownMenuItem onClick={() => handleResendInvite(employee)} disabled={!!isResending}>
               {isResending === employee.id ? (
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />
               ) : (
@@ -251,10 +248,7 @@ const EmployeesPage = () => {
           </>
         )}
         {canDelete && (
-          <DropdownMenuItem
-            onClick={() => openDeleteDialog(employee)}
-            className="text-destructive"
-          >
+          <DropdownMenuItem onClick={() => openDeleteDialog(employee)} className="text-destructive">
             <Trash2 className="h-4 w-4 mr-2" />
             Eliminar
           </DropdownMenuItem>
@@ -404,9 +398,7 @@ const EmployeesPage = () => {
                         <TableRow
                           key={employee.id}
                           className={`h-8 ${canEdit ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                          onClick={() =>
-                            canEdit && navigate(`/admin/colaboradores/${employee.id}`)
-                          }
+                          onClick={() => canEdit && navigate(`/admin/colaboradores/${employee.id}`)}
                         >
                           <TableCell className="py-1 px-2">
                             <span className="font-medium">{employee.name}</span>

@@ -152,6 +152,7 @@ const EmployeeFinancialTab = ({
       valor_recebido: 0,
       valor_subsidio_alimentacao: 0,
       valor_cartao_da: 0,
+      valor_descontado: 0,
     };
 
   const updateFinance = async (
@@ -301,12 +302,13 @@ const EmployeeFinancialTab = ({
                   <TableHead className="h-8 py-1 px-2 text-right">Sub. Alimentação</TableHead>
                   <TableHead className="h-8 py-1 px-2 text-right">Valor Transferido</TableHead>
                   <TableHead className="h-8 py-1 px-2 text-right">Cartão DÁ</TableHead>
+                  <TableHead className="h-8 py-1 px-2 text-right">Valor Descontado</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {isLoading || isLoadingFinances ? (
                   <TableRow>
-                    <TableCell colSpan={6} className="text-center py-4 text-sm">
+                    <TableCell colSpan={7} className="text-center py-4 text-sm">
                       <div className="flex justify-center items-center">
                         <Loader2 className="w-6 h-6 animate-spin text-primary" />
                       </div>
@@ -315,7 +317,7 @@ const EmployeeFinancialTab = ({
                 ) : filtered.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={6}
+                      colSpan={7}
                       className="text-center py-4 text-sm text-muted-foreground"
                     >
                       Nenhum colaborador encontrado
@@ -362,6 +364,14 @@ const EmployeeFinancialTab = ({
                             ariaLabel={`Cartão DÁ de ${employee.name}`}
                           />
                         </TableCell>
+                        <TableCell className="py-1 px-2 text-right">
+                          <EditableCell
+                            value={f.valor_descontado}
+                            canEdit={canEditFinancial}
+                            onCommit={v => updateFinance(employee.id, 'valor_descontado', v)}
+                            ariaLabel={`Valor descontado de ${employee.name}`}
+                          />
+                        </TableCell>
                       </TableRow>
                     );
                   })
@@ -376,7 +386,7 @@ const EmployeeFinancialTab = ({
           <CardContent className="pt-6">
             <h3 className="text-sm font-semibold mb-3">Distribuição de gastos do mês</h3>
             {hasChartData ? (
-              <div className="w-full" style={{ height: 320 }}>
+              <div className="w-full h-80 print:h-[640px]">
                 <ResponsiveContainer width="100%" height="100%">
                   <PieChart>
                     <Pie
@@ -385,7 +395,7 @@ const EmployeeFinancialTab = ({
                       nameKey="name"
                       cx="50%"
                       cy="50%"
-                      outerRadius={110}
+                      outerRadius="80%"
                       label={({ name, percent }) =>
                         `${name}: ${(percent! * 100).toFixed(1)}%`
                       }

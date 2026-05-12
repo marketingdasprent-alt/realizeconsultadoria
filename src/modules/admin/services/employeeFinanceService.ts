@@ -11,6 +11,7 @@ export interface FinanceFields {
   valor_recebido: number;
   valor_subsidio_alimentacao: number;
   valor_cartao_da: number;
+  valor_descontado: number;
 }
 
 export const employeeFinanceService = {
@@ -49,6 +50,7 @@ export const employeeFinanceService = {
         valor_recebido: fields.valor_recebido ?? 0,
         valor_subsidio_alimentacao: fields.valor_subsidio_alimentacao ?? 0,
         valor_cartao_da: fields.valor_cartao_da ?? 0,
+        valor_descontado: fields.valor_descontado ?? 0,
       };
 
       const { data, error } = await supabase

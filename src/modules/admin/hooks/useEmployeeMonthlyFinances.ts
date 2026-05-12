@@ -29,12 +29,14 @@ const emptyFinance = (): FinanceFields => ({
   valor_recebido: 0,
   valor_subsidio_alimentacao: 0,
   valor_cartao_da: 0,
+  valor_descontado: 0,
 });
 
 const toFields = (row: EmployeeMonthlyFinance): FinanceFields => ({
   valor_recebido: Number(row.valor_recebido) || 0,
   valor_subsidio_alimentacao: Number(row.valor_subsidio_alimentacao) || 0,
   valor_cartao_da: Number(row.valor_cartao_da) || 0,
+  valor_descontado: Number(row.valor_descontado) || 0,
 });
 
 export const useEmployeeMonthlyFinances = (

@@ -727,6 +727,7 @@ export type Database = {
           notes: string | null;
           updated_at: string;
           valor_cartao_da: number;
+          valor_descontado: number;
           valor_recebido: number;
           valor_subsidio_alimentacao: number;
           year: number;
@@ -739,6 +740,7 @@ export type Database = {
           notes?: string | null;
           updated_at?: string;
           valor_cartao_da?: number;
+          valor_descontado?: number;
           valor_recebido?: number;
           valor_subsidio_alimentacao?: number;
           year: number;
@@ -751,6 +753,7 @@ export type Database = {
           notes?: string | null;
           updated_at?: string;
           valor_cartao_da?: number;
+          valor_descontado?: number;
           valor_recebido?: number;
           valor_subsidio_alimentacao?: number;
           year?: number;

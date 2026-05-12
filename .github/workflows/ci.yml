@@ -103,7 +103,18 @@ jobs:
           node-version: '22'
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - run: npx playwright install --with-deps
+      - name: Cache Playwright browsers
+        uses: actions/cache@v4
+        id: playwright-cache
+        with:
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('**/pnpm-lock.yaml') }}
+      - name: Install Playwright (with system deps, first run)
+        if: steps.playwright-cache.outputs.cache-hit != 'true'
+        run: npx playwright install --with-deps chromium
+      - name: Install Playwright (from cache, skip apt)
+        if: steps.playwright-cache.outputs.cache-hit == 'true'
+        run: npx playwright install chromium
 
       # Setup environment variables from GitHub Secrets (or use .env.ci fallback)
       - name: Setup environment variables

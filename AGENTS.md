@@ -40,6 +40,7 @@ pnpm run preview            # Pré-visualizar build de produção
 make build                  # (Opcional) Build via Makefile
 
 # Testes
+pnpm run validate           # Executar o CI CD localmente
 pnpm run test               # Executar todos os testes unitários/integrados (Vitest)
 pnpm run test:ui            # Testes em modo watch/UI
 pnpm run test:frontend      # Testes apenas para componentes UI

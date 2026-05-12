@@ -1,5 +1,8 @@
 project_id = "jvvnsoasylusbmxfotci"
 
+[functions.delete-employee]
+verify_jwt = false
+
 [functions.send-safety-checkup-reminders]
 verify_jwt = false
 

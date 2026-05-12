@@ -32,6 +32,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import EmployeeAvisoDialog from '@/components/admin/EmployeeAvisoDialog';
@@ -49,6 +50,7 @@ const EmployeesPage = () => {
   const { canExecuteTopic } = useAdminPermissions();
   const { employees, isLoading, deleteEmployee, toggleStatus, resendInvite } = useEmployees();
 
+  const [activeTab, setActiveTab] = useState<'personal' | 'financial'>('personal');
   const [searchTerm, setSearchTerm] = useState('');
   const [avisoDialogEmployee, setAvisoDialogEmployee] = useState<any>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -63,7 +65,7 @@ const EmployeesPage = () => {
   } | null>(null);
 
   // Sorting state
-  type SortField = 'name' | 'email' | 'company' | 'position' | 'status';
+  type SortField = 'name' | 'email' | 'company' | 'position' | 'status' | 'iban';
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -171,7 +173,8 @@ const EmployeesPage = () => {
       employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
       employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
       // @ts-expect-error - Supabase relational data typing
-      employee.companies?.name?.toLowerCase().includes(searchTerm.toLowerCase())
+      employee.companies?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (employee.iban || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
   const sortedEmployees = [...filteredEmployees].sort((a, b) => {
@@ -188,6 +191,7 @@ const EmployeesPage = () => {
         // @ts-expect-error - Supabase relational data typing
         comparison = (a.companies?.name || '')
           .toLowerCase()
+          // @ts-expect-error - Supabase relational data typing
           .localeCompare((b.companies?.name || '').toLowerCase());
         break;
       case 'position':
@@ -198,10 +202,65 @@ const EmployeesPage = () => {
       case 'status':
         comparison = a.is_active === b.is_active ? 0 : a.is_active ? -1 : 1;
         break;
+      case 'iban':
+        comparison = (a.iban || '').toLowerCase().localeCompare((b.iban || '').toLowerCase());
+        break;
     }
 
     return sortDirection === 'asc' ? comparison : -comparison;
   });
+
+  const renderRowActions = (employee: Employee) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button variant="ghost" size="icon">
+          <MoreHorizontal className="h-4 w-4" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end">
+        {canEdit && (
+          <DropdownMenuItem onClick={() => navigate(`/admin/colaboradores/${employee.id}`)}>
+            <Edit className="h-4 w-4 mr-2" />
+            Editar
+          </DropdownMenuItem>
+        )}
+        {canNotifications && (
+          <DropdownMenuItem onClick={() => setAvisoDialogEmployee(employee)}>
+            <AlertTriangle className="h-4 w-4 mr-2" />
+            Avisos
+          </DropdownMenuItem>
+        )}
+        {canResetPassword && (
+          <>
+            <DropdownMenuItem onClick={() => setPasswordDialogEmployee(employee)}>
+              <Key className="h-4 w-4 mr-2" />
+              Definir Nova Senha
+            </DropdownMenuItem>
+            <DropdownMenuItem
+              onClick={() => handleResendInvite(employee)}
+              disabled={!!isResending}
+            >
+              {isResending === employee.id ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <RefreshCw className="h-4 w-4 mr-2" />
+              )}
+              Re-enviar Convite
+            </DropdownMenuItem>
+          </>
+        )}
+        {canDelete && (
+          <DropdownMenuItem
+            onClick={() => openDeleteDialog(employee)}
+            className="text-destructive"
+          >
+            <Trash2 className="h-4 w-4 mr-2" />
+            Eliminar
+          </DropdownMenuItem>
+        )}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
 
   return (
     <>
@@ -243,7 +302,11 @@ const EmployeesPage = () => {
                 spellCheck={false}
                 inputMode="search"
                 name="search-employees"
-                placeholder="Pesquisar por nome, email ou empresa..."
+                placeholder={
+                  activeTab === 'financial'
+                    ? 'Pesquisar por nome, IBAN ou empresa...'
+                    : 'Pesquisar por nome, email ou empresa...'
+                }
                 value={searchTerm}
                 onChange={e => setSearchTerm(e.target.value)}
                 className="pl-10"
@@ -252,176 +315,236 @@ const EmployeesPage = () => {
           </CardContent>
         </Card>
 
-        {/* Table */}
-        <Card className="shadow-card">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead
-                    className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort('name')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Nome
-                      <SortIcon field="name" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="hidden md:table-cell h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort('email')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Email
-                      <SortIcon field="email" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort('company')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Empresa
-                      <SortIcon field="company" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="hidden md:table-cell h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort('position')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Cargo
-                      <SortIcon field="position" />
-                    </div>
-                  </TableHead>
-                  <TableHead
-                    className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                    onClick={() => handleSort('status')}
-                  >
-                    <div className="flex items-center gap-1">
-                      Estado
-                      <SortIcon field="status" />
-                    </div>
-                  </TableHead>
-                  <TableHead className="w-[40px] h-8 py-1 px-2"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-4 text-sm">
-                      <div className="flex justify-center items-center">
-                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : sortedEmployees.length === 0 ? (
-                  <TableRow>
-                    <TableCell
-                      colSpan={6}
-                      className="text-center py-4 text-sm text-muted-foreground"
-                    >
-                      Nenhum colaborador encontrado
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  sortedEmployees.map(employee => (
-                    <TableRow
-                      key={employee.id}
-                      className={`h-8 ${canEdit ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                      onClick={() => canEdit && navigate(`/admin/colaboradores/${employee.id}`)}
-                    >
-                      <TableCell className="py-1 px-2">
-                        <span className="font-medium">{employee.name}</span>
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell py-1 px-2 text-sm">
-                        {employee.email}
-                      </TableCell>
-                      <TableCell className="py-1 px-2 text-sm">
-                        {/* @ts-expect-error - Supabase relational data typing */}
-                        {employee.companies?.name}
-                      </TableCell>
-                      <TableCell className="hidden md:table-cell py-1 px-2 text-sm">
-                        {employee.position || '-'}
-                      </TableCell>
-                      <TableCell
-                        className="py-1 px-2"
-                        onClick={e => {
-                          if (canEdit) {
-                            e.stopPropagation();
-                            handleToggleStatus(employee);
-                          }
-                        }}
+        {/* Tabs: Pessoais / Financeiras */}
+        <Tabs
+          value={activeTab}
+          onValueChange={value => setActiveTab(value as 'personal' | 'financial')}
+        >
+          <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-flex">
+            <TabsTrigger value="personal">Informações Pessoais</TabsTrigger>
+            <TabsTrigger value="financial">Informações Financeiras</TabsTrigger>
+          </TabsList>
+
+          {/* Informações Pessoais */}
+          <TabsContent value="personal" className="mt-4">
+            <Card className="shadow-card">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead
+                        className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleSort('name')}
                       >
-                        <Badge
-                          variant={employee.is_active ? 'default' : 'secondary'}
-                          className={`text-xs py-0 ${canEdit ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                        >
-                          {employee.is_active ? 'Ativo' : 'Desativado'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell className="py-1 px-2" onClick={e => e.stopPropagation()}>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {canEdit && (
-                              <DropdownMenuItem
-                                onClick={() => navigate(`/admin/colaboradores/${employee.id}`)}
-                              >
-                                <Edit className="h-4 w-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                            )}
-                            {canNotifications && (
-                              <DropdownMenuItem onClick={() => setAvisoDialogEmployee(employee)}>
-                                <AlertTriangle className="h-4 w-4 mr-2" />
-                                Avisos
-                              </DropdownMenuItem>
-                            )}
-                            {canResetPassword && (
-                              <>
-                                <DropdownMenuItem
-                                  onClick={() => setPasswordDialogEmployee(employee)}
-                                >
-                                  <Key className="h-4 w-4 mr-2" />
-                                  Definir Nova Senha
-                                </DropdownMenuItem>
-                                <DropdownMenuItem
-                                  onClick={() => handleResendInvite(employee)}
-                                  disabled={!!isResending}
-                                >
-                                  {isResending === employee.id ? (
-                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                  ) : (
-                                    <RefreshCw className="h-4 w-4 mr-2" />
-                                  )}
-                                  Re-enviar Convite
-                                </DropdownMenuItem>
-                              </>
-                            )}
-                            {canDelete && (
-                              <DropdownMenuItem
-                                onClick={() => openDeleteDialog(employee)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Eliminar
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+                        <div className="flex items-center gap-1">
+                          Nome
+                          <SortIcon field="name" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="hidden md:table-cell h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleSort('email')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Email
+                          <SortIcon field="email" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleSort('company')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Empresa
+                          <SortIcon field="company" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="hidden md:table-cell h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleSort('position')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Cargo
+                          <SortIcon field="position" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleSort('status')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Estado
+                          <SortIcon field="status" />
+                        </div>
+                      </TableHead>
+                      <TableHead className="w-[40px] h-8 py-1 px-2"></TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={6} className="text-center py-4 text-sm">
+                          <div className="flex justify-center items-center">
+                            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : sortedEmployees.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={6}
+                          className="text-center py-4 text-sm text-muted-foreground"
+                        >
+                          Nenhum colaborador encontrado
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      sortedEmployees.map(employee => (
+                        <TableRow
+                          key={employee.id}
+                          className={`h-8 ${canEdit ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                          onClick={() =>
+                            canEdit && navigate(`/admin/colaboradores/${employee.id}`)
+                          }
+                        >
+                          <TableCell className="py-1 px-2">
+                            <span className="font-medium">{employee.name}</span>
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell py-1 px-2 text-sm">
+                            {employee.email}
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-sm">
+                            {/* @ts-expect-error - Supabase relational data typing */}
+                            {employee.companies?.name}
+                          </TableCell>
+                          <TableCell className="hidden md:table-cell py-1 px-2 text-sm">
+                            {employee.position || '-'}
+                          </TableCell>
+                          <TableCell
+                            className="py-1 px-2"
+                            onClick={e => {
+                              if (canEdit) {
+                                e.stopPropagation();
+                                handleToggleStatus(employee);
+                              }
+                            }}
+                          >
+                            <Badge
+                              variant={employee.is_active ? 'default' : 'secondary'}
+                              className={`text-xs py-0 ${canEdit ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                            >
+                              {employee.is_active ? 'Ativo' : 'Desativado'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="py-1 px-2" onClick={e => e.stopPropagation()}>
+                            {renderRowActions(employee)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Informações Financeiras */}
+          <TabsContent value="financial" className="mt-4">
+            <Card className="shadow-card">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead
+                        className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleSort('name')}
+                      >
+                        <div className="flex items-center gap-1">
+                          Nome
+                          <SortIcon field="name" />
+                        </div>
+                      </TableHead>
+                      <TableHead
+                        className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => handleSort('iban')}
+                      >
+                        <div className="flex items-center gap-1">
+                          IBAN
+                          <SortIcon field="iban" />
+                        </div>
+                      </TableHead>
+                      <TableHead className="h-8 py-1 px-2 text-muted-foreground">
+                        Campo 1
+                      </TableHead>
+                      <TableHead className="h-8 py-1 px-2 text-muted-foreground">
+                        Campo 2
+                      </TableHead>
+                      <TableHead className="h-8 py-1 px-2 text-muted-foreground">
+                        Campo 3
+                      </TableHead>
+                      <TableHead className="h-8 py-1 px-2 text-muted-foreground">
+                        Campo 4
+                      </TableHead>
+                      <TableHead className="w-[40px] h-8 py-1 px-2"></TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={7} className="text-center py-4 text-sm">
+                          <div className="flex justify-center items-center">
+                            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : sortedEmployees.length === 0 ? (
+                      <TableRow>
+                        <TableCell
+                          colSpan={7}
+                          className="text-center py-4 text-sm text-muted-foreground"
+                        >
+                          Nenhum colaborador encontrado
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      sortedEmployees.map(employee => (
+                        <TableRow
+                          key={employee.id}
+                          className={`h-8 ${canEdit ? 'cursor-pointer hover:bg-muted/50' : ''}`}
+                          onClick={() =>
+                            canEdit && navigate(`/admin/colaboradores/${employee.id}`)
+                          }
+                        >
+                          <TableCell className="py-1 px-2">
+                            <span className="font-medium">{employee.name}</span>
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-sm font-mono">
+                            {employee.iban || '-'}
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-sm text-muted-foreground">
+                            -
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-sm text-muted-foreground">
+                            -
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-sm text-muted-foreground">
+                            -
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-sm text-muted-foreground">
+                            -
+                          </TableCell>
+                          <TableCell className="py-1 px-2" onClick={e => e.stopPropagation()}>
+                            {renderRowActions(employee)}
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Employee Aviso Dialog */}
         <EmployeeAvisoDialog

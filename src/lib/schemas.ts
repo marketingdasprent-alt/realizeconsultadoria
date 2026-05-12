@@ -47,7 +47,7 @@ export const updateCompanySchema = createCompanySchema.partial();
 
 // ─── Colaborador ─────────────────────────────────────────────────────────────
 
-export const createEmployeeSchema = z.object({
+const baseEmployeeFields = {
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   email: z.string().min(1, 'Email é obrigatório').email('Email inválido'),
   phone: z.string().optional().nullable(),
@@ -58,11 +58,29 @@ export const createEmployeeSchema = z.object({
   nationality: z.string().optional().nullable(),
   document_number: z.string().optional().nullable(),
   iban: z.string().optional().nullable(),
+  cartao_da: z.string().optional().nullable(),
+  cartao_refeicao: z.string().optional().nullable(),
+  safety_checkup_date: z.date().optional().nullable(),
+  safety_checkup_renewal_months: z.string().optional(),
+  birth_date: z.date().optional().nullable(),
   notes: z.string().optional().nullable(),
   is_active: z.boolean().default(true),
-});
+};
 
-export const updateEmployeeSchema = createEmployeeSchema.partial();
+export const createEmployeeSchema = z
+  .object({
+    ...baseEmployeeFields,
+    password: z.string().min(8, 'Senha deve ter pelo menos 8 caracteres'),
+    confirmPassword: z.string().min(1, 'Confirmação de senha é obrigatória'),
+    vacation_days: z.string().optional(),
+    self_schedulable_days: z.string().optional(),
+  })
+  .refine(data => data.password === data.confirmPassword, {
+    message: 'As senhas não coincidem',
+    path: ['confirmPassword'],
+  });
+
+export const updateEmployeeSchema = z.object(baseEmployeeFields).partial();
 
 // ─── Ausência ─────────────────────────────────────────────────────────────────
 

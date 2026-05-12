@@ -1,6 +1,13 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { encode } from 'https://deno.land/std@0.190.0/encoding/base64.ts';
+
+function encodeBase64(bytes: Uint8Array): string {
+  let binary = '';
+  for (let i = 0; i < bytes.byteLength; i++) {
+    binary += String.fromCharCode(bytes[i]);
+  }
+  return btoa(binary);
+}
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -63,7 +70,7 @@ const handler = async (req: Request): Promise<Response> => {
         }
 
         const arrayBuffer = await fileData.arrayBuffer();
-        const base64Content = encode(new Uint8Array(arrayBuffer));
+        const base64Content = encodeBase64(new Uint8Array(arrayBuffer));
 
         emailAttachments.push({
           content: base64Content,

@@ -190,7 +190,14 @@ export const employeeService = {
         body: employeeData,
       });
 
-      if (error) throw error;
+      if (error) {
+        let errorMessage = error.message;
+        try {
+          const body = await (error as any).context?.json();
+          if (body?.error) errorMessage = body.error;
+        } catch {}
+        throw new Error(errorMessage);
+      }
       return { data, error: null };
     } catch (error) {
       return { data: null, error };
@@ -209,7 +216,14 @@ export const employeeService = {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        let errorMessage = error.message;
+        try {
+          const body = await (error as any).context?.json();
+          if (body?.error) errorMessage = body.error;
+        } catch {}
+        throw new Error(errorMessage);
+      }
       return { data, error: null };
     } catch (error) {
       return { data: null, error };

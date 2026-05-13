@@ -13,6 +13,9 @@ import {
   MessageSquare,
   Trash2,
   FolderOpen,
+  Key,
+  ChevronDown,
+  User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -59,6 +62,14 @@ import PWAInstallBanner from '@/components/PWAInstallBanner';
 import DocumentUploader from '@/components/employee/DocumentUploader';
 import AbsenceDocumentsDialog from '@/components/admin/AbsenceDocumentsDialog';
 import AddDocumentsDialog from '@/components/employee/AddDocumentsDialog';
+import ChangePasswordDialog from '@/components/employee/ChangePasswordDialog';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 
 interface SelectedFile {
   file: File;
@@ -140,6 +151,8 @@ const EmployeeDashboard = () => {
   const [absenceIdForUpload, setAbsenceIdForUpload] = useState<string | null>(null);
   const [ticketCount, setTicketCount] = useState(0);
   const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false);
+  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [employeeEmail, setEmployeeEmail] = useState('');
 
   const currentYear = new Date().getFullYear();
 
@@ -152,6 +165,8 @@ const EmployeeDashboard = () => {
       navigate('/colaborador/login');
       return;
     }
+
+    setEmployeeEmail(session.user.email ?? '');
 
     // Get employee data
     const { data: employeeData } = await supabase
@@ -562,15 +577,37 @@ const EmployeeDashboard = () => {
             </div>
           </div>
 
-          {/* Desktop: User info | Mobile: Just logout */}
+          {/* Desktop: User info | Mobile: Dropdown menu */}
           <div className="flex items-center gap-3 lg:gap-4">
             <div className="text-right hidden lg:block">
               <p className="font-medium">{employee.name}</p>
               <p className="text-sm text-muted-foreground">{employee.companies?.name}</p>
             </div>
-            <Button variant="ghost" size="icon" onClick={handleLogout}>
-              <LogOut className="h-5 w-5" />
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="flex items-center gap-1 px-2">
+                  <User className="h-5 w-5" />
+                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48">
+                <DropdownMenuItem
+                  onClick={() => setIsChangePasswordOpen(true)}
+                  className="cursor-pointer"
+                >
+                  <Key className="h-4 w-4 mr-2" />
+                  Alterar Palavra-passe
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem
+                  onClick={handleLogout}
+                  className=" cursor-pointer text-destructive focus:text-destructive"
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sair
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </header>
@@ -1008,6 +1045,12 @@ const EmployeeDashboard = () => {
         employeeEmail={employee.email}
         companyName={employee.companies?.name || ''}
         onSuccess={loadEmployeeData}
+      />
+
+      <ChangePasswordDialog
+        open={isChangePasswordOpen}
+        onOpenChange={setIsChangePasswordOpen}
+        employeeEmail={employeeEmail}
       />
     </div>
   );

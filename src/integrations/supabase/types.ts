@@ -761,6 +761,7 @@ export type Database = {
       };
       employees: {
         Row: {
+          birth_date: string | null;
           cartao_da: string | null;
           cartao_refeicao: string | null;
           company_id: string;
@@ -783,6 +784,7 @@ export type Database = {
           user_id: string | null;
         };
         Insert: {
+          birth_date?: string | null;
           cartao_da?: string | null;
           cartao_refeicao?: string | null;
           company_id: string;
@@ -805,6 +807,7 @@ export type Database = {
           user_id?: string | null;
         };
         Update: {
+          birth_date?: string | null;
           cartao_da?: string | null;
           cartao_refeicao?: string | null;
           company_id?: string;
@@ -955,6 +958,30 @@ export type Database = {
         Relationships: [];
       };
       notification_emails_absences: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          email: string;
+          id: string;
+          is_active: boolean;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          email: string;
+          id?: string;
+          is_active?: boolean;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          email?: string;
+          id?: string;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
+      notification_emails_birthdays: {
         Row: {
           created_at: string;
           created_by: string | null;

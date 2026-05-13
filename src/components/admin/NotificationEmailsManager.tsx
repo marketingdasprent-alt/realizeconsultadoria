@@ -7,7 +7,7 @@ import { Switch } from '@/components/ui/switch';
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
-import { Mail, Plus, Trash2, ChevronDown, Building2 } from 'lucide-react';
+import { Mail, Plus, Trash2, ChevronDown, Building2, Cake } from 'lucide-react';
 
 interface EmailEntry {
   id: string;
@@ -27,9 +27,11 @@ interface DepartmentEmails {
 export function NotificationEmailsManager() {
   const [isLoading, setIsLoading] = useState(true);
   const [absenceEmails, setAbsenceEmails] = useState<EmailEntry[]>([]);
+  const [birthdayEmails, setBirthdayEmails] = useState<EmailEntry[]>([]);
   const [departments, setDepartments] = useState<SupportDepartment[]>([]);
   const [supportEmails, setSupportEmails] = useState<DepartmentEmails>({});
   const [newAbsenceEmail, setNewAbsenceEmail] = useState('');
+  const [newBirthdayEmail, setNewBirthdayEmail] = useState('');
   const [newSupportEmails, setNewSupportEmails] = useState<{ [deptId: string]: string }>({});
   const [openDepartments, setOpenDepartments] = useState<string[]>([]);
 
@@ -48,6 +50,15 @@ export function NotificationEmailsManager() {
 
       if (absenceError) throw absenceError;
       setAbsenceEmails(absenceData || []);
+
+      // Fetch birthday notification emails
+      const { data: birthdayData, error: birthdayError } = await supabase
+        .from('notification_emails_birthdays')
+        .select('id, email, is_active')
+        .order('created_at');
+
+      if (birthdayError) throw birthdayError;
+      setBirthdayEmails(birthdayData || []);
 
       // Fetch departments
       const { data: deptData, error: deptError } = await supabase
@@ -150,6 +161,69 @@ export function NotificationEmailsManager() {
       toast.success('Email removido');
     } catch (error: any) {
       console.error('Error deleting absence email:', error);
+      toast.error('Erro ao remover email');
+    }
+  };
+
+  // Birthday email handlers
+  const handleAddBirthdayEmail = async () => {
+    const email = newBirthdayEmail.trim().toLowerCase();
+    if (!email) return;
+
+    if (!validateEmail(email)) {
+      toast.error('Email inválido');
+      return;
+    }
+
+    if (birthdayEmails.some(e => e.email.toLowerCase() === email)) {
+      toast.error('Este email já está configurado');
+      return;
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('notification_emails_birthdays')
+        .insert({ email })
+        .select()
+        .single();
+
+      if (error) throw error;
+
+      setBirthdayEmails([...birthdayEmails, data]);
+      setNewBirthdayEmail('');
+      toast.success('Email adicionado com sucesso');
+    } catch (error: any) {
+      console.error('Error adding birthday email:', error);
+      toast.error('Erro ao adicionar email');
+    }
+  };
+
+  const handleToggleBirthdayEmail = async (id: string, isActive: boolean) => {
+    try {
+      const { error } = await supabase
+        .from('notification_emails_birthdays')
+        .update({ is_active: isActive })
+        .eq('id', id);
+
+      if (error) throw error;
+
+      setBirthdayEmails(birthdayEmails.map(e => (e.id === id ? { ...e, is_active: isActive } : e)));
+    } catch (error: any) {
+      console.error('Error toggling birthday email:', error);
+      toast.error('Erro ao atualizar email');
+    }
+  };
+
+  const handleDeleteBirthdayEmail = async (id: string) => {
+    try {
+      const { error } = await supabase.from('notification_emails_birthdays').delete().eq('id', id);
+
+      if (error) throw error;
+
+      setBirthdayEmails(birthdayEmails.filter(e => e.id !== id));
+      toast.success('Email removido');
+    } catch (error: any) {
+      console.error('Error deleting birthday email:', error);
       toast.error('Erro ao remover email');
     }
   };
@@ -303,6 +377,67 @@ export function NotificationEmailsManager() {
               onKeyDown={e => e.key === 'Enter' && handleAddAbsenceEmail()}
             />
             <Button onClick={handleAddAbsenceEmail} disabled={!newAbsenceEmail.trim()}>
+              <Plus className="h-4 w-4 mr-1" />
+              Adicionar
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Birthday Notifications */}
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2 text-lg">
+            <Cake className="h-5 w-5" />
+            Notificações de Aniversários
+          </CardTitle>
+          <CardDescription>
+            Emails que receberão notificações diárias às 08:00 quando algum colaborador faz anos
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          {birthdayEmails.length === 0 ? (
+            <p className="text-sm text-muted-foreground">Nenhum email configurado</p>
+          ) : (
+            <div className="space-y-2">
+              {birthdayEmails.map(entry => (
+                <div
+                  key={entry.id}
+                  className="flex items-center justify-between gap-4 rounded-lg border p-3"
+                >
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-4 w-4 text-muted-foreground" />
+                    <span className={entry.is_active ? '' : 'text-muted-foreground line-through'}>
+                      {entry.email}
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={entry.is_active}
+                      onCheckedChange={checked => handleToggleBirthdayEmail(entry.id, checked)}
+                    />
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      onClick={() => handleDeleteBirthdayEmail(entry.id)}
+                    >
+                      <Trash2 className="h-4 w-4 text-destructive" />
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <div className="flex gap-2">
+            <Input
+              placeholder="Adicionar email..."
+              type="email"
+              value={newBirthdayEmail}
+              onChange={e => setNewBirthdayEmail(e.target.value)}
+              onKeyDown={e => e.key === 'Enter' && handleAddBirthdayEmail()}
+            />
+            <Button onClick={handleAddBirthdayEmail} disabled={!newBirthdayEmail.trim()}>
               <Plus className="h-4 w-4 mr-1" />
               Adicionar
             </Button>

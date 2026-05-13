@@ -1031,6 +1031,30 @@ export type Database = {
         };
         Relationships: [];
       };
+      notification_emails_birthdays: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          email: string;
+          id: string;
+          is_active: boolean;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          email: string;
+          id?: string;
+          is_active?: boolean;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          email?: string;
+          id?: string;
+          is_active?: boolean;
+        };
+        Relationships: [];
+      };
       notification_emails_support: {
         Row: {
           created_at: string;

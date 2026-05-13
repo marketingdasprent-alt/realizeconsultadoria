@@ -1,5 +1,7 @@
 project_id = "jvvnsoasylusbmxfotci"
 
+[functions.send-birthday-reminders]
+
 [functions.delete-employee]
 verify_jwt = false
 

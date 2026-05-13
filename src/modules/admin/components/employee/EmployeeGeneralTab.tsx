@@ -386,7 +386,7 @@ const EmployeeGeneralTab = ({
                           selected={field.value}
                           onSelect={field.onChange}
                           locale={pt}
-                          captionLayout="dropdown-buttons"
+                          captionLayout="dropdown"
                           fromYear={1940}
                           toYear={new Date().getFullYear()}
                           initialFocus

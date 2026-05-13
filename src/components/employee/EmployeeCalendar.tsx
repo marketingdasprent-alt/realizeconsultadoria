@@ -148,31 +148,29 @@ const EmployeeCalendar = ({ absences, holidays }: EmployeeCalendarProps) => {
   };
 
   return (
-    <Card className="shadow-card">
-      <CardHeader className="pb-2 px-3 lg:px-6">
+    <Card className="shadow-card overflow-hidden">
+      <CardHeader className="pb-3 px-4 lg:px-6">
+        <CardTitle className="font-display text-lg lg:text-xl mb-2">Meu Calendário</CardTitle>
         <div className="flex items-center justify-between">
-          <CardTitle className="font-display text-lg lg:text-xl">Meu Calendário</CardTitle>
-          <div className="flex items-center gap-1 lg:gap-2">
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 lg:h-10 lg:w-10"
-              onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
-            >
-              <ChevronLeft className="h-4 w-4 lg:h-5 lg:w-5" />
-            </Button>
-            <span className="font-medium text-sm lg:text-base min-w-[100px] lg:min-w-[140px] text-center capitalize">
-              {format(currentMonth, 'MMM yyyy', { locale: pt })}
-            </span>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 lg:h-10 lg:w-10"
-              onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
-            >
-              <ChevronRight className="h-4 w-4 lg:h-5 lg:w-5" />
-            </Button>
-          </div>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 rounded-full"
+            onClick={() => setCurrentMonth(subMonths(currentMonth, 1))}
+          >
+            <ChevronLeft className="h-4 w-4" />
+          </Button>
+          <span className="font-semibold text-sm lg:text-base capitalize">
+            {format(currentMonth, 'MMMM yyyy', { locale: pt })}
+          </span>
+          <Button
+            variant="outline"
+            size="icon"
+            className="h-8 w-8 rounded-full"
+            onClick={() => setCurrentMonth(addMonths(currentMonth, 1))}
+          >
+            <ChevronRight className="h-4 w-4" />
+          </Button>
         </div>
       </CardHeader>
       <CardContent className="px-2 lg:px-6 pb-4">

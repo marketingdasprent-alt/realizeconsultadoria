@@ -11,18 +11,24 @@ type EmployeeUpdate = Database['public']['Tables']['employees']['Update'];
 
 export const employeeService = {
   /**
-   * Obter colaboradores com paginação e nome da empresa
+   * Obter colaboradores e nome da empresa.
+   * Sem `page` definido, devolve todos os registos (sem paginação) — usado
+   * pela vista admin que mostra a tabela completa.
    */
-  getAll: async (page = 1, pageSize = PAGE_SIZES.DEFAULT) => {
+  getAll: async (page?: number, pageSize: number = PAGE_SIZES.DEFAULT) => {
     try {
-      const from = (page - 1) * pageSize;
-      const to = from + pageSize - 1;
-
-      const { data, error, count } = await supabase
+      let query = supabase
         .from('employees')
         .select('*, companies(id, name)', { count: 'exact' })
-        .order('name')
-        .range(from, to);
+        .order('name');
+
+      if (page !== undefined) {
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize - 1;
+        query = query.range(from, to);
+      }
+
+      const { data, error, count } = await query;
 
       if (error) throw error;
       return { data, error: null, count };
@@ -120,12 +126,26 @@ export const employeeService = {
   },
 
   /**
-   * Eliminar colaborador
+   * Soft delete: desativa colaborador e bloqueia login (via Edge Function)
    */
   delete: async (id: string) => {
     try {
-      const { error } = await supabase.from('employees').delete().eq('id', id);
-      if (error) throw error;
+      const { data, error } = await supabase.functions.invoke('delete-employee', {
+        body: { employee_id: id },
+      });
+
+      if (error) {
+        let errorMessage = error.message;
+        try {
+          const body = await (error as any).context?.json();
+          if (body?.error) errorMessage = body.error;
+        } catch {
+          /* response body is not JSON — use original message */
+        }
+        throw new Error(errorMessage);
+      }
+
+      if (data?.error) throw new Error(data.error);
       return { success: true, error: null };
     } catch (error) {
       return { success: false, error };
@@ -184,7 +204,16 @@ export const employeeService = {
         body: employeeData,
       });
 
-      if (error) throw error;
+      if (error) {
+        let errorMessage = error.message;
+        try {
+          const body = await (error as any).context?.json();
+          if (body?.error) errorMessage = body.error;
+        } catch {
+          /* response body is not JSON — use original message */
+        }
+        throw new Error(errorMessage);
+      }
       return { data, error: null };
     } catch (error) {
       return { data: null, error };
@@ -203,7 +232,16 @@ export const employeeService = {
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        let errorMessage = error.message;
+        try {
+          const body = await (error as any).context?.json();
+          if (body?.error) errorMessage = body.error;
+        } catch {
+          /* response body is not JSON — use original message */
+        }
+        throw new Error(errorMessage);
+      }
       return { data, error: null };
     } catch (error) {
       return { data: null, error };

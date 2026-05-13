@@ -718,6 +718,56 @@ export type Database = {
           },
         ];
       };
+      employee_monthly_finances: {
+        Row: {
+          created_at: string;
+          employee_id: string;
+          id: string;
+          month: number;
+          notes: string | null;
+          updated_at: string;
+          valor_cartao_da: number;
+          valor_descontado: number;
+          valor_recebido: number;
+          valor_subsidio_alimentacao: number;
+          year: number;
+        };
+        Insert: {
+          created_at?: string;
+          employee_id: string;
+          id?: string;
+          month: number;
+          notes?: string | null;
+          updated_at?: string;
+          valor_cartao_da?: number;
+          valor_descontado?: number;
+          valor_recebido?: number;
+          valor_subsidio_alimentacao?: number;
+          year: number;
+        };
+        Update: {
+          created_at?: string;
+          employee_id?: string;
+          id?: string;
+          month?: number;
+          notes?: string | null;
+          updated_at?: string;
+          valor_cartao_da?: number;
+          valor_descontado?: number;
+          valor_recebido?: number;
+          valor_subsidio_alimentacao?: number;
+          year?: number;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'employee_monthly_finances_employee_id_fkey';
+            columns: ['employee_id'];
+            isOneToOne: false;
+            referencedRelation: 'employees';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       employee_vacation_balances: {
         Row: {
           created_at: string;

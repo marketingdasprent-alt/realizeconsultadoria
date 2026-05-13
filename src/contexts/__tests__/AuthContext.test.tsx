@@ -294,7 +294,7 @@ describe('AuthContext', () => {
     });
 
     vi.mocked(authService.login).mockResolvedValue({
-      data: mockSession,
+      data: { session: mockSession, user: mockSession.user },
       error: null,
     } as any);
 

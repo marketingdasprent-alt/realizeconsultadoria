@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { encode } from 'https://deno.land/std@0.190.0/encoding/base64.ts';
+
+const BATCH_SIZE = 10;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -48,33 +49,21 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Process attachments
-    const emailAttachments: any[] = [];
+    // Generate signed URLs for attachments — avoids loading file bytes into memory
+    const emailAttachments: { url: string; name: string }[] = [];
     if (payload.attachments && payload.attachments.length > 0) {
-      console.log(`Processando ${payload.attachments.length} anexos...`);
+      console.log(`Gerando URLs para ${payload.attachments.length} anexos...`);
       for (const att of payload.attachments) {
-        const { data: fileData, error: fileError } = await supabaseAdmin.storage
+        const { data: signedData, error: signedError } = await supabaseAdmin.storage
           .from('marketing-emails')
-          .download(att.path);
+          .createSignedUrl(att.path, 3600); // valid for 1 hour
 
-        if (fileError) {
-          console.error(`Erro ao fazer download do anexo ${att.path}:`, fileError);
+        if (signedError || !signedData?.signedUrl) {
+          console.error(`Erro ao gerar URL para ${att.path}:`, signedError);
           continue;
         }
 
-        const arrayBuffer = await fileData.arrayBuffer();
-        const base64Content = encode(new Uint8Array(arrayBuffer));
-
-        emailAttachments.push({
-          content: base64Content,
-          name: att.name,
-        });
-
-        // Remove file from bucket after downloading to clean up space
-        // We can optionally keep them if the user wants them stored, but the instructions
-        // imply they are temporary and only kept for the history metadata (not the file itself).
-        // Since we save the path in metadata, if we delete them, they can't be downloaded from history.
-        // Let's NOT delete them so they can be viewed in history later if needed.
+        emailAttachments.push({ url: signedData.signedUrl, name: att.name });
       }
     }
 
@@ -96,7 +85,7 @@ const handler = async (req: Request): Promise<Response> => {
           <tr>
             <td style="padding: 40px 30px;">
               <div style="color: #333333; font-size: 16px; line-height: 1.6; white-space: pre-wrap;">${payload.message}</div>
-              
+
               <div style="margin-top: 40px; border-top: 1px solid #eeeeee; padding-top: 20px;">
                 <p style="margin: 0; color: #666666; font-size: 14px;">Com os melhores cumprimentos,</p>
                 <p style="margin: 5px 0 0 0; font-weight: bold; color: #333333;">${payload.senderName}</p>
@@ -117,54 +106,53 @@ const handler = async (req: Request): Promise<Response> => {
       </html>
     `;
 
-    // To send to multiple people keeping privacy, usually we use BCC, but Brevo has limits.
-    // We can just send individual emails or use the 'bcc' field if sending one email.
-    // Given the requirement is an internal communication, we can send one email with all as BCC, or iterate.
-    // Brevo `to` can take multiple, but they see each other. Let's send individually to avoid exposing personal emails.
-    // Wait, the prompt says "Comunicação Interna". If we send to all, `to` is fine, or we can use `bcc`.
-    // Let's send individual emails to avoid exposing personal emails to everyone.
-
     let successCount = 0;
 
-    // Send emails
-    const emailPromises = payload.recipients.map(email => {
-      const emailPayload: any = {
-        sender: {
-          name: payload.senderName || 'Marketing Dasprent',
-          email: 'marketing@dasprent.pt',
-        },
-        to: [{ email }],
-        subject: payload.subject,
-        htmlContent: emailHtml,
-      };
+    // Send in batches to avoid memory pressure from many parallel requests
+    for (let i = 0; i < payload.recipients.length; i += BATCH_SIZE) {
+      const batch = payload.recipients.slice(i, i + BATCH_SIZE);
 
-      if (emailAttachments.length > 0) {
-        emailPayload.attachment = emailAttachments;
-      }
+      const batchPromises = batch.map(email => {
+        const emailPayload: Record<string, unknown> = {
+          sender: {
+            name: payload.senderName || 'Marketing Dasprent',
+            email: 'marketing@dasprent.pt',
+          },
+          to: [{ email }],
+          subject: payload.subject,
+          htmlContent: emailHtml,
+        };
 
-      return fetch('https://api.brevo.com/v3/smtp/email', {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'api-key': brevoApiKey,
-        },
-        body: JSON.stringify(emailPayload),
+        if (emailAttachments.length > 0) {
+          emailPayload.attachment = emailAttachments;
+        }
+
+        return fetch('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            'api-key': brevoApiKey,
+          },
+          body: JSON.stringify(emailPayload),
+        });
       });
-    });
 
-    const results = await Promise.allSettled(emailPromises);
-    successCount = results.filter(r => r.status === 'fulfilled' && (r.value as Response).ok).length;
-    const failCount = results.length - successCount;
+      const results = await Promise.allSettled(batchPromises);
+      successCount += results.filter(
+        r => r.status === 'fulfilled' && (r.value as Response).ok
+      ).length;
 
-    if (failCount > 0) {
-      console.warn(`Envio de email: ${successCount} com sucesso, ${failCount} falharam`);
-      // Print first error if available
       const firstError = results.find(r => r.status === 'fulfilled' && !(r.value as Response).ok);
       if (firstError && firstError.status === 'fulfilled') {
         const errorText = await (firstError.value as Response).text();
         console.error('Exemplo de erro Brevo:', errorText);
       }
+    }
+
+    const failCount = payload.recipients.length - successCount;
+    if (failCount > 0) {
+      console.warn(`Envio de email: ${successCount} com sucesso, ${failCount} falharam`);
     }
 
     console.log(`Emails enviados com sucesso para ${successCount} destinatários`);

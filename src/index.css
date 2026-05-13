@@ -265,4 +265,25 @@
   .print-table td {
     border: 1px solid hsl(0, 0%, 85%);
   }
+
+  /* Section-only print: when body has .financial-printing, only the
+     .financial-print-section subtree is rendered to paper. Uses
+     visibility (not display) so descendants stay visible even though
+     ancestors are hidden — sidesteps deep DOM nesting. */
+  body.financial-printing,
+  body.financial-printing * {
+    visibility: hidden;
+  }
+
+  body.financial-printing .financial-print-section,
+  body.financial-printing .financial-print-section * {
+    visibility: visible;
+  }
+
+  body.financial-printing .financial-print-section {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+  }
 }

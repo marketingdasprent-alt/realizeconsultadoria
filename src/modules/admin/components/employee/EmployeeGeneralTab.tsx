@@ -226,7 +226,10 @@ const EmployeeGeneralTab = ({
 
         toast({
           title: 'Colaborador criado com sucesso!',
-          description: 'Email com credenciais enviado automaticamente.',
+          description: createData?.emailSent
+            ? `Email com credenciais enviado para ${data.email}.`
+            : 'Colaborador criado, mas o email de boas-vindas não foi enviado.',
+          variant: createData?.emailSent ? 'default' : 'destructive',
         });
         if (createData?.employeeId) onCreated(createData.employeeId);
         else navigate('/admin/colaboradores');

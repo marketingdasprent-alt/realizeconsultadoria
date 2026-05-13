@@ -1,64 +1,28 @@
-import { useState, useEffect } from 'react';
+import { useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { supabase } from '@/integrations/supabase/client';
 import { motion } from 'framer-motion';
 import { Rocket, Sparkles, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import ComingSoonHeader from '@/components/layout/ComingSoonHeader';
 import Footer from '@/components/layout/Footer';
+import { useAuth } from '@/contexts/AuthContext';
 
 const ComingSoonPage = () => {
   const navigate = useNavigate();
-  const [isRedirecting, setIsRedirecting] = useState(true);
+  const { isLoading, isAuthenticated, role } = useAuth();
 
   useEffect(() => {
-    const checkAuthAndRedirect = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    if (isLoading) return;
+    if (!isAuthenticated || !role) return;
 
-      if (session) {
-        let preference = localStorage.getItem('auth_preference');
+    if (role === 'admin') {
+      navigate('/admin', { replace: true });
+    } else if (role === 'employee' || role === 'company_admin') {
+      navigate('/colaborador', { replace: true });
+    }
+  }, [isLoading, isAuthenticated, role, navigate]);
 
-        // Always verify admin role to prevent incorrect redirection even if a preference exists
-        const { data: hasAdminRole } = await supabase.rpc('has_role', {
-          _user_id: session.user.id,
-          _role: 'admin',
-        });
-
-        if (hasAdminRole) {
-          preference = 'admin';
-          localStorage.setItem('auth_preference', 'admin');
-        } else if (!preference) {
-          // If not admin and no preference, check if it's an employee
-          const { data: employee } = await supabase
-            .from('employees')
-            .select('id')
-            .eq('user_id', session.user.id)
-            .maybeSingle();
-
-          if (employee) {
-            preference = 'employee';
-            localStorage.setItem('auth_preference', 'employee');
-          }
-        }
-
-        if (preference === 'admin') {
-          navigate('/admin');
-          return;
-        } else if (preference === 'employee') {
-          navigate('/colaborador');
-          return;
-        }
-      }
-
-      setIsRedirecting(false);
-    };
-
-    checkAuthAndRedirect();
-  }, [navigate]);
-
-  if (isRedirecting) {
+  if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background">
         <div className="text-center">

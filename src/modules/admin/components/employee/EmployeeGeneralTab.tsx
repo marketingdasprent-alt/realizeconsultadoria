@@ -389,7 +389,16 @@ const EmployeeGeneralTab = ({
                           captionLayout="dropdown"
                           fromYear={1940}
                           toYear={new Date().getFullYear()}
-                          classNames={{ caption_label: 'hidden' }}
+                          labels={{
+                            labelMonthDropdown: () => '',
+                            labelYearDropdown: () => '',
+                          }}
+                          classNames={{
+                            caption_label: 'hidden',
+                            caption_dropdowns: 'flex items-center gap-1',
+                            dropdown:
+                              'text-sm font-medium bg-transparent border-0 cursor-pointer focus:outline-none capitalize',
+                          }}
                           initialFocus
                         />
                       </PopoverContent>

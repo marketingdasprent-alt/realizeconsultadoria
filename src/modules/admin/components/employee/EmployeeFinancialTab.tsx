@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download, Info, Loader2 } from 'lucide-react';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   PieChart,
   Pie,
@@ -32,6 +33,7 @@ import { useIsRhMember } from '@/hooks/useIsRhMember';
 import { useEmployeeMonthlyFinances } from '@/modules/admin/hooks/useEmployeeMonthlyFinances';
 import type { FinanceFields } from '@/modules/admin/services/employeeFinanceService';
 import type { Employee } from '@/modules/admin/services/employeeService';
+import DiscountItemsPopover from './DiscountItemsPopover';
 
 const MONTH_LABELS = [
   'Janeiro',
@@ -117,7 +119,7 @@ const EditableCell = ({ value, canEdit, onCommit, ariaLabel }: EditableCellProps
         }
       }}
       onClick={e => e.stopPropagation()}
-      className="h-7 w-28 text-sm"
+      className="h-7 w-20 ml-auto text-sm text-right [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
       aria-label={ariaLabel}
     />
   );
@@ -141,6 +143,8 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
     finances: currentFinances,
     isLoading: isLoadingFinances,
     updateField,
+    addDiscountItem,
+    removeDiscountItem,
   } = useEmployeeMonthlyFinances(year, month);
 
   const getFinance = (employeeId: string): FinanceFields =>
@@ -149,9 +153,14 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
       valor_subsidio_alimentacao: 0,
       valor_cartao_da: 0,
       valor_descontado: 0,
+      discount_items: [],
     };
 
-  const updateFinance = async (employeeId: string, field: keyof FinanceFields, value: number) => {
+  const updateFinance = async (
+    employeeId: string,
+    field: 'valor_recebido' | 'valor_subsidio_alimentacao' | 'valor_cartao_da',
+    value: number
+  ) => {
     if (!canEditFinancial) return;
     const result = await updateField(employeeId, field, value);
     if (!result.success) {
@@ -178,14 +187,22 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
     let recebido = 0;
     let subsidio = 0;
     let cartao = 0;
+    let descontado = 0;
     filtered.forEach(e => {
       const f = currentFinances[e.id];
       if (!f) return;
       recebido += f.valor_recebido || 0;
       subsidio += f.valor_subsidio_alimentacao || 0;
       cartao += f.valor_cartao_da || 0;
+      descontado += f.valor_descontado || 0;
     });
-    return { recebido, subsidio, cartao, total: recebido + subsidio + cartao };
+    return {
+      recebido,
+      subsidio,
+      cartao,
+      descontado,
+      total: recebido + subsidio + cartao,
+    };
   }, [filtered, currentFinances]);
 
   const chartData = useMemo(
@@ -290,11 +307,30 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
                 <TableRow>
                   <TableHead className="h-8 py-1 px-2">Nome</TableHead>
                   <TableHead className="h-8 py-1 px-2">IBAN</TableHead>
-                  <TableHead className="h-8 py-1 px-2 text-right">Valor Recebido</TableHead>
+                  <TableHead className="h-8 py-1 px-2 text-right">Valor Recibo</TableHead>
                   <TableHead className="h-8 py-1 px-2 text-right">Sub. Alimentação</TableHead>
-                  <TableHead className="h-8 py-1 px-2 text-right">Valor Transferido</TableHead>
                   <TableHead className="h-8 py-1 px-2 text-right">Cartão DÁ</TableHead>
-                  <TableHead className="h-8 py-1 px-2 text-right">Valor Descontado</TableHead>
+                  <TableHead className="h-8 py-1 px-2 text-right">Total</TableHead>
+                  <TableHead className="h-8 py-1 px-2 text-right text-muted-foreground">
+                    <TooltipProvider delayDuration={200}>
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span className="inline-flex items-center justify-end gap-1 cursor-help">
+                            Valor Descontado
+                            <Info className="h-3 w-3" />
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent
+                          side="bottom"
+                          align="end"
+                          sideOffset={6}
+                          className="text-xs max-w-[220px] z-50"
+                        >
+                          Coluna informativa — não entra no cálculo do Total
+                        </TooltipContent>
+                      </Tooltip>
+                    </TooltipProvider>
+                  </TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -316,58 +352,86 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
                     </TableCell>
                   </TableRow>
                 ) : (
-                  filtered.map(employee => {
-                    const f = getFinance(employee.id);
-                    const transferido =
-                      (f.valor_recebido || 0) - (f.valor_subsidio_alimentacao || 0);
-                    return (
-                      <TableRow key={employee.id} className="h-8">
-                        <TableCell className="py-1 px-2">
-                          <span className="font-medium">{employee.name}</span>
-                        </TableCell>
-                        <TableCell className="py-1 px-2 text-sm font-mono">
-                          {employee.iban || '-'}
-                        </TableCell>
-                        <TableCell className="py-1 px-2 text-right">
-                          <EditableCell
-                            value={f.valor_recebido}
-                            canEdit={canEditFinancial}
-                            onCommit={v => updateFinance(employee.id, 'valor_recebido', v)}
-                            ariaLabel={`Valor recebido de ${employee.name}`}
-                          />
-                        </TableCell>
-                        <TableCell className="py-1 px-2 text-right">
-                          <EditableCell
-                            value={f.valor_subsidio_alimentacao}
-                            canEdit={canEditFinancial}
-                            onCommit={v =>
-                              updateFinance(employee.id, 'valor_subsidio_alimentacao', v)
-                            }
-                            ariaLabel={`Subsídio de alimentação de ${employee.name}`}
-                          />
-                        </TableCell>
-                        <TableCell className="py-1 px-2 text-right text-sm text-muted-foreground">
-                          {formatCurrency(transferido)}
-                        </TableCell>
-                        <TableCell className="py-1 px-2 text-right">
-                          <EditableCell
-                            value={f.valor_cartao_da}
-                            canEdit={canEditFinancial}
-                            onCommit={v => updateFinance(employee.id, 'valor_cartao_da', v)}
-                            ariaLabel={`Cartão DÁ de ${employee.name}`}
-                          />
-                        </TableCell>
-                        <TableCell className="py-1 px-2 text-right">
-                          <EditableCell
-                            value={f.valor_descontado}
-                            canEdit={canEditFinancial}
-                            onCommit={v => updateFinance(employee.id, 'valor_descontado', v)}
-                            ariaLabel={`Valor descontado de ${employee.name}`}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    );
-                  })
+                  <>
+                    {filtered.map(employee => {
+                      const f = getFinance(employee.id);
+                      const totalRow =
+                        (f.valor_recebido || 0) +
+                        (f.valor_subsidio_alimentacao || 0) +
+                        (f.valor_cartao_da || 0);
+                      return (
+                        <TableRow key={employee.id} className="h-8">
+                          <TableCell className="py-1 px-2">
+                            <span className="font-medium">{employee.name}</span>
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-sm font-mono">
+                            {employee.iban || '-'}
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-right">
+                            <EditableCell
+                              value={f.valor_recebido}
+                              canEdit={canEditFinancial}
+                              onCommit={v => updateFinance(employee.id, 'valor_recebido', v)}
+                              ariaLabel={`Valor recibo de ${employee.name}`}
+                            />
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-right">
+                            <EditableCell
+                              value={f.valor_subsidio_alimentacao}
+                              canEdit={canEditFinancial}
+                              onCommit={v =>
+                                updateFinance(employee.id, 'valor_subsidio_alimentacao', v)
+                              }
+                              ariaLabel={`Subsídio de alimentação de ${employee.name}`}
+                            />
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-right">
+                            <EditableCell
+                              value={f.valor_cartao_da}
+                              canEdit={canEditFinancial}
+                              onCommit={v => updateFinance(employee.id, 'valor_cartao_da', v)}
+                              ariaLabel={`Cartão DÁ de ${employee.name}`}
+                            />
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-right font-semibold text-sm">
+                            {formatCurrency(totalRow)}
+                          </TableCell>
+                          <TableCell className="py-1 px-2 text-right">
+                            <DiscountItemsPopover
+                              employeeId={employee.id}
+                              employeeName={employee.name}
+                              total={f.valor_descontado || 0}
+                              items={f.discount_items}
+                              canEdit={canEditFinancial}
+                              onAdd={payload => addDiscountItem(employee.id, payload)}
+                              onRemove={id => removeDiscountItem(employee.id, id)}
+                            />
+                          </TableCell>
+                        </TableRow>
+                      );
+                    })}
+                    <TableRow className="bg-muted/60 font-semibold border-t-2 hover:bg-muted/60">
+                      <TableCell className="py-2 px-2 font-bold uppercase text-xs tracking-wide">
+                        Total
+                      </TableCell>
+                      <TableCell className="py-2 px-2" />
+                      <TableCell className="py-2 px-2 text-right font-semibold">
+                        {formatCurrency(totals.recebido)}
+                      </TableCell>
+                      <TableCell className="py-2 px-2 text-right font-semibold">
+                        {formatCurrency(totals.subsidio)}
+                      </TableCell>
+                      <TableCell className="py-2 px-2 text-right font-semibold">
+                        {formatCurrency(totals.cartao)}
+                      </TableCell>
+                      <TableCell className="py-2 px-2 text-right font-bold">
+                        {formatCurrency(totals.total)}
+                      </TableCell>
+                      <TableCell className="py-2 px-2 text-right font-semibold text-muted-foreground">
+                        {formatCurrency(totals.descontado)}
+                      </TableCell>
+                    </TableRow>
+                  </>
                 )}
               </TableBody>
             </Table>
@@ -389,14 +453,22 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
                       cx="50%"
                       cy="50%"
                       outerRadius="80%"
-                      label={({ name, percent }) => `${name}: ${(percent! * 100).toFixed(1)}%`}
+                      label={({ value, percent }) =>
+                        `${formatCurrency(value as number)} (${((percent ?? 0) * 100).toFixed(1)}%)`
+                      }
                     >
                       {chartData.map(entry => (
                         <Cell key={entry.name} fill={entry.color} />
                       ))}
                     </Pie>
                     <RechartsTooltip formatter={(value: number) => formatCurrency(value)} />
-                    <Legend />
+                    <Legend
+                      formatter={(value, entry) => {
+                        const payloadValue = (entry?.payload as { value?: number } | undefined)
+                          ?.value;
+                        return `${value}: ${formatCurrency(payloadValue ?? 0)}`;
+                      }}
+                    />
                   </PieChart>
                 </ResponsiveContainer>
               </div>

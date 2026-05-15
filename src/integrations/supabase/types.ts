@@ -721,6 +721,7 @@ export type Database = {
       employee_monthly_finances: {
         Row: {
           created_at: string;
+          discount_items: unknown;
           employee_id: string;
           id: string;
           month: number;
@@ -734,6 +735,7 @@ export type Database = {
         };
         Insert: {
           created_at?: string;
+          discount_items?: unknown;
           employee_id: string;
           id?: string;
           month: number;
@@ -747,6 +749,7 @@ export type Database = {
         };
         Update: {
           created_at?: string;
+          discount_items?: unknown;
           employee_id?: string;
           id?: string;
           month?: number;

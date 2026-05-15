@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   employeeFinanceService,
+  sumDiscountItems,
+  type DiscountItem,
   type EmployeeMonthlyFinance,
   type FinanceFields,
 } from '@/modules/admin/services/employeeFinanceService';
@@ -19,8 +21,16 @@ interface UseEmployeeMonthlyFinancesResult {
    */
   updateField: (
     employeeId: string,
-    field: keyof FinanceFields,
+    field: 'valor_recebido' | 'valor_subsidio_alimentacao' | 'valor_cartao_da',
     value: number
+  ) => Promise<{ success: boolean; error?: string }>;
+  addDiscountItem: (
+    employeeId: string,
+    payload: { category: string; description: string | null; amount: number }
+  ) => Promise<{ success: boolean; error?: string }>;
+  removeDiscountItem: (
+    employeeId: string,
+    itemId: string
   ) => Promise<{ success: boolean; error?: string }>;
   refetch: () => Promise<void>;
 }
@@ -30,14 +40,27 @@ const emptyFinance = (): FinanceFields => ({
   valor_subsidio_alimentacao: 0,
   valor_cartao_da: 0,
   valor_descontado: 0,
+  discount_items: [],
 });
 
-const toFields = (row: EmployeeMonthlyFinance): FinanceFields => ({
-  valor_recebido: Number(row.valor_recebido) || 0,
-  valor_subsidio_alimentacao: Number(row.valor_subsidio_alimentacao) || 0,
-  valor_cartao_da: Number(row.valor_cartao_da) || 0,
-  valor_descontado: Number(row.valor_descontado) || 0,
-});
+const toFields = (row: EmployeeMonthlyFinance): FinanceFields => {
+  const rawItems = Array.isArray(row.discount_items) ? (row.discount_items as unknown[]) : [];
+  const items: DiscountItem[] = rawItems
+    .filter((it): it is Record<string, unknown> => typeof it === 'object' && it !== null)
+    .map(it => ({
+      id: String(it.id ?? crypto.randomUUID()),
+      category: String(it.category ?? 'outro'),
+      description: it.description == null ? null : String(it.description),
+      amount: Number(it.amount) || 0,
+    }));
+  return {
+    valor_recebido: Number(row.valor_recebido) || 0,
+    valor_subsidio_alimentacao: Number(row.valor_subsidio_alimentacao) || 0,
+    valor_cartao_da: Number(row.valor_cartao_da) || 0,
+    valor_descontado: Number(row.valor_descontado) || 0,
+    discount_items: items,
+  };
+};
 
 export const useEmployeeMonthlyFinances = (
   year: number,
@@ -69,23 +92,16 @@ export const useEmployeeMonthlyFinances = (
     fetchData();
   }, [fetchData]);
 
-  const updateField = useCallback(
-    async (employeeId: string, field: keyof FinanceFields, value: number) => {
-      const previous = finances[employeeId] ?? emptyFinance();
-      const next: FinanceFields = { ...previous, [field]: value };
-
-      // Optimistic update
+  const persist = useCallback(
+    async (employeeId: string, next: FinanceFields, previous: FinanceFields) => {
       setFinances(prev => ({ ...prev, [employeeId]: next }));
-
       const { error: upsertError } = await employeeFinanceService.upsert(
         employeeId,
         year,
         month,
         next
       );
-
       if (upsertError) {
-        // Revert
         setFinances(prev => ({ ...prev, [employeeId]: previous }));
         const message =
           upsertError instanceof Error ? upsertError.message : 'Erro ao guardar valor.';
@@ -93,11 +109,69 @@ export const useEmployeeMonthlyFinances = (
       }
       return { success: true };
     },
-    [finances, year, month]
+    [year, month]
+  );
+
+  const updateField = useCallback(
+    async (
+      employeeId: string,
+      field: 'valor_recebido' | 'valor_subsidio_alimentacao' | 'valor_cartao_da',
+      value: number
+    ) => {
+      const previous = finances[employeeId] ?? emptyFinance();
+      const next: FinanceFields = { ...previous, [field]: value };
+      return persist(employeeId, next, previous);
+    },
+    [finances, persist]
+  );
+
+  const addDiscountItem = useCallback(
+    async (
+      employeeId: string,
+      payload: { category: string; description: string | null; amount: number }
+    ) => {
+      const previous = finances[employeeId] ?? emptyFinance();
+      const newItem: DiscountItem = {
+        id: crypto.randomUUID(),
+        category: payload.category,
+        description: payload.description,
+        amount: payload.amount,
+      };
+      const nextItems = [...previous.discount_items, newItem];
+      const next: FinanceFields = {
+        ...previous,
+        discount_items: nextItems,
+        valor_descontado: sumDiscountItems(nextItems),
+      };
+      return persist(employeeId, next, previous);
+    },
+    [finances, persist]
+  );
+
+  const removeDiscountItem = useCallback(
+    async (employeeId: string, itemId: string) => {
+      const previous = finances[employeeId] ?? emptyFinance();
+      const nextItems = previous.discount_items.filter(it => it.id !== itemId);
+      const next: FinanceFields = {
+        ...previous,
+        discount_items: nextItems,
+        valor_descontado: sumDiscountItems(nextItems),
+      };
+      return persist(employeeId, next, previous);
+    },
+    [finances, persist]
   );
 
   return useMemo(
-    () => ({ finances, isLoading, error, updateField, refetch: fetchData }),
-    [finances, isLoading, error, updateField, fetchData]
+    () => ({
+      finances,
+      isLoading,
+      error,
+      updateField,
+      addDiscountItem,
+      removeDiscountItem,
+      refetch: fetchData,
+    }),
+    [finances, isLoading, error, updateField, addDiscountItem, removeDiscountItem, fetchData]
   );
 };

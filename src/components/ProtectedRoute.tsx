@@ -37,20 +37,13 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     return <Navigate to={fallbackPath} state={{ from: location }} replace />;
   }
 
-  // Se requer um role específico e não tem, negar acesso
+  // Se requer um role específico e não tem, redirecionar para a área correta
   if (requiredRole) {
     const rolesArray = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
     if (!role || !rolesArray.includes(role)) {
-      return (
-        <div className="min-h-screen flex items-center justify-center">
-          <div className="text-center">
-            <h1 className="text-2xl font-bold text-destructive mb-2">Acesso Negado</h1>
-            <p className="text-muted-foreground">
-              Você não tem permissão para acessar esta página.
-            </p>
-          </div>
-        </div>
-      );
+      // Redirecionar admin para /admin e employee para /colaborador
+      const redirectTo = role === 'admin' ? '/admin' : role === 'employee' ? '/colaborador' : fallbackPath;
+      return <Navigate to={redirectTo} replace />;
     }
   }
 

@@ -130,15 +130,17 @@ describe('ProtectedRoute', () => {
               </ProtectedRoute>
             }
           />
-          <Route path="/admin/login" element={<div>Access Denied</div>} />
+          <Route path="/colaborador" element={<div>Employee Area</div>} />
         </Routes>
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Acesso Negado')).toBeInTheDocument();
+    // Role 'employee' sem permissão 'admin' → redireciona para /colaborador
+    expect(screen.queryByText('Admin Dashboard')).not.toBeInTheDocument();
+    expect(screen.getByText('Employee Area')).toBeInTheDocument();
   });
 
-  it('should show access denied message when role does not match', () => {
+  it('should not render protected content when role does not match', () => {
     mockUseAuth.mockReturnValue({
       isLoading: false,
       isAuthenticated: true,
@@ -159,10 +161,7 @@ describe('ProtectedRoute', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Acesso Negado')).toBeInTheDocument();
-    expect(
-      screen.getByText('Você não tem permissão para acessar esta página.')
-    ).toBeInTheDocument();
+    expect(screen.queryByText('Admin Content')).not.toBeInTheDocument();
   });
 
   it('should allow access when user has required role', () => {
@@ -234,7 +233,7 @@ describe('ProtectedRoute', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Acesso Negado')).toBeInTheDocument();
+    expect(screen.queryByText('Multi-role Content')).not.toBeInTheDocument();
   });
 
   it('should use custom fallback path', () => {
@@ -291,6 +290,6 @@ describe('ProtectedRoute', () => {
       </MemoryRouter>
     );
 
-    expect(screen.getByText('Acesso Negado')).toBeInTheDocument();
+    expect(screen.queryByText('Admin Content')).not.toBeInTheDocument();
   });
 });

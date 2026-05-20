@@ -201,12 +201,24 @@ const EmployeeDocumentsTab = ({ employeeId }: EmployeeDocumentsTabProps) => {
 
   const handleDelete = async (doc: EmployeeDocument) => {
     try {
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from('employee-files')
-        .remove([doc.file_path]);
+      // Bulk-uploaded documents share a single physical file across many
+      // employee_documents rows. Only delete the file from storage when no
+      // other record still references it, otherwise their downloads break.
+      const { count, error: countError } = await supabase
+        .from('employee_documents')
+        .select('id', { count: 'exact', head: true })
+        .eq('file_path', doc.file_path)
+        .neq('id', doc.id);
 
-      if (storageError) throw storageError;
+      if (countError) throw countError;
+
+      if (!count) {
+        const { error: storageError } = await supabase.storage
+          .from('employee-files')
+          .remove([doc.file_path]);
+
+        if (storageError) throw storageError;
+      }
 
       // Delete from database
       const { error: dbError } = await supabase

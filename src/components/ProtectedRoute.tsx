@@ -42,7 +42,8 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
     const rolesArray = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
     if (!role || !rolesArray.includes(role)) {
       // Redirecionar admin para /admin e employee para /colaborador
-      const redirectTo = role === 'admin' ? '/admin' : role === 'employee' ? '/colaborador' : fallbackPath;
+      const redirectTo =
+        role === 'admin' ? '/admin' : role === 'employee' ? '/colaborador' : fallbackPath;
       return <Navigate to={redirectTo} replace />;
     }
   }

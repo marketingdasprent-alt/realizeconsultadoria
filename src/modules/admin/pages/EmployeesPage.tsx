@@ -250,10 +250,12 @@ const EmployeesPage = () => {
   const [isPrintingReport, setIsPrintingReport] = useState(false);
 
   const handlePrintVacationReport = async () => {
-    if (sortedEmployees.length === 0) {
+    const activeEmployees = sortedEmployees.filter(e => e.is_active);
+
+    if (activeEmployees.length === 0) {
       toast({
-        title: 'Sem colaboradores',
-        description: 'Não há colaboradores na lista atual para gerar o relatório.',
+        title: 'Sem colaboradores ativos',
+        description: 'Não há colaboradores ativos na lista atual para gerar o relatório.',
         variant: 'destructive',
       });
       return;
@@ -323,7 +325,7 @@ const EmployeesPage = () => {
       let totAdminReserved = 0;
       let rowsWithoutBalance = 0;
 
-      const rows = sortedEmployees
+      const rows = activeEmployees
         .map(emp => {
           const balance = balanceByEmp.get(emp.id);
           const agg = aggByEmp.get(emp.id) || { pending: 0, scheduledByEmployee: 0 };
@@ -410,7 +412,7 @@ const EmployeesPage = () => {
             <img src="${logoBase64}" alt="Realize" />
             <div class="title">
               <h1>Relatório de Férias</h1>
-              <div class="subtitle">Ano ${currentYear} · ${sortedEmployees.length} colaboradores</div>
+              <div class="subtitle">Ano ${currentYear} · ${activeEmployees.length} colaboradores ativos</div>
             </div>
           </header>
           <div class="legend">

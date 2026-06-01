@@ -128,8 +128,14 @@ const VacationBalanceCard = ({ employeeId }: VacationBalanceCardProps) => {
   const remainingSelfSchedulable = hasSelfSchedulableLimit
     ? Math.max(0, balance.self_schedulable_days! - employeeScheduledDays)
     : null;
+  // Se o colaborador marcou mais do que a sua quota própria, o excedente
+  // "come" da reserva da empresa.
   const adminReservedDays = hasSelfSchedulableLimit
-    ? balance.total_days - balance.self_schedulable_days!
+    ? Math.max(
+        0,
+        balance.total_days -
+          Math.max(employeeScheduledDays, balance.self_schedulable_days!)
+      )
     : 0;
 
   return (

@@ -724,8 +724,10 @@ export type Database = {
           discount_items: unknown;
           employee_id: string;
           id: string;
+          km_extras: number;
           month: number;
           notes: string | null;
+          taxa_km: number;
           updated_at: string;
           valor_cartao_da: number;
           valor_descontado: number;
@@ -738,8 +740,10 @@ export type Database = {
           discount_items?: unknown;
           employee_id: string;
           id?: string;
+          km_extras?: number;
           month: number;
           notes?: string | null;
+          taxa_km?: number;
           updated_at?: string;
           valor_cartao_da?: number;
           valor_descontado?: number;
@@ -752,8 +756,10 @@ export type Database = {
           discount_items?: unknown;
           employee_id?: string;
           id?: string;
+          km_extras?: number;
           month?: number;
           notes?: string | null;
+          taxa_km?: number;
           updated_at?: string;
           valor_cartao_da?: number;
           valor_descontado?: number;

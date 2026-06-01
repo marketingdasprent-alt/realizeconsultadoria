@@ -27,6 +27,7 @@ const EmployeeVacationTab = ({ employeeId, employeeName }: EmployeeVacationTabPr
   const [balance, setBalance] = useState<VacationBalance | null>(null);
   const [totalDaysInput, setTotalDaysInput] = useState('22');
   const [selfSchedulableDaysInput, setSelfSchedulableDaysInput] = useState('');
+  const [employeeScheduledDays, setEmployeeScheduledDays] = useState(0);
 
   const currentYear = new Date().getFullYear();
 
@@ -45,13 +46,23 @@ const EmployeeVacationTab = ({ employeeId, employeeName }: EmployeeVacationTabPr
   const fetchBalance = async () => {
     setIsLoading(true);
     try {
-      const { data } = await supabase
-        .from('employee_vacation_balances')
-        .select('*')
-        .eq('employee_id', employeeId)
-        .eq('year', currentYear)
-        .maybeSingle();
+      const [balanceRes, employeeAbsencesRes] = await Promise.all([
+        supabase
+          .from('employee_vacation_balances')
+          .select('*')
+          .eq('employee_id', employeeId)
+          .eq('year', currentYear)
+          .maybeSingle(),
+        supabase
+          .from('absences')
+          .select('id, absence_periods(business_days, start_date)')
+          .eq('employee_id', employeeId)
+          .eq('absence_type', 'vacation')
+          .eq('created_by_role', 'employee')
+          .in('status', ['pending', 'approved']),
+      ]);
 
+      const data = balanceRes.data;
       if (data) {
         setBalance(data);
         setTotalDaysInput(data.total_days.toString());
@@ -61,6 +72,18 @@ const EmployeeVacationTab = ({ employeeId, employeeName }: EmployeeVacationTabPr
         setTotalDaysInput('22');
         setSelfSchedulableDaysInput('');
       }
+
+      const yearStart = `${currentYear}-01-01`;
+      const yearEnd = `${currentYear}-12-31`;
+      const scheduled = (employeeAbsencesRes.data || []).reduce((acc, absence) => {
+        const periods =
+          (absence.absence_periods as { business_days: number; start_date: string }[] | null) || [];
+        const sum = periods
+          .filter(p => p.start_date >= yearStart && p.start_date <= yearEnd)
+          .reduce((s, p) => s + (Number(p.business_days) || 0), 0);
+        return acc + sum;
+      }, 0);
+      setEmployeeScheduledDays(scheduled);
     } catch (error) {
       console.error('Error fetching balance:', error);
     } finally {
@@ -140,11 +163,26 @@ const EmployeeVacationTab = ({ employeeId, employeeName }: EmployeeVacationTabPr
     }
   };
 
+  // Input preview values (while editing)
   const totalDays = parseFloat(totalDaysInput) || 0;
   const selfSchedulableDays = selfSchedulableDaysInput
     ? parseFloat(selfSchedulableDaysInput)
     : null;
   const adminReservedDays = selfSchedulableDays !== null ? totalDays - selfSchedulableDays : 0;
+
+  // Saved values for "real" usage-aware metrics
+  const savedTotal = balance?.total_days ?? 0;
+  const savedSelfMax =
+    balance?.self_schedulable_days != null ? Number(balance.self_schedulable_days) : null;
+  const savedAdminReservedTheoretical =
+    savedSelfMax !== null ? savedTotal - savedSelfMax : 0;
+  const remainingSelfSchedulable =
+    savedSelfMax !== null ? Math.max(0, savedSelfMax - employeeScheduledDays) : null;
+  // Se o colaborador marcou mais do que a sua quota, o excedente "come" da empresa
+  const adminReservedAdjusted =
+    savedSelfMax !== null
+      ? Math.max(0, savedTotal - Math.max(employeeScheduledDays, savedSelfMax))
+      : 0;
 
   if (isLoading) {
     return (
@@ -240,14 +278,34 @@ const EmployeeVacationTab = ({ employeeId, employeeName }: EmployeeVacationTabPr
                     <User className="h-4 w-4" /> Colaborador pode marcar:
                   </span>
                   <span className="font-medium text-gold">
-                    {formatDays(selfSchedulableDays)} dias
+                    {balance && savedSelfMax !== null ? (
+                      <>
+                        {formatDays(remainingSelfSchedulable!)} /{' '}
+                        <span className="text-muted-foreground">{formatDays(savedSelfMax)}</span>{' '}
+                        dias restantes
+                      </>
+                    ) : (
+                      <>{formatDays(selfSchedulableDays)} dias</>
+                    )}
                   </span>
                 </div>
                 <div className="flex justify-between text-sm">
                   <span className="text-muted-foreground flex items-center gap-2">
                     <Building2 className="h-4 w-4" /> Reservado pela empresa:
                   </span>
-                  <span className="font-medium">{formatDays(adminReservedDays)} dias</span>
+                  <span className="font-medium">
+                    {balance && savedSelfMax !== null ? (
+                      <>
+                        {formatDays(adminReservedAdjusted)} /{' '}
+                        <span className="text-muted-foreground">
+                          {formatDays(savedAdminReservedTheoretical)}
+                        </span>{' '}
+                        dias
+                      </>
+                    ) : (
+                      <>{formatDays(adminReservedDays)} dias</>
+                    )}
+                  </span>
                 </div>
               </>
             )}
@@ -261,7 +319,7 @@ const EmployeeVacationTab = ({ employeeId, employeeName }: EmployeeVacationTabPr
                 <div className="flex justify-between text-sm mt-2">
                   <span className="text-muted-foreground">Dias disponíveis:</span>
                   <span className="font-medium text-gold">
-                    {formatDays(totalDays - balance.used_days)}
+                    {formatDays(balance.total_days - balance.used_days)}
                   </span>
                 </div>
               </div>

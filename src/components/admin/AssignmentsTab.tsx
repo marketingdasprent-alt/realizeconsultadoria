@@ -98,12 +98,12 @@ const AssignmentsTab = () => {
           .eq('assignment_id', editingAssignment.id);
         const assignedIds = assignedItems?.map((i: any) => i.equipment_id) || [];
         if (assignedIds.length > 0) {
-          query = query.or(`status.eq.available,id.in.(${assignedIds.join(',')})`);
+          query = query.or(`employee_id.is.null,id.in.(${assignedIds.join(',')})`);
         } else {
-          query = query.eq('status', 'available');
+          query = query.is('employee_id', null);
         }
       } else {
-        query = query.eq('status', 'available');
+        query = query.is('employee_id', null);
       }
 
       const { data, error } = await query;

@@ -64,16 +64,23 @@ export interface DiscountItem {
 export const getCategoryLabel = (value: string): string =>
   DISCOUNT_CATEGORIES.find(c => c.value === value)?.label ?? value;
 
+export const DEFAULT_TAXA_KM = 0.4;
+
 export interface FinanceFields {
   valor_recebido: number;
   valor_subsidio_alimentacao: number;
   valor_cartao_da: number;
   valor_descontado: number;
+  km_extras: number;
+  taxa_km: number;
   discount_items: DiscountItem[];
 }
 
 export const sumDiscountItems = (items: DiscountItem[] | undefined | null): number =>
   (items || []).reduce((acc, it) => acc + (Number(it.amount) || 0), 0);
+
+export const computeAjudaCusto = (km: number, taxa: number): number =>
+  (Number(km) || 0) * (Number(taxa) || 0);
 
 export const employeeFinanceService = {
   /**
@@ -112,6 +119,8 @@ export const employeeFinanceService = {
         valor_subsidio_alimentacao: fields.valor_subsidio_alimentacao ?? 0,
         valor_cartao_da: fields.valor_cartao_da ?? 0,
         valor_descontado: fields.valor_descontado ?? 0,
+        km_extras: fields.km_extras ?? 0,
+        taxa_km: fields.taxa_km ?? DEFAULT_TAXA_KM,
         discount_items: (fields.discount_items ?? []) as unknown,
       };
 

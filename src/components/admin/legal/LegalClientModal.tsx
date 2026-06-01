@@ -37,7 +37,7 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
+import { cn, formatIban } from '@/lib/utils';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Badge } from '@/components/ui/badge';
@@ -752,7 +752,13 @@ export default function LegalClientModal({
                       <Input
                         className="w-2/3 h-8 shadow-xs"
                         value={formData.iban}
-                        onChange={e => setFormData({ ...formData, iban: e.target.value })}
+                        onChange={e =>
+                          setFormData({ ...formData, iban: formatIban(e.target.value) })
+                        }
+                        placeholder="PT50 0000 0000 0000 0000 0000 0"
+                        maxLength={42}
+                        autoCapitalize="characters"
+                        spellCheck={false}
                       />
                     </div>
                   </div>

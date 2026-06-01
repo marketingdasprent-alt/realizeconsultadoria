@@ -2,10 +2,18 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   employeeFinanceService,
   sumDiscountItems,
+  DEFAULT_TAXA_KM,
   type DiscountItem,
   type EmployeeMonthlyFinance,
   type FinanceFields,
 } from '@/modules/admin/services/employeeFinanceService';
+
+type EditableNumberField =
+  | 'valor_recebido'
+  | 'valor_subsidio_alimentacao'
+  | 'valor_cartao_da'
+  | 'km_extras'
+  | 'taxa_km';
 
 export interface FinanceByEmployeeId {
   [employeeId: string]: FinanceFields;
@@ -21,7 +29,7 @@ interface UseEmployeeMonthlyFinancesResult {
    */
   updateField: (
     employeeId: string,
-    field: 'valor_recebido' | 'valor_subsidio_alimentacao' | 'valor_cartao_da',
+    field: EditableNumberField,
     value: number
   ) => Promise<{ success: boolean; error?: string }>;
   addDiscountItem: (
@@ -40,6 +48,8 @@ const emptyFinance = (): FinanceFields => ({
   valor_subsidio_alimentacao: 0,
   valor_cartao_da: 0,
   valor_descontado: 0,
+  km_extras: 0,
+  taxa_km: DEFAULT_TAXA_KM,
   discount_items: [],
 });
 
@@ -53,11 +63,14 @@ const toFields = (row: EmployeeMonthlyFinance): FinanceFields => {
       description: it.description == null ? null : String(it.description),
       amount: Number(it.amount) || 0,
     }));
+  const rowTaxa = Number(row.taxa_km);
   return {
     valor_recebido: Number(row.valor_recebido) || 0,
     valor_subsidio_alimentacao: Number(row.valor_subsidio_alimentacao) || 0,
     valor_cartao_da: Number(row.valor_cartao_da) || 0,
     valor_descontado: Number(row.valor_descontado) || 0,
+    km_extras: Number(row.km_extras) || 0,
+    taxa_km: Number.isFinite(rowTaxa) && rowTaxa > 0 ? rowTaxa : DEFAULT_TAXA_KM,
     discount_items: items,
   };
 };
@@ -113,11 +126,7 @@ export const useEmployeeMonthlyFinances = (
   );
 
   const updateField = useCallback(
-    async (
-      employeeId: string,
-      field: 'valor_recebido' | 'valor_subsidio_alimentacao' | 'valor_cartao_da',
-      value: number
-    ) => {
+    async (employeeId: string, field: EditableNumberField, value: number) => {
       const previous = finances[employeeId] ?? emptyFinance();
       const next: FinanceFields = { ...previous, [field]: value };
       return persist(employeeId, next, previous);

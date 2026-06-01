@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useCallback, useState } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import {
   Plus,
   Search,
@@ -11,6 +11,7 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  CalendarDays,
   Upload,
   RefreshCw,
   Loader2,
@@ -44,6 +45,8 @@ import ResendInviteSuccessDialog from '@/components/admin/ResendInviteSuccessDia
 import { useEmployees } from '@/hooks/useEmployees';
 import EmployeeFinancialTab from '@/modules/admin/components/employee/EmployeeFinancialTab';
 import type { Employee } from '@/modules/admin/services/employeeService';
+import { supabase } from '@/integrations/supabase/client';
+import { getLogoBase64 } from '@/lib/logo-utils';
 
 const EmployeesPage = () => {
   const navigate = useNavigate();
@@ -51,8 +54,41 @@ const EmployeesPage = () => {
   const { canExecuteTopic } = useAdminPermissions();
   const { employees, isLoading, deleteEmployee, toggleStatus, resendInvite } = useEmployees();
 
-  const [activeTab, setActiveTab] = useState<'personal' | 'financial'>('personal');
-  const [searchTerm, setSearchTerm] = useState('');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const activeTab: 'personal' | 'financial' =
+    searchParams.get('tab') === 'financial' ? 'financial' : 'personal';
+  const searchTerm = searchParams.get('q') || '';
+
+  const setActiveTab = useCallback(
+    (tab: 'personal' | 'financial') => {
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev);
+          if (tab === 'personal') next.delete('tab');
+          else next.set('tab', tab);
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const setSearchTerm = useCallback(
+    (term: string) => {
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev);
+          if (term) next.set('q', term);
+          else next.delete('q');
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
   const [avisoDialogEmployee, setAvisoDialogEmployee] = useState<any>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
@@ -211,6 +247,237 @@ const EmployeesPage = () => {
     return sortDirection === 'asc' ? comparison : -comparison;
   });
 
+  const [isPrintingReport, setIsPrintingReport] = useState(false);
+
+  const handlePrintVacationReport = async () => {
+    if (sortedEmployees.length === 0) {
+      toast({
+        title: 'Sem colaboradores',
+        description: 'Não há colaboradores na lista atual para gerar o relatório.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsPrintingReport(true);
+    try {
+      const currentYear = new Date().getFullYear();
+
+      const [balancesRes, absencesRes, logoBase64] = await Promise.all([
+        supabase
+          .from('employee_vacation_balances')
+          .select('employee_id, total_days, used_days, self_schedulable_days')
+          .eq('year', currentYear),
+        supabase
+          .from('absences')
+          .select(
+            'id, employee_id, status, created_by_role, absence_periods(business_days, start_date)'
+          )
+          .eq('absence_type', 'vacation')
+          .in('status', ['pending', 'approved']),
+        getLogoBase64(),
+      ]);
+
+      if (balancesRes.error) throw balancesRes.error;
+      if (absencesRes.error) throw absencesRes.error;
+
+      const balanceByEmp = new Map(
+        (balancesRes.data || []).map(b => [b.employee_id, b])
+      );
+
+      type AbsenceRow = {
+        employee_id: string;
+        status: string;
+        created_by_role: string | null;
+        absence_periods: { business_days: number; start_date: string }[] | null;
+      };
+      const absences = (absencesRes.data || []) as unknown as AbsenceRow[];
+
+      const yearStart = `${currentYear}-01-01`;
+      const yearEnd = `${currentYear}-12-31`;
+
+      type Aggregate = { pending: number; scheduledByEmployee: number };
+      const aggByEmp = new Map<string, Aggregate>();
+      absences.forEach(a => {
+        const periods = a.absence_periods || [];
+        const sumDays = periods
+          .filter(p => p.start_date >= yearStart && p.start_date <= yearEnd)
+          .reduce((s, p) => s + (Number(p.business_days) || 0), 0);
+        if (sumDays === 0) return;
+        const agg = aggByEmp.get(a.employee_id) || { pending: 0, scheduledByEmployee: 0 };
+        if (a.status === 'pending') agg.pending += sumDays;
+        if (a.created_by_role === 'employee') agg.scheduledByEmployee += sumDays;
+        aggByEmp.set(a.employee_id, agg);
+      });
+
+      const formatDays = (n: number) => (n % 1 === 0 ? n.toString() : n.toFixed(1));
+      const escapeHtml = (s: string) =>
+        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+      // Build rows + totals
+      let totTotal = 0;
+      let totUsed = 0;
+      let totPending = 0;
+      let totAvailable = 0;
+      let totRemainingSelf = 0;
+      let totAdminReserved = 0;
+      let rowsWithoutBalance = 0;
+
+      const rows = sortedEmployees
+        .map(emp => {
+          const balance = balanceByEmp.get(emp.id);
+          const agg = aggByEmp.get(emp.id) || { pending: 0, scheduledByEmployee: 0 };
+          // @ts-expect-error - Supabase relational data typing
+          const companyName = emp.companies?.name || '-';
+
+          if (!balance) {
+            rowsWithoutBalance++;
+            return `<tr>
+                <td>${escapeHtml(emp.name)}</td>
+                <td>${escapeHtml(companyName)}</td>
+                <td colspan="6" class="muted center">Sem saldo configurado para ${currentYear}</td>
+              </tr>`;
+          }
+
+          const total = Number(balance.total_days) || 0;
+          const used = Number(balance.used_days) || 0;
+          const available = total - used;
+          const selfMax =
+            balance.self_schedulable_days != null ? Number(balance.self_schedulable_days) : null;
+          const remainingSelf =
+            selfMax !== null ? Math.max(0, selfMax - agg.scheduledByEmployee) : null;
+          // Se o colaborador marcou mais do que a sua quota própria (selfMax),
+          // o excedente "come" da reserva da empresa.
+          const adminReserved =
+            selfMax !== null
+              ? Math.max(0, total - Math.max(agg.scheduledByEmployee, selfMax))
+              : 0;
+
+          totTotal += total;
+          totUsed += used;
+          totPending += agg.pending;
+          totAvailable += available;
+          if (remainingSelf !== null) totRemainingSelf += remainingSelf;
+          totAdminReserved += adminReserved;
+
+          return `<tr>
+              <td>${escapeHtml(emp.name)}</td>
+              <td>${escapeHtml(companyName)}</td>
+              <td class="num">${formatDays(total)}</td>
+              <td class="num">${formatDays(used)}</td>
+              <td class="num ${agg.pending > 0 ? 'warn' : 'muted'}">${formatDays(agg.pending)}</td>
+              <td class="num strong">${formatDays(available)}</td>
+              <td class="num">${
+                selfMax !== null
+                  ? `${formatDays(remainingSelf!)} <span class="muted">/ ${formatDays(selfMax)}</span>`
+                  : '<span class="muted">—</span>'
+              }</td>
+              <td class="num">${
+                selfMax !== null ? formatDays(adminReserved) : '<span class="muted">—</span>'
+              }</td>
+            </tr>`;
+        })
+        .join('');
+
+      const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8" />
+        <title>Relatório de Férias — ${currentYear}</title>
+        <style>
+          @page { size: A4 landscape; margin: 12mm; }
+          * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+          body { font-family: Arial, sans-serif; font-size: 11px; color: #111; margin: 0; padding: 0; }
+          header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #B7933D; padding-bottom: 10px; margin-bottom: 14px; }
+          header img { height: 50px; }
+          header .title { text-align: right; }
+          header h1 { font-size: 16px; margin: 0; color: #111; }
+          header .subtitle { font-size: 11px; color: #666; margin-top: 2px; }
+          .legend { display: flex; flex-wrap: wrap; gap: 14px; font-size: 10px; color: #666; margin-bottom: 10px; padding: 8px 12px; background: #fafafa; border: 1px solid #e5e5e5; border-radius: 6px; }
+          .legend strong { color: #111; }
+          table { width: 100%; border-collapse: collapse; }
+          th, td { border-bottom: 1px solid #e5e5e5; padding: 6px 8px; text-align: left; vertical-align: middle; }
+          th { background: #f3f3f3; font-size: 10px; text-transform: uppercase; letter-spacing: 0.04em; color: #444; }
+          td.num { text-align: right; font-variant-numeric: tabular-nums; }
+          td.center { text-align: center; }
+          td.strong { font-weight: 700; color: #B7933D; }
+          td.warn { color: #d97706; font-weight: 600; }
+          td.muted { color: #888; }
+          tr.totals td { border-top: 2px solid #111; border-bottom: none; font-weight: 700; background: #f7f7f7; }
+          footer { margin-top: 14px; font-size: 9px; color: #888; text-align: right; }
+        </style></head>
+        <body>
+          <header>
+            <img src="${logoBase64}" alt="Realize" />
+            <div class="title">
+              <h1>Relatório de Férias</h1>
+              <div class="subtitle">Ano ${currentYear} · ${sortedEmployees.length} colaboradores</div>
+            </div>
+          </header>
+          <div class="legend">
+            <div><strong>Utilizados</strong> — dias já gozados (aprovados)</div>
+            <div><strong>Pendentes</strong> — aguardam aprovação</div>
+            <div><strong>Disponíveis</strong> — total − utilizados</div>
+            <div><strong>Pode marcar</strong> — quanto resta o colaborador pode marcar</div>
+            <div><strong>Empresa</strong> — dias reservados para marcação pela empresa</div>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Nome</th>
+                <th>Empresa</th>
+                <th style="text-align:right">Total</th>
+                <th style="text-align:right">Utilizados</th>
+                <th style="text-align:right">Pendentes</th>
+                <th style="text-align:right">Disponíveis</th>
+                <th style="text-align:right">Pode Marcar</th>
+                <th style="text-align:right">Empresa</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows}
+              <tr class="totals">
+                <td>TOTAL</td>
+                <td></td>
+                <td class="num">${formatDays(totTotal)}</td>
+                <td class="num">${formatDays(totUsed)}</td>
+                <td class="num">${formatDays(totPending)}</td>
+                <td class="num">${formatDays(totAvailable)}</td>
+                <td class="num">${formatDays(totRemainingSelf)}</td>
+                <td class="num">${formatDays(totAdminReserved)}</td>
+              </tr>
+            </tbody>
+          </table>
+          ${
+            rowsWithoutBalance > 0
+              ? `<p style="margin-top:10px;font-size:10px;color:#999">* ${rowsWithoutBalance} colaboradores sem saldo de férias configurado para ${currentYear}.</p>`
+              : ''
+          }
+          <footer>Documento gerado em ${new Date().toLocaleDateString('pt-PT')}</footer>
+          <script>
+            setTimeout(function() { window.print(); window.onafterprint = function() { window.close(); }; }, 300);
+          </script>
+        </body></html>`;
+
+      const printWindow = window.open('', '_blank');
+      if (!printWindow) {
+        toast({
+          title: 'Erro ao abrir janela de impressão',
+          description: 'Verifique se pop-ups estão bloqueados.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      printWindow.document.write(html);
+      printWindow.document.close();
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao gerar relatório',
+        description: error.message || 'Ocorreu um erro inesperado.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsPrintingReport(false);
+    }
+  };
+
   const renderRowActions = (employee: Employee) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -267,7 +534,20 @@ const EmployeesPage = () => {
             <p className="text-muted-foreground mt-1">Gerir colaboradores das empresas</p>
           </div>
 
-          <div className="flex gap-2">
+          <div className="flex flex-wrap gap-2">
+            <Button
+              variant="outline"
+              onClick={handlePrintVacationReport}
+              disabled={isPrintingReport || isLoading}
+            >
+              {isPrintingReport ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <CalendarDays className="h-4 w-4 mr-2" />
+              )}
+              <span className="hidden sm:inline">Relatório de Férias</span>
+              <span className="sm:hidden">Férias</span>
+            </Button>
             {canEdit && (
               <Button variant="outline" onClick={() => setBulkDocDialogOpen(true)}>
                 <Upload className="h-4 w-4 mr-2" />

@@ -11,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { cn } from '@/lib/utils';
+import { cn, formatIban } from '@/lib/utils';
 import {
   Select,
   SelectContent,
@@ -93,7 +93,7 @@ const EmployeeGeneralTab = ({
       confirmPassword: '',
       vacation_days: '22',
       self_schedulable_days: '',
-      iban: employee?.iban || '',
+      iban: formatIban(employee?.iban || ''),
       cartao_da: employee?.cartao_da || '',
       cartao_refeicao: employee?.cartao_refeicao || '',
       safety_checkup_date: employee?.safety_checkup_date
@@ -124,7 +124,7 @@ const EmployeeGeneralTab = ({
         company_id: employee.company_id,
         nationality: employee.nationality || '',
         document_number: employee.document_number || '',
-        iban: employee.iban || '',
+        iban: formatIban(employee.iban || ''),
         cartao_da: employee.cartao_da || '',
         cartao_refeicao: employee.cartao_refeicao || '',
         safety_checkup_date: employee.safety_checkup_date

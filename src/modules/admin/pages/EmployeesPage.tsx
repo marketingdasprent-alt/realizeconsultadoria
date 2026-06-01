@@ -357,7 +357,9 @@ const EmployeesPage = () => {
           totUsed += used;
           totPending += agg.pending;
           totAvailable += available;
-          if (remainingSelf !== null) totRemainingSelf += remainingSelf;
+          // Sem limite próprio (selfMax null) → o colaborador pode marcar todos
+          // os dias disponíveis; somam à mesma à totRemainingSelf.
+          totRemainingSelf += remainingSelf !== null ? remainingSelf : available;
           totAdminReserved += adminReserved;
 
           return `<tr>

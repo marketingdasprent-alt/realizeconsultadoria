@@ -57,7 +57,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useIsRhMember } from '@/hooks/useIsRhMember';
-import { cn, formatIban } from '@/lib/utils';
+import { cn, formatIban, matchesSearch } from '@/lib/utils';
 import { getLogoBase64 } from '@/lib/logo-utils';
 import { useEmployeeMonthlyFinances } from '@/modules/admin/hooks/useEmployeeMonthlyFinances';
 import {
@@ -515,16 +515,15 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
   };
 
   const filtered = useMemo(() => {
-    const lowered = searchTerm.toLowerCase();
-    const loweredNoSpaces = lowered.replace(/\s/g, '');
+    const loweredNoSpaces = searchTerm.replace(/\s/g, '').toLowerCase();
     return employees.filter(e => {
+      if (matchesSearch(e.name, searchTerm)) return true;
+      // @ts-expect-error - Supabase relational data typing
+      if (matchesSearch(e.companies?.name || '', searchTerm)) return true;
+      // IBAN: comparar sem espaços
       const ibanNoSpaces = (e.iban || '').replace(/\s/g, '').toLowerCase();
-      return (
-        e.name.toLowerCase().includes(lowered) ||
-        ibanNoSpaces.includes(loweredNoSpaces) ||
-        // @ts-expect-error - Supabase relational data typing
-        e.companies?.name?.toLowerCase().includes(lowered)
-      );
+      if (loweredNoSpaces && ibanNoSpaces.includes(loweredNoSpaces)) return true;
+      return false;
     });
   }, [employees, searchTerm]);
 

@@ -37,3 +37,23 @@ export function sanitizeFileName(fileName: string): string {
   const normalized = fileName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
   return normalized.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
 }
+
+// Normaliza uma string para pesquisa: remove acentos, lowercase, trim.
+export function normalizeForSearch(value: string): string {
+  if (!value) return '';
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
+}
+
+// Verifica se `target` contem todos os tokens de `term`, em qualquer ordem,
+// ignorando acentos e case. Permite "pereira joao" -> "Joao Pereira".
+export function matchesSearch(target: string, term: string): boolean {
+  if (!term) return true;
+  const normTarget = normalizeForSearch(target);
+  const tokens = normalizeForSearch(term).split(/\s+/).filter(Boolean);
+  if (tokens.length === 0) return true;
+  return tokens.every(t => normTarget.includes(t));
+}

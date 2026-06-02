@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
 import { getLogoBase64 } from '@/lib/logo-utils';
+import { matchesSearch } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import {
@@ -311,7 +312,7 @@ const AbsenceRequestsPage = () => {
   };
 
   const filteredRequests = requests.filter(request =>
-    request.employee.name.toLowerCase().includes(searchTerm.toLowerCase())
+    matchesSearch(request.employee.name, searchTerm)
   );
 
   const handlePrintReport = async () => {

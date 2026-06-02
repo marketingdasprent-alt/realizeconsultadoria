@@ -57,6 +57,7 @@ import EmployeeFinancialTab from '@/modules/admin/components/employee/EmployeeFi
 import type { Employee } from '@/modules/admin/services/employeeService';
 import { supabase } from '@/integrations/supabase/client';
 import { getLogoBase64 } from '@/lib/logo-utils';
+import { matchesSearch } from '@/lib/utils';
 
 const EmployeesPage = () => {
   const navigate = useNavigate();
@@ -236,14 +237,17 @@ const EmployeesPage = () => {
     }
   };
 
-  const filteredEmployees = employees.filter(
-    employee =>
-      employee.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      employee.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      // @ts-expect-error - Supabase relational data typing
-      employee.companies?.name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      (employee.iban || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredEmployees = employees.filter(employee => {
+    if (matchesSearch(employee.name, searchTerm)) return true;
+    if (matchesSearch(employee.email, searchTerm)) return true;
+    // @ts-expect-error - Supabase relational data typing
+    if (matchesSearch(employee.companies?.name || '', searchTerm)) return true;
+    // IBAN: comparar sem espaços para tolerar formatação
+    const ibanNoSpaces = (employee.iban || '').replace(/\s/g, '').toLowerCase();
+    const termNoSpaces = searchTerm.replace(/\s/g, '').toLowerCase();
+    if (termNoSpaces && ibanNoSpaces.includes(termNoSpaces)) return true;
+    return false;
+  });
 
   // KPI stats: refletem a pesquisa mas não o filtro de status
   // (o filtro de status existe precisamente para escolher Ativos/Inativos).

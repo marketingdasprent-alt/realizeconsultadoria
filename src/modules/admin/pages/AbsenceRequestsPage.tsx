@@ -414,6 +414,10 @@ const AbsenceRequestsPage = () => {
     const mainRequests = filteredRequests.filter(r => r.status !== 'rejected');
     const rejectedRequests = filteredRequests.filter(r => r.status === 'rejected');
 
+    // Conjunto de colaboradores que excederam a sua quota própria de férias
+    // (preenchido durante o fetch do saldo, usado para destacar a linha).
+    const exceededEmployeeIds = new Set<string>();
+
     // Agrupar por categoria
     const groupByCategory = (reqs: typeof filteredRequests) => {
       const m = new Map<string, typeof filteredRequests>();
@@ -430,7 +434,18 @@ const AbsenceRequestsPage = () => {
       items: AbsenceRequest[],
       opts: { dayMode: 'approved' | 'requested'; showSubtotal: boolean }
     ) => {
+      // Ordenar por nome do colaborador (acentos ignorados), depois por data
       const sortedItems = [...items].sort((a, b) => {
+        const aName = a.employee.name
+          .normalize('NFD')
+          .replace(/[̀-ͯ]/g, '')
+          .toLowerCase();
+        const bName = b.employee.name
+          .normalize('NFD')
+          .replace(/[̀-ͯ]/g, '')
+          .toLowerCase();
+        const nameCompare = aName.localeCompare(bName);
+        if (nameCompare !== 0) return nameCompare;
         const aStart = (a.periods || []).map(p => p.start_date).sort()[0] || '';
         const bStart = (b.periods || []).map(p => p.start_date).sort()[0] || '';
         return aStart.localeCompare(bStart);
@@ -441,14 +456,26 @@ const AbsenceRequestsPage = () => {
           ? items.reduce((s, r) => s + approvedDays(r), 0)
           : items.reduce((s, r) => s + requestedDays(r), 0);
 
+      let prevEmpId: string | null = null;
       const rows = sortedItems
         .map(req => {
+          const isNewEmpGroup = prevEmpId !== null && prevEmpId !== req.employee.id;
+          prevEmpId = req.employee.id;
+          const isExceeded =
+            categoryKey === 'vacation' && exceededEmployeeIds.has(req.employee.id);
+          const classes = [
+            isNewEmpGroup ? 'row-emp-divider' : '',
+            isExceeded ? 'exceeded' : '',
+          ]
+            .filter(Boolean)
+            .join(' ');
+
           const days = opts.dayMode === 'approved' ? approvedDays(req) : requestedDays(req);
           const dayText =
             opts.dayMode === 'approved' && (req.status === 'pending' || days === 0)
               ? `<span class="muted">${formatDays(requestedDays(req))} pedidos</span>`
               : formatDays(days);
-          return `<tr>
+          return `<tr${classes ? ` class="${classes}"` : ''}>
               <td>${escapeHtml(req.employee.name)}</td>
               <td>${escapeHtml(req.company?.name || '-')}</td>
               <td>${formatPeriod(req)}</td>
@@ -562,7 +589,11 @@ const AbsenceRequestsPage = () => {
               : 0;
           const adminReservedTheoretical = selfMax !== null ? total - selfMax : 0;
 
-          return `<tr>
+          // Marcar excedido: colaborador marcou mais do que a sua quota propria
+          const isExceeded = selfMax !== null && scheduled > selfMax;
+          if (isExceeded) exceededEmployeeIds.add(emp.id);
+
+          return `<tr${isExceeded ? ' class="exceeded"' : ''}>
               <td>${escapeHtml(emp.name)}</td>
               <td class="num">${formatDays(total)}</td>
               <td class="num">${formatDays(used)}</td>
@@ -794,6 +825,11 @@ const AbsenceRequestsPage = () => {
         .st-approved { background: #d1fae5; color: #065f46; }
         .st-partial { background: #dbeafe; color: #1e40af; }
         .st-rejected { background: #fee2e2; color: #991b1b; }
+        /* Divider entre grupos de colaboradores na mesma categoria */
+        tr.row-emp-divider td { border-top: 2px solid #d4d4d8; }
+        /* Linhas de colaboradores que excederam a quota propria de ferias */
+        tr.exceeded td { background: #fef2f2; }
+        tr.exceeded.row-emp-divider td { border-top-color: #fca5a5; }
         .totals {
           margin-top: 18px;
           padding: 12px 16px;

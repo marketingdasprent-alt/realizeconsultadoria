@@ -440,6 +440,7 @@ const EmployeesPage = () => {
 
       const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8" />
         <title>Relatório de Férias — ${currentYear}</title>
+        <link rel="icon" href="/favicon.png" type="image/png" />
         <style>
           @page { size: A4 landscape; margin: 12mm; }
           * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }

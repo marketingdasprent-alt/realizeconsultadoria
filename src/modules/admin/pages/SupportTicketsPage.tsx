@@ -213,6 +213,7 @@ const SupportTicketsPage = () => {
     const html = `
       <!DOCTYPE html>
       <html><head><title>Tickets de Suporte</title>
+      <link rel="icon" href="/favicon.png" type="image/png" />
       <style>
         @page { size: A4 portrait; margin: 1.5cm; }
         body { font-family: Arial, sans-serif; color: #000; margin: 0; padding: 0; }

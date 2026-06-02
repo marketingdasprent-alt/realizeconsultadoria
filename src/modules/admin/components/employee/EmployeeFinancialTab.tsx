@@ -722,6 +722,7 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
 
     const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8" />
       <title>Informações Financeiras — ${monthLabel} ${year}</title>
+      <link rel="icon" href="/favicon.png" type="image/png" />
       <style>
         @page { size: A4 landscape; margin: 12mm; }
         * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }

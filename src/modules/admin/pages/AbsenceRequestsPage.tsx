@@ -190,6 +190,7 @@ const AbsenceRequestsPage = () => {
       <html>
       <head>
         <title>Comprovativo de Ausência - ${request.employee.name}</title>
+        <link rel="icon" href="/favicon.png" type="image/png" />
         <style>
           * { margin: 0; padding: 0; box-sizing: border-box; }
           body { font-family: 'Segoe UI', Arial, sans-serif; padding: 40px; color: #333; line-height: 1.6; }
@@ -439,6 +440,9 @@ const AbsenceRequestsPage = () => {
     // quota própria do colaborador. Apenas estes pedidos individuais ficam
     // destacados (em vez de todos do colaborador).
     const exceededAbsenceIds = new Set<string>();
+    // Absences que estão na fronteira: parte dos seus dias ainda cabe na
+    // quota do colaborador, parte excede (consumida pela empresa).
+    const partialAbsenceIds = new Set<string>();
 
     // Agrupar por categoria
     const groupByCategory = (reqs: typeof filteredRequests) => {
@@ -485,9 +489,12 @@ const AbsenceRequestsPage = () => {
           prevEmpId = req.employee.id;
           const isExceeded =
             categoryKey === 'vacation' && exceededAbsenceIds.has(req.id);
+          const isPartial =
+            categoryKey === 'vacation' && partialAbsenceIds.has(req.id);
           const classes = [
             isNewEmpGroup ? 'row-emp-divider' : '',
             isExceeded ? 'exceeded' : '',
+            isPartial ? 'partial' : '',
           ]
             .filter(Boolean)
             .join(' ');
@@ -602,6 +609,10 @@ const AbsenceRequestsPage = () => {
       // 2) Aprovadas futuras (compromisso firmado)
       // 3) Pendentes (ainda não confirmadas)
       // Dentro de cada grupo, ordem cronológica.
+      // Só são marcadas como excedidas as absences cujo cumulativo ANTES de as
+      // somar já passa o selfMax (i.e., totalmente fora da quota do
+      // colaborador). Absences "fronteira" — parte dentro da quota, parte fora —
+      // não são marcadas (a saldo geral já indica o excesso).
       absencesByEmployee.forEach((list, empId) => {
         const bal = balanceMap.get(empId);
         if (!bal) return;
@@ -620,8 +631,13 @@ const AbsenceRequestsPage = () => {
         const ordered = [...approvedPast, ...approvedFuture, ...pending];
         let cumul = 0;
         for (const abs of ordered) {
+          if (cumul >= selfMax) {
+            exceededAbsenceIds.add(abs.id);
+          } else if (cumul + abs.days > selfMax) {
+            // Linha fronteira: começa dentro da quota mas ultrapassa-a
+            partialAbsenceIds.add(abs.id);
+          }
           cumul += abs.days;
-          if (cumul > selfMax) exceededAbsenceIds.add(abs.id);
         }
       });
 
@@ -744,6 +760,7 @@ const AbsenceRequestsPage = () => {
 
     const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8" />
       <title>Relatório de Pedidos de Ausência</title>
+      <link rel="icon" href="/favicon.png" type="image/png" />
       <style>
         * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
         body {
@@ -907,6 +924,9 @@ const AbsenceRequestsPage = () => {
         /* Linhas de colaboradores que excederam a quota propria de ferias */
         tr.exceeded td { background: #fef2f2; }
         tr.exceeded.row-emp-divider td { border-top-color: #fca5a5; }
+        /* Linhas fronteira: parte dentro da quota, parte fora (laranja claro) */
+        tr.partial td { background: #fff7ed; }
+        tr.partial.row-emp-divider td { border-top-color: #fdba74; }
         .totals {
           margin-top: 18px;
           padding: 12px 16px;

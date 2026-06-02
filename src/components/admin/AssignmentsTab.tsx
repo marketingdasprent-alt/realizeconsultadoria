@@ -633,6 +633,7 @@ const AssignmentsTab = () => {
         : `Eu, ${employee?.name}, portador(a) do documento nº ${employee?.document_number || 'N/A'}, declaro que para todos os efeitos, RECEBI os equipamentos acima mencionados, em bom estado, da empresa ${company?.name || 'N/A'}, com o NIPC ${company?.nif || 'N/A'}.<br/><br/>Importa referir que, comprometo-me a devolver os equipamentos acima citados, com uma hora de antecedência de data de término da atividade laboral, de modo que os serviços informáticos verifiquem as funcionalidades dos mesmos.`;
 
       const html = `<!DOCTYPE html><html><head><title>${title}</title>
+        <link rel="icon" href="/favicon.png" type="image/png" />
         <style>
           @page { size: A4; margin: 20mm; }
           * { margin: 0; padding: 0; box-sizing: border-box; }

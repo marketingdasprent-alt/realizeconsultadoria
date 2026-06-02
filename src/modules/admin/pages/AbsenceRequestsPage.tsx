@@ -1,6 +1,23 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Clock, Check, X, Filter, Printer, RefreshCw, Search, Plus } from 'lucide-react';
+import {
+  Check,
+  ChevronDown,
+  Clock,
+  Filter,
+  Plus,
+  Printer,
+  RefreshCw,
+  Search,
+  X,
+} from 'lucide-react';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
@@ -315,7 +332,7 @@ const AbsenceRequestsPage = () => {
     matchesSearch(request.employee.name, searchTerm)
   );
 
-  const handlePrintReport = async () => {
+  const handlePrintReport = async (mode: 'full' | 'saldo' = 'full') => {
     if (filteredRequests.length === 0) {
       toast({
         title: 'Sem pedidos para imprimir',
@@ -415,8 +432,13 @@ const AbsenceRequestsPage = () => {
     const rejectedRequests = filteredRequests.filter(r => r.status === 'rejected');
 
     // Conjunto de colaboradores que excederam a sua quota própria de férias
-    // (preenchido durante o fetch do saldo, usado para destacar a linha).
+    // (preenchido durante o fetch do saldo, usado para destacar a linha da
+    // tabela de Saldo de Férias).
     const exceededEmployeeIds = new Set<string>();
+    // Conjunto de IDs de absences cujo *cumulativo cronológico* excedeu a
+    // quota própria do colaborador. Apenas estes pedidos individuais ficam
+    // destacados (em vez de todos do colaborador).
+    const exceededAbsenceIds = new Set<string>();
 
     // Agrupar por categoria
     const groupByCategory = (reqs: typeof filteredRequests) => {
@@ -462,7 +484,7 @@ const AbsenceRequestsPage = () => {
           const isNewEmpGroup = prevEmpId !== null && prevEmpId !== req.employee.id;
           prevEmpId = req.employee.id;
           const isExceeded =
-            categoryKey === 'vacation' && exceededEmployeeIds.has(req.employee.id);
+            categoryKey === 'vacation' && exceededAbsenceIds.has(req.id);
           const classes = [
             isNewEmpGroup ? 'row-emp-divider' : '',
             isExceeded ? 'exceeded' : '',
@@ -515,6 +537,17 @@ const AbsenceRequestsPage = () => {
     const vacationEmpIds = Array.from(new Set(vacationRequests.map(r => r.employee.id)));
     const currentYear = new Date().getFullYear();
 
+    if (mode === 'saldo' && vacationEmpIds.length === 0) {
+      printWindow.close();
+      toast({
+        title: 'Sem pedidos de férias',
+        description:
+          'O relatório de Saldo de Férias só pode ser gerado quando há pedidos de Férias na lista filtrada.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (vacationEmpIds.length > 0) {
       const [balancesRes, empAbsencesRes] = await Promise.all([
         supabase
@@ -538,14 +571,42 @@ const AbsenceRequestsPage = () => {
       const yearStart = `${currentYear}-01-01`;
       const yearEnd = `${currentYear}-12-31`;
       const scheduledMap = new Map<string, number>();
+      // Para cálculo cronológico do excedente
+      const absencesByEmployee = new Map<
+        string,
+        Array<{ id: string; days: number; firstDate: string }>
+      >();
       ((empAbsencesRes.data || []) as Array<{
+        id: string;
         employee_id: string;
         absence_periods: { business_days: number; start_date: string }[] | null;
       }>).forEach(a => {
-        const sum = (a.absence_periods || [])
-          .filter(p => p.start_date >= yearStart && p.start_date <= yearEnd)
-          .reduce((s, p) => s + Number(p.business_days || 0), 0);
+        const yearPeriods = (a.absence_periods || []).filter(
+          p => p.start_date >= yearStart && p.start_date <= yearEnd
+        );
+        if (yearPeriods.length === 0) return;
+        const sum = yearPeriods.reduce((s, p) => s + Number(p.business_days || 0), 0);
         scheduledMap.set(a.employee_id, (scheduledMap.get(a.employee_id) || 0) + sum);
+
+        const firstDate = yearPeriods.map(p => p.start_date).sort()[0];
+        const arr = absencesByEmployee.get(a.employee_id) || [];
+        arr.push({ id: a.id, days: sum, firstDate });
+        absencesByEmployee.set(a.employee_id, arr);
+      });
+
+      // Identificar absences cujo cumulativo cronológico excedeu o selfMax
+      absencesByEmployee.forEach((list, empId) => {
+        const bal = balanceMap.get(empId);
+        if (!bal) return;
+        const selfMax =
+          bal.self_schedulable_days != null ? Number(bal.self_schedulable_days) : null;
+        if (selfMax === null) return;
+        const sorted = [...list].sort((a, b) => a.firstDate.localeCompare(b.firstDate));
+        let cumul = 0;
+        for (const abs of sorted) {
+          cumul += abs.days;
+          if (cumul > selfMax) exceededAbsenceIds.add(abs.id);
+        }
       });
 
       // Pendentes (deste relatório, da categoria férias)
@@ -914,11 +975,11 @@ const AbsenceRequestsPage = () => {
           @page { size: A4 portrait; margin: 12mm; }
         }
       </style></head>
-      <body class="exclude-rejected">
+      <body class="${mode === 'full' && rejectedRequests.length > 0 ? 'exclude-rejected' : ''}">
         <div class="toolbar">
           <button class="primary" onclick="window.print()">🖨 Imprimir</button>
           ${
-            rejectedRequests.length > 0
+            mode === 'full' && rejectedRequests.length > 0
               ? `<label>
                   <input type="checkbox" onchange="document.body.classList.toggle('exclude-rejected', !this.checked)" />
                   Incluir rejeitados (${rejectedRequests.length})
@@ -932,27 +993,35 @@ const AbsenceRequestsPage = () => {
             <header class="doc">
               <img src="${logoBase64}" alt="Realize" />
               <div class="title">
-                <h1>Relatório de Pedidos de Ausência</h1>
-                <div class="subtitle">${mainRequests.length} pedidos · ${mainCategories.length} categorias</div>
+                <h1>${mode === 'saldo' ? 'Saldo de Férias por Colaborador' : 'Relatório de Pedidos de Ausência'}</h1>
+                <div class="subtitle">${
+                  mode === 'saldo'
+                    ? `${vacationEmpIds.length} ${vacationEmpIds.length === 1 ? 'colaborador' : 'colaboradores'} · ano ${currentYear}`
+                    : `${mainRequests.length} pedidos · ${mainCategories.length} categorias`
+                }</div>
               </div>
             </header>
             <div class="filters">
               <strong>Filtros:</strong> Estado: ${escapeHtml(statusFilterLabel)}${searchTerm ? ` · Pesquisa: "${escapeHtml(searchTerm)}"` : ''}
             </div>
-            ${mainSections}
-            <div class="totals">
-              <span>TOTAL APROVADO: ${totalApprovedRequests} ${totalApprovedRequests === 1 ? 'pedido' : 'pedidos'}</span>
-              <span>${formatDays(totalApprovedDays)} dias úteis</span>
-            </div>
+            ${mode === 'saldo' ? vacationQuotaHtml : mainSections}
             ${
-              rejectedRequests.length > 0
-                ? `<div class="rejected-section">
-                    <div class="rejected-divider">
-                      Pedidos Rejeitados
-                      <small>Não contam para o total · ${rejectedRequests.length} ${rejectedRequests.length === 1 ? 'pedido' : 'pedidos'}</small>
-                    </div>
-                    ${rejectedSections}
-                  </div>`
+              mode === 'full'
+                ? `<div class="totals">
+                    <span>TOTAL APROVADO: ${totalApprovedRequests} ${totalApprovedRequests === 1 ? 'pedido' : 'pedidos'}</span>
+                    <span>${formatDays(totalApprovedDays)} dias úteis</span>
+                  </div>
+                  ${
+                    rejectedRequests.length > 0
+                      ? `<div class="rejected-section">
+                          <div class="rejected-divider">
+                            Pedidos Rejeitados
+                            <small>Não contam para o total · ${rejectedRequests.length} ${rejectedRequests.length === 1 ? 'pedido' : 'pedidos'}</small>
+                          </div>
+                          ${rejectedSections}
+                        </div>`
+                      : ''
+                  }`
                 : ''
             }
             <footer class="doc">Documento gerado em ${format(new Date(), 'dd/MM/yyyy', { locale: pt })}</footer>
@@ -986,15 +1055,38 @@ const AbsenceRequestsPage = () => {
               <Plus className="h-4 w-4 mr-2" />
               Adicionar
             </Button>
-            <Button
-              variant="outline"
-              onClick={handlePrintReport}
-              disabled={isLoading || filteredRequests.length === 0}
-            >
-              <Printer className="h-4 w-4 mr-2" />
-              <span className="hidden sm:inline">Imprimir Relatório</span>
-              <span className="sm:hidden">Imprimir</span>
-            </Button>
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="outline"
+                  disabled={isLoading || filteredRequests.length === 0}
+                >
+                  <Printer className="h-4 w-4 mr-2" />
+                  <span className="hidden sm:inline">Imprimir</span>
+                  <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-[260px]">
+                <DropdownMenuItem onClick={() => handlePrintReport('full')}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  <div className="flex flex-col">
+                    <span>Relatório de Pedidos</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Todos os pedidos por categoria
+                    </span>
+                  </div>
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => handlePrintReport('saldo')}>
+                  <Printer className="h-4 w-4 mr-2" />
+                  <div className="flex flex-col">
+                    <span>Saldo de Férias</span>
+                    <span className="text-[11px] text-muted-foreground">
+                      Só a tabela de saldo por colaborador
+                    </span>
+                  </div>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
             <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />
               Atualizar
@@ -1073,6 +1165,40 @@ const AbsenceRequestsPage = () => {
             </Select>
           </div>
         </div>
+
+        {/* Filtros activos - indicador visual */}
+        {(searchTerm || statusFilter !== 'all') && (
+          <div className="flex flex-wrap items-center gap-2 px-3 py-2 bg-amber-50 border border-amber-200 rounded-md text-sm">
+            <Filter className="h-3.5 w-3.5 text-amber-700 shrink-0" />
+            <span className="text-amber-900 font-medium">Filtros activos:</span>
+            {statusFilter !== 'all' && (
+              <Badge variant="secondary" className="bg-amber-100 text-amber-900 border-amber-300">
+                Estado:{' '}
+                {statusOptions.find(o => o.value === statusFilter)?.label || statusFilter}
+              </Badge>
+            )}
+            {searchTerm && (
+              <Badge variant="secondary" className="bg-amber-100 text-amber-900 border-amber-300">
+                Pesquisa: "{searchTerm}"
+              </Badge>
+            )}
+            <span className="text-xs text-amber-800 ml-auto">
+              {filteredRequests.length} de {requests.length} pedidos
+            </span>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="h-7 px-2 text-amber-900 hover:bg-amber-100"
+              onClick={() => {
+                setSearchTerm('');
+                handleStatusChange('all');
+              }}
+            >
+              <X className="h-3.5 w-3.5 mr-1" />
+              Limpar
+            </Button>
+          </div>
+        )}
 
         {/* Requests List */}
         {isLoading ? (

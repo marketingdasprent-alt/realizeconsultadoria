@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Clock, Check, X, Filter, RefreshCw, Search, Plus } from 'lucide-react';
+import { Clock, Check, X, Filter, Printer, RefreshCw, Search, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
@@ -313,6 +313,207 @@ const AbsenceRequestsPage = () => {
     request.employee.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
 
+  const handlePrintReport = async () => {
+    if (filteredRequests.length === 0) {
+      toast({
+        title: 'Sem pedidos para imprimir',
+        description: 'Não existem pedidos com os filtros actuais.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+      toast({
+        title: 'Erro ao abrir janela de impressão',
+        description: 'Verifique se pop-ups estão bloqueados.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    const logoBase64 = await getLogoBase64();
+    const escapeHtml = (s: string) =>
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+
+    const statusLabels: Record<string, string> = {
+      pending: 'Pendente',
+      approved: 'Aprovado',
+      partially_approved: 'Parcialmente Aprovado',
+      rejected: 'Rejeitado',
+    };
+    const statusClass: Record<string, string> = {
+      pending: 'st-pending',
+      approved: 'st-approved',
+      partially_approved: 'st-partial',
+      rejected: 'st-rejected',
+    };
+
+    const statusFilterLabel =
+      statusOptions.find(o => o.value === statusFilter)?.label || 'Todos os Estados';
+
+    // Group by absence_type
+    const grouped = new Map<string, typeof filteredRequests>();
+    filteredRequests.forEach(req => {
+      const key = req.absence_type;
+      const arr = grouped.get(key) || [];
+      arr.push(req);
+      grouped.set(key, arr);
+    });
+
+    // Sort categories by predefined order, then unknown
+    const categoryOrder = [
+      'vacation',
+      'sick_leave',
+      'appointment',
+      'personal_leave',
+      'maternity',
+      'paternity',
+      'training',
+      'other',
+    ];
+    const sortedCategories = Array.from(grouped.keys()).sort((a, b) => {
+      const ia = categoryOrder.indexOf(a);
+      const ib = categoryOrder.indexOf(b);
+      return (ia === -1 ? 999 : ia) - (ib === -1 ? 999 : ib);
+    });
+
+    const formatPeriod = (req: AbsenceRequest) => {
+      const periods = req.periods || [];
+      if (periods.length === 0) return '-';
+      const starts = periods
+        .map(p => p.start_date)
+        .filter(Boolean)
+        .sort();
+      const ends = periods
+        .map(p => p.end_date)
+        .filter(Boolean)
+        .sort();
+      const minStart = starts[0];
+      const maxEnd = ends[ends.length - 1];
+      if (!minStart || !maxEnd) return '-';
+      if (minStart === maxEnd) {
+        return format(new Date(minStart), 'dd/MM/yyyy', { locale: pt });
+      }
+      const compact =
+        periods.length > 1
+          ? ` <span class="muted">(${periods.length} períodos)</span>`
+          : '';
+      return `${format(new Date(minStart), 'dd/MM/yyyy', { locale: pt })} – ${format(new Date(maxEnd), 'dd/MM/yyyy', { locale: pt })}${compact}`;
+    };
+
+    const formatDays = (n: number) => (n % 1 === 0 ? n.toString() : n.toFixed(2));
+    const sumDays = (reqs: typeof filteredRequests) =>
+      reqs.reduce(
+        (acc, r) => acc + (r.periods || []).reduce((s, p) => s + Number(p.business_days || 0), 0),
+        0
+      );
+
+    let totalDaysAll = 0;
+    const sections = sortedCategories
+      .map(cat => {
+        const items = grouped.get(cat) || [];
+        const sortedItems = [...items].sort((a, b) => {
+          const aStart = (a.periods || []).map(p => p.start_date).sort()[0] || '';
+          const bStart = (b.periods || []).map(p => p.start_date).sort()[0] || '';
+          return aStart.localeCompare(bStart);
+        });
+        const categoryLabel = absenceTypeLabels[cat] || cat;
+        const catDays = sumDays(items);
+        totalDaysAll += catDays;
+
+        const rows = sortedItems
+          .map(req => {
+            const reqDays = (req.periods || []).reduce(
+              (s, p) => s + Number(p.business_days || 0),
+              0
+            );
+            return `<tr>
+                <td>${escapeHtml(req.employee.name)}</td>
+                <td>${escapeHtml(req.company?.name || '-')}</td>
+                <td>${formatPeriod(req)}</td>
+                <td class="num">${formatDays(reqDays)}</td>
+                <td><span class="badge ${statusClass[req.status] || ''}">${statusLabels[req.status] || req.status}</span></td>
+              </tr>`;
+          })
+          .join('');
+
+        return `<section class="cat">
+            <h2>${escapeHtml(categoryLabel)}
+              <span class="cat-meta">${items.length} ${items.length === 1 ? 'pedido' : 'pedidos'} · ${formatDays(catDays)} dias</span>
+            </h2>
+            <table>
+              <thead>
+                <tr>
+                  <th>Colaborador</th>
+                  <th>Empresa</th>
+                  <th>Período</th>
+                  <th style="text-align:right">Dias úteis</th>
+                  <th>Estado</th>
+                </tr>
+              </thead>
+              <tbody>${rows}</tbody>
+            </table>
+          </section>`;
+      })
+      .join('');
+
+    const html = `<!DOCTYPE html><html lang="pt"><head><meta charset="utf-8" />
+      <title>Relatório de Pedidos de Ausência</title>
+      <style>
+        @page { size: A4 portrait; margin: 12mm; }
+        * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+        body { font-family: Arial, sans-serif; font-size: 10.5px; color: #111; margin: 0; padding: 0; }
+        header { display: flex; align-items: center; justify-content: space-between; border-bottom: 2px solid #B7933D; padding-bottom: 10px; margin-bottom: 12px; }
+        header img { height: 48px; }
+        header .title { text-align: right; }
+        header h1 { font-size: 15px; margin: 0; color: #111; }
+        header .subtitle { font-size: 10px; color: #666; margin-top: 2px; }
+        .filters { font-size: 10px; color: #666; margin-bottom: 12px; padding: 6px 10px; background: #fafafa; border: 1px solid #e5e5e5; border-radius: 6px; }
+        .filters strong { color: #111; }
+        section.cat { margin-bottom: 14px; page-break-inside: avoid; break-inside: avoid; }
+        section.cat h2 { font-size: 12px; font-weight: 700; color: #B7933D; border-bottom: 1px solid #B7933D55; padding-bottom: 3px; margin-bottom: 6px; display: flex; justify-content: space-between; align-items: baseline; }
+        .cat-meta { font-size: 10px; color: #666; font-weight: 500; }
+        table { width: 100%; border-collapse: collapse; }
+        th, td { border-bottom: 1px solid #eee; padding: 5px 7px; text-align: left; vertical-align: top; }
+        th { background: #f3f3f3; font-size: 9.5px; text-transform: uppercase; letter-spacing: 0.04em; color: #444; }
+        td.num { text-align: right; font-variant-numeric: tabular-nums; }
+        .muted { color: #999; }
+        .badge { display: inline-block; padding: 1px 7px; border-radius: 10px; font-size: 9px; font-weight: 600; }
+        .st-pending { background: #fef3c7; color: #92400e; }
+        .st-approved { background: #d1fae5; color: #065f46; }
+        .st-partial { background: #dbeafe; color: #1e40af; }
+        .st-rejected { background: #fee2e2; color: #991b1b; }
+        .totals { margin-top: 14px; padding: 8px 12px; background: #fafafa; border: 1px solid #e5e5e5; border-radius: 6px; display: flex; justify-content: space-between; font-size: 11px; font-weight: 700; }
+        footer { margin-top: 14px; font-size: 9px; color: #888; text-align: right; }
+      </style></head>
+      <body>
+        <header>
+          <img src="${logoBase64}" alt="Realize" />
+          <div class="title">
+            <h1>Relatório de Pedidos de Ausência</h1>
+            <div class="subtitle">${filteredRequests.length} pedidos · ${sortedCategories.length} categorias</div>
+          </div>
+        </header>
+        <div class="filters">
+          <strong>Filtros:</strong> Estado: ${escapeHtml(statusFilterLabel)}${searchTerm ? ` · Pesquisa: "${escapeHtml(searchTerm)}"` : ''}
+        </div>
+        ${sections}
+        <div class="totals">
+          <span>TOTAL: ${filteredRequests.length} pedidos</span>
+          <span>${formatDays(totalDaysAll)} dias úteis</span>
+        </div>
+        <footer>Documento gerado em ${format(new Date(), 'dd/MM/yyyy', { locale: pt })}</footer>
+        <script>
+          setTimeout(function() { window.print(); window.onafterprint = function() { window.close(); }; }, 300);
+        </script>
+      </body></html>`;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+  };
+
   const pendingCount = filteredRequests.filter(r => r.status === 'pending').length;
   const approvedCount = filteredRequests.filter(
     r => r.status === 'approved' || r.status === 'partially_approved'
@@ -330,10 +531,19 @@ const AbsenceRequestsPage = () => {
               Gerir pedidos de férias e ausências dos colaboradores
             </p>
           </div>
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             <Button variant="gold" onClick={() => setAddDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />
               Adicionar
+            </Button>
+            <Button
+              variant="outline"
+              onClick={handlePrintReport}
+              disabled={isLoading || filteredRequests.length === 0}
+            >
+              <Printer className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Imprimir Relatório</span>
+              <span className="sm:hidden">Imprimir</span>
             </Button>
             <Button variant="outline" onClick={() => refetch()} disabled={isLoading}>
               <RefreshCw className={`h-4 w-4 mr-2 ${isLoading ? 'animate-spin' : ''}`} />

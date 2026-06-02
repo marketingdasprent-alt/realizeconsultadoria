@@ -11,10 +11,13 @@ import {
   ArrowUp,
   ArrowDown,
   ArrowUpDown,
+  Cake,
   CalendarDays,
   Upload,
   RefreshCw,
   Loader2,
+  UserCheck,
+  UserX,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -33,6 +36,13 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
@@ -58,6 +68,12 @@ const EmployeesPage = () => {
   const activeTab: 'personal' | 'financial' =
     searchParams.get('tab') === 'financial' ? 'financial' : 'personal';
   const searchTerm = searchParams.get('q') || '';
+  const statusFilter: 'active' | 'inactive' | 'all' =
+    searchParams.get('status') === 'inactive'
+      ? 'inactive'
+      : searchParams.get('status') === 'all'
+        ? 'all'
+        : 'active';
 
   const setActiveTab = useCallback(
     (tab: 'personal' | 'financial') => {
@@ -81,6 +97,21 @@ const EmployeesPage = () => {
           const next = new URLSearchParams(prev);
           if (term) next.set('q', term);
           else next.delete('q');
+          return next;
+        },
+        { replace: true }
+      );
+    },
+    [setSearchParams]
+  );
+
+  const setStatusFilter = useCallback(
+    (status: 'active' | 'inactive' | 'all') => {
+      setSearchParams(
+        prev => {
+          const next = new URLSearchParams(prev);
+          if (status === 'active') next.delete('status');
+          else next.set('status', status);
           return next;
         },
         { replace: true }
@@ -214,7 +245,27 @@ const EmployeesPage = () => {
       (employee.iban || '').toLowerCase().includes(searchTerm.toLowerCase())
   );
 
-  const sortedEmployees = [...filteredEmployees].sort((a, b) => {
+  // KPI stats: refletem a pesquisa mas não o filtro de status
+  // (o filtro de status existe precisamente para escolher Ativos/Inativos).
+  const currentMonthIdx = new Date().getMonth();
+  const stats = {
+    active: filteredEmployees.filter(e => e.is_active).length,
+    inactive: filteredEmployees.filter(e => !e.is_active).length,
+    birthdays: filteredEmployees.filter(e => {
+      // @ts-expect-error - Supabase relational data typing
+      if (!e.birth_date) return false;
+      // @ts-expect-error - Supabase relational data typing
+      return new Date(e.birth_date).getMonth() === currentMonthIdx;
+    }).length,
+  };
+
+  const statusFilteredEmployees = filteredEmployees.filter(employee => {
+    if (statusFilter === 'all') return true;
+    if (statusFilter === 'active') return employee.is_active;
+    return !employee.is_active;
+  });
+
+  const sortedEmployees = [...statusFilteredEmployees].sort((a, b) => {
     let comparison = 0;
 
     switch (sortField) {
@@ -568,28 +619,76 @@ const EmployeesPage = () => {
           </div>
         </div>
 
-        {/* Search */}
+        {/* KPI Cards */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <Card className="shadow-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
+                <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
+                <span>Ativos</span>
+              </div>
+              <div className="text-2xl font-bold tabular-nums leading-tight">{stats.active}</div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
+                <UserX className="h-3.5 w-3.5 text-destructive" />
+                <span>Inativos</span>
+              </div>
+              <div className="text-2xl font-bold tabular-nums leading-tight text-muted-foreground">
+                {stats.inactive}
+              </div>
+            </CardContent>
+          </Card>
+          <Card className="shadow-card">
+            <CardContent className="p-4">
+              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
+                <Cake className="h-3.5 w-3.5 text-gold" />
+                <span>Aniversariantes do Mês</span>
+              </div>
+              <div className="text-2xl font-bold tabular-nums leading-tight">{stats.birthdays}</div>
+            </CardContent>
+          </Card>
+        </div>
+
+        {/* Search + Status filter */}
         <Card className="shadow-card">
           <CardContent className="pt-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                autoComplete="off"
-                autoCorrect="off"
-                autoCapitalize="off"
-                spellCheck={false}
-                inputMode="search"
-                name="search-employees"
-                placeholder={
-                  activeTab === 'financial'
-                    ? 'Pesquisar por nome, IBAN ou empresa...'
-                    : 'Pesquisar por nome, email ou empresa...'
-                }
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="relative flex-1">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  type="search"
+                  autoComplete="off"
+                  autoCorrect="off"
+                  autoCapitalize="off"
+                  spellCheck={false}
+                  inputMode="search"
+                  name="search-employees"
+                  placeholder={
+                    activeTab === 'financial'
+                      ? 'Pesquisar por nome, IBAN ou empresa...'
+                      : 'Pesquisar por nome, email ou empresa...'
+                  }
+                  value={searchTerm}
+                  onChange={e => setSearchTerm(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <Select
+                value={statusFilter}
+                onValueChange={value => setStatusFilter(value as 'active' | 'inactive' | 'all')}
+              >
+                <SelectTrigger className="w-full sm:w-[160px]">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="active">Ativos</SelectItem>
+                  <SelectItem value="inactive">Inativos</SelectItem>
+                  <SelectItem value="all">Todos</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
           </CardContent>
         </Card>

@@ -570,15 +570,18 @@ const AbsenceRequestsPage = () => {
 
       const yearStart = `${currentYear}-01-01`;
       const yearEnd = `${currentYear}-12-31`;
+      const today = new Date().toISOString().slice(0, 10);
       const scheduledMap = new Map<string, number>();
-      // Para cálculo cronológico do excedente
+      // Para cálculo do excedente por prioridade (aprovadas passadas →
+      // aprovadas futuras → pendentes)
       const absencesByEmployee = new Map<
         string,
-        Array<{ id: string; days: number; firstDate: string }>
+        Array<{ id: string; days: number; firstDate: string; status: string }>
       >();
       ((empAbsencesRes.data || []) as Array<{
         id: string;
         employee_id: string;
+        status: string;
         absence_periods: { business_days: number; start_date: string }[] | null;
       }>).forEach(a => {
         const yearPeriods = (a.absence_periods || []).filter(
@@ -590,20 +593,33 @@ const AbsenceRequestsPage = () => {
 
         const firstDate = yearPeriods.map(p => p.start_date).sort()[0];
         const arr = absencesByEmployee.get(a.employee_id) || [];
-        arr.push({ id: a.id, days: sum, firstDate });
+        arr.push({ id: a.id, days: sum, firstDate, status: a.status });
         absencesByEmployee.set(a.employee_id, arr);
       });
 
-      // Identificar absences cujo cumulativo cronológico excedeu o selfMax
+      // Identificar absences que excederam o selfMax aplicando prioridade:
+      // 1) Aprovadas passadas (já gozadas)
+      // 2) Aprovadas futuras (compromisso firmado)
+      // 3) Pendentes (ainda não confirmadas)
+      // Dentro de cada grupo, ordem cronológica.
       absencesByEmployee.forEach((list, empId) => {
         const bal = balanceMap.get(empId);
         if (!bal) return;
         const selfMax =
           bal.self_schedulable_days != null ? Number(bal.self_schedulable_days) : null;
         if (selfMax === null) return;
-        const sorted = [...list].sort((a, b) => a.firstDate.localeCompare(b.firstDate));
+        const byDate = (a: { firstDate: string }, b: { firstDate: string }) =>
+          a.firstDate.localeCompare(b.firstDate);
+        const approvedPast = list
+          .filter(a => a.status === 'approved' && a.firstDate < today)
+          .sort(byDate);
+        const approvedFuture = list
+          .filter(a => a.status === 'approved' && a.firstDate >= today)
+          .sort(byDate);
+        const pending = list.filter(a => a.status === 'pending').sort(byDate);
+        const ordered = [...approvedPast, ...approvedFuture, ...pending];
         let cumul = 0;
-        for (const abs of sorted) {
+        for (const abs of ordered) {
           cumul += abs.days;
           if (cumul > selfMax) exceededAbsenceIds.add(abs.id);
         }

@@ -5,6 +5,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Input } from '@/components/ui/input';
 import { getLogoBase64 } from '@/lib/logo-utils';
+import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -479,10 +480,141 @@ const AbsenceRequestsPage = () => {
 
     const mainGrouped = groupByCategory(mainRequests);
     const mainCategories = sortCategories(Array.from(mainGrouped.keys()));
+
+    // Saldo de férias por colaborador (só para a categoria 'vacation')
+    let vacationQuotaHtml = '';
+    const vacationRequests = mainRequests.filter(r => r.absence_type === 'vacation');
+    const vacationEmpIds = Array.from(new Set(vacationRequests.map(r => r.employee.id)));
+    const currentYear = new Date().getFullYear();
+
+    if (vacationEmpIds.length > 0) {
+      const [balancesRes, empAbsencesRes] = await Promise.all([
+        supabase
+          .from('employee_vacation_balances')
+          .select('employee_id, total_days, used_days, self_schedulable_days')
+          .eq('year', currentYear)
+          .in('employee_id', vacationEmpIds),
+        supabase
+          .from('absences')
+          .select('id, employee_id, status, absence_periods(business_days, start_date)')
+          .eq('absence_type', 'vacation')
+          .eq('created_by_role', 'employee')
+          .in('status', ['pending', 'approved'])
+          .in('employee_id', vacationEmpIds),
+      ]);
+
+      const balanceMap = new Map(
+        (balancesRes.data || []).map(b => [b.employee_id, b])
+      );
+
+      const yearStart = `${currentYear}-01-01`;
+      const yearEnd = `${currentYear}-12-31`;
+      const scheduledMap = new Map<string, number>();
+      ((empAbsencesRes.data || []) as Array<{
+        employee_id: string;
+        absence_periods: { business_days: number; start_date: string }[] | null;
+      }>).forEach(a => {
+        const sum = (a.absence_periods || [])
+          .filter(p => p.start_date >= yearStart && p.start_date <= yearEnd)
+          .reduce((s, p) => s + Number(p.business_days || 0), 0);
+        scheduledMap.set(a.employee_id, (scheduledMap.get(a.employee_id) || 0) + sum);
+      });
+
+      // Pendentes (deste relatório, da categoria férias)
+      const pendingMap = new Map<string, number>();
+      vacationRequests
+        .filter(r => r.status === 'pending')
+        .forEach(req => {
+          const sum = requestedDays(req);
+          pendingMap.set(req.employee.id, (pendingMap.get(req.employee.id) || 0) + sum);
+        });
+
+      const employeesById = new Map<string, AbsenceRequest['employee']>();
+      vacationRequests.forEach(r => employeesById.set(r.employee.id, r.employee));
+      const employeesArr = Array.from(employeesById.values()).sort((a, b) =>
+        a.name.toLowerCase().localeCompare(b.name.toLowerCase())
+      );
+
+      const quotaRows = employeesArr
+        .map(emp => {
+          const balance = balanceMap.get(emp.id);
+          const scheduled = scheduledMap.get(emp.id) || 0;
+          const pending = pendingMap.get(emp.id) || 0;
+
+          if (!balance) {
+            return `<tr>
+                <td>${escapeHtml(emp.name)}</td>
+                <td colspan="6" class="muted">Sem saldo configurado para ${currentYear}</td>
+              </tr>`;
+          }
+
+          const total = Number(balance.total_days) || 0;
+          const used = Number(balance.used_days) || 0;
+          const available = total - used;
+          const selfMax =
+            balance.self_schedulable_days != null ? Number(balance.self_schedulable_days) : null;
+          const remainingSelf =
+            selfMax !== null ? Math.max(0, selfMax - scheduled) : available;
+          const adminReserved =
+            selfMax !== null
+              ? Math.max(0, total - Math.max(scheduled, selfMax))
+              : 0;
+          const adminReservedTheoretical = selfMax !== null ? total - selfMax : 0;
+
+          return `<tr>
+              <td>${escapeHtml(emp.name)}</td>
+              <td class="num">${formatDays(total)}</td>
+              <td class="num">${formatDays(used)}</td>
+              <td class="num ${pending > 0 ? 'warn' : 'muted'}">${formatDays(pending)}</td>
+              <td class="num">${
+                selfMax !== null
+                  ? `${formatDays(remainingSelf)} <span class="muted">/ ${formatDays(selfMax)}</span>`
+                  : `${formatDays(available)} <span class="muted">(todos)</span>`
+              }</td>
+              <td class="num">${
+                selfMax !== null
+                  ? `${formatDays(adminReserved)} <span class="muted">/ ${formatDays(adminReservedTheoretical)}</span>`
+                  : '<span class="muted">—</span>'
+              }</td>
+              <td class="num strong">${formatDays(available)}</td>
+            </tr>`;
+        })
+        .join('');
+
+      vacationQuotaHtml = `<section class="quota-summary">
+          <h3>Saldo de Férias por Colaborador <small>(ano ${currentYear})</small></h3>
+          <table>
+            <thead>
+              <tr>
+                <th>Colaborador</th>
+                <th style="text-align:right">Total</th>
+                <th style="text-align:right">Usados</th>
+                <th style="text-align:right">Pendentes</th>
+                <th style="text-align:right">Pode Marcar</th>
+                <th style="text-align:right">Empresa</th>
+                <th style="text-align:right">Disponíveis</th>
+              </tr>
+            </thead>
+            <tbody>${quotaRows}</tbody>
+          </table>
+          <div class="quota-note">
+            Colaborador que excedeu a sua quota própria: o excedente desconta da
+            reserva da empresa.
+          </div>
+        </section>`;
+    }
+
     const mainSections = mainCategories
-      .map(cat =>
-        buildSection(cat, mainGrouped.get(cat) || [], { dayMode: 'approved', showSubtotal: true })
-      )
+      .map(cat => {
+        const section = buildSection(cat, mainGrouped.get(cat) || [], {
+          dayMode: 'approved',
+          showSubtotal: true,
+        });
+        if (cat === 'vacation' && vacationQuotaHtml) {
+          return section + vacationQuotaHtml;
+        }
+        return section;
+      })
       .join('');
 
     const rejectedGrouped = groupByCategory(rejectedRequests);
@@ -672,6 +804,40 @@ const AbsenceRequestsPage = () => {
           font-size: 13px;
           font-weight: 700;
           color: #5a4a1f;
+        }
+        .quota-summary {
+          margin-top: 4px;
+          margin-bottom: 18px;
+          padding: 10px 12px;
+          background: #fafaf5;
+          border: 1px solid #B7933D33;
+          border-radius: 8px;
+          page-break-inside: avoid;
+          break-inside: avoid;
+        }
+        .quota-summary h3 {
+          font-size: 11px;
+          font-weight: 700;
+          color: #B7933D;
+          margin: 0 0 8px;
+          text-transform: uppercase;
+          letter-spacing: 0.05em;
+        }
+        .quota-summary h3 small {
+          color: #999;
+          font-weight: 400;
+          text-transform: none;
+          font-size: 10px;
+        }
+        .quota-summary table { font-size: 10px; }
+        .quota-summary th { background: transparent; }
+        .quota-summary .strong { font-weight: 700; color: #B7933D; }
+        .quota-summary .warn { color: #d97706; font-weight: 600; }
+        .quota-note {
+          margin-top: 6px;
+          font-size: 9px;
+          color: #888;
+          font-style: italic;
         }
         .rejected-divider {
           margin: 28px 0 16px;

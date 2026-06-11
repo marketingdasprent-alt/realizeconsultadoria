@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import { getAppBaseUrl } from '@/lib/utils';
 
 export const authService = {
   /**
@@ -50,7 +51,7 @@ export const authService = {
   resetPassword: async (email: string) => {
     try {
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
-        redirectTo: `${window.location.origin}/auth/set-password`,
+        redirectTo: `${getAppBaseUrl()}/auth/set-password`,
       });
       if (error) throw error;
       return { success: true, error: null };

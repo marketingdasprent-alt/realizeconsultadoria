@@ -10,6 +10,7 @@ import { motion } from 'framer-motion';
 import logo from '@/assets/logo-realize.png';
 import { useDeviceDetect } from '@/hooks/useDeviceDetect';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
+import { getAppBaseUrl } from '@/lib/utils';
 
 const EmployeeLoginPage = () => {
   const navigate = useNavigate();
@@ -150,7 +151,7 @@ const EmployeeLoginPage = () => {
       const { error } = await supabase.functions.invoke('recover-password', {
         body: {
           email: forgotPasswordEmail.trim().toLowerCase(),
-          redirectTo: `${window.location.origin}/auth/set-password?mode=employee`,
+          redirectTo: `${getAppBaseUrl()}/auth/set-password?mode=employee`,
         },
       });
 

@@ -151,9 +151,10 @@ describe('authService', () => {
 
   describe('resetPassword', () => {
     it('should send password reset email', async () => {
-      // Mock window.location.origin
+      // Em localhost, usa a origin local (dev)
       Object.defineProperty(window, 'location', {
-        value: { origin: 'http://localhost:5173' },
+        value: { origin: 'http://localhost:5173', hostname: 'localhost' },
+        configurable: true,
       });
 
       vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({
@@ -181,9 +182,11 @@ describe('authService', () => {
       expect(result.error).toBeDefined();
     });
 
-    it('should use correct redirect URL', async () => {
+    it('should always use the production URL outside localhost (never preview domains)', async () => {
+      // Simula abertura a partir de um domínio de preview (ex.: Lovable)
       Object.defineProperty(window, 'location', {
-        value: { origin: 'https://example.com' },
+        value: { origin: 'https://preview.lovableproject.com', hostname: 'preview.lovableproject.com' },
+        configurable: true,
       });
 
       vi.mocked(supabase.auth.resetPasswordForEmail).mockResolvedValue({
@@ -194,7 +197,7 @@ describe('authService', () => {
       await authService.resetPassword('test@example.com');
 
       expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith('test@example.com', {
-        redirectTo: 'https://example.com/auth/set-password',
+        redirectTo: 'https://realize.dasprent.pt/auth/set-password',
       });
     });
   });

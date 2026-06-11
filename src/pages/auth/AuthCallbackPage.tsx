@@ -4,6 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { Loader2, CheckCircle, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoRealize from '@/assets/logo-realize.png';
+import { getAppBaseUrl } from '@/lib/utils';
 
 const AuthCallbackPage = () => {
   const navigate = useNavigate();
@@ -253,7 +254,7 @@ const AuthCallbackPage = () => {
 
   // Build PWA URL with token
   const getPWAUrl = () => {
-    const baseUrl = window.location.origin;
+    const baseUrl = getAppBaseUrl();
     if (transferToken) {
       return `${baseUrl}/auth/pwa?token=${transferToken}`;
     }

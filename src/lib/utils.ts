@@ -5,6 +5,31 @@ export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
+/**
+ * URL canónico de produção da aplicação.
+ * Usado para construir links em emails (reset de password, etc.) de forma a
+ * NUNCA apontarem para domínios de preview (ex.: Lovable), mesmo que a app
+ * tenha sido aberta a partir de um.
+ */
+export const APP_BASE_URL = 'https://realize.dasprent.pt';
+
+/**
+ * Devolve a origem a usar para links externos (emails).
+ * - Em desenvolvimento local (localhost / 127.0.0.1) usa a origem atual,
+ *   para que o fluxo funcione no ambiente de dev.
+ * - Em qualquer outro caso devolve sempre o domínio de produção,
+ *   ignorando domínios de preview como o Lovable.
+ */
+export function getAppBaseUrl(): string {
+  if (typeof window !== 'undefined') {
+    const host = window.location.hostname;
+    if (host === 'localhost' || host === '127.0.0.1') {
+      return window.location.origin;
+    }
+  }
+  return APP_BASE_URL;
+}
+
 export function formatPhoneNumber(phone: string): string {
   if (!phone) return '';
   const cleaned = phone.replace(/\D/g, '');

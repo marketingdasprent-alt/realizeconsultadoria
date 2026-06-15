@@ -3,9 +3,9 @@
     "relation": ["delegate_permission/common.handle_all_urls"],
     "target": {
       "namespace": "android_app",
-      "package_name": "pt.dasprent.realize",
+      "package_name": "com.realizeconsultadoria.myapp",
       "sha256_cert_fingerprints": [
-        "2F:00:C5:19:9F:37:74:2F:52:64:95:00:C9:8A:3F:FB:4A:3F:EE:E8:BE:71:B0:9E:2A:98:69:44:47:F6:C1:11"
+        "A2:DF:77:5D:DA:37:D5:D8:16:7B:56:F5:31:5C:45:78:60:AC:A9:32:8F:5A:D5:91:6A:C2:7E:8C:A6:52:C6:F3"
       ]
     }
   }

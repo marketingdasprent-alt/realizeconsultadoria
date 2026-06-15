@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "pt.dasprent.realize",
+      "sha256_cert_fingerprints": [
+        "SUBSTITUIR_PELA_FINGERPRINT_DO_BUBBLEWRAP"
+      ]
+    }
+  }
+]

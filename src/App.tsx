@@ -30,6 +30,7 @@ import EmployeeDocumentsPage from './modules/employee/pages/EmployeeDocumentsPag
 import AuthCallbackPage from './pages/auth/AuthCallbackPage';
 import SetPasswordPage from './pages/auth/SetPasswordPage';
 import InstallPage from './pages/InstallPage';
+import DeleteAccountPage from './pages/DeleteAccountPage';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
@@ -50,6 +51,7 @@ const App = () => (
               <Route path="/politica-privacidade" element={<PrivacyPolicyPage />} />
               <Route path="/cookies" element={<CookiesPolicyPage />} />
               <Route path="/termos-condicoes" element={<TermsPage />} />
+              <Route path="/eliminar-conta" element={<DeleteAccountPage />} />
 
               {/* Auth Callback */}
               <Route path="/auth/callback" element={<AuthCallbackPage />} />

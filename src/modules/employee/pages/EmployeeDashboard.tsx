@@ -264,7 +264,8 @@ const EmployeeDashboard = () => {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    navigate('/');
+    const standalone = window.matchMedia('(display-mode: standalone)').matches;
+    navigate(standalone ? '/colaborador/login' : '/');
   };
 
   const refreshAbsences = async () => {

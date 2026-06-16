@@ -53,9 +53,31 @@ export default defineConfig(({ mode }) => ({
         globPatterns: ['**/*.{ico,png,svg,woff,woff2}'],
         navigateFallback: null,
         navigateFallbackDenylist: [/^\/~oauth/],
-        runtimeCaching: [],
         skipWaiting: true,
         clientsClaim: true,
+        runtimeCaching: [
+          {
+            urlPattern: ({ request }) =>
+              request.destination === 'document' ||
+              request.destination === 'script' ||
+              request.destination === 'style',
+            handler: 'NetworkFirst',
+            options: {
+              cacheName: 'app-shell',
+              networkTimeoutSeconds: 5,
+            },
+          },
+          {
+            urlPattern: ({ request }) =>
+              request.destination === 'image' ||
+              request.destination === 'font',
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'static-assets',
+              expiration: { maxAgeSeconds: 60 * 60 * 24 * 30 },
+            },
+          },
+        ],
       },
     }),
   ].filter(Boolean),

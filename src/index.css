@@ -9,6 +9,11 @@
    Estilo: Minimalista e Elegante
 */
 
+/* Force light mode — prevents Chrome/Android from applying forced dark mode */
+:root {
+  color-scheme: light;
+}
+
 @layer base {
   :root {
     /* Cores principais */

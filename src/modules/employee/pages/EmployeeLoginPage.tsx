@@ -12,6 +12,8 @@ import { useDeviceDetect } from '@/hooks/useDeviceDetect';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { getAppBaseUrl } from '@/lib/utils';
 
+const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
+
 const EmployeeLoginPage = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -192,14 +194,16 @@ const EmployeeLoginPage = () => {
           transition={{ duration: 0.5 }}
           className="max-w-md w-full mx-auto"
         >
-          <Button
-            variant="ghost"
-            onClick={() => (showForgotPassword ? setShowForgotPassword(false) : navigate('/'))}
-            className="mb-8 -ml-2"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {showForgotPassword ? 'Voltar ao login' : 'Voltar'}
-          </Button>
+          {(!isStandalone || showForgotPassword) && (
+            <Button
+              variant="ghost"
+              onClick={() => (showForgotPassword ? setShowForgotPassword(false) : navigate('/'))}
+              className="mb-8 -ml-2"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              {showForgotPassword ? 'Voltar ao login' : 'Voltar'}
+            </Button>
+          )}
 
           <div className="flex items-center gap-4 mb-8">
             <img src={logo} alt="Realize Logo" className="h-12 w-auto" />

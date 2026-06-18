@@ -185,7 +185,10 @@ describe('authService', () => {
     it('should always use the production URL outside localhost (never preview domains)', async () => {
       // Simula abertura a partir de um domínio de preview (ex.: Lovable)
       Object.defineProperty(window, 'location', {
-        value: { origin: 'https://preview.lovableproject.com', hostname: 'preview.lovableproject.com' },
+        value: {
+          origin: 'https://preview.lovableproject.com',
+          hostname: 'preview.lovableproject.com',
+        },
         configurable: true,
       });
 

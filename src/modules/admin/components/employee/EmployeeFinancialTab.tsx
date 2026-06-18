@@ -105,8 +105,7 @@ const kmFormatter = new Intl.NumberFormat('pt-PT', {
 
 const formatKm = (value: number) => `${kmFormatter.format(value || 0)} km`;
 
-const formatTaxa = (value: number) =>
-  `${(value || 0).toFixed(2).replace('.', ',')} €/km`;
+const formatTaxa = (value: number) => `${(value || 0).toFixed(2).replace('.', ',')} €/km`;
 
 const focusCell = (cellId: string | null | undefined) => {
   if (!cellId) return;
@@ -278,13 +277,7 @@ interface AjudaCustoCellProps {
   employeeName: string;
 }
 
-const AjudaCustoCell = ({
-  km,
-  taxa,
-  canEdit,
-  onChangeTaxa,
-  employeeName,
-}: AjudaCustoCellProps) => {
+const AjudaCustoCell = ({ km, taxa, canEdit, onChangeTaxa, employeeName }: AjudaCustoCellProps) => {
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<string>(taxa ? String(taxa) : String(DEFAULT_TAXA_KM));
 
@@ -584,7 +577,10 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
       prevYear -= 1;
     }
 
-    const { data: prevData, error } = await employeeFinanceService.listByPeriod(prevYear, prevMonth);
+    const { data: prevData, error } = await employeeFinanceService.listByPeriod(
+      prevYear,
+      prevMonth
+    );
 
     if (error) {
       toast({
@@ -666,11 +662,7 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
     const monthLabel = MONTH_LABELS[month - 1];
 
     const escapeHtml = (s: string) =>
-      s
-        .replace(/&/g, '&amp;')
-        .replace(/</g, '&lt;')
-        .replace(/>/g, '&gt;')
-        .replace(/"/g, '&quot;');
+      s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
     const printChartData = [
       { name: 'Vencimento base', value: totals.recebido, color: CHART_COLORS.vencimento },
@@ -1162,12 +1154,7 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
                       tickFormatter={v => formatCurrency(v as number)}
                       tick={{ fontSize: 11 }}
                     />
-                    <YAxis
-                      type="category"
-                      dataKey="name"
-                      width={140}
-                      tick={{ fontSize: 12 }}
-                    />
+                    <YAxis type="category" dataKey="name" width={140} tick={{ fontSize: 12 }} />
                     <RechartsTooltip
                       formatter={(value: number) => formatCurrency(value)}
                       cursor={{ fill: 'rgba(0,0,0,0.04)' }}

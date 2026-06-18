@@ -133,8 +133,7 @@ const VacationBalanceCard = ({ employeeId }: VacationBalanceCardProps) => {
   const adminReservedDays = hasSelfSchedulableLimit
     ? Math.max(
         0,
-        balance.total_days -
-          Math.max(employeeScheduledDays, balance.self_schedulable_days!)
+        balance.total_days - Math.max(employeeScheduledDays, balance.self_schedulable_days!)
       )
     : 0;
 

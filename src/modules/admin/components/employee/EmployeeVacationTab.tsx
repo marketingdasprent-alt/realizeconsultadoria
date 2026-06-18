@@ -174,8 +174,7 @@ const EmployeeVacationTab = ({ employeeId, employeeName }: EmployeeVacationTabPr
   const savedTotal = balance?.total_days ?? 0;
   const savedSelfMax =
     balance?.self_schedulable_days != null ? Number(balance.self_schedulable_days) : null;
-  const savedAdminReservedTheoretical =
-    savedSelfMax !== null ? savedTotal - savedSelfMax : 0;
+  const savedAdminReservedTheoretical = savedSelfMax !== null ? savedTotal - savedSelfMax : 0;
   const remainingSelfSchedulable =
     savedSelfMax !== null ? Math.max(0, savedSelfMax - employeeScheduledDays) : null;
   // Se o colaborador marcou mais do que a sua quota, o excedente "come" da empresa

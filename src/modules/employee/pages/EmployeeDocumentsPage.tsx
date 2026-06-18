@@ -91,7 +91,7 @@ const EmployeeDocumentsPage = () => {
                   Meus Documentos
                 </h1>
                 <p className="text-xs lg:text-sm text-muted-foreground hidden sm:block">
-                  Documentos da empresa
+                  Documentos da empresa e os seus
                 </p>
               </div>
             </div>
@@ -109,7 +109,7 @@ const EmployeeDocumentsPage = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-4 lg:py-6">
-        <EmployeeDocumentsSection employeeId={employee.id} />
+        <EmployeeDocumentsSection employeeId={employee.id} employeeName={employee.name} />
       </main>
     </div>
   );

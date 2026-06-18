@@ -44,7 +44,8 @@ const DeleteAccountPage = () => {
           <h1 className="font-display text-3xl font-semibold">Eliminar Conta</h1>
         </div>
         <p className="text-muted-foreground mb-8">
-          Pode solicitar a eliminação da sua conta e de todos os dados associados a qualquer momento.
+          Pode solicitar a eliminação da sua conta e de todos os dados associados a qualquer
+          momento.
         </p>
 
         {/* Info cards */}
@@ -112,9 +113,7 @@ const DeleteAccountPage = () => {
                 />
               </div>
               <div>
-                <label className="block text-sm font-medium mb-1.5">
-                  Motivo (opcional)
-                </label>
+                <label className="block text-sm font-medium mb-1.5">Motivo (opcional)</label>
                 <Textarea
                   value={reason}
                   onChange={e => setReason(e.target.value)}

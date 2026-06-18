@@ -462,14 +462,8 @@ const AbsenceRequestsPage = () => {
     ) => {
       // Ordenar por nome do colaborador (acentos ignorados), depois por data
       const sortedItems = [...items].sort((a, b) => {
-        const aName = a.employee.name
-          .normalize('NFD')
-          .replace(/[̀-ͯ]/g, '')
-          .toLowerCase();
-        const bName = b.employee.name
-          .normalize('NFD')
-          .replace(/[̀-ͯ]/g, '')
-          .toLowerCase();
+        const aName = a.employee.name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+        const bName = b.employee.name.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
         const nameCompare = aName.localeCompare(bName);
         if (nameCompare !== 0) return nameCompare;
         const aStart = (a.periods || []).map(p => p.start_date).sort()[0] || '';
@@ -487,10 +481,8 @@ const AbsenceRequestsPage = () => {
         .map(req => {
           const isNewEmpGroup = prevEmpId !== null && prevEmpId !== req.employee.id;
           prevEmpId = req.employee.id;
-          const isExceeded =
-            categoryKey === 'vacation' && exceededAbsenceIds.has(req.id);
-          const isPartial =
-            categoryKey === 'vacation' && partialAbsenceIds.has(req.id);
+          const isExceeded = categoryKey === 'vacation' && exceededAbsenceIds.has(req.id);
+          const isPartial = categoryKey === 'vacation' && partialAbsenceIds.has(req.id);
           const classes = [
             isNewEmpGroup ? 'row-emp-divider' : '',
             isExceeded ? 'exceeded' : '',
@@ -571,9 +563,7 @@ const AbsenceRequestsPage = () => {
           .in('employee_id', vacationEmpIds),
       ]);
 
-      const balanceMap = new Map(
-        (balancesRes.data || []).map(b => [b.employee_id, b])
-      );
+      const balanceMap = new Map((balancesRes.data || []).map(b => [b.employee_id, b]));
 
       const yearStart = `${currentYear}-01-01`;
       const yearEnd = `${currentYear}-12-31`;
@@ -585,12 +575,14 @@ const AbsenceRequestsPage = () => {
         string,
         Array<{ id: string; days: number; firstDate: string; status: string }>
       >();
-      ((empAbsencesRes.data || []) as Array<{
-        id: string;
-        employee_id: string;
-        status: string;
-        absence_periods: { business_days: number; start_date: string }[] | null;
-      }>).forEach(a => {
+      (
+        (empAbsencesRes.data || []) as Array<{
+          id: string;
+          employee_id: string;
+          status: string;
+          absence_periods: { business_days: number; start_date: string }[] | null;
+        }>
+      ).forEach(a => {
         const yearPeriods = (a.absence_periods || []).filter(
           p => p.start_date >= yearStart && p.start_date <= yearEnd
         );
@@ -674,12 +666,9 @@ const AbsenceRequestsPage = () => {
           const available = total - used;
           const selfMax =
             balance.self_schedulable_days != null ? Number(balance.self_schedulable_days) : null;
-          const remainingSelf =
-            selfMax !== null ? Math.max(0, selfMax - scheduled) : available;
+          const remainingSelf = selfMax !== null ? Math.max(0, selfMax - scheduled) : available;
           const adminReserved =
-            selfMax !== null
-              ? Math.max(0, total - Math.max(scheduled, selfMax))
-              : 0;
+            selfMax !== null ? Math.max(0, total - Math.max(scheduled, selfMax)) : 0;
           const adminReservedTheoretical = selfMax !== null ? total - selfMax : 0;
 
           // Marcar excedido: colaborador marcou mais do que a sua quota propria
@@ -1093,10 +1082,7 @@ const AbsenceRequestsPage = () => {
             </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button
-                  variant="outline"
-                  disabled={isLoading || filteredRequests.length === 0}
-                >
+                <Button variant="outline" disabled={isLoading || filteredRequests.length === 0}>
                   <Printer className="h-4 w-4 mr-2" />
                   <span className="hidden sm:inline">Imprimir</span>
                   <ChevronDown className="h-3 w-3 ml-1.5 opacity-70" />
@@ -1209,8 +1195,7 @@ const AbsenceRequestsPage = () => {
             <span className="text-amber-900 font-medium">Filtros activos:</span>
             {statusFilter !== 'all' && (
               <Badge variant="secondary" className="bg-amber-100 text-amber-900 border-amber-300">
-                Estado:{' '}
-                {statusOptions.find(o => o.value === statusFilter)?.label || statusFilter}
+                Estado: {statusOptions.find(o => o.value === statusFilter)?.label || statusFilter}
               </Badge>
             )}
             {searchTerm && (

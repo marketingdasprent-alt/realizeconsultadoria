@@ -19,7 +19,8 @@ export default defineConfig(({ mode }) => ({
       manifest: {
         name: 'Realize - Portal de Gestão',
         short_name: 'Realize',
-        description: 'Portal de gestão de férias e ausências para colaboradores da Realize Consultadoria.',
+        description:
+          'Portal de gestão de férias e ausências para colaboradores da Realize Consultadoria.',
         theme_color: '#B7933D',
         background_color: '#ffffff',
         display: 'standalone',
@@ -69,8 +70,7 @@ export default defineConfig(({ mode }) => ({
           },
           {
             urlPattern: ({ request }) =>
-              request.destination === 'image' ||
-              request.destination === 'font',
+              request.destination === 'image' || request.destination === 'font',
             handler: 'CacheFirst',
             options: {
               cacheName: 'static-assets',

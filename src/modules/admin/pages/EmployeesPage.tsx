@@ -338,9 +338,7 @@ const EmployeesPage = () => {
       if (balancesRes.error) throw balancesRes.error;
       if (absencesRes.error) throw absencesRes.error;
 
-      const balanceByEmp = new Map(
-        (balancesRes.data || []).map(b => [b.employee_id, b])
-      );
+      const balanceByEmp = new Map((balancesRes.data || []).map(b => [b.employee_id, b]));
 
       type AbsenceRow = {
         employee_id: string;
@@ -369,7 +367,11 @@ const EmployeesPage = () => {
 
       const formatDays = (n: number) => (n % 1 === 0 ? n.toString() : n.toFixed(1));
       const escapeHtml = (s: string) =>
-        s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+        s
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;');
 
       // Build rows + totals
       let totTotal = 0;
@@ -406,9 +408,7 @@ const EmployeesPage = () => {
           // Se o colaborador marcou mais do que a sua quota própria (selfMax),
           // o excedente "come" da reserva da empresa.
           const adminReserved =
-            selfMax !== null
-              ? Math.max(0, total - Math.max(agg.scheduledByEmployee, selfMax))
-              : 0;
+            selfMax !== null ? Math.max(0, total - Math.max(agg.scheduledByEmployee, selfMax)) : 0;
 
           totTotal += total;
           totUsed += used;

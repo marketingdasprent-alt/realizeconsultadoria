@@ -99,7 +99,8 @@ const EmployeeDocumentsTab = ({ employeeId }: EmployeeDocumentsTabProps) => {
 
       if (uploadError) throw uploadError;
 
-      // Save metadata
+      // Save metadata. Mark the document as a company upload so the employee's
+      // "Meus Documentos" view can label it "Submetido pela empresa".
       const { error: dbError } = await supabase.from('employee_documents').insert({
         employee_id: employeeId,
         file_name: file.name,
@@ -109,6 +110,8 @@ const EmployeeDocumentsTab = ({ employeeId }: EmployeeDocumentsTabProps) => {
         category: selectedCategory || null,
         description: description || null,
         uploaded_by: userData.user.id,
+        uploaded_by_role: 'admin',
+        uploaded_by_name: userData.user.email || null,
       });
 
       if (dbError) throw dbError;

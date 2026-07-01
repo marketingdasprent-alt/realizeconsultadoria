@@ -9,6 +9,7 @@ import {
   Printer,
   RefreshCw,
   Search,
+  Users,
   X,
 } from 'lucide-react';
 import {
@@ -38,6 +39,7 @@ import AbsenceApprovalDialog from '@/components/admin/AbsenceApprovalDialog';
 import AbsenceDocumentsDialog from '@/components/admin/AbsenceDocumentsDialog';
 import AbsenceEditDialog from '@/components/admin/AbsenceEditDialog';
 import AdminAddAbsenceDialog from '@/components/admin/AdminAddAbsenceDialog';
+import AdminBulkAbsenceDialog from '@/components/admin/AdminBulkAbsenceDialog';
 import {
   Dialog,
   DialogContent,
@@ -84,6 +86,7 @@ const AbsenceRequestsPage = () => {
   const [isUnapproving, setIsUnapproving] = useState(false);
   const [unapproveNote, setUnapproveNote] = useState('');
   const [addDialogOpen, setAddDialogOpen] = useState(false);
+  const [bulkDialogOpen, setBulkDialogOpen] = useState(false);
 
   const handleStatusChange = (value: string) => {
     setStatusFilter(value);
@@ -1080,6 +1083,11 @@ const AbsenceRequestsPage = () => {
               <Plus className="h-4 w-4 mr-2" />
               Adicionar
             </Button>
+            <Button variant="outline" onClick={() => setBulkDialogOpen(true)}>
+              <Users className="h-4 w-4 mr-2" />
+              <span className="hidden sm:inline">Marcar em Massa</span>
+              <span className="sm:hidden">Massa</span>
+            </Button>
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button variant="outline" disabled={isLoading || filteredRequests.length === 0}>
@@ -1294,6 +1302,13 @@ const AbsenceRequestsPage = () => {
       <AdminAddAbsenceDialog
         open={addDialogOpen}
         onOpenChange={setAddDialogOpen}
+        holidays={holidays}
+        onSuccess={refetch}
+      />
+
+      <AdminBulkAbsenceDialog
+        open={bulkDialogOpen}
+        onOpenChange={setBulkDialogOpen}
         holidays={holidays}
         onSuccess={refetch}
       />

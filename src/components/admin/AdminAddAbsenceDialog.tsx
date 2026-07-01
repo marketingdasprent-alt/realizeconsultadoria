@@ -116,6 +116,7 @@ const AdminAddAbsenceDialog = ({
       const { data, error } = await supabase
         .from('employees')
         .select('id, name, company_id, companies(name)')
+        .eq('is_active', true)
         .order('name');
 
       if (error) throw error;

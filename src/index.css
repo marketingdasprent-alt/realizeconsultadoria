@@ -9,9 +9,40 @@
    Estilo: Minimalista e Elegante
 */
 
-/* Force light mode — prevents Chrome/Android from applying forced dark mode */
+/* Force light mode — prevents Chrome/Android/Samsung Browser from applying forced dark mode */
 :root {
   color-scheme: light;
+}
+
+/* Override any system or browser dark mode — this project is light-only */
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: light;
+    --background: 0 0% 100%;
+    --foreground: 0 0% 0%;
+    --card: 0 0% 100%;
+    --card-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 39 52% 68%;
+    --primary-foreground: 0 0% 0%;
+    --secondary: 40 30% 97%;
+    --secondary-foreground: 0 0% 0%;
+    --muted: 0 0% 96%;
+    --muted-foreground: 0 0% 45%;
+    --accent: 39 52% 68%;
+    --accent-foreground: 0 0% 0%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 0 0% 90%;
+    --input: 0 0% 90%;
+    --ring: 39 52% 68%;
+  }
+
+  html, body {
+    background-color: #ffffff !important;
+    color: #000000 !important;
+  }
 }
 
 @layer base {
@@ -83,35 +114,7 @@
     --shadow-card: 0 1px 3px hsla(0, 0%, 0%, 0.05), 0 10px 30px -10px hsla(0, 0%, 0%, 0.1);
   }
 
-  .dark {
-    --background: 0 0% 5%;
-    --foreground: 0 0% 98%;
 
-    --card: 0 0% 8%;
-    --card-foreground: 0 0% 98%;
-
-    --popover: 0 0% 8%;
-    --popover-foreground: 0 0% 98%;
-
-    --primary: 39 52% 68%;
-    --primary-foreground: 0 0% 0%;
-
-    --secondary: 0 0% 15%;
-    --secondary-foreground: 0 0% 98%;
-
-    --muted: 0 0% 15%;
-    --muted-foreground: 0 0% 65%;
-
-    --accent: 0 0% 15%;
-    --accent-foreground: 0 0% 98%;
-
-    --destructive: 0 62% 30%;
-    --destructive-foreground: 0 0% 98%;
-
-    --border: 0 0% 20%;
-    --input: 0 0% 20%;
-    --ring: 39 52% 68%;
-  }
 }
 
 @layer base {

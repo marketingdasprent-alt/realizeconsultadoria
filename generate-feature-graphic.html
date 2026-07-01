@@ -1,0 +1,153 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>Gerar Feature Graphic</title>
+<style>
+  body { margin: 0; background: #111; display: flex; flex-direction: column; align-items: center; padding: 20px; font-family: Arial; }
+  canvas { border: 1px solid #333; }
+  button { margin-top: 16px; padding: 12px 32px; background: #B7933D; color: white; border: none; border-radius: 8px; font-size: 16px; cursor: pointer; }
+  button:hover { background: #D4A843; }
+  p { color: #aaa; margin-top: 8px; font-size: 13px; }
+</style>
+</head>
+<body>
+<canvas id="c" width="1024" height="500"></canvas>
+<button onclick="download()">⬇ Guardar como PNG</button>
+<p>O ficheiro feature-graphic.png será guardado na pasta de Downloads.</p>
+
+<script>
+const canvas = document.getElementById('c');
+const ctx = canvas.getContext('2d');
+
+function draw() {
+  const W = 1024, H = 500;
+
+  // Background gradient
+  const bg = ctx.createLinearGradient(0, 0, W, H);
+  bg.addColorStop(0, '#1a1612');
+  bg.addColorStop(1, '#2d2318');
+  ctx.fillStyle = bg;
+  ctx.fillRect(0, 0, W, H);
+
+  // Glow circles
+  const glow1 = ctx.createRadialGradient(150, 250, 0, 150, 250, 300);
+  glow1.addColorStop(0, 'rgba(183,147,61,0.18)');
+  glow1.addColorStop(1, 'rgba(183,147,61,0)');
+  ctx.fillStyle = glow1;
+  ctx.fillRect(0, 0, W, H);
+
+  const glow2 = ctx.createRadialGradient(880, 180, 0, 880, 180, 280);
+  glow2.addColorStop(0, 'rgba(183,147,61,0.13)');
+  glow2.addColorStop(1, 'rgba(183,147,61,0)');
+  ctx.fillStyle = glow2;
+  ctx.fillRect(0, 0, W, H);
+
+  // Top/bottom border lines
+  ctx.strokeStyle = 'rgba(183,147,61,0.35)';
+  ctx.lineWidth = 2;
+  ctx.beginPath(); ctx.moveTo(0,1); ctx.lineTo(W,1); ctx.stroke();
+  ctx.beginPath(); ctx.moveTo(0,H-1); ctx.lineTo(W,H-1); ctx.stroke();
+
+  // Left gold accent bar
+  const goldBar = ctx.createLinearGradient(0, 155, 0, 345);
+  goldBar.addColorStop(0, '#D4A843');
+  goldBar.addColorStop(1, '#B7933D');
+  ctx.fillStyle = goldBar;
+  roundRect(ctx, 80, 155, 4, 190, 2);
+  ctx.fill();
+
+  // "Realize" text
+  ctx.fillStyle = '#FFFFFF';
+  ctx.font = 'bold 72px Georgia, serif';
+  ctx.letterSpacing = '-1px';
+  ctx.fillText('Realize', 112, 240);
+
+  // "CONSULTADORIA" text
+  ctx.fillStyle = '#B7933D';
+  ctx.font = '300 24px Arial, sans-serif';
+  ctx.letterSpacing = '6px';
+  ctx.fillText('CONSULTADORIA', 114, 285);
+
+  // Divider line
+  ctx.strokeStyle = 'rgba(183,147,61,0.5)';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(114, 305); ctx.lineTo(400, 305); ctx.stroke();
+
+  // Tagline below divider
+  ctx.fillStyle = '#c8b88a';
+  ctx.font = '18px Arial, sans-serif';
+  ctx.letterSpacing = '1px';
+  ctx.fillText('Portal de Gestão de Colaboradores', 114, 335);
+
+  // Feature cards (right side)
+  const cards = [
+    { x: 590, y: 90,  emoji: '🌴', title: 'Férias',      sub1: 'Gestão de ausências',   sub2: 'e pedidos online' },
+    { x: 800, y: 90,  emoji: '📅', title: 'Calendário',  sub1: 'Visualize ausências',    sub2: 'em tempo real' },
+    { x: 590, y: 210, emoji: '📄', title: 'Documentos',  sub1: 'Aceda aos seus',         sub2: 'documentos pessoais' },
+    { x: 800, y: 210, emoji: '🎫', title: 'Suporte',     sub1: 'Tickets internos',       sub2: 'sempre disponíveis' },
+  ];
+
+  cards.forEach(card => {
+    // Card background
+    ctx.fillStyle = 'rgba(255,255,255,0.04)';
+    roundRect(ctx, card.x, card.y, 190, 95, 12);
+    ctx.fill();
+
+    // Card border
+    ctx.strokeStyle = 'rgba(183,147,61,0.35)';
+    ctx.lineWidth = 1;
+    roundRect(ctx, card.x, card.y, 190, 95, 12);
+    ctx.stroke();
+
+    // Emoji
+    ctx.font = '28px Arial';
+    ctx.fillText(card.emoji, card.x + 16, card.y + 48);
+
+    // Title
+    ctx.fillStyle = '#FFFFFF';
+    ctx.font = 'bold 14px Arial';
+    ctx.letterSpacing = '0px';
+    ctx.fillText(card.title, card.x + 56, card.y + 38);
+
+    // Subtitles
+    ctx.fillStyle = '#c8b88a';
+    ctx.font = '12px Arial';
+    ctx.fillText(card.sub1, card.x + 56, card.y + 58);
+    ctx.fillText(card.sub2, card.x + 56, card.y + 75);
+  });
+
+  // Bottom URL
+  ctx.fillStyle = 'rgba(183,147,61,0.8)';
+  ctx.font = '13px Arial';
+  ctx.letterSpacing = '3px';
+  ctx.textAlign = 'center';
+  ctx.fillText('realize.dasprent.pt', W / 2, 438);
+  ctx.textAlign = 'left';
+}
+
+function roundRect(ctx, x, y, w, h, r) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.quadraticCurveTo(x + w, y, x + w, y + r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.quadraticCurveTo(x + w, y + h, x + w - r, y + h);
+  ctx.lineTo(x + r, y + h);
+  ctx.quadraticCurveTo(x, y + h, x, y + h - r);
+  ctx.lineTo(x, y + r);
+  ctx.quadraticCurveTo(x, y, x + r, y);
+  ctx.closePath();
+}
+
+function download() {
+  const link = document.createElement('a');
+  link.download = 'feature-graphic.png';
+  link.href = canvas.toDataURL('image/png');
+  link.click();
+}
+
+draw();
+</script>
+</body>
+</html>

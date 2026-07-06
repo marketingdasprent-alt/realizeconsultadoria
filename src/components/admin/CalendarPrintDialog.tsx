@@ -67,6 +67,7 @@ const CalendarPrintDialog = ({
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [viewYear, setViewYear] = useState(defaultDate.getFullYear());
   const [company, setCompany] = useState(defaultCompany);
+  const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [isGenerating, setIsGenerating] = useState(false);
 
   const now = new Date();
@@ -79,6 +80,7 @@ const CalendarPrintDialog = ({
       setSelected(new Set([monthKey(defaultDate.getFullYear(), defaultDate.getMonth())]));
       setViewYear(defaultDate.getFullYear());
       setCompany(defaultCompany);
+      setOrientation('portrait');
     }
   }, [open, defaultDate, defaultCompany]);
 
@@ -138,6 +140,7 @@ const CalendarPrintDialog = ({
            employees!inner ( name, companies ( name ) ),
            absence_periods ( start_date, end_date, status, period_type, start_time, end_time, business_days )`
         )
+        .eq('absence_type', 'vacation')
         .lte('start_date', format(rangeEnd, 'yyyy-MM-dd'))
         .gte('end_date', format(rangeStart, 'yyyy-MM-dd'))
         .in('status', ['approved', 'partially_approved']);
@@ -167,6 +170,7 @@ const CalendarPrintDialog = ({
         months: selectedList.map(m => ({ year: m.year, month: m.month })),
         companyLabel,
         logoBase64,
+        orientation,
       });
 
       const printWindow = window.open('', '_blank');
@@ -200,11 +204,11 @@ const CalendarPrintDialog = ({
         <DialogHeader>
           <DialogTitle className="font-display text-xl flex items-center gap-2">
             <CalendarRange className="h-5 w-5" />
-            Imprimir Calendário
+            Imprimir Mapa de Férias
           </DialogTitle>
           <DialogDescription>
-            Clique nos meses que quer imprimir. Cada mês sai numa folha horizontal com as ausências
-            aprovadas e o total de cada colaborador.
+            Clique nos meses que quer imprimir. Cada mês sai numa folha horizontal (A4) com as
+            férias aprovadas de cada colaborador no dia certo.
           </DialogDescription>
         </DialogHeader>
 
@@ -225,6 +229,31 @@ const CalendarPrintDialog = ({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* ── Orientation ── */}
+          <div>
+            <label className="block text-sm font-medium mb-2">Orientação da folha</label>
+            <div className="grid grid-cols-2 gap-2">
+              {([
+                ['portrait', 'Vertical'],
+                ['landscape', 'Horizontal'],
+              ] as const).map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  onClick={() => setOrientation(value)}
+                  className={cn(
+                    'h-10 rounded-md text-sm font-medium border transition-colors',
+                    orientation === value
+                      ? 'bg-primary text-primary-foreground border-primary'
+                      : 'bg-background text-foreground border-input hover:bg-accent'
+                  )}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
           </div>
 
           {/* ── Month grid ── */}

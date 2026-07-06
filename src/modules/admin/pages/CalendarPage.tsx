@@ -350,7 +350,7 @@ const CalendarPage = () => {
               </Select>
               <Button variant="outline" onClick={() => setPrintDialogOpen(true)}>
                 <Printer className="h-4 w-4 mr-2" />
-                Imprimir Calendário
+                Mapa de Férias
               </Button>
             </div>
           </div>

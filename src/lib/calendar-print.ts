@@ -1,7 +1,7 @@
 import { format, endOfMonth, eachDayOfInterval, getDay, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { absenceTypeLabels, absenceTypeColors, defaultAbsenceTypeColor } from './absence-types';
-import { isHoliday, isBusinessDay, countBusinessDays, type Holiday } from './vacation-utils';
+import { absenceTypeColors, defaultAbsenceTypeColor } from './absence-types';
+import { isHoliday, type Holiday } from './vacation-utils';
 
 interface PrintPeriod {
   start_date: string;
@@ -30,6 +30,7 @@ export interface CalendarPrintOptions {
   months: { year: number; month: number }[];
   companyLabel: string;
   logoBase64: string;
+  orientation: 'portrait' | 'landscape';
 }
 
 interface Segment {
@@ -38,8 +39,6 @@ interface Segment {
   partial: boolean;
   businessDays: number | null;
 }
-
-const MAX_CHIPS = 4;
 
 const escapeHtml = (s: string) =>
   s
@@ -54,9 +53,6 @@ const shortName = (full: string): string => {
   if (parts.length <= 1) return parts[0] || '';
   return `${parts[0]} ${parts[parts.length - 1][0]}.`;
 };
-
-const fmtDays = (n: number): string =>
-  n % 1 === 0 ? String(n) : n.toFixed(2).replace(/0$/, '').replace('.', ',');
 
 /**
  * Approved date segments of an absence. When the absence has periods, only the
@@ -104,52 +100,6 @@ const chipsForDay = (day: Date, absences: PrintAbsence[]): DayChip[] => {
   return chips;
 };
 
-/** Map<employeeName, Map<type, businessDays>> for a single month. */
-const computeMonthTotals = (
-  absences: PrintAbsence[],
-  monthStart: Date,
-  monthEnd: Date,
-  holidays: Holiday[]
-): Map<string, Map<string, number>> => {
-  const map = new Map<string, Map<string, number>>();
-
-  for (const a of absences) {
-    const name = a.employees?.name || '';
-    if (!name) continue;
-
-    for (const seg of approvedSegments(a)) {
-      let days = 0;
-
-      if (seg.partial) {
-        // Partial periods are single-day: count their fraction if the day falls
-        // within the month and is a working day.
-        if (
-          seg.start >= monthStart &&
-          seg.start <= monthEnd &&
-          isBusinessDay(seg.start, holidays)
-        ) {
-          days = seg.businessDays != null ? seg.businessDays : 0;
-        }
-      } else {
-        const s = seg.start < monthStart ? monthStart : seg.start;
-        const e = seg.end > monthEnd ? monthEnd : seg.end;
-        if (s <= e) days = countBusinessDays(s, e, holidays);
-      }
-
-      if (days <= 0) continue;
-
-      let tmap = map.get(name);
-      if (!tmap) {
-        tmap = new Map();
-        map.set(name, tmap);
-      }
-      tmap.set(a.absence_type, (tmap.get(a.absence_type) || 0) + days);
-    }
-  }
-
-  return map;
-};
-
 const typeChip = (type: string, content: string, extraClass = ''): string => {
   const c = absenceTypeColors[type] || defaultAbsenceTypeColor;
   return `<span class="${extraClass}" style="background:${c.fill};color:${c.text};border-color:${c.border}">${content}</span>`;
@@ -189,16 +139,9 @@ const buildMonthSheet = (
       const chips = chipsForDay(day, absences);
       if (chips.length > 0) {
         inner += '<div class="chips">';
-        chips.slice(0, MAX_CHIPS).forEach(ch => {
-          inner += typeChip(
-            ch.type,
-            escapeHtml(ch.name) + (ch.half ? ' ½' : ''),
-            'chip'
-          );
+        chips.forEach(ch => {
+          inner += typeChip(ch.type, escapeHtml(ch.name) + (ch.half ? ' ½' : ''), 'chip');
         });
-        if (chips.length > MAX_CHIPS) {
-          inner += `<span class="more">+${chips.length - MAX_CHIPS} mais</span>`;
-        }
         inner += '</div>';
       }
     }
@@ -211,40 +154,6 @@ const buildMonthSheet = (
   const trail = (7 - ((firstDow + days.length) % 7)) % 7;
   for (let i = 0; i < trail; i++) cells += '<div class="cell empty"></div>';
 
-  // ── Totals & legend ──
-  const totalsMap = computeMonthTotals(absences, monthStart, monthEnd, holidays);
-  const typesPresent = new Set<string>();
-
-  const totalsRows = Array.from(totalsMap.entries())
-    .map(([name, tmap]) => {
-      const parts = Array.from(tmap.entries());
-      parts.forEach(([t]) => typesPresent.add(t));
-      const total = parts.reduce((s, [, n]) => s + n, 0);
-      return { name, parts, total };
-    })
-    .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
-
-  const totalsHtml = totalsRows.length
-    ? totalsRows
-        .map(row => {
-          const chips = row.parts
-            .sort((a, b) => b[1] - a[1])
-            .map(([t, n]) =>
-              typeChip(t, `${fmtDays(n)} ${absenceTypeLabels[t] || t}`, 'tpart')
-            )
-            .join('');
-          return `<div class="trow"><span class="who">${escapeHtml(row.name)}</span><span class="tparts">${chips}</span></div>`;
-        })
-        .join('')
-    : '<div class="empty-note">Sem ausências aprovadas neste mês.</div>';
-
-  const legendHtml = Array.from(typesPresent)
-    .map(t => {
-      const c = absenceTypeColors[t] || defaultAbsenceTypeColor;
-      return `<span class="leg"><span class="swatch" style="background:${c.fill};border-color:${c.border}"></span>${absenceTypeLabels[t] || t}</span>`;
-    })
-    .join('');
-
   const monthLabel = format(monthStart, 'MMMM yyyy', { locale: pt });
 
   return `
@@ -252,11 +161,11 @@ const buildMonthSheet = (
       <div class="sheet-head">
         <div class="brand">
           <img src="${opts.logoBase64}" alt="Realize" />
-          <small>Calendário de ausências</small>
+          <small>Mapa de Férias</small>
         </div>
         <div class="month-title">
           <div class="m">${escapeHtml(monthLabel)}</div>
-          <div class="sub">Ausências aprovadas</div>
+          <div class="sub">Férias aprovadas</div>
         </div>
         <div class="sheet-meta">
           Empresa<br><strong>${escapeHtml(opts.companyLabel)}</strong>
@@ -264,17 +173,6 @@ const buildMonthSheet = (
       </div>
 
       <div class="grid">${cells}</div>
-
-      <div class="footer">
-        <div>
-          <p class="block-label">Legenda por tipo</p>
-          <div class="legend">${legendHtml || '<span class="muted">—</span>'}</div>
-        </div>
-        <div class="totals-wrap">
-          <p class="block-label">Totais do mês por colaborador</p>
-          <div class="totals">${totalsHtml}</div>
-        </div>
-      </div>
 
       <div class="sheet-foot">
         <span>Realize Consultadoria · Documento interno</span>
@@ -284,21 +182,24 @@ const buildMonthSheet = (
 };
 
 /**
- * Builds a full, self-contained HTML document with one landscape A4 sheet per
- * month in the [from, to] range. Meant to be written into a new window and
- * printed.
+ * Builds a full, self-contained HTML document — the "Mapa de Férias" — with one
+ * landscape A4 sheet per selected month. Meant to be written into a new window
+ * and printed.
  */
 export const generateCalendarPrintHtml = (opts: CalendarPrintOptions): string => {
   const months = [...opts.months].sort((a, b) => a.year - b.year || a.month - b.month);
   const sheets = months.map(mo => buildMonthSheet(mo.year, mo.month, opts));
 
   const generatedOn = format(new Date(), "dd/MM/yyyy 'às' HH:mm", { locale: pt });
+  const landscape = opts.orientation === 'landscape';
+  const pageSize = landscape ? 'A4 landscape' : 'A4 portrait';
+  const sheetWidth = landscape ? '277mm' : '190mm';
 
   return `<!DOCTYPE html>
 <html lang="pt">
 <head>
 <meta charset="utf-8" />
-<title>Calendário de Ausências</title>
+<title>Mapa de Férias</title>
 <link rel="icon" href="/favicon.png" type="image/png" />
 <style>
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
@@ -323,7 +224,7 @@ export const generateCalendarPrintHtml = (opts: CalendarPrintOptions): string =>
 
   .sheets { padding: 24px 16px 48px; }
   .sheet {
-    background: #fff; color: #1a1a1a; width: 277mm; max-width: 100%;
+    background: #fff; color: #1a1a1a; width: ${sheetWidth}; max-width: 100%;
     margin: 0 auto 20px; padding: 10mm 12mm; border-radius: 3px;
     box-shadow: 0 8px 28px rgba(0,0,0,.14);
   }
@@ -352,7 +253,7 @@ export const generateCalendarPrintHtml = (opts: CalendarPrintOptions): string =>
   .wd:nth-child(7n) { border-right: 0; }
   .wd.we { color: #b0a894; }
   .cell {
-    min-height: 74px; padding: 3px 5px 5px; background: #fff;
+    min-height: 60px; padding: 3px 5px 5px; background: #fff;
     border-right: 1px solid #e4e0d6; border-bottom: 1px solid #e4e0d6;
     display: flex; flex-direction: column; gap: 3px;
   }
@@ -363,26 +264,11 @@ export const generateCalendarPrintHtml = (opts: CalendarPrintOptions): string =>
   .dnum { font-size: 12px; font-weight: 700; color: #1a1a1a; font-variant-numeric: tabular-nums; line-height: 1.1; display: flex; align-items: baseline; gap: 5px; }
   .cell.we .dnum { color: #a89f8b; font-weight: 600; }
   .hol-name { font-size: 8.5px; font-weight: 600; color: #a07f2f; text-transform: none; letter-spacing: 0; }
-  .chips { display: flex; flex-direction: column; gap: 2px; }
+  .chips { display: flex; flex-direction: column; gap: 1.5px; }
   .chip {
-    font-size: 9.5px; font-weight: 600; line-height: 1.25; padding: 1.5px 5px;
+    font-size: 9.5px; font-weight: 600; line-height: 1.2; padding: 1px 5px;
     border-radius: 4px; border: 1px solid; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
   }
-  .more { font-size: 9px; font-weight: 700; color: #6b6b6b; padding: 0 4px; }
-
-  .footer { display: grid; grid-template-columns: 1fr; gap: 10px; margin-top: 12px; }
-  .block-label { font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #a07f2f; margin: 0 0 6px; }
-  .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; }
-  .leg { display: inline-flex; align-items: center; gap: 6px; font-size: 11px; }
-  .swatch { width: 12px; height: 12px; border-radius: 3px; border: 1px solid; flex: none; }
-  .totals-wrap { border-top: 1px dashed #cfc9bb; padding-top: 10px; }
-  .totals { display: grid; grid-template-columns: repeat(3, 1fr); gap: 4px 22px; }
-  .trow { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11px; padding: 2px 0; border-bottom: 1px solid #f0eee7; }
-  .trow .who { font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-  .tparts { display: flex; gap: 4px; flex: none; flex-wrap: wrap; justify-content: flex-end; }
-  .tpart { font-size: 9.5px; font-weight: 700; padding: 1px 6px; border-radius: 10px; border: 1px solid; font-variant-numeric: tabular-nums; }
-  .empty-note { font-size: 11px; color: #999; font-style: italic; }
-  .muted { color: #999; }
   .sheet-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 10px; color: #999; border-top: 1px solid #e4e0d6; padding-top: 8px; }
 
   @media print {
@@ -391,7 +277,7 @@ export const generateCalendarPrintHtml = (opts: CalendarPrintOptions): string =>
     .sheets { padding: 0; }
     .sheet { box-shadow: none; border-radius: 0; margin: 0; padding: 8mm; width: auto; page-break-after: always; }
     .sheet:last-child { page-break-after: auto; }
-    @page { size: A4 landscape; margin: 8mm; }
+    @page { size: ${pageSize}; margin: 8mm; }
   }
 </style>
 </head>

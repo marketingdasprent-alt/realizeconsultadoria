@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   format,
   startOfMonth,
@@ -24,17 +24,14 @@ import {
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import { supabase } from '@/integrations/supabase/client';
-import { isWeekend } from '@/lib/vacation-utils';
-import { absenceTypeLabels } from '@/lib/absence-types';
+import { isWeekend, isBusinessDay, countBusinessDays } from '@/lib/vacation-utils';
+import {
+  absenceTypeLabels,
+  absenceTypeColors,
+  defaultAbsenceTypeColor,
+} from '@/lib/absence-types';
+import CalendarPrintDialog from '@/components/admin/CalendarPrintDialog';
 
 interface AbsencePeriod {
   id: string;
@@ -83,6 +80,10 @@ const statusColors: Record<string, string> = {
   rejected: 'bg-red-500',
 };
 
+/** Format a day count for display: 10 → "10", 0.5 → "0,5". */
+const fmtDays = (n: number): string =>
+  n % 1 === 0 ? String(n) : n.toFixed(2).replace(/0$/, '').replace('.', ',');
+
 const CalendarPage = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
   const [absences, setAbsences] = useState<Absence[]>([]);
@@ -90,6 +91,7 @@ const CalendarPage = () => {
   const [holidays, setHolidays] = useState<Holiday[]>([]);
   const [selectedCompany, setSelectedCompany] = useState<string>('all');
   const [isLoading, setIsLoading] = useState(true);
+  const [printDialogOpen, setPrintDialogOpen] = useState(false);
 
   const monthStart = startOfMonth(currentDate);
   const monthEnd = endOfMonth(currentDate);
@@ -182,6 +184,72 @@ const CalendarPage = () => {
       : absences.filter(
           a => a.employees?.companies?.name === companies.find(c => c.id === selectedCompany)?.name
         );
+
+  /**
+   * Per-collaborator summary for the visible month: approved business days,
+   * broken down by absence type (clipped to the month). Powers the side list.
+   */
+  const monthSummary = useMemo(() => {
+    const perEmp = new Map<string, { name: string; parts: Map<string, number>; total: number }>();
+
+    for (const absence of filteredAbsences) {
+      const name = absence.employees?.name || '';
+      if (!name) continue;
+      const type = absence.absence_type;
+      const periods = absence.absence_periods || [];
+
+      const segments =
+        periods.length > 0
+          ? periods
+              .filter(p => (p.status || absence.status) === 'approved')
+              .map(p => ({
+                start: parseISO(p.start_date),
+                end: parseISO(p.end_date),
+                partial: p.period_type === 'partial',
+                bd: p.business_days != null ? Number(p.business_days) : null,
+              }))
+          : absence.status === 'approved'
+            ? [
+                {
+                  start: parseISO(absence.start_date),
+                  end: parseISO(absence.end_date),
+                  partial: false,
+                  bd: null,
+                },
+              ]
+            : [];
+
+      for (const seg of segments) {
+        let days = 0;
+        if (seg.partial) {
+          if (seg.start >= monthStart && seg.start <= monthEnd && isBusinessDay(seg.start, holidays)) {
+            days = seg.bd != null ? seg.bd : 0;
+          }
+        } else {
+          const s = seg.start < monthStart ? monthStart : seg.start;
+          const e = seg.end > monthEnd ? monthEnd : seg.end;
+          if (s <= e) days = countBusinessDays(s, e, holidays);
+        }
+        if (days <= 0) continue;
+
+        let rec = perEmp.get(name);
+        if (!rec) {
+          rec = { name, parts: new Map(), total: 0 };
+          perEmp.set(name, rec);
+        }
+        rec.parts.set(type, (rec.parts.get(type) || 0) + days);
+        rec.total += days;
+      }
+    }
+
+    return Array.from(perEmp.values())
+      .map(r => ({
+        name: r.name,
+        total: r.total,
+        parts: Array.from(r.parts.entries()).sort((a, b) => b[1] - a[1]),
+      }))
+      .sort((a, b) => b.total - a.total || a.name.localeCompare(b.name));
+  }, [filteredAbsences, monthStart, monthEnd, holidays]);
 
   // Helper para formatar período com horas parciais
   const formatPeriodDisplay = (period: {
@@ -280,9 +348,9 @@ const CalendarPage = () => {
                   ))}
                 </SelectContent>
               </Select>
-              <Button variant="outline" onClick={() => window.print()}>
+              <Button variant="outline" onClick={() => setPrintDialogOpen(true)}>
                 <Printer className="h-4 w-4 mr-2" />
-                Imprimir
+                Imprimir Calendário
               </Button>
             </div>
           </div>
@@ -362,8 +430,9 @@ const CalendarPage = () => {
           </div>
           {/* ========== END PRINT-ONLY REPORT ========== */}
 
-          {/* Calendar Navigation - hidden on print */}
-          <Card className="shadow-card print:hidden">
+          {/* Calendar (≈80%) + month summary (≈20%) — hidden on print */}
+          <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,4fr)_minmax(240px,1fr)] gap-6 print:hidden">
+          <Card className="shadow-card">
             <CardHeader className="flex flex-row items-center justify-between pb-2 print:pb-4">
               <Button
                 variant="outline"
@@ -406,7 +475,7 @@ const CalendarPage = () => {
               <div className="grid grid-cols-7 gap-1">
                 {/* Empty cells for days before month start */}
                 {Array.from({ length: getDay(monthStart) }).map((_, i) => (
-                  <div key={`empty-${i}`} className="aspect-square" />
+                  <div key={`empty-${i}`} className="min-h-[78px]" />
                 ))}
 
                 {days.map(day => {
@@ -419,7 +488,7 @@ const CalendarPage = () => {
                     <Tooltip key={day.toISOString()}>
                       <TooltipTrigger asChild>
                         <div
-                          className={`aspect-square p-1 border rounded-lg transition-colors ${
+                          className={`min-h-[78px] p-1.5 border rounded-lg transition-colors ${
                             isToday
                               ? 'border-gold bg-gold/5'
                               : holiday
@@ -501,48 +570,54 @@ const CalendarPage = () => {
             </CardContent>
           </Card>
 
-          {/* Monthly Summary Table - hidden on print */}
-          <Card className="shadow-card print:hidden">
-            <CardHeader>
-              <CardTitle className="font-display text-xl">
-                Ausências Aprovadas - {format(currentDate, 'MMMM yyyy', { locale: pt })}
-              </CardTitle>
+          {/* Right column (≈20%): month summary — names, types and quantity */}
+          <Card className="shadow-card">
+            <CardHeader className="pb-3">
+              <CardTitle className="font-display text-lg">Resumo do mês</CardTitle>
+              <p className="text-xs text-muted-foreground capitalize">
+                {format(currentDate, 'MMMM yyyy', { locale: pt })} · ausências aprovadas
+              </p>
             </CardHeader>
-            <CardContent>
-              {(() => {
-                const approvedPeriods = getApprovedPeriodsForSummary();
-
-                return approvedPeriods.length === 0 ? (
-                  <p className="text-muted-foreground text-sm">
-                    Nenhuma ausência aprovada para este mês
-                  </p>
-                ) : (
-                  <Table>
-                    <TableHeader>
-                      <TableRow>
-                        <TableHead>Colaborador</TableHead>
-                        <TableHead className="hidden sm:table-cell">Empresa</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Período</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {approvedPeriods.map(period => (
-                        <TableRow key={period.id}>
-                          <TableCell className="font-medium">{period.employeeName}</TableCell>
-                          <TableCell className="hidden sm:table-cell">
-                            {period.companyName}
-                          </TableCell>
-                          <TableCell>{absenceTypeLabels[period.absenceType]}</TableCell>
-                          <TableCell>{formatPeriodDisplay(period)}</TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                );
-              })()}
+            <CardContent className="px-3">
+              {monthSummary.length === 0 ? (
+                <p className="text-sm text-muted-foreground px-1">
+                  Nenhuma ausência aprovada este mês.
+                </p>
+              ) : (
+                <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
+                  {monthSummary.map(emp => (
+                    <div key={emp.name} className="rounded-lg border p-2.5">
+                      <div className="flex items-center justify-between gap-2 mb-1.5">
+                        <span className="font-medium text-sm truncate">{emp.name}</span>
+                        <span className="text-xs font-semibold text-muted-foreground tabular-nums shrink-0">
+                          {fmtDays(emp.total)}d
+                        </span>
+                      </div>
+                      <div className="flex flex-wrap gap-1">
+                        {emp.parts.map(([type, days]) => {
+                          const c = absenceTypeColors[type] || defaultAbsenceTypeColor;
+                          return (
+                            <span
+                              key={type}
+                              className="text-[11px] font-medium px-1.5 py-0.5 rounded border leading-tight"
+                              style={{
+                                backgroundColor: c.fill,
+                                color: c.text,
+                                borderColor: c.border,
+                              }}
+                            >
+                              {absenceTypeLabels[type] || type} · {fmtDays(days)}
+                            </span>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </CardContent>
           </Card>
+          </div>
 
           {/* Legend & Pending Requests - hidden on print */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 print:hidden">
@@ -618,6 +693,14 @@ const CalendarPage = () => {
           </div>
         </div>
       </TooltipProvider>
+
+      <CalendarPrintDialog
+        open={printDialogOpen}
+        onOpenChange={setPrintDialogOpen}
+        companies={companies}
+        defaultCompany={selectedCompany}
+        defaultDate={currentDate}
+      />
     </>
   );
 };

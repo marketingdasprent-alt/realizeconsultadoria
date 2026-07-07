@@ -5,6 +5,7 @@ import {
   Car,
   Copy,
   CreditCard,
+  FileSpreadsheet,
   Info,
   Loader2,
   MinusCircle,
@@ -474,6 +475,7 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
 
   const [copyDialogOpen, setCopyDialogOpen] = useState(false);
   const [isCopying, setIsCopying] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
 
   const getFinance = (employeeId: string): FinanceFields =>
     currentFinances[employeeId] || {
@@ -811,6 +813,157 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
     printWindow.document.close();
   };
 
+  const handleExportExcel = async () => {
+    if (filtered.length === 0) {
+      toast({
+        title: 'Sem dados para exportar',
+        description: 'Não existem colaboradores na lista atual.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const ExcelJSmod = await import('exceljs');
+      const ExcelJS = ExcelJSmod.default ?? ExcelJSmod;
+      const monthLabel = MONTH_LABELS[month - 1];
+
+      const workbook = new ExcelJS.Workbook();
+      workbook.creator = 'Realize Consultadoria';
+      const ws = workbook.addWorksheet(`${monthLabel} ${year}`, {
+        views: [{ state: 'frozen', ySplit: 4 }],
+        pageSetup: { orientation: 'landscape', fitToPage: true, fitToWidth: 1, fitToHeight: 0 },
+      });
+
+      ws.columns = [
+        { width: 30 }, // Nome
+        { width: 32 }, // IBAN
+        { width: 14 }, // Valor Recibo
+        { width: 16 }, // Sub. Alimentação
+        { width: 14 }, // Cartão DÁ
+        { width: 12 }, // KM Extras
+        { width: 15 }, // Ajuda de Custo
+        { width: 14 }, // Total
+        { width: 16 }, // Valor Descontado
+      ];
+
+      // Título
+      ws.addRow(['Informações Financeiras']);
+      ws.mergeCells('A1:I1');
+      const titleCell = ws.getCell('A1');
+      titleCell.font = { bold: true, size: 15, color: { argb: 'FF111111' } };
+      ws.getRow(1).height = 22;
+
+      // Subtítulo
+      ws.addRow([
+        `${monthLabel} ${year} · ${filtered.length} ${
+          filtered.length === 1 ? 'colaborador' : 'colaboradores'
+        }`,
+      ]);
+      ws.mergeCells('A2:I2');
+      ws.getCell('A2').font = { size: 11, color: { argb: 'FF666666' } };
+
+      // Linha em branco
+      ws.addRow([]);
+
+      // Cabeçalho
+      const headerRow = ws.addRow([
+        'Nome',
+        'IBAN',
+        'Valor Recibo',
+        'Sub. Alimentação',
+        'Cartão DÁ',
+        'KM Extras',
+        'Ajuda de Custo',
+        'Total',
+        'Valor Descontado',
+      ]);
+      headerRow.height = 18;
+      headerRow.eachCell(cell => {
+        cell.font = { bold: true, color: { argb: 'FFFFFFFF' } };
+        cell.fill = { type: 'pattern', pattern: 'solid', fgColor: { argb: 'FFB7933D' } };
+        cell.alignment = { vertical: 'middle', horizontal: 'center' };
+      });
+
+      // Dados
+      filtered.forEach(employee => {
+        const f = currentFinances[employee.id] || {
+          valor_recebido: 0,
+          valor_subsidio_alimentacao: 0,
+          valor_cartao_da: 0,
+          valor_descontado: 0,
+          km_extras: 0,
+          taxa_km: DEFAULT_TAXA_KM,
+          discount_items: [],
+        };
+        const ajudaCusto = computeAjudaCusto(f.km_extras, f.taxa_km);
+        const totalRow =
+          (f.valor_recebido || 0) +
+          (f.valor_subsidio_alimentacao || 0) +
+          (f.valor_cartao_da || 0) +
+          ajudaCusto;
+        ws.addRow([
+          employee.name,
+          formatIban(employee.iban || '') || '-',
+          f.valor_recebido || 0,
+          f.valor_subsidio_alimentacao || 0,
+          f.valor_cartao_da || 0,
+          f.km_extras > 0 ? f.km_extras : null,
+          ajudaCusto > 0 ? ajudaCusto : null,
+          totalRow,
+          f.valor_descontado || 0,
+        ]);
+      });
+
+      // Linha de totais
+      const totalsRow = ws.addRow([
+        'TOTAL',
+        '',
+        totals.recebido,
+        totals.subsidio,
+        totals.cartao,
+        totals.kmExtras > 0 ? totals.kmExtras : null,
+        totals.ajudaCusto > 0 ? totals.ajudaCusto : null,
+        totals.total,
+        totals.descontado,
+      ]);
+      totalsRow.eachCell(cell => {
+        cell.font = { bold: true };
+        cell.border = { top: { style: 'medium', color: { argb: 'FF111111' } } };
+      });
+
+      // Formatos numéricos por coluna
+      const CURRENCY_FMT = '#,##0.00 "€"';
+      const KM_FMT = '#,##0.0 "km"';
+      [3, 4, 5, 7, 8, 9].forEach(colIdx => {
+        ws.getColumn(colIdx).numFmt = CURRENCY_FMT;
+      });
+      ws.getColumn(6).numFmt = KM_FMT;
+
+      const buffer = await workbook.xlsx.writeBuffer();
+      const blob = new Blob([buffer], {
+        type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+      });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `Informacoes_Financeiras_${monthLabel}_${year}.xlsx`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      toast({
+        title: 'Erro ao exportar',
+        description: 'Não foi possível gerar o ficheiro Excel.',
+        variant: 'destructive',
+      });
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
   return (
     <div className="space-y-4">
       {/* Controls: month/year + export */}
@@ -864,6 +1017,18 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
                 Copiar do mês anterior
               </Button>
             )}
+            <Button
+              variant="outline"
+              onClick={handleExportExcel}
+              disabled={isExporting || isLoadingFinances || filtered.length === 0}
+            >
+              {isExporting ? (
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              ) : (
+                <FileSpreadsheet className="h-4 w-4 mr-2" />
+              )}
+              Exportar Excel
+            </Button>
             <Button variant="outline" onClick={handlePrint}>
               <Printer className="h-4 w-4 mr-2" />
               Imprimir

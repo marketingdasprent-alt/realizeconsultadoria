@@ -368,6 +368,29 @@ const EmployeeDashboard = () => {
         return;
       }
 
+      // Impedir sobreposição com um pedido ainda pendente (por aprovar/recusar):
+      // não pode existir outro pedido pendente do colaborador a cobrir estas datas.
+      const { data: overlappingPending, error: overlapError } = await supabase
+        .from('absences')
+        .select('id')
+        .eq('employee_id', employee.id)
+        .eq('status', 'pending')
+        .lte('start_date', format(maxDate, 'yyyy-MM-dd'))
+        .gte('end_date', format(minDate, 'yyyy-MM-dd'))
+        .limit(1);
+
+      if (overlapError) throw overlapError;
+
+      if (overlappingPending && overlappingPending.length > 0) {
+        toast({
+          title: 'Pedido pendente para essas datas',
+          description:
+            'Já tem um pedido pendente que cobre essas datas. Aguarde a aprovação ou recusa antes de submeter outro.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // Create the main absence record
       const { data: absenceData, error: absenceError } = await supabase
         .from('absences')

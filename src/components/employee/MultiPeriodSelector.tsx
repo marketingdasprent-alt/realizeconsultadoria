@@ -95,6 +95,11 @@ const MultiPeriodSelector = ({
     // Admins can select any date — skip the 48h notice restriction
     if (adminMode) return false;
 
+    // A antecedência de 48h só se aplica a Férias. Outros tipos (baixa médica,
+    // consultas, etc.) são imprevisíveis e podem ser marcados a qualquer momento,
+    // incluindo amanhã ou hoje — por isso não se desativa a data para esses.
+    if (absenceType !== 'vacation') return false;
+
     const today = new Date(new Date().setHours(0, 0, 0, 0));
     const minNoticeDate = new Date(today);
     minNoticeDate.setDate(minNoticeDate.getDate() + 2);

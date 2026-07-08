@@ -353,19 +353,23 @@ const EmployeeDashboard = () => {
       const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
       const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
 
-      // Validate notice period (48h)
-      const today = new Date(new Date().setHours(0, 0, 0, 0));
-      const minNoticeDate = new Date(today);
-      minNoticeDate.setDate(minNoticeDate.getDate() + 2);
+      // Validar antecedência de 48h — APENAS para Férias.
+      // Outros tipos (baixa médica, consultas, licenças, etc.) são imprevisíveis
+      // e podem ser marcados a qualquer momento, incluindo no próprio dia.
+      if (absenceType === 'vacation') {
+        const today = new Date(new Date().setHours(0, 0, 0, 0));
+        const minNoticeDate = new Date(today);
+        minNoticeDate.setDate(minNoticeDate.getDate() + 2);
 
-      if (minDate < minNoticeDate) {
-        toast({
-          title: 'Erro de antecedência',
-          description:
-            'Os pedidos de ausência devem ser feitos com pelo menos 48 horas de antecedência.',
-          variant: 'destructive',
-        });
-        return;
+        if (minDate < minNoticeDate) {
+          toast({
+            title: 'Erro de antecedência',
+            description:
+              'Os pedidos de férias devem ser feitos com pelo menos 48 horas de antecedência.',
+            variant: 'destructive',
+          });
+          return;
+        }
       }
 
       // Impedir sobreposição com um pedido ainda pendente (por aprovar/recusar):

@@ -28,6 +28,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import MultiPeriodSelector from '@/components/employee/MultiPeriodSelector';
 import { DatePeriod, Holiday, countBusinessDays } from '@/lib/vacation-utils';
+import { findApprovedConflicts } from '@/lib/absence-overlap';
 import { absenceTypeLabels, trainingModeLabels } from '@/lib/absence-types';
 
 interface Employee {
@@ -48,11 +49,7 @@ interface AdminBulkAbsenceDialogProps {
  * Normalise a string: lowercase + remove diacritics.
  * "João" → "joao", "Ângela" → "angela"
  */
-const normalise = (s: string) =>
-  s
-    .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
-    .toLowerCase();
+const normalise = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
 
 const matchesEmployee = (emp: Employee, query: string): boolean => {
   if (!query.trim()) return true;
@@ -152,8 +149,7 @@ const AdminBulkAbsenceDialog = ({
     [employees, search]
   );
 
-  const allVisibleSelected =
-    visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id));
+  const allVisibleSelected = visibleIds.length > 0 && visibleIds.every(id => selectedIds.has(id));
 
   const toggleEmployee = (id: string) => {
     setSelectedIds(prev => {
@@ -250,8 +246,41 @@ const AdminBulkAbsenceDialog = ({
       const endDate = format(maxDate, 'yyyy-MM-dd');
       const nowIso = new Date().toISOString();
 
+      const periodsToCheck = periods.map(period => ({
+        start_date: format(period.from, 'yyyy-MM-dd'),
+        end_date: format(period.to, 'yyyy-MM-dd'),
+        period_type: period.periodType,
+        start_time: period.startTime || null,
+        end_time: period.endTime || null,
+      }));
+
+      // 0. Excluir quem já tem ausência aprovada nestas datas. Sem isto, correr a
+      // marcação em massa duas vezes cria pedidos duplicados em silêncio.
+      const conflictChecks = await Promise.all(
+        chosen.map(async emp => {
+          const { data: conflicts, error: conflictError } = await findApprovedConflicts(
+            emp.id,
+            periodsToCheck
+          );
+          if (conflictError) throw conflictError;
+          return { emp, hasConflict: (conflicts || []).length > 0 };
+        })
+      );
+
+      const skipped = conflictChecks.filter(c => c.hasConflict).map(c => c.emp);
+      const toCreate = conflictChecks.filter(c => !c.hasConflict).map(c => c.emp);
+
+      if (toCreate.length === 0) {
+        toast({
+          title: 'Nada a marcar',
+          description: `${skipped.length === 1 ? 'O colaborador selecionado já tem' : 'Todos os colaboradores selecionados já têm'} ausência aprovada nestas datas.`,
+          variant: 'destructive',
+        });
+        return;
+      }
+
       // 1. Insert one absence per employee (batch).
-      const absenceRows = chosen.map(emp => ({
+      const absenceRows = toCreate.map(emp => ({
         employee_id: emp.id,
         company_id: emp.company_id,
         start_date: startDate,
@@ -304,11 +333,19 @@ const AdminBulkAbsenceDialog = ({
         throw periodsError;
       }
 
+      const skippedNote =
+        skipped.length > 0
+          ? ` ${skipped.length} ignorado(s) por já ter(em) ausência aprovada nestas datas: ${skipped
+              .slice(0, 3)
+              .map(e => e.name)
+              .join(', ')}${skipped.length > 3 ? ` e mais ${skipped.length - 3}` : ''}.`
+          : '';
+
       toast({
         title: 'Marcação em massa concluída',
-        description: `${chosen.length} ${chosen.length === 1 ? 'pedido criado' : 'pedidos criados'}${
+        description: `${toCreate.length} ${toCreate.length === 1 ? 'pedido criado' : 'pedidos criados'}${
           autoApprove ? ' e aprovados automaticamente' : ' (pendentes de aprovação)'
-        }.`,
+        }.${skippedNote}`,
       });
 
       onOpenChange(false);

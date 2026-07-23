@@ -136,7 +136,7 @@ const CalendarPrintDialog = ({
       let query = supabase
         .from('absences')
         .select(
-          `id, start_date, end_date, absence_type, status, company_id,
+          `id, employee_id, start_date, end_date, absence_type, status, company_id,
            employees!inner ( name, companies ( name ) ),
            absence_periods ( start_date, end_date, status, period_type, start_time, end_time, business_days )`
         )
@@ -235,10 +235,12 @@ const CalendarPrintDialog = ({
           <div>
             <label className="block text-sm font-medium mb-2">Orientação da folha</label>
             <div className="grid grid-cols-2 gap-2">
-              {([
-                ['portrait', 'Vertical'],
-                ['landscape', 'Horizontal'],
-              ] as const).map(([value, label]) => (
+              {(
+                [
+                  ['portrait', 'Vertical'],
+                  ['landscape', 'Horizontal'],
+                ] as const
+              ).map(([value, label]) => (
                 <button
                   key={value}
                   type="button"

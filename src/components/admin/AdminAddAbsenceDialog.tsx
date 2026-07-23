@@ -34,6 +34,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import MultiPeriodSelector from '@/components/employee/MultiPeriodSelector';
 import { DatePeriod, Holiday, countBusinessDays } from '@/lib/vacation-utils';
+import { findApprovedConflicts, describeConflicts } from '@/lib/absence-overlap';
 import { absenceTypeLabels, trainingModeLabels } from '@/lib/absence-types';
 
 interface Employee {
@@ -185,6 +186,31 @@ const AdminAddAbsenceDialog = ({
       const allDates = periods.flatMap(p => [p.from, p.to]);
       const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
       const maxDate = new Date(Math.max(...allDates.map(d => d.getTime())));
+
+      const periodsToCheck = periods.map(period => ({
+        start_date: format(period.from, 'yyyy-MM-dd'),
+        end_date: format(period.to, 'yyyy-MM-dd'),
+        period_type: period.periodType,
+        start_time: period.startTime || null,
+        end_time: period.endTime || null,
+      }));
+
+      // O mesmo colaborador não pode ficar com dois pedidos aprovados no mesmo dia.
+      const { data: conflicts, error: conflictError } = await findApprovedConflicts(
+        employee.id,
+        periodsToCheck
+      );
+
+      if (conflictError) throw conflictError;
+
+      if (conflicts && conflicts.length > 0) {
+        toast({
+          title: 'Ausência já aprovada nessas datas',
+          description: `${employee.name}: ${describeConflicts(conflicts)}`,
+          variant: 'destructive',
+        });
+        return;
+      }
 
       const { data: absenceData, error: absenceError } = await supabase
         .from('absences')

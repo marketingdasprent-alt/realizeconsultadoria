@@ -17,6 +17,11 @@ import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { isWeekend, isHoliday, Holiday } from '@/lib/vacation-utils';
+import {
+  findApprovedConflicts,
+  describeConflicts,
+  type OverlapPeriod,
+} from '@/lib/absence-overlap';
 import { absenceTypeLabels } from '@/lib/absence-types';
 
 interface AbsencePeriod {
@@ -224,6 +229,55 @@ const AbsenceApprovalDialog = ({
           : hasPeriods
             ? request.periods.reduce((sum, p) => sum + p.business_days, 0)
             : request.total_business_days || allRequestedDates.length;
+
+      // Impedir que dois pedidos do mesmo colaborador acabem ambos aprovados no
+      // mesmo dia. Numa aprovação parcial só contam os dias efetivamente aceites.
+      let periodsBeingApproved: OverlapPeriod[];
+
+      if (mode === 'partial') {
+        periodsBeingApproved = selectedDates.map(d => ({
+          start_date: format(d, 'yyyy-MM-dd'),
+          end_date: format(d, 'yyyy-MM-dd'),
+          period_type: 'full_day',
+        }));
+      } else {
+        // Ler os períodos frescos da BD: os do `request` não trazem as horas.
+        const { data: freshPeriods, error: freshError } = await supabase
+          .from('absence_periods')
+          .select('start_date, end_date, period_type, start_time, end_time')
+          .eq('absence_id', request.id);
+
+        if (freshError) throw freshError;
+
+        periodsBeingApproved =
+          freshPeriods && freshPeriods.length > 0
+            ? freshPeriods
+            : [
+                {
+                  start_date: request.start_date,
+                  end_date: request.end_date,
+                  period_type: 'full_day',
+                },
+              ];
+      }
+
+      const { data: conflicts, error: conflictError } = await findApprovedConflicts(
+        request.employee_id,
+        periodsBeingApproved,
+        request.id
+      );
+
+      if (conflictError) throw conflictError;
+
+      if (conflicts && conflicts.length > 0) {
+        toast({
+          title: 'Conflito com ausência já aprovada',
+          description: `${request.employee.name}: ${describeConflicts(conflicts)} Reprove um dos pedidos antes de aprovar este.`,
+          variant: 'destructive',
+        });
+        setIsLoading(false);
+        return;
+      }
 
       // Update absence status
       const { error: absenceError } = await supabase

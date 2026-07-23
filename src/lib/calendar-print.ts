@@ -15,6 +15,7 @@ interface PrintPeriod {
 
 export interface PrintAbsence {
   id: string;
+  employee_id?: string | null;
   start_date: string;
   end_date: string;
   absence_type: string;
@@ -41,11 +42,7 @@ interface Segment {
 }
 
 const escapeHtml = (s: string) =>
-  s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+  s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** "João Silva" → "João S." · single-word names stay as-is. */
 const shortName = (full: string): string => {
@@ -72,7 +69,14 @@ const approvedSegments = (a: PrintAbsence): Segment[] => {
       }));
   }
   if (a.status === 'approved') {
-    return [{ start: parseISO(a.start_date), end: parseISO(a.end_date), partial: false, businessDays: null }];
+    return [
+      {
+        start: parseISO(a.start_date),
+        end: parseISO(a.end_date),
+        partial: false,
+        businessDays: null,
+      },
+    ];
   }
   return [];
 };
@@ -84,20 +88,27 @@ interface DayChip {
 }
 
 const chipsForDay = (day: Date, absences: PrintAbsence[]): DayChip[] => {
-  const chips: DayChip[] = [];
+  // Um chip por colaborador por dia: se tiver mais do que uma ausência aprovada
+  // a cair no mesmo dia, o nome não pode sair repetido no mapa.
+  const byEmployee = new Map<string, DayChip>();
+
   for (const a of absences) {
     for (const seg of approvedSegments(a)) {
       if (day >= seg.start && day <= seg.end) {
-        chips.push({
-          name: shortName(a.employees?.name || ''),
-          type: a.absence_type,
-          half: seg.partial,
-        });
+        const key = a.employee_id || a.employees?.name || a.id;
+        if (!byEmployee.has(key)) {
+          byEmployee.set(key, {
+            name: shortName(a.employees?.name || ''),
+            type: a.absence_type,
+            half: seg.partial,
+          });
+        }
         break; // one chip per absence per day
       }
     }
   }
-  return chips;
+
+  return Array.from(byEmployee.values());
 };
 
 const typeChip = (type: string, content: string, extraClass = ''): string => {
@@ -105,11 +116,7 @@ const typeChip = (type: string, content: string, extraClass = ''): string => {
   return `<span class="${extraClass}" style="background:${c.fill};color:${c.text};border-color:${c.border}">${content}</span>`;
 };
 
-const buildMonthSheet = (
-  year: number,
-  month: number,
-  opts: CalendarPrintOptions
-): string => {
+const buildMonthSheet = (year: number, month: number, opts: CalendarPrintOptions): string => {
   const { absences, holidays } = opts;
   const monthStart = new Date(year, month, 1);
   const monthEnd = endOfMonth(monthStart);

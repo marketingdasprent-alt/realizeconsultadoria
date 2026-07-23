@@ -26,11 +26,7 @@ import { Badge } from '@/components/ui/badge';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { supabase } from '@/integrations/supabase/client';
 import { isWeekend, isBusinessDay, countBusinessDays } from '@/lib/vacation-utils';
-import {
-  absenceTypeLabels,
-  absenceTypeColors,
-  defaultAbsenceTypeColor,
-} from '@/lib/absence-types';
+import { absenceTypeLabels, absenceTypeColors, defaultAbsenceTypeColor } from '@/lib/absence-types';
 import CalendarPrintDialog from '@/components/admin/CalendarPrintDialog';
 
 interface AbsencePeriod {
@@ -46,6 +42,7 @@ interface AbsencePeriod {
 
 interface Absence {
   id: string;
+  employee_id: string;
   start_date: string;
   end_date: string;
   absence_type: string;
@@ -83,6 +80,18 @@ const statusColors: Record<string, string> = {
 /** Format a day count for display: 10 → "10", 0.5 → "0,5". */
 const fmtDays = (n: number): string =>
   n % 1 === 0 ? String(n) : n.toFixed(2).replace(/0$/, '').replace('.', ',');
+
+/**
+ * Ordem de importância de um estado quando o mesmo colaborador tem mais do que
+ * um pedido a cair no mesmo dia. Só o mais forte é desenhado, para o nome nunca
+ * aparecer repetido — um pedido reprovado não deve tapar/duplicar o aprovado
+ * que veio a seguir.
+ */
+const statusPriority: Record<string, number> = {
+  approved: 3,
+  pending: 2,
+  rejected: 1,
+};
 
 const CalendarPage = () => {
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -170,7 +179,23 @@ const CalendarPage = () => {
       }
     }
 
-    return results;
+    // Um chip por colaborador por dia. Se tiver vários pedidos a cair no mesmo
+    // dia, fica o de estado mais forte (aprovado > pendente > reprovado).
+    const strongestPerEmployee = new Map<string, AbsenceWithDayStatus>();
+
+    for (const entry of results) {
+      const key = entry.employee_id || entry.employees?.name || entry.id;
+      const current = strongestPerEmployee.get(key);
+
+      if (
+        !current ||
+        (statusPriority[entry.dayStatus] || 0) > (statusPriority[current.dayStatus] || 0)
+      ) {
+        strongestPerEmployee.set(key, entry);
+      }
+    }
+
+    return Array.from(strongestPerEmployee.values());
   };
 
   const getHolidayForDay = (day: Date): Holiday | undefined => {
@@ -222,7 +247,11 @@ const CalendarPage = () => {
       for (const seg of segments) {
         let days = 0;
         if (seg.partial) {
-          if (seg.start >= monthStart && seg.start <= monthEnd && isBusinessDay(seg.start, holidays)) {
+          if (
+            seg.start >= monthStart &&
+            seg.start <= monthEnd &&
+            isBusinessDay(seg.start, holidays)
+          ) {
             days = seg.bd != null ? seg.bd : 0;
           }
         } else {
@@ -432,191 +461,191 @@ const CalendarPage = () => {
 
           {/* Calendar (≈80%) + month summary (≈20%) — hidden on print */}
           <div className="grid grid-cols-1 xl:grid-cols-[minmax(0,4fr)_minmax(240px,1fr)] gap-6 print:hidden">
-          <Card className="shadow-card">
-            <CardHeader className="flex flex-row items-center justify-between pb-2 print:pb-4">
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setCurrentDate(subMonths(currentDate, 1))}
-                className="print:hidden"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </Button>
-              <CardTitle className="font-display text-2xl capitalize print:text-xl">
-                {format(currentDate, 'MMMM yyyy', { locale: pt })}
-              </CardTitle>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setCurrentDate(addMonths(currentDate, 1))}
-                className="print:hidden"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </Button>
-            </CardHeader>
-            <CardContent>
-              {/* Weekday Headers */}
-              <div className="grid grid-cols-7 gap-1 mb-2">
-                {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, index) => (
-                  <div
-                    key={day}
-                    className={`text-center text-sm font-medium py-2 ${
-                      index === 0 || index === 6
-                        ? 'text-muted-foreground/60'
-                        : 'text-muted-foreground'
-                    }`}
-                  >
-                    {day}
-                  </div>
-                ))}
-              </div>
-
-              {/* Calendar Grid */}
-              <div className="grid grid-cols-7 gap-1">
-                {/* Empty cells for days before month start */}
-                {Array.from({ length: getDay(monthStart) }).map((_, i) => (
-                  <div key={`empty-${i}`} className="min-h-[78px]" />
-                ))}
-
-                {days.map(day => {
-                  const dayAbsences = getAbsencesForDay(day);
-                  const isToday = isSameDay(day, new Date());
-                  const holiday = getHolidayForDay(day);
-                  const isWeekendDay = isWeekend(day);
-
-                  return (
-                    <Tooltip key={day.toISOString()}>
-                      <TooltipTrigger asChild>
-                        <div
-                          className={`min-h-[78px] p-1.5 border rounded-lg transition-colors ${
-                            isToday
-                              ? 'border-gold bg-gold/5'
-                              : holiday
-                                ? 'border-primary/30 bg-primary/5'
-                                : isWeekendDay
-                                  ? 'border-border/50 bg-muted/30'
-                                  : 'border-border'
-                          }`}
-                        >
-                          <div
-                            className={`text-sm font-medium mb-1 flex items-center gap-1 ${
-                              isToday
-                                ? 'text-gold'
-                                : holiday
-                                  ? 'text-primary'
-                                  : isWeekendDay
-                                    ? 'text-muted-foreground/60'
-                                    : ''
-                            }`}
-                          >
-                            {format(day, 'd')}
-                            {holiday && (
-                              <span className="text-[10px] text-primary truncate hidden lg:inline">
-                                {holiday.name.length > 8
-                                  ? holiday.name.slice(0, 8) + '…'
-                                  : holiday.name}
-                              </span>
-                            )}
-                          </div>
-                          <div className="space-y-0.5 overflow-hidden">
-                            {dayAbsences.slice(0, 2).map(absence => (
-                              <div
-                                key={absence.id}
-                                className={`text-xs truncate px-1 py-0.5 rounded ${statusColors[absence.dayStatus] || statusColors.pending} text-white`}
-                              >
-                                {absence.employees?.name?.split(' ')[0]}
-                              </div>
-                            ))}
-                            {dayAbsences.length > 2 && (
-                              <div className="text-xs text-muted-foreground">
-                                +{dayAbsences.length - 2} mais
-                              </div>
-                            )}
-                          </div>
-                        </div>
-                      </TooltipTrigger>
-                      {(holiday || dayAbsences.length > 0) && (
-                        <TooltipContent side="top" className="max-w-xs">
-                          {holiday && (
-                            <p className="font-medium text-primary mb-1">🎉 {holiday.name}</p>
-                          )}
-                          {dayAbsences.map(absence => {
-                            // Find the period for this day to show time info
-                            const periodForDay = absence.absence_periods?.find(p => {
-                              const pStart = parseISO(p.start_date);
-                              const pEnd = parseISO(p.end_date);
-                              return day >= pStart && day <= pEnd;
-                            });
-                            const timeInfo =
-                              periodForDay?.period_type === 'partial' &&
-                              periodForDay.start_time &&
-                              periodForDay.end_time
-                                ? ` (${periodForDay.start_time}-${periodForDay.end_time})`
-                                : '';
-                            return (
-                              <p key={absence.id} className="text-sm">
-                                {absence.employees?.name} -{' '}
-                                {absenceTypeLabels[absence.absence_type]}
-                                {timeInfo}
-                              </p>
-                            );
-                          })}
-                        </TooltipContent>
-                      )}
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Right column (≈20%): month summary — names, types and quantity */}
-          <Card className="shadow-card">
-            <CardHeader className="pb-3">
-              <CardTitle className="font-display text-lg">Resumo do mês</CardTitle>
-              <p className="text-xs text-muted-foreground capitalize">
-                {format(currentDate, 'MMMM yyyy', { locale: pt })} · ausências aprovadas
-              </p>
-            </CardHeader>
-            <CardContent className="px-3">
-              {monthSummary.length === 0 ? (
-                <p className="text-sm text-muted-foreground px-1">
-                  Nenhuma ausência aprovada este mês.
-                </p>
-              ) : (
-                <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
-                  {monthSummary.map(emp => (
-                    <div key={emp.name} className="rounded-lg border p-2.5">
-                      <div className="flex items-center justify-between gap-2 mb-1.5">
-                        <span className="font-medium text-sm truncate">{emp.name}</span>
-                        <span className="text-xs font-semibold text-muted-foreground tabular-nums shrink-0">
-                          {fmtDays(emp.total)}d
-                        </span>
-                      </div>
-                      <div className="flex flex-wrap gap-1">
-                        {emp.parts.map(([type, days]) => {
-                          const c = absenceTypeColors[type] || defaultAbsenceTypeColor;
-                          return (
-                            <span
-                              key={type}
-                              className="text-[11px] font-medium px-1.5 py-0.5 rounded border leading-tight"
-                              style={{
-                                backgroundColor: c.fill,
-                                color: c.text,
-                                borderColor: c.border,
-                              }}
-                            >
-                              {absenceTypeLabels[type] || type} · {fmtDays(days)}
-                            </span>
-                          );
-                        })}
-                      </div>
+            <Card className="shadow-card">
+              <CardHeader className="flex flex-row items-center justify-between pb-2 print:pb-4">
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentDate(subMonths(currentDate, 1))}
+                  className="print:hidden"
+                >
+                  <ChevronLeft className="h-4 w-4" />
+                </Button>
+                <CardTitle className="font-display text-2xl capitalize print:text-xl">
+                  {format(currentDate, 'MMMM yyyy', { locale: pt })}
+                </CardTitle>
+                <Button
+                  variant="outline"
+                  size="icon"
+                  onClick={() => setCurrentDate(addMonths(currentDate, 1))}
+                  className="print:hidden"
+                >
+                  <ChevronRight className="h-4 w-4" />
+                </Button>
+              </CardHeader>
+              <CardContent>
+                {/* Weekday Headers */}
+                <div className="grid grid-cols-7 gap-1 mb-2">
+                  {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map((day, index) => (
+                    <div
+                      key={day}
+                      className={`text-center text-sm font-medium py-2 ${
+                        index === 0 || index === 6
+                          ? 'text-muted-foreground/60'
+                          : 'text-muted-foreground'
+                      }`}
+                    >
+                      {day}
                     </div>
                   ))}
                 </div>
-              )}
-            </CardContent>
-          </Card>
+
+                {/* Calendar Grid */}
+                <div className="grid grid-cols-7 gap-1">
+                  {/* Empty cells for days before month start */}
+                  {Array.from({ length: getDay(monthStart) }).map((_, i) => (
+                    <div key={`empty-${i}`} className="min-h-[78px]" />
+                  ))}
+
+                  {days.map(day => {
+                    const dayAbsences = getAbsencesForDay(day);
+                    const isToday = isSameDay(day, new Date());
+                    const holiday = getHolidayForDay(day);
+                    const isWeekendDay = isWeekend(day);
+
+                    return (
+                      <Tooltip key={day.toISOString()}>
+                        <TooltipTrigger asChild>
+                          <div
+                            className={`min-h-[78px] p-1.5 border rounded-lg transition-colors ${
+                              isToday
+                                ? 'border-gold bg-gold/5'
+                                : holiday
+                                  ? 'border-primary/30 bg-primary/5'
+                                  : isWeekendDay
+                                    ? 'border-border/50 bg-muted/30'
+                                    : 'border-border'
+                            }`}
+                          >
+                            <div
+                              className={`text-sm font-medium mb-1 flex items-center gap-1 ${
+                                isToday
+                                  ? 'text-gold'
+                                  : holiday
+                                    ? 'text-primary'
+                                    : isWeekendDay
+                                      ? 'text-muted-foreground/60'
+                                      : ''
+                              }`}
+                            >
+                              {format(day, 'd')}
+                              {holiday && (
+                                <span className="text-[10px] text-primary truncate hidden lg:inline">
+                                  {holiday.name.length > 8
+                                    ? holiday.name.slice(0, 8) + '…'
+                                    : holiday.name}
+                                </span>
+                              )}
+                            </div>
+                            <div className="space-y-0.5 overflow-hidden">
+                              {dayAbsences.slice(0, 2).map(absence => (
+                                <div
+                                  key={absence.id}
+                                  className={`text-xs truncate px-1 py-0.5 rounded ${statusColors[absence.dayStatus] || statusColors.pending} text-white`}
+                                >
+                                  {absence.employees?.name?.split(' ')[0]}
+                                </div>
+                              ))}
+                              {dayAbsences.length > 2 && (
+                                <div className="text-xs text-muted-foreground">
+                                  +{dayAbsences.length - 2} mais
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </TooltipTrigger>
+                        {(holiday || dayAbsences.length > 0) && (
+                          <TooltipContent side="top" className="max-w-xs">
+                            {holiday && (
+                              <p className="font-medium text-primary mb-1">🎉 {holiday.name}</p>
+                            )}
+                            {dayAbsences.map(absence => {
+                              // Find the period for this day to show time info
+                              const periodForDay = absence.absence_periods?.find(p => {
+                                const pStart = parseISO(p.start_date);
+                                const pEnd = parseISO(p.end_date);
+                                return day >= pStart && day <= pEnd;
+                              });
+                              const timeInfo =
+                                periodForDay?.period_type === 'partial' &&
+                                periodForDay.start_time &&
+                                periodForDay.end_time
+                                  ? ` (${periodForDay.start_time}-${periodForDay.end_time})`
+                                  : '';
+                              return (
+                                <p key={absence.id} className="text-sm">
+                                  {absence.employees?.name} -{' '}
+                                  {absenceTypeLabels[absence.absence_type]}
+                                  {timeInfo}
+                                </p>
+                              );
+                            })}
+                          </TooltipContent>
+                        )}
+                      </Tooltip>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Right column (≈20%): month summary — names, types and quantity */}
+            <Card className="shadow-card">
+              <CardHeader className="pb-3">
+                <CardTitle className="font-display text-lg">Resumo do mês</CardTitle>
+                <p className="text-xs text-muted-foreground capitalize">
+                  {format(currentDate, 'MMMM yyyy', { locale: pt })} · ausências aprovadas
+                </p>
+              </CardHeader>
+              <CardContent className="px-3">
+                {monthSummary.length === 0 ? (
+                  <p className="text-sm text-muted-foreground px-1">
+                    Nenhuma ausência aprovada este mês.
+                  </p>
+                ) : (
+                  <div className="space-y-2 max-h-[620px] overflow-y-auto pr-1">
+                    {monthSummary.map(emp => (
+                      <div key={emp.name} className="rounded-lg border p-2.5">
+                        <div className="flex items-center justify-between gap-2 mb-1.5">
+                          <span className="font-medium text-sm truncate">{emp.name}</span>
+                          <span className="text-xs font-semibold text-muted-foreground tabular-nums shrink-0">
+                            {fmtDays(emp.total)}d
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1">
+                          {emp.parts.map(([type, days]) => {
+                            const c = absenceTypeColors[type] || defaultAbsenceTypeColor;
+                            return (
+                              <span
+                                key={type}
+                                className="text-[11px] font-medium px-1.5 py-0.5 rounded border leading-tight"
+                                style={{
+                                  backgroundColor: c.fill,
+                                  color: c.text,
+                                  borderColor: c.border,
+                                }}
+                              >
+                                {absenceTypeLabels[type] || type} · {fmtDays(days)}
+                              </span>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardContent>
+            </Card>
           </div>
 
           {/* Legend & Pending Requests - hidden on print */}

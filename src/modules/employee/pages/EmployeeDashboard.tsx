@@ -55,6 +55,7 @@ import EmployeeCalendar from '@/components/employee/EmployeeCalendar';
 import { AvisosSection } from '@/components/employee/AvisosSection';
 import NewTicketDialog from '@/components/employee/NewTicketDialog';
 import { DatePeriod, Holiday, countBusinessDays, formatTimeRange } from '@/lib/vacation-utils';
+import { findApprovedConflicts, describeConflicts } from '@/lib/absence-overlap';
 import { absenceTypeLabels, trainingModeLabels } from '@/lib/absence-types';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
@@ -390,6 +391,33 @@ const EmployeeDashboard = () => {
           title: 'Pedido pendente para essas datas',
           description:
             'Já tem um pedido pendente que cobre essas datas. Aguarde a aprovação ou recusa antes de submeter outro.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
+      // Impedir sobreposição com uma ausência JÁ APROVADA: o mesmo colaborador
+      // não pode ter dois pedidos aprovados a ocupar o mesmo dia. Dois períodos
+      // parciais no mesmo dia continuam a ser permitidos se as horas não colidirem.
+      const candidatePeriods = periods.map(period => ({
+        start_date: format(period.from, 'yyyy-MM-dd'),
+        end_date: format(period.to, 'yyyy-MM-dd'),
+        period_type: period.periodType,
+        start_time: period.startTime || null,
+        end_time: period.endTime || null,
+      }));
+
+      const { data: conflicts, error: conflictError } = await findApprovedConflicts(
+        employee.id,
+        candidatePeriods
+      );
+
+      if (conflictError) throw conflictError;
+
+      if (conflicts && conflicts.length > 0) {
+        toast({
+          title: 'Já tem ausência aprovada nessas datas',
+          description: describeConflicts(conflicts),
           variant: 'destructive',
         });
         return;

@@ -1,4 +1,11 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi } from 'vitest';
+
+// O módulo absence-overlap importa o supabase client (usado por findApprovedConflicts).
+// As funções testadas aqui são puras e não lhe tocam, mas o simples import inicializa
+// o client — e no CI os jobs de teste correm sem .env, pelo que createClient rebenta
+// com "supabaseUrl is required". Mockar evita isso (padrão de mocking do projeto).
+vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
+
 import { periodsConflict, findSelfConflicts, describeConflicts } from '../absence-overlap';
 
 const fullDay = (start: string, end = start) => ({

@@ -48,29 +48,26 @@ serve(async req => {
     const { data: allDomains, error } = await supabase
       .from('site_domains')
       .select('*')
-      .order('creation_date', { ascending: true });
+      .order('renewal_date', { ascending: true });
 
     if (error) {
       throw error;
     }
 
-    const currentYear = today.getFullYear();
     const expiringDomains = [];
 
     allDomains?.forEach(domain => {
-      const creation = new Date(domain.creation_date);
-      const targetYear = domain.last_paid_year ? domain.last_paid_year + 1 : currentYear;
-      const targetAnniversary = new Date(targetYear, creation.getMonth(), creation.getDate());
+      const renewalDate = new Date(`${domain.renewal_date}T00:00:00`);
 
       const daysUntil = Math.floor(
-        (targetAnniversary.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
+        (renewalDate.getTime() - today.getTime()) / (1000 * 60 * 60 * 24)
       );
 
       // Included if it's within 7 days of renewing OR expired (daysUntil < 0)
       if (daysUntil <= 7) {
         expiringDomains.push({
           ...domain,
-          targetAnniversary,
+          renewalDate,
           daysUntil,
           isExpired: daysUntil < 0,
         });
@@ -102,7 +99,7 @@ serve(async req => {
     `;
 
     expiringDomains.forEach(domain => {
-      const formattedDate = domain.targetAnniversary.toLocaleDateString('pt-PT');
+      const formattedDate = domain.renewalDate.toLocaleDateString('pt-PT');
       const formattedValue = new Intl.NumberFormat('pt-PT', {
         style: 'currency',
         currency: 'EUR',

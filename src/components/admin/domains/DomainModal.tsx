@@ -17,8 +17,9 @@ export interface DomainData {
   id?: string;
   domain_name: string;
   renewal_value: number;
-  creation_date: string;
-  last_paid_year?: number;
+  /** Data da próxima renovação (YYYY-MM-DD). Avança um ano quando é marcado como pago. */
+  renewal_date: string;
+  last_paid_year?: number | null;
 }
 
 interface DomainModalProps {
@@ -34,7 +35,7 @@ export function DomainModal({ open, onOpenChange, domain, onSave }: DomainModalP
   const [formData, setFormData] = useState<DomainData>({
     domain_name: '',
     renewal_value: 0,
-    creation_date: '',
+    renewal_date: '',
   });
 
   useEffect(() => {
@@ -44,7 +45,7 @@ export function DomainModal({ open, onOpenChange, domain, onSave }: DomainModalP
       setFormData({
         domain_name: '',
         renewal_value: 0,
-        creation_date: '',
+        renewal_date: '',
       });
     }
   }, [domain, open]);
@@ -54,7 +55,7 @@ export function DomainModal({ open, onOpenChange, domain, onSave }: DomainModalP
     setIsSubmitting(true);
 
     try {
-      if (!formData.domain_name || !formData.creation_date) {
+      if (!formData.domain_name || !formData.renewal_date) {
         throw new Error('Por favor preencha todos os campos obrigatórios.');
       }
 
@@ -65,7 +66,7 @@ export function DomainModal({ open, onOpenChange, domain, onSave }: DomainModalP
           .update({
             domain_name: formData.domain_name,
             renewal_value: formData.renewal_value,
-            creation_date: formData.creation_date,
+            renewal_date: formData.renewal_date,
           })
           .eq('id', formData.id);
 
@@ -77,7 +78,7 @@ export function DomainModal({ open, onOpenChange, domain, onSave }: DomainModalP
           {
             domain_name: formData.domain_name,
             renewal_value: formData.renewal_value,
-            creation_date: formData.creation_date,
+            renewal_date: formData.renewal_date,
           },
         ]);
 
@@ -117,6 +118,21 @@ export function DomainModal({ open, onOpenChange, domain, onSave }: DomainModalP
           </div>
 
           <div className="space-y-2">
+            <Label htmlFor="renewal_date">Data da Próxima Renovação *</Label>
+            <Input
+              id="renewal_date"
+              type="date"
+              value={formData.renewal_date}
+              onChange={e => setFormData({ ...formData, renewal_date: e.target.value })}
+              required
+            />
+            <p className="text-xs text-muted-foreground">
+              A data em que o domínio expira e tem de ser pago (a mesma que aparece no registador,
+              ex: dominios.pt). Ao marcar como pago, avança automaticamente um ano.
+            </p>
+          </div>
+
+          <div className="space-y-2">
             <Label htmlFor="renewal_value">Valor da Renovação (€) *</Label>
             <Input
               id="renewal_value"
@@ -126,17 +142,6 @@ export function DomainModal({ open, onOpenChange, domain, onSave }: DomainModalP
               onChange={e =>
                 setFormData({ ...formData, renewal_value: parseFloat(e.target.value) || 0 })
               }
-              required
-            />
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="creation_date">Data de Criação *</Label>
-            <Input
-              id="creation_date"
-              type="date"
-              value={formData.creation_date}
-              onChange={e => setFormData({ ...formData, creation_date: e.target.value })}
               required
             />
           </div>

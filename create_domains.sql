@@ -5,7 +5,9 @@ CREATE TABLE IF NOT EXISTS public.site_domains (
     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
     domain_name text NOT NULL,
     renewal_value numeric(10, 2) NOT NULL DEFAULT 0,
-    creation_date date NOT NULL,
+    -- Data da próxima renovação (avança +1 ano quando marcado como pago)
+    renewal_date date NOT NULL,
+    -- Ano da última renovação paga; pago quando last_paid_year = ano(renewal_date) - 1
     last_paid_year integer,
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now()

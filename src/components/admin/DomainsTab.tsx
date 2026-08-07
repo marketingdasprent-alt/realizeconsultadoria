@@ -14,7 +14,7 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { differenceInDays, format, parseISO } from 'date-fns';
+import { addYears, differenceInDays, format, parseISO, startOfDay, subYears } from 'date-fns';
 import { DomainModal, DomainData } from '@/components/admin/domains/DomainModal';
 import {
   AlertDialog,
@@ -43,7 +43,7 @@ export default function DomainsTab() {
       const { data, error } = await supabase
         .from('site_domains')
         .select('*')
-        .order('creation_date', { ascending: true });
+        .order('renewal_date', { ascending: true });
 
       if (error) throw error;
       setDomains(data || []);
@@ -84,48 +84,65 @@ export default function DomainsTab() {
   };
 
   const getCycleInfo = (domain: DomainData) => {
-    const today = new Date();
-    today.setHours(0, 0, 0, 0);
-    const currentYear = today.getFullYear();
-    const creation = parseISO(domain.creation_date);
+    const today = startOfDay(new Date());
+    const renewal = startOfDay(parseISO(domain.renewal_date));
+    const daysUntil = differenceInDays(renewal, today);
 
-    const targetYear = domain.last_paid_year ? domain.last_paid_year + 1 : currentYear;
-    const targetAnniversary = new Date(targetYear, creation.getMonth(), creation.getDate());
-
-    const daysUntil = differenceInDays(targetAnniversary, today);
-    const isPaidThisYear = (domain.last_paid_year || 0) >= currentYear;
+    // A renovação do ciclo actual está paga quando a data já foi avançada um ano.
+    const isPaid = domain.last_paid_year === renewal.getFullYear() - 1;
 
     let label = 'Regular';
     let className = 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300';
 
     if (daysUntil < 0) {
-      label = 'Expirado';
+      label = `Expirado há ${Math.abs(daysUntil)} ${Math.abs(daysUntil) === 1 ? 'dia' : 'dias'}`;
       className = 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300';
-    } else if (daysUntil <= 7) {
-      label = `Renova em ${daysUntil} dias`;
+    } else if (daysUntil === 0) {
+      label = 'Renova hoje';
       className = 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
-    } else if (isPaidThisYear) {
-      label = 'Pago';
-      className = 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300';
+    } else if (daysUntil <= 7) {
+      label = `Renova em ${daysUntil} ${daysUntil === 1 ? 'dia' : 'dias'}`;
+      className = 'bg-orange-100 text-orange-800 dark:bg-orange-900/30 dark:text-orange-300';
+    } else if (daysUntil <= 30) {
+      label = `Renova em ${daysUntil} dias`;
+      className = 'bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300';
     }
 
-    return { label, className, isPaidThisYear, targetAnniversary };
+    return { label, className, isPaid, daysUntil, renewal };
   };
 
+  /**
+   * Marcar como pago avança a data da próxima renovação um ano (e voltar a clicar desfaz),
+   * tal como acontece no registador quando se paga a renovação.
+   */
   const handleTogglePaid = async (domain: DomainData, currentPaid: boolean) => {
-    const currentYear = new Date().getFullYear();
-    const newYear = currentPaid ? currentYear - 1 : currentYear;
+    const renewal = parseISO(domain.renewal_date);
+    const newRenewal = format(
+      currentPaid ? subYears(renewal, 1) : addYears(renewal, 1),
+      'yyyy-MM-dd'
+    );
+    const newPaidYear = currentPaid ? null : renewal.getFullYear();
 
     // Optimistic UI update
-    setDomains(prev => prev.map(d => (d.id === domain.id ? { ...d, last_paid_year: newYear } : d)));
+    setDomains(prev =>
+      prev.map(d =>
+        d.id === domain.id ? { ...d, renewal_date: newRenewal, last_paid_year: newPaidYear } : d
+      )
+    );
 
     try {
       const { error } = await supabase
         .from('site_domains')
-        .update({ last_paid_year: newYear })
+        .update({ renewal_date: newRenewal, last_paid_year: newPaidYear })
         .eq('id', domain.id);
 
       if (error) throw error;
+
+      toast({
+        title: currentPaid
+          ? 'Pagamento anulado'
+          : `Renovação registada — próxima a ${format(parseISO(newRenewal), 'dd/MM/yyyy')}`,
+      });
 
       fetchDomains(true);
     } catch (error: any) {
@@ -188,7 +205,6 @@ export default function DomainsTab() {
                 <TableRow>
                   <TableHead className="font-semibold">Domínio</TableHead>
                   <TableHead className="font-semibold text-center">Valor (€)</TableHead>
-                  <TableHead className="font-semibold text-center">Criado a</TableHead>
                   <TableHead className="font-semibold text-center">Próxima Renovação</TableHead>
                   <TableHead className="font-semibold text-center">Estado</TableHead>
                   <TableHead className="font-semibold text-center">Pago</TableHead>
@@ -198,7 +214,7 @@ export default function DomainsTab() {
               <TableBody>
                 {isLoading ? (
                   <TableRow>
-                    <TableCell colSpan={7} className="h-32 text-center">
+                    <TableCell colSpan={6} className="h-32 text-center">
                       <div className="flex flex-col items-center justify-center text-muted-foreground">
                         <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mb-2"></div>
                         A carregar domínios...
@@ -208,7 +224,7 @@ export default function DomainsTab() {
                 ) : filteredDomains.length === 0 ? (
                   <TableRow>
                     <TableCell
-                      colSpan={7}
+                      colSpan={6}
                       className="h-32 text-center text-muted-foreground bg-muted/5"
                     >
                       Nenhum domínio encontrado.
@@ -228,11 +244,8 @@ export default function DomainsTab() {
                             currency: 'EUR',
                           }).format(domain.renewal_value)}
                         </TableCell>
-                        <TableCell className="text-center">
-                          {format(parseISO(domain.creation_date), 'dd/MM/yyyy')}
-                        </TableCell>
                         <TableCell className="text-center font-medium">
-                          {format(info.targetAnniversary, 'dd/MM/yyyy')}
+                          {format(info.renewal, 'dd/MM/yyyy')}
                         </TableCell>
                         <TableCell className="text-center">
                           <span
@@ -246,9 +259,14 @@ export default function DomainsTab() {
                             <Badge
                               className="cursor-pointer hover:bg-opacity-80 transition-colors"
                               variant="outline"
-                              onClick={() => handleTogglePaid(domain, info.isPaidThisYear)}
+                              onClick={() => handleTogglePaid(domain, info.isPaid)}
+                              title={
+                                info.isPaid
+                                  ? 'Clique para anular o pagamento (recua a renovação um ano)'
+                                  : 'Clique ao pagar a renovação (avança a data um ano)'
+                              }
                               style={
-                                info.isPaidThisYear
+                                info.isPaid
                                   ? {
                                       backgroundColor: '#dcfce7',
                                       color: '#166534',
@@ -261,7 +279,7 @@ export default function DomainsTab() {
                                     }
                               }
                             >
-                              {info.isPaidThisYear ? 'Pago' : 'Pendente'}
+                              {info.isPaid ? 'Pago' : 'Pendente'}
                             </Badge>
                           </div>
                         </TableCell>

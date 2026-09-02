@@ -249,11 +249,25 @@ const EmployeeGeneralTab = ({
     }
   };
 
+  // Sem isto, uma validação falhada (ex.: senha com menos de 8 caracteres) apenas
+  // marcava o campo e o utilizador não percebia porque é que nada era criado.
+  const onInvalid = (formErrors: Record<string, any>) => {
+    const firstMessage = Object.values(formErrors).find(
+      (fieldError: any) => typeof fieldError?.message === 'string'
+    ) as { message?: string } | undefined;
+
+    toast({
+      title: 'Não foi possível guardar',
+      description: firstMessage?.message || 'Verifique os campos assinalados a vermelho.',
+      variant: 'destructive',
+    });
+  };
+
   return (
     <Card>
       <CardContent className="pt-6">
         <FormProvider {...methods}>
-          <form onSubmit={handleSubmit(onSubmit)} className="space-y-6">
+          <form onSubmit={handleSubmit(onSubmit, onInvalid)} className="space-y-6">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="md:col-span-2">
                 <label className="block text-sm font-medium mb-1">Empresa *</label>
@@ -302,10 +316,17 @@ const EmployeeGeneralTab = ({
                       {...register('password')}
                       placeholder="Mínimo 8 caracteres"
                     />
-                    {errors.password && (
+                    {errors.password ? (
                       <p className="text-red-500 text-xs mt-1">
                         {errors.password.message as string}
                       </p>
+                    ) : (
+                      (watch('password')?.length ?? 0) > 0 &&
+                      (watch('password')?.length ?? 0) < 8 && (
+                        <p className="text-red-500 text-xs mt-1">
+                          Senha deve ter pelo menos 8 caracteres
+                        </p>
+                      )
                     )}
                   </div>
                   <div className="md:col-span-2">

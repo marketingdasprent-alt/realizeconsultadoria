@@ -123,6 +123,11 @@ const ChangeAdminPasswordDialog = ({
               onChange={e => setNewPassword(e.target.value)}
               placeholder="Mínimo 8 caracteres"
             />
+            {newPassword.length > 0 && newPassword.length < 8 && (
+              <p className="text-xs text-destructive">
+                A palavra-passe deve ter pelo menos 8 caracteres.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -134,6 +139,9 @@ const ChangeAdminPasswordDialog = ({
               onChange={e => setConfirmPassword(e.target.value)}
               placeholder="Repetir palavra-passe"
             />
+            {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+              <p className="text-xs text-destructive">As palavras-passe não coincidem.</p>
+            )}
           </div>
 
           <div className="flex items-center space-x-2 pt-2">
@@ -153,11 +161,7 @@ const ChangeAdminPasswordDialog = ({
           <Button variant="outline" onClick={handleClose} disabled={isLoading}>
             Cancelar
           </Button>
-          <Button
-            variant="gold"
-            onClick={handleSubmit}
-            disabled={isLoading || newPassword.length < 8 || newPassword !== confirmPassword}
-          >
+          <Button variant="gold" onClick={handleSubmit} disabled={isLoading}>
             {isLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />A guardar...

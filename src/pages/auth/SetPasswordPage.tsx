@@ -277,6 +277,11 @@ const SetPasswordPage = () => {
                   {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </Button>
               </div>
+              {password.trim().length > 0 && password.trim().length < 8 && (
+                <p className="text-xs text-destructive">
+                  A palavra-passe deve ter pelo menos 8 caracteres.
+                </p>
+              )}
             </div>
 
             <div className="space-y-2">

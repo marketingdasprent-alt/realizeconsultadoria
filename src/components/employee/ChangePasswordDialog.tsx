@@ -111,7 +111,7 @@ const ChangePasswordDialog = ({ open, onOpenChange, employeeEmail }: ChangePassw
   };
 
   const isValid =
-    currentPassword.length > 0 && newPassword.length >= 8 && newPassword === confirmPassword;
+    currentPassword.length > 0 && newPassword.length > 0 && confirmPassword.length > 0;
 
   return (
     <Dialog open={open} onOpenChange={handleClose}>
@@ -167,6 +167,11 @@ const ChangePasswordDialog = ({ open, onOpenChange, employeeEmail }: ChangePassw
                 {showNew ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
               </button>
             </div>
+            {newPassword.length > 0 && newPassword.length < 8 && (
+              <p className="text-xs text-destructive">
+                A palavra-passe deve ter pelo menos 8 caracteres.
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">

@@ -214,6 +214,11 @@ const ChangeEmployeePasswordDialog = ({
                 )}
               </Button>
             </div>
+            {newPassword.length > 0 && newPassword.length < 8 && (
+              <p className="text-xs text-destructive">
+                A palavra-passe deve ter pelo menos 8 caracteres
+              </p>
+            )}
           </div>
 
           <div className="space-y-2">
@@ -226,6 +231,9 @@ const ChangeEmployeePasswordDialog = ({
               placeholder="Repetir palavra-passe"
               autoComplete="new-password"
             />
+            {confirmPassword.length > 0 && newPassword !== confirmPassword && (
+              <p className="text-xs text-destructive">As palavras-passe não coincidem</p>
+            )}
           </div>
 
           <div className="flex items-center space-x-2 pt-2">

@@ -727,22 +727,19 @@ const SettingsPage = () => {
                         placeholder="Mínimo 8 caracteres"
                         className="mt-1"
                       />
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Esta será a palavra-passe inicial do administrador
-                      </p>
+                      {invitePassword.length > 0 && invitePassword.length < 8 ? (
+                        <p className="text-xs text-destructive mt-1">
+                          A palavra-passe deve ter pelo menos 8 caracteres.
+                        </p>
+                      ) : (
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Esta será a palavra-passe inicial do administrador
+                        </p>
+                      )}
                     </div>
                   </div>
                   <div className="flex justify-end pt-2">
-                    <Button
-                      variant="gold"
-                      onClick={handleInviteAdmin}
-                      disabled={
-                        isInviting ||
-                        !inviteEmail.trim() ||
-                        !invitePassword ||
-                        invitePassword.length < 8
-                      }
-                    >
+                    <Button variant="gold" onClick={handleInviteAdmin} disabled={isInviting}>
                       {isInviting ? (
                         <Loader2 className="h-4 w-4 mr-2 animate-spin" />
                       ) : (

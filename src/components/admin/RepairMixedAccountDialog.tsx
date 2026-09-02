@@ -155,6 +155,9 @@ const RepairMixedAccountDialog = ({
                 onChange={e => setPassword(e.target.value)}
                 placeholder="Mínimo 8 caracteres"
               />
+              {password.length > 0 && password.length < 8 && (
+                <p className="text-sm text-destructive">A senha deve ter pelo menos 8 caracteres</p>
+              )}
             </div>
             <div className="space-y-2">
               <Label htmlFor="repair-confirm-password">Confirmar senha</Label>
@@ -176,13 +179,7 @@ const RepairMixedAccountDialog = ({
           <Button variant="outline" onClick={handleClose} disabled={isRepairing}>
             Cancelar
           </Button>
-          <Button
-            variant="gold"
-            onClick={handleRepair}
-            disabled={
-              isRepairing || !password || password.length < 8 || password !== confirmPassword
-            }
-          >
+          <Button variant="gold" onClick={handleRepair} disabled={isRepairing}>
             {isRepairing ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />A reparar...

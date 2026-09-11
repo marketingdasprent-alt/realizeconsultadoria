@@ -6,8 +6,10 @@
 --   * last_paid_date substitui o last_paid_year dos domínios, porque um ano não chega
 --     para identificar o período pago quando a cobrança é mensal.
 --
--- Considera-se o ciclo actual pago quando last_paid_date = renewal_date menos um período,
--- ou seja, quando a renovação já foi avançada ao marcar o pagamento.
+-- Considera-se o ciclo actual pago quando avançar last_paid_date um período dá renewal_date,
+-- ou seja, quando a renovação já foi avançada ao marcar o pagamento. A comparação é feita
+-- para a frente porque avançar meses não é reversível no fim do mês: 31/01 avança para
+-- 28/02, mas 28/02 recua para 28/01.
 
 CREATE TABLE IF NOT EXISTS public.recurring_services (
     id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
@@ -33,7 +35,7 @@ CREATE TABLE IF NOT EXISTS public.recurring_services (
 COMMENT ON COLUMN public.recurring_services.renewal_date IS
   'Data da próxima renovação. Avança um mês ou um ano (conforme billing_cycle) quando é marcado como pago.';
 COMMENT ON COLUMN public.recurring_services.last_paid_date IS
-  'Data de renovação do último período pago. Pago quando last_paid_date = renewal_date menos um período.';
+  'Data de renovação do último período pago. Pago quando last_paid_date avançado um período = renewal_date.';
 
 -- Listagens e o email de avisos ordenam/filtram sempre por data de renovação.
 CREATE INDEX IF NOT EXISTS recurring_services_renewal_date_idx

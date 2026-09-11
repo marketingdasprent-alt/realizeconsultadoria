@@ -35,7 +35,7 @@ USING (
 --   '0 8 * * *',
 --   $$
 --     select net.http_post(
---         url:='https://jvvnsoasylusbmyfotci.supabase.co/functions/v1/send-domain-renewal-reminders',
+--         url:='https://jvvnsoasylusbmxfotci.supabase.co/functions/v1/send-domain-renewal-reminders',
 --         headers:='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb,
 --         body:='{}'::jsonb
 --     )

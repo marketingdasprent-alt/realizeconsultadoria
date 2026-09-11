@@ -1,7 +1,7 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
-const RESEND_API_KEY = Deno.env.get('RESEND_API_KEY');
+const BREVO_API_KEY = Deno.env.get('BREVO_API_KEY');
 const TARGET_EMAIL = 'marketing@dasprent.pt';
 
 /** Avisa deste número de dias antes da renovação/débito. */
@@ -44,8 +44,8 @@ serve(async req => {
       throw new Error('Missing Supabase environment variables');
     }
 
-    if (!RESEND_API_KEY) {
-      throw new Error('Missing RESEND_API_KEY');
+    if (!BREVO_API_KEY) {
+      throw new Error('Missing BREVO_API_KEY');
     }
 
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
@@ -168,23 +168,24 @@ serve(async req => {
       </p>
     `;
 
-    const resResponse = await fetch('https://api.resend.com/emails', {
+    const resResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
+        Accept: 'application/json',
         'Content-Type': 'application/json',
-        Authorization: `Bearer ${RESEND_API_KEY}`,
+        'api-key': BREVO_API_KEY,
       },
       body: JSON.stringify({
-        from: 'Realize Consultadoria <onboarding@resend.dev>', // Or your verified domain
-        to: [TARGET_EMAIL],
+        sender: { name: 'Realize Consultadoria', email: 'noreply@dasprent.pt' },
+        to: [{ email: TARGET_EMAIL }],
         subject: '🚨 Alerta: Serviços a renovar',
-        html: emailHtml,
+        htmlContent: emailHtml,
       }),
     });
 
     if (!resResponse.ok) {
       const errorData = await resResponse.text();
-      console.error('Resend API error:', errorData);
+      console.error('Brevo API error:', errorData);
       throw new Error(`Failed to send email: ${errorData}`);
     }
 

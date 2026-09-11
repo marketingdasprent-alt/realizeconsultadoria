@@ -82,6 +82,7 @@ import PhonesTab from '@/components/admin/PhonesTab';
 import EquipmentsTab from '@/components/admin/EquipmentsTab';
 import AssignmentsTab from '@/components/admin/AssignmentsTab';
 import DomainsTab from '@/components/admin/DomainsTab';
+import ServicesTab from '@/components/admin/ServicesTab';
 import { supabase } from '@/integrations/supabase/client';
 
 interface Access {
@@ -893,7 +894,7 @@ const AccessesPage = () => {
 
         <Tabs defaultValue="accesses" className="w-full">
           <ScrollArea className="w-full whitespace-nowrap pb-2">
-            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full sm:max-w-3xl sm:grid-cols-5 h-10">
+            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full sm:max-w-3xl sm:grid-cols-6 h-10">
               <TabsTrigger
                 value="accesses"
                 className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4"
@@ -931,6 +932,13 @@ const AccessesPage = () => {
               >
                 <Globe className="h-4 w-4 hidden sm:inline" />
                 Domínios
+              </TabsTrigger>
+              <TabsTrigger
+                value="servicos"
+                className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4"
+              >
+                <Wifi className="h-4 w-4 hidden sm:inline" />
+                Serviços
               </TabsTrigger>
             </TabsList>
           </ScrollArea>
@@ -1113,6 +1121,15 @@ const AccessesPage = () => {
 
           <TabsContent value="dominios" className="mt-6">
             <DomainsTab />
+          </TabsContent>
+
+          <TabsContent value="servicos" className="mt-6">
+            <ServicesTab
+              canManage={canManage}
+              companies={companies}
+              companyFilter={companyFilter}
+              setCompanyFilter={setCompanyFilter}
+            />
           </TabsContent>
         </Tabs>
       </div>

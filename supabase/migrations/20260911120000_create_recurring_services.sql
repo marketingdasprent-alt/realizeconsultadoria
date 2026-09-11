@@ -60,8 +60,14 @@ TO authenticated
 USING (public.has_role(auth.uid(), 'admin'))
 WITH CHECK (public.has_role(auth.uid(), 'admin'));
 
--- Agendamento do email de avisos (requer pg_cron e pg_net activos).
--- Correr manualmente depois de fazer deploy da edge function:
+-- Agendamento do email de avisos. Correr manualmente depois do deploy da edge function.
+--
+-- Activar pg_cron e pg_net primeiro, em Database > Extensions no dashboard. Fazê-lo por
+-- SQL (create extension) rebenta com "dependent privileges exist", porque o script interno
+-- da extensão mexe em privilégios de cron.job que já têm dependentes.
+--
+-- Sem header Authorization de propósito: a função tem verify_jwt = false (ver config.toml),
+-- por isso não precisa de chave e assim não se guarda nenhuma no repositório.
 --
 -- SELECT cron.schedule(
 --   'service-renewal-reminder',
@@ -69,7 +75,7 @@ WITH CHECK (public.has_role(auth.uid(), 'admin'));
 --   $$
 --     select net.http_post(
 --         url:='https://jvvnsoasylusbmxfotci.supabase.co/functions/v1/send-service-renewal-reminders',
---         headers:='{"Content-Type": "application/json", "Authorization": "Bearer YOUR_ANON_KEY"}'::jsonb,
+--         headers:='{"Content-Type": "application/json"}'::jsonb,
 --         body:='{}'::jsonb
 --     )
 --   $$

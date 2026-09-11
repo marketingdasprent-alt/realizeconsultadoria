@@ -97,75 +97,197 @@ serve(async req => {
       });
     }
 
-    let emailHtml = '<h2>Alerta de Serviços (Internet e Assinaturas)</h2>';
+    const overdueCount = expiringServices.filter(s => s.isExpired).length;
+    const totalDue = expiringServices.reduce((sum, s) => sum + Number(s.amount ?? 0), 0);
 
-    if (expiringServices.length > 0) {
-      emailHtml += `
-        <p>Os seguintes serviços renovam dentro de ${RENEWAL_WARNING_DAYS} dias ou já passaram da data:</p>
-        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 700px;">
-          <thead>
-            <tr style="background-color: #f3f4f6; text-align: left;">
-              <th>Serviço</th>
-              <th>Tipo</th>
-              <th>Empresa</th>
-              <th>Próxima Renovação</th>
-              <th>Valor</th>
-            </tr>
-          </thead>
-          <tbody>
-      `;
+    // Só a primeira letra em maiúscula: o text-transform: capitalize do CSS poria
+    // maiúscula em cada palavra ("11 De Setembro De 2026"), que em português é errado.
+    const rawToday = today.toLocaleDateString('pt-PT', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric',
+    });
+    const todayFormatted = rawToday.charAt(0).toUpperCase() + rawToday.slice(1);
 
-      expiringServices.forEach(service => {
-        const formattedDate = service.renewalDate.toLocaleDateString('pt-PT');
-        const rowStyle = service.isExpired ? 'color: #dc2626; font-weight: bold;' : '';
+    const th = (align: 'left' | 'center' | 'right') =>
+      `padding: 10px 16px; text-align: ${align}; font-size: 11px; color: #999999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.5px; border-bottom: 2px solid #eeeeee;`;
+    const td = (align: 'left' | 'center' | 'right') =>
+      `padding: 12px 16px; text-align: ${align}; font-size: 14px; color: #333333; border-bottom: 1px solid #f2f2f2;`;
 
-        emailHtml += `
-          <tr style="${rowStyle}">
-            <td>${service.name}${service.provider ? ` (${service.provider})` : ''}</td>
-            <td>${TYPE_LABELS[service.service_type] ?? service.service_type}</td>
-            <td>${service.companies?.name ?? '—'}</td>
-            <td>${formattedDate} ${service.isExpired ? '(Em atraso)' : ''}</td>
-            <td>${formatEuro(service.amount)}${CYCLE_LABELS[service.billing_cycle] ?? ''}</td>
-          </tr>
-        `;
-      });
+    // O título diz o que é preciso fazer hoje: os atrasados mandam, porque são os que
+    // arriscam corte de serviço. Sem atrasados, é só um aviso de que o débito se aproxima.
+    const headline = overdueCount
+      ? `${overdueCount} ${overdueCount === 1 ? 'serviço em atraso' : 'serviços em atraso'}`
+      : expiringServices.length
+        ? `${expiringServices.length} ${expiringServices.length === 1 ? 'serviço a renovar' : 'serviços a renovar'}`
+        : `${endingFidelity.length} ${endingFidelity.length === 1 ? 'fidelização a acabar' : 'fidelizações a acabar'}`;
 
-      emailHtml += '</tbody></table>';
-    }
+    const renewalRows = expiringServices
+      .map(service => {
+        const nameColor = service.isExpired ? '#b91c1c' : '#333333';
+        const status = service.isExpired
+          ? `<span style="display: inline-block; padding: 3px 10px; border-radius: 999px; white-space: nowrap; background-color: #fee2e2; color: #b91c1c; font-size: 12px; font-weight: 600;">Em atraso</span>`
+          : service.daysUntil === 0
+            ? `<span style="display: inline-block; padding: 3px 10px; border-radius: 999px; white-space: nowrap; background-color: #ffedd5; color: #9a3412; font-size: 12px; font-weight: 600;">Hoje</span>`
+            : `<span style="display: inline-block; padding: 3px 10px; border-radius: 999px; white-space: nowrap; background-color: #fef3c7; color: #92400e; font-size: 12px; font-weight: 600;">${service.daysUntil} ${service.daysUntil === 1 ? 'dia' : 'dias'}</span>`;
 
-    if (endingFidelity.length > 0) {
-      emailHtml += `
-        <p style="margin-top: 24px;">Fidelizações a acabar nos próximos ${FIDELITY_WARNING_DAYS} dias (altura de renegociar):</p>
-        <table border="1" cellpadding="8" cellspacing="0" style="border-collapse: collapse; width: 100%; max-width: 700px;">
-          <thead>
-            <tr style="background-color: #f3f4f6; text-align: left;">
-              <th>Serviço</th>
-              <th>Empresa</th>
-              <th>Fim da Fidelização</th>
-              <th>Faltam</th>
-            </tr>
-          </thead>
-          <tbody>
-      `;
-
-      endingFidelity.forEach(service => {
-        emailHtml += `
+        return `
           <tr>
-            <td>${service.name}${service.provider ? ` (${service.provider})` : ''}</td>
-            <td>${service.companies?.name ?? '—'}</td>
-            <td>${service.fidelityDate.toLocaleDateString('pt-PT')}</td>
-            <td>${service.daysUntilFidelity} ${service.daysUntilFidelity === 1 ? 'dia' : 'dias'}</td>
+            <td style="${td('left')}">
+              <span style="color: ${nameColor}; font-weight: 600;">${service.name}</span>
+              <span style="display: block; color: #999999; font-size: 12px; margin-top: 2px;">
+                ${[TYPE_LABELS[service.service_type] ?? service.service_type, service.provider, service.companies?.name].filter(Boolean).join(' · ')}
+              </span>
+            </td>
+            <td style="${td('center')}">${service.renewalDate.toLocaleDateString('pt-PT')}</td>
+            <td style="${td('center')}">${status}</td>
+            <td style="${td('right')}; white-space: nowrap;">
+              <strong>${formatEuro(service.amount)}</strong><span style="color: #999999; font-size: 12px;">${CYCLE_LABELS[service.billing_cycle] ?? ''}</span>
+            </td>
           </tr>
         `;
-      });
+      })
+      .join('');
 
-      emailHtml += '</tbody></table>';
-    }
+    const fidelityRows = endingFidelity
+      .map(
+        service => `
+          <tr>
+            <td style="${td('left')}">
+              <span style="font-weight: 600;">${service.name}</span>
+              <span style="display: block; color: #999999; font-size: 12px; margin-top: 2px;">
+                ${[service.provider, service.companies?.name].filter(Boolean).join(' · ')}
+              </span>
+            </td>
+            <td style="${td('center')}">${service.fidelityDate.toLocaleDateString('pt-PT')}</td>
+            <td style="${td('right')}">${service.daysUntilFidelity} ${service.daysUntilFidelity === 1 ? 'dia' : 'dias'}</td>
+          </tr>
+        `
+      )
+      .join('');
 
-    emailHtml += `
-      <p style="margin-top: 20px; color: #6b7280; font-size: 12px;">
-        Este é um email automático gerado pelo sistema Realize Consultadoria.
-      </p>
+    const renewalSection = expiringServices.length
+      ? `
+        <p style="margin: 0 0 16px 0; color: #555555; font-size: 14px; line-height: 1.6;">
+          ${
+            expiringServices.length === 1
+              ? 'O seguinte serviço renova nos próximos'
+              : 'Os seguintes serviços renovam nos próximos'
+          } ${RENEWAL_WARNING_DAYS} dias ou já passaram da data de pagamento:
+        </p>
+
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #eeeeee; border-radius: 8px; overflow: hidden;">
+          <thead>
+            <tr style="background-color: #f8f8f8;">
+              <th style="${th('left')}">Serviço</th>
+              <th style="${th('center')}">Renovação</th>
+              <th style="${th('center')}">Estado</th>
+              <th style="${th('right')}">Valor</th>
+            </tr>
+          </thead>
+          <tbody>${renewalRows}</tbody>
+          <tfoot>
+            <tr style="background-color: #fafafa;">
+              <td colspan="3" style="padding: 12px 16px; text-align: right; font-size: 12px; color: #999999; text-transform: uppercase; letter-spacing: 0.5px;">Total</td>
+              <td style="padding: 12px 16px; text-align: right; font-size: 15px; color: #333333;"><strong>${formatEuro(totalDue)}</strong></td>
+            </tr>
+          </tfoot>
+        </table>
+      `
+      : '';
+
+    const fidelitySection = endingFidelity.length
+      ? `
+        <p style="margin: ${expiringServices.length ? '32px' : '0'} 0 16px 0; color: #555555; font-size: 14px; line-height: 1.6;">
+          ${endingFidelity.length === 1 ? 'Esta fidelização acaba' : 'Estas fidelizações acabam'}
+          nos próximos ${FIDELITY_WARNING_DAYS} dias — boa altura para renegociar:
+        </p>
+
+        <table style="width: 100%; border-collapse: collapse; border: 1px solid #eeeeee; border-radius: 8px; overflow: hidden;">
+          <thead>
+            <tr style="background-color: #f8f8f8;">
+              <th style="${th('left')}">Serviço</th>
+              <th style="${th('center')}">Fim</th>
+              <th style="${th('right')}">Faltam</th>
+            </tr>
+          </thead>
+          <tbody>${fidelityRows}</tbody>
+        </table>
+      `
+      : '';
+
+    const overdueCallout = overdueCount
+      ? `
+        <div style="margin-top: 24px; padding: 14px 16px; background-color: #fef2f2; border-left: 3px solid #dc2626; border-radius: 0 6px 6px 0;">
+          <p style="margin: 0; color: #991b1b; font-size: 13px; line-height: 1.5;">
+            ⚠️ ${overdueCount === 1 ? 'Há 1 serviço' : `Há ${overdueCount} serviços`} com a data de pagamento
+            ultrapassada. Se já ${overdueCount === 1 ? 'foi pago' : 'foram pagos'}, marque como pago em
+            Acessos &rsaquo; Serviços para a data avançar.
+          </p>
+        </div>
+      `
+      : '';
+
+    const emailHtml = `
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    </head>
+    <body style="margin: 0; padding: 0; background-color: #f5f5f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;">
+      <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="max-width: 600px; margin: 40px auto; background-color: #ffffff; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 16px rgba(0,0,0,0.08);">
+
+        <!-- Header -->
+        <tr>
+          <td style="background-color: #000000; padding: 28px 30px; text-align: center;">
+            <h1 style="color: #d5b884; margin: 0; font-size: 26px; letter-spacing: 2px;">REALIZE</h1>
+            <p style="color: #d5b884; margin: 4px 0 0 0; font-size: 11px; letter-spacing: 4px;">CONSULTADORIA</p>
+          </td>
+        </tr>
+
+        <!-- Banner -->
+        <tr>
+          <td style="background: linear-gradient(135deg, #d5b884 0%, #c9a96e 100%); padding: 24px 30px; text-align: center;">
+            <p style="margin: 0 0 8px 0; font-size: 36px;">${overdueCount ? '⚠️' : '🔔'}</p>
+            <h2 style="margin: 0 0 6px 0; color: #000000; font-size: 22px; font-weight: 700;">${headline}</h2>
+            <p style="margin: 0; color: #333333; font-size: 13px;">${todayFormatted}</p>
+          </td>
+        </tr>
+
+        <!-- Body -->
+        <tr>
+          <td style="padding: 30px 30px 20px;">
+            ${renewalSection}
+            ${fidelitySection}
+            ${overdueCallout}
+
+            <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 28px auto 0;">
+              <tr>
+                <td style="background-color: #d5b884; border-radius: 6px;">
+                  <a href="https://realize.dasprent.pt/admin/acessos"
+                    style="display: inline-block; padding: 14px 36px; color: #000000; text-decoration: none; font-weight: 600; font-size: 15px;">
+                    Ver Serviços
+                  </a>
+                </td>
+              </tr>
+            </table>
+          </td>
+        </tr>
+
+        <!-- Footer -->
+        <tr>
+          <td style="background-color: #000000; padding: 18px 30px; text-align: center;">
+            <p style="color: #666666; font-size: 12px; margin: 0;">
+              © ${today.getFullYear()} Realize Consultadoria. Todos os direitos reservados.
+            </p>
+          </td>
+        </tr>
+
+      </table>
+    </body>
+    </html>
     `;
 
     const resResponse = await fetch('https://api.brevo.com/v3/smtp/email', {
@@ -178,7 +300,7 @@ serve(async req => {
       body: JSON.stringify({
         sender: { name: 'Realize Consultadoria', email: 'noreply@dasprent.pt' },
         to: [{ email: TARGET_EMAIL }],
-        subject: '🚨 Alerta: Serviços a renovar',
+        subject: overdueCount ? `⚠️ ${headline}` : `🔔 ${headline}`,
         htmlContent: emailHtml,
       }),
     });

@@ -38,6 +38,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { absenceTypeLabels, trainingModeLabels } from '@/lib/absence-types';
+import { absenceService } from '@/modules/admin/services/absenceService';
 import {
   Holiday,
   AVAILABLE_HOURS,
@@ -95,9 +96,16 @@ interface AbsenceEditDialogProps {
   onOpenChange: (open: boolean) => void;
   request: AbsenceRequest | null;
   onSuccess: () => void;
+  actor?: 'admin' | 'employee';
 }
 
-const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEditDialogProps) => {
+const AbsenceEditDialog = ({
+  open,
+  onOpenChange,
+  request,
+  onSuccess,
+  actor = 'admin',
+}: AbsenceEditDialogProps) => {
   const { toast } = useToast();
   const [periods, setPeriods] = useState<EditablePeriod[]>([]);
   const [notes, setNotes] = useState('');
@@ -116,6 +124,10 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
 
   // Edit period state
   const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null);
+  const [editPeriodDates, setEditPeriodDates] = useState<{
+    from: Date | undefined;
+    to: Date | undefined;
+  }>({ from: undefined, to: undefined });
   const [editStartTime, setEditStartTime] = useState('09:00');
   const [editEndTime, setEditEndTime] = useState('13:00');
 
@@ -142,6 +154,7 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
       setNotes(request.notes || '');
       setIsAddingPeriod(false);
       setEditingPeriodId(null);
+      setEditPeriodDates({ from: undefined, to: undefined });
     }
   }, [request, open]);
 
@@ -162,6 +175,12 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
   const editAvailableEndTimes = AVAILABLE_HOURS.filter(time => time > editStartTime);
 
   const isDateDisabled = (date: Date) => {
+    if (actor === 'employee') {
+      const minimumDate = new Date();
+      minimumDate.setHours(0, 0, 0, 0);
+      minimumDate.setDate(minimumDate.getDate() + 2);
+      if (date < minimumDate) return true;
+    }
     if (isWeekend(date)) return true;
     if (checkIsHoliday(date, holidays)) return true;
     return false;
@@ -230,6 +249,7 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
 
   const handleStartEdit = (index: number) => {
     const period = periods[index];
+    setEditPeriodDates({ from: period.start_date, to: period.end_date });
     if (period.period_type === 'partial') {
       setEditStartTime(period.start_time || '09:00');
       setEditEndTime(period.end_time || '13:00');
@@ -239,12 +259,15 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
 
   const handleSaveEdit = (index: number) => {
     const period = periods[index];
+    if (!editPeriodDates.from) return;
+
+    const endDate = editPeriodDates.to || editPeriodDates.from;
     const startTime = editStartTime;
     const endTime = editEndTime;
 
     const businessDays = calculatePeriodBusinessDays(
-      period.start_date,
-      period.end_date,
+      editPeriodDates.from,
+      endDate,
       period.period_type,
       startTime,
       endTime
@@ -253,16 +276,20 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
     const updated = [...periods];
     updated[index] = {
       ...period,
+      start_date: editPeriodDates.from,
+      end_date: endDate,
       start_time: period.period_type === 'partial' ? startTime : undefined,
       end_time: period.period_type === 'partial' ? endTime : undefined,
       business_days: businessDays,
     };
     setPeriods(updated);
     setEditingPeriodId(null);
+    setEditPeriodDates({ from: undefined, to: undefined });
   };
 
   const handleCancelEdit = () => {
     setEditingPeriodId(null);
+    setEditPeriodDates({ from: undefined, to: undefined });
   };
 
   const handleSave = async () => {
@@ -280,6 +307,33 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
 
     setIsLoading(true);
     try {
+      if (request.absence_type === 'vacation' && request.status === 'approved') {
+        const { error } = await absenceService.rescheduleApprovedVacation({
+          absenceId: request.id,
+          notes: notes || null,
+          periods: activePeriods.map(period => ({
+            startDate: format(period.start_date, 'yyyy-MM-dd'),
+            endDate: format(period.end_date, 'yyyy-MM-dd'),
+            periodType: period.period_type,
+            startTime: period.start_time || null,
+            endTime: period.end_time || null,
+          })),
+        });
+
+        if (error) throw error;
+
+        toast({
+          title: actor === 'employee' ? 'Remarcação enviada' : 'Férias remarcadas',
+          description:
+            actor === 'employee'
+              ? 'As novas datas ficaram pendentes de aprovação.'
+              : 'As férias continuam aprovadas nas novas datas.',
+        });
+        onSuccess();
+        onOpenChange(false);
+        return;
+      }
+
       // Calculate new date range from all active periods
       const allDates = activePeriods.flatMap(p => [p.start_date, p.end_date]);
       const minDate = new Date(Math.min(...allDates.map(d => d.getTime())));
@@ -348,11 +402,12 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
 
       onSuccess();
       onOpenChange(false);
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Error updating absence:', error);
       toast({
         title: 'Erro ao atualizar',
-        description: error.message || 'Não foi possível atualizar o pedido.',
+        description:
+          error instanceof Error ? error.message : 'Não foi possível atualizar o pedido.',
         variant: 'destructive',
       });
     } finally {
@@ -360,7 +415,21 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
     }
   };
 
+  if (!request) return null;
+
   const activePeriods = periods.filter(p => !p.toDelete);
+  const isApprovedVacation = request.absence_type === 'vacation' && request.status === 'approved';
+  const hasVacationDateChanges =
+    !isApprovedVacation ||
+    activePeriods.length !== request.periods.length ||
+    activePeriods.some((period, index) => {
+      const originalPeriod = request.periods[index];
+      return (
+        !originalPeriod ||
+        format(period.start_date, 'yyyy-MM-dd') !== originalPeriod.start_date ||
+        format(period.end_date, 'yyyy-MM-dd') !== originalPeriod.end_date
+      );
+    });
   const totalBusinessDays = activePeriods.reduce((sum, p) => sum + p.business_days, 0);
 
   const formatPeriodDisplay = (period: EditablePeriod): string => {
@@ -373,34 +442,41 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
     return `${format(period.start_date, 'dd MMM', { locale: pt })} - ${format(period.end_date, 'dd MMM yyyy', { locale: pt })}`;
   };
 
-  if (!request) return null;
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle>Editar Pedido de Ausência</DialogTitle>
-          <DialogDescription className="space-y-2">
-            <div className="flex items-center gap-2 mt-2">
-              <User className="h-4 w-4" />
-              <span className="font-medium">{request.employee.name}</span>
-            </div>
-            <div className="flex items-center gap-4 text-sm">
-              <div className="flex items-center gap-1">
-                <Building2 className="h-3.5 w-3.5" />
-                <span>{request.company.name}</span>
+          <DialogTitle>
+            {isApprovedVacation ? 'Remarcar Férias' : 'Editar Pedido de Ausência'}
+          </DialogTitle>
+          <DialogDescription asChild>
+            <div className="space-y-2">
+              {actor === 'employee' && (
+                <p className="text-sm text-amber-700 dark:text-amber-400">
+                  Ao guardar, o pedido volta a pendente para nova aprovação.
+                </p>
+              )}
+              <div className="flex items-center gap-2 mt-2">
+                <User className="h-4 w-4" />
+                <span className="font-medium">{request.employee.name}</span>
               </div>
-              <Badge variant="outline">
-                {absenceTypeLabels[request.absence_type] || request.absence_type}
-                {request.absence_type === 'training' && (request as any).training_mode && (
-                  <span className="ml-1">
-                    (
-                    {trainingModeLabels[(request as any).training_mode] ||
-                      (request as any).training_mode}
-                    )
-                  </span>
-                )}
-              </Badge>
+              <div className="flex items-center gap-4 text-sm">
+                <div className="flex items-center gap-1">
+                  <Building2 className="h-3.5 w-3.5" />
+                  <span>{request.company.name}</span>
+                </div>
+                <Badge variant="outline">
+                  {absenceTypeLabels[request.absence_type] || request.absence_type}
+                  {request.absence_type === 'training' && (request as any).training_mode && (
+                    <span className="ml-1">
+                      (
+                      {trainingModeLabels[(request as any).training_mode] ||
+                        (request as any).training_mode}
+                      )
+                    </span>
+                  )}
+                </Badge>
+              </div>
             </div>
           </DialogDescription>
         </DialogHeader>
@@ -447,13 +523,14 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
                                 : period.business_days.toFixed(2)}{' '}
                               dia{period.business_days !== 1 ? 's' : ''}
                             </Badge>
-                            {!isEditing && isPartial && (
+                            {!isEditing && (
                               <Button
                                 type="button"
                                 variant="ghost"
                                 size="icon"
                                 className="h-7 w-7"
                                 onClick={() => handleStartEdit(index)}
+                                aria-label={`Remarcar período de ${format(period.start_date, 'dd/MM/yyyy')} a ${format(period.end_date, 'dd/MM/yyyy')}`}
                               >
                                 <Pencil className="h-3.5 w-3.5" />
                               </Button>
@@ -464,60 +541,103 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
                               size="icon"
                               className="h-7 w-7 text-destructive hover:text-destructive"
                               onClick={() => handleRemovePeriod(index)}
+                              aria-label={`Eliminar período de ${format(period.start_date, 'dd/MM/yyyy')} a ${format(period.end_date, 'dd/MM/yyyy')}`}
                             >
                               <Trash2 className="h-3.5 w-3.5" />
                             </Button>
                           </div>
                         </div>
 
-                        {/* Edit mode for partial periods */}
-                        {isEditing && isPartial && (
+                        {isEditing && (
                           <div className="pt-2 border-t space-y-3">
-                            <div className="grid grid-cols-2 gap-3">
-                              <div>
-                                <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
-                                  Das
-                                </label>
-                                <Select
-                                  value={editStartTime}
-                                  onValueChange={value => {
-                                    setEditStartTime(value);
-                                    if (value >= editEndTime) {
-                                      const nextTime = AVAILABLE_HOURS.find(t => t > value);
-                                      if (nextTime) setEditEndTime(nextTime);
-                                    }
-                                  }}
+                            <Popover>
+                              <PopoverTrigger asChild>
+                                <Button
+                                  type="button"
+                                  variant="outline"
+                                  className="w-full justify-start text-left font-normal"
                                 >
-                                  <SelectTrigger className="h-9">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {AVAILABLE_HOURS.slice(0, -1).map(time => (
-                                      <SelectItem key={time} value={time}>
-                                        {time}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
+                                  <CalendarIcon className="mr-2 h-4 w-4" />
+                                  {editPeriodDates.from
+                                    ? `${format(editPeriodDates.from, 'dd/MM/yyyy')} - ${format(editPeriodDates.to || editPeriodDates.from, 'dd/MM/yyyy')}`
+                                    : 'Selecionar novas datas'}
+                                </Button>
+                              </PopoverTrigger>
+                              <PopoverContent className="w-auto p-0" align="start">
+                                <Calendar
+                                  mode="range"
+                                  defaultMonth={editPeriodDates.from}
+                                  selected={editPeriodDates}
+                                  onSelect={range => {
+                                    if (
+                                      editPeriodDates.from &&
+                                      editPeriodDates.to &&
+                                      range?.from &&
+                                      range.to
+                                    ) {
+                                      const nextStart = isSameDay(range.from, editPeriodDates.from)
+                                        ? range.to
+                                        : range.from;
+                                      setEditPeriodDates({ from: nextStart, to: undefined });
+                                      return;
+                                    }
+                                    setEditPeriodDates({ from: range?.from, to: range?.to });
+                                  }}
+                                  locale={pt}
+                                  weekStartsOn={0}
+                                  disabled={isDateDisabled}
+                                  modifiers={{ holiday: holidays.map(h => new Date(h.date)) }}
+                                  className="pointer-events-auto"
+                                />
+                              </PopoverContent>
+                            </Popover>
+                            {isPartial && (
+                              <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                  <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
+                                    Das
+                                  </label>
+                                  <Select
+                                    value={editStartTime}
+                                    onValueChange={value => {
+                                      setEditStartTime(value);
+                                      if (value >= editEndTime) {
+                                        const nextTime = AVAILABLE_HOURS.find(t => t > value);
+                                        if (nextTime) setEditEndTime(nextTime);
+                                      }
+                                    }}
+                                  >
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {AVAILABLE_HOURS.slice(0, -1).map(time => (
+                                        <SelectItem key={time} value={time}>
+                                          {time}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
+                                    Às
+                                  </label>
+                                  <Select value={editEndTime} onValueChange={setEditEndTime}>
+                                    <SelectTrigger className="h-9">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      {editAvailableEndTimes.map(time => (
+                                        <SelectItem key={time} value={time}>
+                                          {time}
+                                        </SelectItem>
+                                      ))}
+                                    </SelectContent>
+                                  </Select>
+                                </div>
                               </div>
-                              <div>
-                                <label className="block text-xs font-medium mb-1.5 text-muted-foreground">
-                                  Às
-                                </label>
-                                <Select value={editEndTime} onValueChange={setEditEndTime}>
-                                  <SelectTrigger className="h-9">
-                                    <SelectValue />
-                                  </SelectTrigger>
-                                  <SelectContent>
-                                    {editAvailableEndTimes.map(time => (
-                                      <SelectItem key={time} value={time}>
-                                        {time}
-                                      </SelectItem>
-                                    ))}
-                                  </SelectContent>
-                                </Select>
-                              </div>
-                            </div>
+                            )}
                             <div className="flex justify-end gap-2">
                               <Button
                                 type="button"
@@ -528,7 +648,12 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
                                 <X className="h-4 w-4 mr-1" />
                                 Cancelar
                               </Button>
-                              <Button type="button" size="sm" onClick={() => handleSaveEdit(index)}>
+                              <Button
+                                type="button"
+                                size="sm"
+                                onClick={() => handleSaveEdit(index)}
+                                disabled={!editPeriodDates.from}
+                              >
                                 <Check className="h-4 w-4 mr-1" />
                                 Guardar
                               </Button>
@@ -740,7 +865,10 @@ const AbsenceEditDialog = ({ open, onOpenChange, request, onSuccess }: AbsenceEd
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={isLoading}>
             Cancelar
           </Button>
-          <Button onClick={handleSave} disabled={isLoading || activePeriods.length === 0}>
+          <Button
+            onClick={handleSave}
+            disabled={isLoading || activePeriods.length === 0 || !hasVacationDateChanges}
+          >
             {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Guardar Alterações
           </Button>

@@ -16,6 +16,7 @@ import {
   Key,
   ChevronDown,
   User,
+  Pencil,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -64,6 +65,7 @@ import DocumentUploader from '@/components/employee/DocumentUploader';
 import AbsenceDocumentsDialog from '@/components/admin/AbsenceDocumentsDialog';
 import AddDocumentsDialog from '@/components/employee/AddDocumentsDialog';
 import ChangePasswordDialog from '@/components/employee/ChangePasswordDialog';
+import AbsenceEditDialog from '@/components/admin/AbsenceEditDialog';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -153,6 +155,8 @@ const EmployeeDashboard = () => {
   const [ticketCount, setTicketCount] = useState(0);
   const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false);
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
+  const [absenceToReschedule, setAbsenceToReschedule] = useState<Absence | null>(null);
   const [employeeEmail, setEmployeeEmail] = useState('');
 
   const currentYear = new Date().getFullYear();
@@ -876,6 +880,23 @@ const EmployeeDashboard = () => {
                               </span>
                             </div>
                             <div className="flex items-center gap-1 ml-6 sm:ml-0">
+                              {absence.status === 'approved' &&
+                                absence.absence_type === 'vacation' &&
+                                new Date(`${absence.start_date}T00:00:00`) > new Date() && (
+                                  <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-8 px-2"
+                                    onClick={() => {
+                                      setAbsenceToReschedule(absence);
+                                      setEditDialogOpen(true);
+                                    }}
+                                    aria-label={`Remarcar férias de ${format(new Date(`${absence.start_date}T00:00:00`), 'dd/MM/yyyy')}`}
+                                  >
+                                    <Pencil className="h-4 w-4 sm:mr-1" />
+                                    <span>Remarcar</span>
+                                  </Button>
+                                )}
                               {/* Cancel button - for pending or rejected absences */}
                               {(absence.status === 'pending' || absence.status === 'rejected') && (
                                 <AlertDialog>
@@ -1107,6 +1128,33 @@ const EmployeeDashboard = () => {
         open={isChangePasswordOpen}
         onOpenChange={setIsChangePasswordOpen}
         employeeEmail={employeeEmail}
+      />
+
+      <AbsenceEditDialog
+        open={editDialogOpen}
+        onOpenChange={setEditDialogOpen}
+        actor="employee"
+        request={
+          absenceToReschedule
+            ? {
+                id: absenceToReschedule.id,
+                status: absenceToReschedule.status,
+                absence_type: absenceToReschedule.absence_type,
+                notes: absenceToReschedule.notes,
+                employee: {
+                  id: employee.id,
+                  name: employee.name,
+                  email: employee.email,
+                },
+                company: {
+                  id: employee.company_id,
+                  name: employee.companies?.name || '',
+                },
+                periods: absenceToReschedule.absence_periods || [],
+              }
+            : null
+        }
+        onSuccess={loadEmployeeData}
       />
     </div>
   );

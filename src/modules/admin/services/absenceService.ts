@@ -11,6 +11,20 @@ type AbsenceUpdate = Database['public']['Tables']['absences']['Update'];
 
 type AbsenceStatus = (typeof ABSENCE_STATUSES)[keyof typeof ABSENCE_STATUSES];
 
+interface VacationReschedulePeriod {
+  startDate: string;
+  endDate: string;
+  periodType: 'full_day' | 'partial';
+  startTime: string | null;
+  endTime: string | null;
+}
+
+interface VacationRescheduleInput {
+  absenceId: string;
+  notes: string | null;
+  periods: VacationReschedulePeriod[];
+}
+
 export const absenceService = {
   /**
    * Obter todas as ausências com paginação e dados do colaborador
@@ -128,6 +142,30 @@ export const absenceService = {
   },
 
   /**
+   * Remarcar férias aprovadas numa única transação protegida no Supabase
+   */
+  rescheduleApprovedVacation: async ({ absenceId, notes, periods }: VacationRescheduleInput) => {
+    try {
+      const { data, error } = await supabase.rpc('reschedule_approved_vacation', {
+        p_absence_id: absenceId,
+        p_notes: notes,
+        p_periods: periods.map(period => ({
+          start_date: period.startDate,
+          end_date: period.endDate,
+          period_type: period.periodType,
+          start_time: period.startTime,
+          end_time: period.endTime,
+        })),
+      });
+
+      if (error) throw error;
+      return { data, error: null };
+    } catch (error: unknown) {
+      return { data: null, error };
+    }
+  },
+
+  /**
    * Aprovar pedido de ausência
    */
   approve: async (id: string, approvedBy: string) => {
@@ -188,4 +226,11 @@ export const absenceService = {
   },
 };
 
-export type { Absence, AbsenceInsert, AbsenceUpdate, AbsenceStatus };
+export type {
+  Absence,
+  AbsenceInsert,
+  AbsenceUpdate,
+  AbsenceStatus,
+  VacationRescheduleInput,
+  VacationReschedulePeriod,
+};

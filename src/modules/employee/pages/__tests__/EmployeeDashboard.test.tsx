@@ -80,7 +80,9 @@ vi.mock('@/integrations/supabase/client', () => {
           const query = {
             select: () => query,
             eq: () => query,
-            order: vi.fn().mockResolvedValue({ data: [approvedVacation, pendingVacation], error: null }),
+            order: vi
+              .fn()
+              .mockResolvedValue({ data: [approvedVacation, pendingVacation], error: null }),
           };
           return query;
         }

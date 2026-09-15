@@ -1606,6 +1606,14 @@ export type Database = {
         };
         Returns: boolean;
       };
+      reschedule_vacation: {
+        Args: {
+          p_absence_id: string;
+          p_notes?: string | null;
+          p_periods: Json;
+        };
+        Returns: string;
+      };
     };
     Enums: {
       app_role: 'admin' | 'company_admin' | 'employee';

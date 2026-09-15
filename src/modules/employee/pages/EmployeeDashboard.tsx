@@ -880,7 +880,9 @@ const EmployeeDashboard = () => {
                               </span>
                             </div>
                             <div className="flex items-center gap-1 ml-6 sm:ml-0">
-                              {absence.status === 'approved' &&
+                              {/* Férias futuras: as aprovadas remarcam-se, as pendentes
+                                  corrigem-se enquanto ninguém decidiu sobre elas */}
+                              {(absence.status === 'approved' || absence.status === 'pending') &&
                                 absence.absence_type === 'vacation' &&
                                 new Date(`${absence.start_date}T00:00:00`) > new Date() && (
                                   <Button
@@ -891,10 +893,16 @@ const EmployeeDashboard = () => {
                                       setAbsenceToReschedule(absence);
                                       setEditDialogOpen(true);
                                     }}
-                                    aria-label={`Remarcar férias de ${format(new Date(`${absence.start_date}T00:00:00`), 'dd/MM/yyyy')}`}
+                                    aria-label={`${
+                                      absence.status === 'pending'
+                                        ? 'Editar pedido de férias de'
+                                        : 'Remarcar férias de'
+                                    } ${format(new Date(`${absence.start_date}T00:00:00`), 'dd/MM/yyyy')}`}
                                   >
                                     <Pencil className="h-4 w-4 sm:mr-1" />
-                                    <span>Remarcar</span>
+                                    <span>
+                                      {absence.status === 'pending' ? 'Editar' : 'Remarcar'}
+                                    </span>
                                   </Button>
                                 )}
                               {/* Cancel button - for pending or rejected absences */}

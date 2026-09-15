@@ -1606,7 +1606,7 @@ export type Database = {
         };
         Returns: boolean;
       };
-      reschedule_approved_vacation: {
+      reschedule_vacation: {
         Args: {
           p_absence_id: string;
           p_notes?: string | null;

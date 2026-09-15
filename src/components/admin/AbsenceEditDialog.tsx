@@ -307,8 +307,11 @@ const AbsenceEditDialog = ({
 
     setIsLoading(true);
     try {
-      if (request.absence_type === 'vacation' && request.status === 'approved') {
-        const { error } = await absenceService.rescheduleApprovedVacation({
+      if (
+        request.absence_type === 'vacation' &&
+        (request.status === 'approved' || request.status === 'pending')
+      ) {
+        const { error } = await absenceService.rescheduleVacation({
           absenceId: request.id,
           notes: notes || null,
           periods: activePeriods.map(period => ({
@@ -322,10 +325,16 @@ const AbsenceEditDialog = ({
 
         if (error) throw error;
 
+        const eraPendente = request.status === 'pending';
         toast({
-          title: actor === 'employee' ? 'Remarcação enviada' : 'Férias remarcadas',
-          description:
-            actor === 'employee'
+          title: eraPendente
+            ? 'Pedido atualizado'
+            : actor === 'employee'
+              ? 'Remarcação enviada'
+              : 'Férias remarcadas',
+          description: eraPendente
+            ? 'As novas datas continuam pendentes de aprovação.'
+            : actor === 'employee'
               ? 'As novas datas ficaram pendentes de aprovação.'
               : 'As férias continuam aprovadas nas novas datas.',
         });
@@ -418,9 +427,13 @@ const AbsenceEditDialog = ({
   if (!request) return null;
 
   const activePeriods = periods.filter(p => !p.toDelete);
-  const isApprovedVacation = request.absence_type === 'vacation' && request.status === 'approved';
+  const isPendingRequest = request.status === 'pending';
+  // Ferias aprovadas ou ainda pendentes seguem ambas pela RPC: valida sobreposicoes,
+  // feriados e dias uteis do lado do servidor, em vez de escrever nas tabelas a partir do cliente.
+  const isVacationReschedule =
+    request.absence_type === 'vacation' && (request.status === 'approved' || isPendingRequest);
   const hasVacationDateChanges =
-    !isApprovedVacation ||
+    !isVacationReschedule ||
     activePeriods.length !== request.periods.length ||
     activePeriods.some((period, index) => {
       const originalPeriod = request.periods[index];
@@ -447,13 +460,19 @@ const AbsenceEditDialog = ({
       <DialogContent className="max-w-lg max-h-[90vh] flex flex-col">
         <DialogHeader>
           <DialogTitle>
-            {isApprovedVacation ? 'Remarcar Férias' : 'Editar Pedido de Ausência'}
+            {isVacationReschedule
+              ? isPendingRequest
+                ? 'Editar Pedido de Férias'
+                : 'Remarcar Férias'
+              : 'Editar Pedido de Ausência'}
           </DialogTitle>
           <DialogDescription asChild>
             <div className="space-y-2">
               {actor === 'employee' && (
                 <p className="text-sm text-amber-700 dark:text-amber-400">
-                  Ao guardar, o pedido volta a pendente para nova aprovação.
+                  {isPendingRequest
+                    ? 'Ao guardar, o pedido continua pendente de aprovação.'
+                    : 'Ao guardar, o pedido volta a pendente para nova aprovação.'}
                 </p>
               )}
               <div className="flex items-center gap-2 mt-2">

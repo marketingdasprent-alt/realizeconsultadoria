@@ -35,6 +35,30 @@ vi.mock('@/integrations/supabase/client', () => {
     ],
   };
 
+  const pendingVacation = {
+    id: 'absence-2',
+    employee_id: employee.id,
+    company_id: employee.company_id,
+    absence_type: 'vacation',
+    status: 'pending',
+    start_date: '2026-11-16',
+    end_date: '2026-11-20',
+    notes: null,
+    absence_periods: [
+      {
+        id: 'period-2',
+        absence_id: 'absence-2',
+        start_date: '2026-11-16',
+        end_date: '2026-11-20',
+        business_days: 5,
+        period_type: 'full_day',
+        start_time: null,
+        end_time: null,
+        status: 'pending',
+      },
+    ],
+  };
+
   return {
     supabase: {
       auth: {
@@ -56,7 +80,7 @@ vi.mock('@/integrations/supabase/client', () => {
           const query = {
             select: () => query,
             eq: () => query,
-            order: vi.fn().mockResolvedValue({ data: [approvedVacation], error: null }),
+            order: vi.fn().mockResolvedValue({ data: [approvedVacation, pendingVacation], error: null }),
           };
           return query;
         }
@@ -115,6 +139,23 @@ describe('EmployeeDashboard', () => {
     // Then: o próprio colaborador pode iniciar a remarcação
     expect(
       screen.getByRole('button', { name: 'Remarcar férias de 05/10/2026' })
+    ).toBeInTheDocument();
+  });
+
+  it('deixa corrigir um pedido de férias ainda pendente', async () => {
+    // Given: o colaborador marcou férias por engano e ninguém as aprovou ainda
+    render(
+      <MemoryRouter>
+        <EmployeeDashboard />
+      </MemoryRouter>
+    );
+
+    // When: o histórico termina de carregar
+    await screen.findAllByText(/16 nov/);
+
+    // Then: pode corrigir o pedido em vez de ter de o cancelar e refazer
+    expect(
+      screen.getByRole('button', { name: 'Editar pedido de férias de 16/11/2026' })
     ).toBeInTheDocument();
   });
 });

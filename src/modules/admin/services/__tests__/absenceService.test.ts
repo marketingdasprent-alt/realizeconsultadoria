@@ -9,7 +9,7 @@ vi.mock('@/integrations/supabase/client', () => ({
   supabase: { rpc },
 }));
 
-describe('absenceService.rescheduleApprovedVacation', () => {
+describe('absenceService.rescheduleVacation', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
@@ -19,7 +19,7 @@ describe('absenceService.rescheduleApprovedVacation', () => {
     rpc.mockResolvedValueOnce({ data: 'pending', error: null });
 
     // When: o serviço recebe as novas datas
-    const result = await absenceService.rescheduleApprovedVacation({
+    const result = await absenceService.rescheduleVacation({
       absenceId: 'absence-1',
       notes: 'Nova semana',
       periods: [
@@ -35,7 +35,7 @@ describe('absenceService.rescheduleApprovedVacation', () => {
 
     // Then: existe apenas uma operação de escrita, com o contrato esperado pela base de dados
     expect(rpc).toHaveBeenCalledTimes(1);
-    expect(rpc).toHaveBeenCalledWith('reschedule_approved_vacation', {
+    expect(rpc).toHaveBeenCalledWith('reschedule_vacation', {
       p_absence_id: 'absence-1',
       p_notes: 'Nova semana',
       p_periods: [

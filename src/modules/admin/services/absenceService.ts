@@ -142,11 +142,13 @@ export const absenceService = {
   },
 
   /**
-   * Remarcar férias aprovadas numa única transação protegida no Supabase
+   * Remarcar férias (aprovadas ou ainda pendentes) numa única transação protegida
+   * no Supabase. Um pedido pendente continua pendente; umas férias aprovadas
+   * editadas pelo colaborador voltam a pendente.
    */
-  rescheduleApprovedVacation: async ({ absenceId, notes, periods }: VacationRescheduleInput) => {
+  rescheduleVacation: async ({ absenceId, notes, periods }: VacationRescheduleInput) => {
     try {
-      const { data, error } = await supabase.rpc('reschedule_approved_vacation', {
+      const { data, error } = await supabase.rpc('reschedule_vacation', {
         p_absence_id: absenceId,
         p_notes: notes,
         p_periods: periods.map(period => ({

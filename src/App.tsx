@@ -2,7 +2,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
@@ -30,6 +30,11 @@ import EmployeeDocumentsPage from './modules/employee/pages/EmployeeDocumentsPag
 import EmployeeTimeClockPage from './modules/timeclock/pages/EmployeeTimeClockPage';
 import TimeClockNfcPage from './modules/timeclock/pages/TimeClockNfcPage';
 import TimeClockAdminPage from './modules/timeclock/pages/TimeClockAdminPage';
+import DocumentsAdminPage from './modules/documents/pages/DocumentsAdminPage';
+import EmployeeLayout from './modules/employee/components/layout/EmployeeLayout';
+import EmployeeHomePage from './modules/employee/pages/EmployeeHomePage';
+import EmployeeNoticesPage from './modules/employee/pages/EmployeeNoticesPage';
+import EmployeeMorePage from './modules/employee/pages/EmployeeMorePage';
 import AuthCallbackPage from './pages/auth/AuthCallbackPage';
 import SetPasswordPage from './pages/auth/SetPasswordPage';
 import InstallPage from './pages/InstallPage';
@@ -80,6 +85,7 @@ const App = () => (
                 <Route path="/admin/suporte" element={<SupportTicketsPage />} />
                 <Route path="/admin/acessos" element={<AccessesPage />} />
                 <Route path="/admin/ponto" element={<TimeClockAdminPage />} />
+                <Route path="/admin/documentos" element={<DocumentsAdminPage />} />
                 <Route path="/admin/configuracoes" element={<SettingsPage />} />
               </Route>
 
@@ -87,18 +93,19 @@ const App = () => (
               <Route path="/colaborador/login" element={<EmployeeLoginPage />} />
               <Route
                 element={
-                  <ProtectedRoute requiredRole="employee">
-                    <div style={{ width: '100%' }}>
-                      {/* Employee layout wrapper */}
-                      <Outlet />
-                    </div>
+                  <ProtectedRoute requiredRole="employee" fallbackPath="/colaborador/login">
+                    {/* Cabeçalho + navegação em tabs; as páginas renderizam no Outlet */}
+                    <EmployeeLayout />
                   </ProtectedRoute>
                 }
               >
-                <Route path="/colaborador" element={<EmployeeDashboard />} />
+                <Route path="/colaborador" element={<EmployeeHomePage />} />
+                <Route path="/colaborador/pedidos" element={<EmployeeDashboard />} />
                 <Route path="/colaborador/tickets" element={<EmployeeTicketsPage />} />
                 <Route path="/colaborador/documentos" element={<EmployeeDocumentsPage />} />
                 <Route path="/colaborador/ponto" element={<EmployeeTimeClockPage />} />
+                <Route path="/colaborador/avisos" element={<EmployeeNoticesPage />} />
+                <Route path="/colaborador/mais" element={<EmployeeMorePage />} />
               </Route>
 
               {/* Registo de ponto por tag NFC: aberto pelo telemóvel ao encostar à tag.

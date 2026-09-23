@@ -17,7 +17,9 @@ import {
   ChevronDown,
   User,
   Pencil,
+  Clock,
 } from 'lucide-react';
+import { ROUTES } from '@/lib/constants';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -707,11 +709,20 @@ const EmployeeDashboard = () => {
               <Button
                 variant="outline"
                 size="sm"
-                className="col-span-2 sm:col-span-1 h-10 sm:h-9"
+                className="h-10 sm:h-9"
                 onClick={() => navigate('/colaborador/documentos')}
               >
                 <FolderOpen className="h-4 w-4 mr-2" />
                 <span>Documentos</span>
+              </Button>
+              <Button
+                variant="outline"
+                size="sm"
+                className="h-10 sm:h-9"
+                onClick={() => navigate(ROUTES.EMPLOYEE.TIMECLOCK)}
+              >
+                <Clock className="h-4 w-4 mr-2" />
+                <span>Ponto</span>
               </Button>
             </div>
           </div>

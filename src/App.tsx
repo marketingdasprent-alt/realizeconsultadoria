@@ -27,6 +27,9 @@ import EmployeeLoginPage from './modules/employee/pages/EmployeeLoginPage';
 import EmployeeDashboard from './modules/employee/pages/EmployeeDashboard';
 import EmployeeTicketsPage from './modules/employee/pages/EmployeeTicketsPage';
 import EmployeeDocumentsPage from './modules/employee/pages/EmployeeDocumentsPage';
+import EmployeeTimeClockPage from './modules/timeclock/pages/EmployeeTimeClockPage';
+import TimeClockNfcPage from './modules/timeclock/pages/TimeClockNfcPage';
+import TimeClockAdminPage from './modules/timeclock/pages/TimeClockAdminPage';
 import AuthCallbackPage from './pages/auth/AuthCallbackPage';
 import SetPasswordPage from './pages/auth/SetPasswordPage';
 import InstallPage from './pages/InstallPage';
@@ -76,6 +79,7 @@ const App = () => (
                 <Route path="/admin/pedidos" element={<AbsenceRequestsPage />} />
                 <Route path="/admin/suporte" element={<SupportTicketsPage />} />
                 <Route path="/admin/acessos" element={<AccessesPage />} />
+                <Route path="/admin/ponto" element={<TimeClockAdminPage />} />
                 <Route path="/admin/configuracoes" element={<SettingsPage />} />
               </Route>
 
@@ -94,7 +98,19 @@ const App = () => (
                 <Route path="/colaborador" element={<EmployeeDashboard />} />
                 <Route path="/colaborador/tickets" element={<EmployeeTicketsPage />} />
                 <Route path="/colaborador/documentos" element={<EmployeeDocumentsPage />} />
+                <Route path="/colaborador/ponto" element={<EmployeeTimeClockPage />} />
               </Route>
+
+              {/* Registo de ponto por tag NFC: aberto pelo telemóvel ao encostar à tag.
+                  Sem sessão → login do colaborador, que depois regressa aqui. */}
+              <Route
+                path="/ponto/nfc"
+                element={
+                  <ProtectedRoute requiredRole="employee" fallbackPath="/colaborador/login">
+                    <TimeClockNfcPage />
+                  </ProtectedRoute>
+                }
+              />
 
               {/* Catch-all */}
               <Route path="*" element={<NotFound />} />

@@ -11,6 +11,7 @@ import {
   Headset,
   Lock,
   Scale,
+  Clock,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -43,6 +44,7 @@ const allNavItems: NavItem[] = [
   { href: ROUTES.ADMIN.EMPLOYEES, icon: Users, label: 'Colaboradores', moduleKey: 'employees' },
   { href: ROUTES.ADMIN.ACCESSES, icon: Lock, label: 'Acessos', moduleKey: 'accesses' },
   { href: ROUTES.ADMIN.REQUESTS, icon: ClipboardList, label: 'Pedidos', moduleKey: 'requests' },
+  { href: ROUTES.ADMIN.TIMECLOCK, icon: Clock, label: 'Ponto', moduleKey: 'timeclock' },
   { href: ROUTES.ADMIN.SUPPORT, icon: Headset, label: 'Suporte', moduleKey: 'support' },
   { href: ROUTES.ADMIN.CALENDAR, icon: Calendar, label: 'Calendário', moduleKey: 'calendar' },
   { href: ROUTES.ADMIN.SETTINGS, icon: Settings, label: 'Configurações', moduleKey: 'settings' },

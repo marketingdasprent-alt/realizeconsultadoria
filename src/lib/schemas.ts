@@ -117,6 +117,48 @@ export const replyTicketSchema = z.object({
   message: z.string().min(1, 'Mensagem não pode estar vazia'),
 });
 
+// ─── Controlo de Ponto ───────────────────────────────────────────────────────
+
+const timeClockReason = z
+  .string()
+  .trim()
+  .min(3, 'Indique o motivo da alteração (mín. 3 caracteres)')
+  .max(500, 'Motivo demasiado longo');
+
+export const timeEntrySchema = z.object({
+  employee_id: z.string().min(1, 'Selecione o colaborador'),
+  entry_type: z.enum(['in', 'out']),
+  date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
+  time: z.string().regex(/^\d{2}:\d{2}$/, 'Hora inválida'),
+  notes: z.string().max(500, 'Notas demasiado longas').optional(),
+  reason: timeClockReason,
+});
+
+export const timeClockReasonSchema = z.object({ reason: timeClockReason });
+
+export const timeClockLocationSchema = z.object({
+  company_id: z.string().min(1, 'Selecione a empresa'),
+  name: z.string().trim().min(2, 'Nome deve ter pelo menos 2 caracteres'),
+  address: z.string().optional(),
+  latitude: z.number({ error: 'Latitude inválida' }).min(-90).max(90),
+  longitude: z.number({ error: 'Longitude inválida' }).min(-180).max(180),
+  radius_m: z
+    .number({ error: 'Raio inválido' })
+    .int()
+    .min(10, 'Mínimo 10 m')
+    .max(2000, 'Máximo 2000 m'),
+  max_accuracy_m: z
+    .number({ error: 'Precisão inválida' })
+    .int()
+    .min(5, 'Mínimo 5 m')
+    .max(5000, 'Máximo 5000 m'),
+  allow_manual: z.boolean(),
+  block_vpn: z.boolean(),
+  /** Um IP ou CIDR por linha. */
+  trusted_ips: z.string().optional(),
+  is_active: z.boolean(),
+});
+
 // ─── Tipos inferidos ─────────────────────────────────────────────────────────
 
 export type LoginInput = z.infer<typeof loginSchema>;
@@ -129,3 +171,6 @@ export type CreateAbsenceInput = z.infer<typeof createAbsenceSchema>;
 export type RejectAbsenceInput = z.infer<typeof rejectAbsenceSchema>;
 export type CreateTicketInput = z.infer<typeof createTicketSchema>;
 export type ReplyTicketInput = z.infer<typeof replyTicketSchema>;
+export type TimeEntryInput = z.infer<typeof timeEntrySchema>;
+export type TimeClockReasonInput = z.infer<typeof timeClockReasonSchema>;
+export type TimeClockLocationInput = z.infer<typeof timeClockLocationSchema>;

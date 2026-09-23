@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parseTagUrl } from '../nfc';
+
+// O serviço de tags importa o cliente Supabase; no CI não há variáveis de ambiente.
+vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 import {
   formatMinutes,
   getErrorMessage,

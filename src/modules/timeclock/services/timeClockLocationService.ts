@@ -1,7 +1,7 @@
 import { FunctionsHttpError } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import type { MapsCoordinates } from '@/lib/maps-link';
-import { getAppBaseUrl } from '@/lib/utils';
+import { APP_BASE_URL } from '@/lib/utils';
 import type { TimeClockLocation, TimeClockLocationInsert, TimeClockTag } from '@/lib/timeclock';
 
 export type TimeClockLocationWithTags = TimeClockLocation & {
@@ -21,13 +21,17 @@ interface TagManageResponse {
 const TAG_COLUMNS =
   'id, location_id, label, tag_type, uid, is_active, last_used_at, created_at, created_by, updated_at';
 
-/** URL a gravar numa tag estática. Curto de propósito (cabe numa NTAG213). */
+/**
+ * URL a gravar numa tag estática. Curto de propósito (cabe numa NTAG213).
+ * Usa sempre o domínio de produção: uma tag física tem de funcionar em todos os
+ * telemóveis, mesmo que o painel tenha sido aberto em localhost ou num preview.
+ */
 export const buildStaticTagUrl = (token: string): string =>
-  `${getAppBaseUrl()}/ponto/nfc?t=${encodeURIComponent(token)}`;
+  `${APP_BASE_URL}/ponto/nfc?t=${encodeURIComponent(token)}`;
 
 /** Modelo de URL a configurar numa NTAG 424 DNA (SDM mirroring em `e` e `c`). */
 export const buildNtag424TemplateUrl = (): string =>
-  `${getAppBaseUrl()}/ponto/nfc?e=00000000000000000000000000000000&c=0000000000000000`;
+  `${APP_BASE_URL}/ponto/nfc?e=00000000000000000000000000000000&c=0000000000000000`;
 
 const invokeTagManage = async (
   body: Record<string, unknown>

@@ -1,5 +1,8 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { parseTagUrl } from '../nfc';
+
+// O serviço de tags importa o cliente Supabase; no CI não há variáveis de ambiente.
+vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 import {
   formatMinutes,
   getErrorMessage,
@@ -111,5 +114,13 @@ describe('parseTagUrl', () => {
     });
     expect(parseTagUrl('https://realize.dasprent.pt/ponto/nfc?e=AA')).toBeNull();
     expect(parseTagUrl('not a url')).toBeNull();
+  });
+});
+
+describe('tag URLs', () => {
+  it('always point to the production domain', async () => {
+    const { buildStaticTagUrl } =
+      await import('@/modules/timeclock/services/timeClockLocationService');
+    expect(buildStaticTagUrl('abc')).toBe('https://realize.dasprent.pt/ponto/nfc?t=abc');
   });
 });

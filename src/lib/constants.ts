@@ -50,12 +50,16 @@ export const ROUTES = {
     SUPPORT: '/admin/suporte',
     ACCESSES: '/admin/acessos',
     SETTINGS: '/admin/configuracoes',
+    TIMECLOCK: '/admin/ponto',
   },
   EMPLOYEE: {
     LOGIN: '/colaborador/login',
     DASHBOARD: '/colaborador',
     TICKETS: '/colaborador/tickets',
     DOCUMENTS: '/colaborador/documentos',
+    TIMECLOCK: '/colaborador/ponto',
+    /** URL gravado nas tags NFC (curto para caber numa NTAG213). */
+    TIMECLOCK_NFC: '/ponto/nfc',
   },
 };
 

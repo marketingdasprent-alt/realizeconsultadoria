@@ -61,3 +61,9 @@ verify_jwt = false
 
 [functions.send-service-renewal-reminders]
 verify_jwt = false
+
+[functions.clock-punch]
+verify_jwt = false
+
+[functions.clock-tag-manage]
+verify_jwt = false

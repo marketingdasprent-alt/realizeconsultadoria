@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,8 +14,23 @@ import { getAppBaseUrl } from '@/lib/utils';
 
 const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
 
+// Só regressa a rotas internas do colaborador (ex.: /ponto/nfc?t=… vindo de uma tag NFC).
+const getSafeRedirect = (state: unknown): string => {
+  const from = (state as { from?: { pathname?: string; search?: string } } | null)?.from;
+  const path = from?.pathname ?? '';
+  if (
+    path !== '/colaborador/login' &&
+    (path.startsWith('/ponto/') || path.startsWith('/colaborador/'))
+  ) {
+    return `${path}${from?.search ?? ''}`;
+  }
+  return '/colaborador';
+};
+
 const EmployeeLoginPage = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+  const redirectTo = getSafeRedirect(location.state);
   const { toast } = useToast();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -42,7 +57,7 @@ const EmployeeLoginPage = () => {
 
       if (employee) {
         localStorage.setItem('auth_preference', 'employee');
-        navigate('/colaborador');
+        navigate(redirectTo);
         return true;
       }
     }
@@ -74,7 +89,7 @@ const EmployeeLoginPage = () => {
       subscription.unsubscribe();
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [navigate]);
+  }, [navigate, redirectTo]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -132,7 +147,7 @@ const EmployeeLoginPage = () => {
         description: 'Login efetuado com sucesso.',
       });
 
-      navigate('/colaborador');
+      navigate(redirectTo);
     } catch (error: any) {
       console.error('Login error:', error);
       toast({

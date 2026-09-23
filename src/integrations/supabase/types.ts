@@ -1547,6 +1547,358 @@ export type Database = {
         };
         Relationships: [];
       };
+      time_clock_attempts: {
+        Row: {
+          accuracy_m: number | null;
+          created_at: string;
+          device_id: string | null;
+          distance_m: number | null;
+          employee_id: string | null;
+          flags: string[];
+          id: string;
+          ip_address: string | null;
+          ip_country: string | null;
+          latitude: number | null;
+          location_id: string | null;
+          longitude: number | null;
+          reason: string;
+          source: string | null;
+          tag_id: string | null;
+          user_agent: string | null;
+          user_id: string | null;
+        };
+        Insert: {
+          accuracy_m?: number | null;
+          created_at?: string;
+          device_id?: string | null;
+          distance_m?: number | null;
+          employee_id?: string | null;
+          flags?: string[];
+          id?: string;
+          ip_address?: string | null;
+          ip_country?: string | null;
+          latitude?: number | null;
+          location_id?: string | null;
+          longitude?: number | null;
+          reason: string;
+          source?: string | null;
+          tag_id?: string | null;
+          user_agent?: string | null;
+          user_id?: string | null;
+        };
+        Update: {
+          accuracy_m?: number | null;
+          created_at?: string;
+          device_id?: string | null;
+          distance_m?: number | null;
+          employee_id?: string | null;
+          flags?: string[];
+          id?: string;
+          ip_address?: string | null;
+          ip_country?: string | null;
+          latitude?: number | null;
+          location_id?: string | null;
+          longitude?: number | null;
+          reason?: string;
+          source?: string | null;
+          tag_id?: string | null;
+          user_agent?: string | null;
+          user_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'time_clock_attempts_employee_id_fkey';
+            columns: ['employee_id'];
+            isOneToOne: false;
+            referencedRelation: 'employees';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'time_clock_attempts_location_id_fkey';
+            columns: ['location_id'];
+            isOneToOne: false;
+            referencedRelation: 'time_clock_locations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'time_clock_attempts_tag_id_fkey';
+            columns: ['tag_id'];
+            isOneToOne: false;
+            referencedRelation: 'time_clock_tags';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      time_clock_entries: {
+        Row: {
+          accuracy_m: number | null;
+          company_id: string;
+          created_at: string;
+          created_by: string | null;
+          device_id: string | null;
+          distance_m: number | null;
+          employee_id: string;
+          entry_type: string;
+          flags: string[];
+          id: string;
+          ip_address: string | null;
+          ip_city: string | null;
+          ip_country: string | null;
+          ip_is_proxy: boolean | null;
+          latitude: number | null;
+          location_id: string | null;
+          longitude: number | null;
+          notes: string | null;
+          punched_at: string;
+          source: string;
+          status: string;
+          tag_id: string | null;
+          updated_at: string;
+          updated_by: string | null;
+          user_agent: string | null;
+        };
+        Insert: {
+          accuracy_m?: number | null;
+          company_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          device_id?: string | null;
+          distance_m?: number | null;
+          employee_id: string;
+          entry_type: string;
+          flags?: string[];
+          id?: string;
+          ip_address?: string | null;
+          ip_city?: string | null;
+          ip_country?: string | null;
+          ip_is_proxy?: boolean | null;
+          latitude?: number | null;
+          location_id?: string | null;
+          longitude?: number | null;
+          notes?: string | null;
+          punched_at?: string;
+          source: string;
+          status?: string;
+          tag_id?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+          user_agent?: string | null;
+        };
+        Update: {
+          accuracy_m?: number | null;
+          company_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          device_id?: string | null;
+          distance_m?: number | null;
+          employee_id?: string;
+          entry_type?: string;
+          flags?: string[];
+          id?: string;
+          ip_address?: string | null;
+          ip_city?: string | null;
+          ip_country?: string | null;
+          ip_is_proxy?: boolean | null;
+          latitude?: number | null;
+          location_id?: string | null;
+          longitude?: number | null;
+          notes?: string | null;
+          punched_at?: string;
+          source?: string;
+          status?: string;
+          tag_id?: string | null;
+          updated_at?: string;
+          updated_by?: string | null;
+          user_agent?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'time_clock_entries_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'time_clock_entries_employee_id_fkey';
+            columns: ['employee_id'];
+            isOneToOne: false;
+            referencedRelation: 'employees';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'time_clock_entries_location_id_fkey';
+            columns: ['location_id'];
+            isOneToOne: false;
+            referencedRelation: 'time_clock_locations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'time_clock_entries_tag_id_fkey';
+            columns: ['tag_id'];
+            isOneToOne: false;
+            referencedRelation: 'time_clock_tags';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      time_clock_entry_history: {
+        Row: {
+          action: string;
+          changed_at: string;
+          changed_by: string | null;
+          changed_by_name: string | null;
+          changed_fields: string[];
+          employee_id: string;
+          entry_id: string;
+          id: string;
+          new_data: Json | null;
+          old_data: Json | null;
+          reason: string | null;
+        };
+        Insert: {
+          action: string;
+          changed_at?: string;
+          changed_by?: string | null;
+          changed_by_name?: string | null;
+          changed_fields?: string[];
+          employee_id: string;
+          entry_id: string;
+          id?: string;
+          new_data?: Json | null;
+          old_data?: Json | null;
+          reason?: string | null;
+        };
+        Update: {
+          action?: string;
+          changed_at?: string;
+          changed_by?: string | null;
+          changed_by_name?: string | null;
+          changed_fields?: string[];
+          employee_id?: string;
+          entry_id?: string;
+          id?: string;
+          new_data?: Json | null;
+          old_data?: Json | null;
+          reason?: string | null;
+        };
+        Relationships: [];
+      };
+      time_clock_locations: {
+        Row: {
+          address: string | null;
+          allow_manual: boolean;
+          block_vpn: boolean;
+          company_id: string;
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          is_active: boolean;
+          latitude: number;
+          longitude: number;
+          max_accuracy_m: number;
+          name: string;
+          radius_m: number;
+          trusted_ips: string[];
+          updated_at: string;
+        };
+        Insert: {
+          address?: string | null;
+          allow_manual?: boolean;
+          block_vpn?: boolean;
+          company_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_active?: boolean;
+          latitude: number;
+          longitude: number;
+          max_accuracy_m?: number;
+          name: string;
+          radius_m?: number;
+          trusted_ips?: string[];
+          updated_at?: string;
+        };
+        Update: {
+          address?: string | null;
+          allow_manual?: boolean;
+          block_vpn?: boolean;
+          company_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_active?: boolean;
+          latitude?: number;
+          longitude?: number;
+          max_accuracy_m?: number;
+          name?: string;
+          radius_m?: number;
+          trusted_ips?: string[];
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'time_clock_locations_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      time_clock_tags: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          id: string;
+          is_active: boolean;
+          label: string;
+          last_counter: number;
+          last_used_at: string | null;
+          location_id: string;
+          tag_type: string;
+          token_hash: string | null;
+          uid: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_active?: boolean;
+          label: string;
+          last_counter?: number;
+          last_used_at?: string | null;
+          location_id: string;
+          tag_type: string;
+          token_hash?: string | null;
+          uid?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          id?: string;
+          is_active?: boolean;
+          label?: string;
+          last_counter?: number;
+          last_used_at?: string | null;
+          location_id?: string;
+          tag_type?: string;
+          token_hash?: string | null;
+          uid?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'time_clock_tags_location_id_fkey';
+            columns: ['location_id'];
+            isOneToOne: false;
+            referencedRelation: 'time_clock_locations';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       user_roles: {
         Row: {
           created_at: string;
@@ -1599,6 +1951,10 @@ export type Database = {
         };
         Returns: boolean;
       };
+      has_timeclock_permission: {
+        Args: { _permission?: string; _topic_key?: string; _user_id: string };
+        Returns: boolean;
+      };
       has_role: {
         Args: {
           _role: Database['public']['Enums']['app_role'];
@@ -1613,6 +1969,31 @@ export type Database = {
           p_periods: Json;
         };
         Returns: string;
+      };
+      time_clock_admin_create_entry: {
+        Args: {
+          _employee_id: string;
+          _entry_type: string;
+          _location_id?: string | null;
+          _notes?: string | null;
+          _punched_at: string;
+          _reason: string;
+        };
+        Returns: string;
+      };
+      time_clock_admin_set_status: {
+        Args: { _entry_id: string; _reason: string; _status: string };
+        Returns: undefined;
+      };
+      time_clock_admin_update_entry: {
+        Args: {
+          _entry_id: string;
+          _entry_type: string;
+          _notes?: string | null;
+          _punched_at: string;
+          _reason: string;
+        };
+        Returns: undefined;
       };
     };
     Enums: {

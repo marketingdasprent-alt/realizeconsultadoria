@@ -159,6 +159,33 @@ export const PERMISSIONS_CONFIG: ModuleTopicsConfig[] = [
     ],
   },
   {
+    moduleKey: 'timeclock',
+    moduleLabel: 'Ponto',
+    topics: [
+      {
+        key: 'view',
+        label: 'Ver folha de ponto',
+        description: 'Visualizar registos, alertas e histórico de alterações',
+        hasView: true,
+        hasExecute: false,
+      },
+      {
+        key: 'edit',
+        label: 'Editar registos',
+        description: 'Criar, corrigir, anular e rever registos de ponto (com motivo)',
+        hasView: false,
+        hasExecute: true,
+      },
+      {
+        key: 'locations',
+        label: 'Gerir locais e tags',
+        description: 'Configurar locais, raio GPS e tags NFC',
+        hasView: true,
+        hasExecute: true,
+      },
+    ],
+  },
+  {
     moduleKey: 'support',
     moduleLabel: 'Suporte',
     topics: [

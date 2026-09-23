@@ -1,116 +1,91 @@
-import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, FolderOpen, LogOut } from 'lucide-react';
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { FolderOpen, Loader2, Upload } from 'lucide-react';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { supabase } from '@/integrations/supabase/client';
-import logo from '@/assets/logo-realize.png';
-import EmployeeDocumentsSection from '@/components/employee/EmployeeDocumentsSection';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { CurrentDocumentsList } from '@/modules/documents/components/employee/CurrentDocumentsList';
+import { PayslipsList } from '@/modules/documents/components/employee/PayslipsList';
+import { SubmissionsList } from '@/modules/documents/components/employee/SubmissionsList';
+import { SubmitDocumentDialog } from '@/modules/documents/components/employee/SubmitDocumentDialog';
+import { useEmployeeDocuments } from '@/modules/documents/hooks/useEmployeeDocuments';
+import { useEmployeeOutlet } from '../hooks/useEmployeeOutlet';
 
-interface Employee {
-  id: string;
-  name: string;
-  company_id: string;
-  companies: { name: string };
-}
-
-const EmployeeDocumentsPage = () => {
-  const navigate = useNavigate();
-  const [employee, setEmployee] = useState<Employee | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+/** Documentos do colaborador: atuais, recibos e os que enviou. */
+const EmployeeDocumentsPage: React.FC = () => {
+  const { employee } = useEmployeeOutlet();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const { current, archived, payslips, submissions, isLoading, error, refetch } =
+    useEmployeeDocuments(employee.id);
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [presetCategory, setPresetCategory] = useState<string | null>(null);
 
   useEffect(() => {
-    const loadData = async () => {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
+    if (searchParams.get('enviar')) {
+      setPresetCategory(searchParams.get('tipo'));
+      setDialogOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
-      if (!session) {
-        navigate('/colaborador/login');
-        return;
-      }
-
-      const { data: employeeData } = await supabase
-        .from('employees')
-        .select('*, companies(name)')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (!employeeData) {
-        navigate('/colaborador/login');
-        return;
-      }
-
-      setEmployee(employeeData);
-      setIsLoading(false);
-    };
-
-    loadData();
-  }, [navigate]);
-
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
+  const openSubmit = (category: string | null = null) => {
+    setPresetCategory(category);
+    setDialogOpen(true);
   };
 
-  if (isLoading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto"></div>
-          <p className="mt-4 text-muted-foreground">A carregar...</p>
-        </div>
-      </div>
-    );
-  }
-
-  if (!employee) return null;
+  const pendingCount = submissions.filter(s => s.status === 'pending').length;
 
   return (
-    <div className="min-h-screen bg-secondary">
-      {/* Header */}
-      <header className="bg-background border-b border-border sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-3 lg:py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 lg:gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 lg:h-10 lg:w-10"
-                onClick={() => navigate('/colaborador')}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <img
-                src={logo}
-                alt="Realize Consultadoria"
-                className="h-8 lg:h-12 w-auto hidden sm:block"
-              />
-              <div>
-                <h1 className="font-display text-base lg:text-xl font-semibold flex items-center gap-2">
-                  <FolderOpen className="h-4 w-4 lg:h-5 lg:w-5 text-gold" />
-                  Meus Documentos
-                </h1>
-                <p className="text-xs lg:text-sm text-muted-foreground hidden sm:block">
-                  Documentos da empresa e os seus
-                </p>
-              </div>
-            </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 lg:h-10 lg:w-10"
-              onClick={handleLogout}
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
-          </div>
-        </div>
-      </header>
+    <div className="space-y-4">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="flex items-center gap-2 font-display text-xl font-semibold">
+          <FolderOpen className="h-5 w-5 text-gold" /> Documentos
+        </h1>
+        <Button variant="gold" className="h-11" onClick={() => openSubmit()}>
+          <Upload className="mr-2 h-4 w-4" /> Enviar
+        </Button>
+      </div>
 
-      {/* Main Content */}
-      <main className="container mx-auto px-4 py-4 lg:py-6">
-        <EmployeeDocumentsSection employeeId={employee.id} employeeName={employee.name} />
-      </main>
+      {error && <p className="text-sm text-destructive">{error}</p>}
+
+      {isLoading ? (
+        <div className="flex justify-center py-10">
+          <Loader2 className="h-6 w-6 animate-spin text-gold" />
+        </div>
+      ) : (
+        <Tabs defaultValue="current">
+          <TabsList className="grid h-11 w-full grid-cols-3">
+            <TabsTrigger value="current">Atuais</TabsTrigger>
+            <TabsTrigger value="payslips">Recibos</TabsTrigger>
+            <TabsTrigger value="submissions" className="gap-1">
+              Enviados
+              {pendingCount > 0 && (
+                <Badge variant="secondary" className="h-5 px-1.5 text-xs">
+                  {pendingCount}
+                </Badge>
+              )}
+            </TabsTrigger>
+          </TabsList>
+          <TabsContent value="current" className="mt-4">
+            <CurrentDocumentsList documents={current} archived={archived} onUpdate={openSubmit} />
+          </TabsContent>
+          <TabsContent value="payslips" className="mt-4">
+            <PayslipsList payslips={payslips} />
+          </TabsContent>
+          <TabsContent value="submissions" className="mt-4">
+            <SubmissionsList submissions={submissions} onChanged={refetch} />
+          </TabsContent>
+        </Tabs>
+      )}
+
+      <SubmitDocumentDialog
+        open={dialogOpen}
+        onOpenChange={setDialogOpen}
+        employeeId={employee.id}
+        employeeName={employee.name}
+        presetCategory={presetCategory}
+        onSubmitted={refetch}
+      />
     </div>
   );
 };

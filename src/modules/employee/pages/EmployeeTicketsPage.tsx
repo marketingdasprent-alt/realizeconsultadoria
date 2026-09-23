@@ -1,25 +1,14 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import {
-  ArrowLeft,
-  Plus,
-  MessageSquare,
-  Headset,
-  LogOut,
-  Paperclip,
-  Download,
-  FileText,
-  Image,
-} from 'lucide-react';
+import { Plus, MessageSquare, Headset, Paperclip, Download, FileText, Image } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { supabase } from '@/integrations/supabase/client';
-import logo from '@/assets/logo-realize.png';
 import NewTicketDialog from '@/components/employee/NewTicketDialog';
 import TicketConversationDialog from '@/components/employee/TicketConversationDialog';
 
@@ -80,6 +69,7 @@ const statusColors: Record<string, 'default' | 'secondary' | 'outline' | 'destru
 
 const EmployeeTicketsPage = () => {
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const [employee, setEmployee] = useState<Employee | null>(null);
   const [tickets, setTickets] = useState<SupportTicket[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -153,10 +143,13 @@ const EmployeeTicketsPage = () => {
     loadData();
   }, [navigate]);
 
-  const handleLogout = async () => {
-    await supabase.auth.signOut();
-    navigate('/');
-  };
+  // Atalho "Pedir ajuda" vindo do Início (/colaborador/tickets?novo=1)
+  useEffect(() => {
+    if (searchParams.get('novo')) {
+      setIsDialogOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const handleDownloadAttachment = async (attachment: TicketAttachment) => {
     console.log('Iniciando download robusto de anexo (Colaborador):', attachment.file_name);
@@ -222,7 +215,7 @@ const EmployeeTicketsPage = () => {
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto"></div>
           <p className="mt-4 text-muted-foreground">A carregar...</p>
@@ -234,61 +227,23 @@ const EmployeeTicketsPage = () => {
   if (!employee) return null;
 
   return (
-    <div className="min-h-screen bg-secondary">
-      {/* Header - Mobile First */}
-      <header className="bg-background border-b border-border sticky top-0 z-10">
-        <div className="container mx-auto px-4 py-3 lg:py-4">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 lg:gap-4">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 lg:h-10 lg:w-10"
-                onClick={() => navigate('/colaborador')}
-              >
-                <ArrowLeft className="h-5 w-5" />
-              </Button>
-              <img
-                src={logo}
-                alt="Realize Consultadoria"
-                className="h-8 lg:h-12 w-auto hidden sm:block"
-              />
-              <div>
-                <h1 className="font-display text-base lg:text-xl font-semibold flex items-center gap-2">
-                  <Headset className="h-4 w-4 lg:h-5 lg:w-5 text-gold" />
-                  Meus Tickets
-                </h1>
-                <p className="text-xs lg:text-sm text-muted-foreground hidden sm:block">
-                  Histórico de suporte
-                </p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 lg:gap-3">
-              <Button
-                variant="gold"
-                size="sm"
-                className="h-9 lg:h-10 text-xs lg:text-sm px-3 lg:px-4"
-                onClick={() => setIsDialogOpen(true)}
-              >
-                <Plus className="h-4 w-4 mr-1 lg:mr-2" />
-                <span className="hidden sm:inline">Novo Ticket</span>
-                <span className="sm:hidden">Novo</span>
-              </Button>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-9 w-9 lg:h-10 lg:w-10"
-                onClick={handleLogout}
-              >
-                <LogOut className="h-5 w-5" />
-              </Button>
-            </div>
-          </div>
+    <div>
+      <div className="mb-4 flex items-center justify-between gap-3">
+        <div>
+          <h1 className="font-display text-xl font-semibold flex items-center gap-2">
+            <Headset className="h-5 w-5 text-gold" />
+            Suporte
+          </h1>
+          <p className="text-xs text-muted-foreground">Pedidos de ajuda aos Recursos Humanos</p>
         </div>
-      </header>
+        <Button variant="gold" className="h-11" onClick={() => setIsDialogOpen(true)}>
+          <Plus className="h-4 w-4 mr-2" />
+          Novo pedido
+        </Button>
+      </div>
 
       {/* Main Content */}
-      <main className="container mx-auto px-4 py-4 lg:py-6">
+      <main>
         {/* Tabs - Horizontal scroll on mobile */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="mb-4 lg:mb-6">
           <ScrollArea className="w-full whitespace-nowrap">

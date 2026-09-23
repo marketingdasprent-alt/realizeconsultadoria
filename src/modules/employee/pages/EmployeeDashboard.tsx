@@ -1,26 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { sanitizeFileName } from '@/lib/utils';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import {
-  Calendar as CalendarIcon,
-  Plus,
-  LogOut,
-  Paperclip,
-  Upload,
-  Headset,
-  MessageSquare,
-  Trash2,
-  FolderOpen,
-  Key,
-  ChevronDown,
-  User,
-  Pencil,
-  Clock,
-} from 'lucide-react';
-import { ROUTES } from '@/lib/constants';
+import { Calendar as CalendarIcon, Plus, Paperclip, Upload, Trash2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   Dialog,
@@ -51,30 +36,27 @@ import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import logo from '@/assets/logo-realize.png';
 import VacationBalanceCard from '@/components/employee/VacationBalanceCard';
 import MultiPeriodSelector from '@/components/employee/MultiPeriodSelector';
 import EmployeeCalendar from '@/components/employee/EmployeeCalendar';
-import { AvisosSection } from '@/components/employee/AvisosSection';
-import NewTicketDialog from '@/components/employee/NewTicketDialog';
 import { DatePeriod, Holiday, countBusinessDays, formatTimeRange } from '@/lib/vacation-utils';
 import { findApprovedConflicts, describeConflicts } from '@/lib/absence-overlap';
 import { absenceTypeLabels, trainingModeLabels } from '@/lib/absence-types';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Label } from '@/components/ui/label';
-import PWAInstallBanner from '@/components/PWAInstallBanner';
 import DocumentUploader from '@/components/employee/DocumentUploader';
 import AbsenceDocumentsDialog from '@/components/admin/AbsenceDocumentsDialog';
 import AddDocumentsDialog from '@/components/employee/AddDocumentsDialog';
-import ChangePasswordDialog from '@/components/employee/ChangePasswordDialog';
 import AbsenceEditDialog from '@/components/admin/AbsenceEditDialog';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
+
+type RequestFilter = 'all' | 'pending' | 'upcoming' | 'past';
+
+const REQUEST_FILTERS: Array<{ value: RequestFilter; label: string }> = [
+  { value: 'all', label: 'Todos' },
+  { value: 'pending', label: 'Pendentes' },
+  { value: 'upcoming', label: 'Próximos' },
+  { value: 'past', label: 'Passados' },
+];
 
 interface SelectedFile {
   file: File;
@@ -154,14 +136,20 @@ const EmployeeDashboard = () => {
   const [selectedAbsenceId, setSelectedAbsenceId] = useState<string | null>(null);
   const [addDocsDialogOpen, setAddDocsDialogOpen] = useState(false);
   const [absenceIdForUpload, setAbsenceIdForUpload] = useState<string | null>(null);
-  const [ticketCount, setTicketCount] = useState(0);
-  const [isTicketDialogOpen, setIsTicketDialogOpen] = useState(false);
-  const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   const [editDialogOpen, setEditDialogOpen] = useState(false);
   const [absenceToReschedule, setAbsenceToReschedule] = useState<Absence | null>(null);
-  const [employeeEmail, setEmployeeEmail] = useState('');
+  const [filter, setFilter] = useState<RequestFilter>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
 
   const currentYear = new Date().getFullYear();
+
+  // Atalho "Novo pedido" vindo do Início (/colaborador/pedidos?novo=1)
+  useEffect(() => {
+    if (searchParams.get('novo')) {
+      setIsDialogOpen(true);
+      setSearchParams({}, { replace: true });
+    }
+  }, [searchParams, setSearchParams]);
 
   const loadEmployeeData = async () => {
     const {
@@ -172,8 +160,6 @@ const EmployeeDashboard = () => {
       navigate('/colaborador/login');
       return;
     }
-
-    setEmployeeEmail(session.user.email ?? '');
 
     // Get employee data
     const { data: employeeData } = await supabase
@@ -186,7 +172,7 @@ const EmployeeDashboard = () => {
       setEmployee(employeeData);
 
       // Fetch data in parallel
-      const [absencesRes, holidaysRes, balanceRes, docsRes, ticketsRes] = await Promise.all([
+      const [absencesRes, holidaysRes, balanceRes, docsRes] = await Promise.all([
         supabase
           .from('absences')
           .select('*, absence_periods(*)')
@@ -204,11 +190,6 @@ const EmployeeDashboard = () => {
           .eq('year', currentYear)
           .maybeSingle(),
         supabase.from('absence_documents').select('absence_id'),
-        supabase
-          .from('support_tickets')
-          .select('id', { count: 'exact', head: true })
-          .eq('employee_id', employeeData.id)
-          .in('status', ['open', 'in_progress']),
       ]);
 
       // Count documents per absence
@@ -225,7 +206,6 @@ const EmployeeDashboard = () => {
       setAbsences(absencesWithDocs);
       setHolidays(holidaysRes.data || []);
       setVacationBalance(balanceRes.data);
-      setTicketCount(ticketsRes.count || 0);
 
       // Fetch days scheduled by employee (for self_schedulable limit)
       if (balanceRes.data?.self_schedulable_days !== null) {
@@ -588,12 +568,22 @@ const EmployeeDashboard = () => {
     return vacationBalance.total_days - vacationBalance.used_days;
   })();
 
-  // Get first name for mobile greeting
-  const firstName = employee?.name?.split(' ')[0] || '';
+  // Filtro da lista: pendentes, próximos (aprovados a partir de hoje) ou passados.
+  const visibleAbsences = useMemo(() => {
+    const today = format(new Date(), 'yyyy-MM-dd');
+    return absences.filter(absence => {
+      if (filter === 'pending') return absence.status === 'pending';
+      if (filter === 'upcoming') {
+        return absence.end_date >= today && absence.status !== 'rejected';
+      }
+      if (filter === 'past') return absence.end_date < today;
+      return true;
+    });
+  }, [absences, filter]);
 
   if (isLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
+      <div className="flex items-center justify-center py-20">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-gold mx-auto"></div>
           <p className="mt-4 text-muted-foreground">A carregar...</p>
@@ -604,7 +594,7 @@ const EmployeeDashboard = () => {
 
   if (!employee) {
     return (
-      <div className="min-h-screen flex items-center justify-center p-4">
+      <div className="flex items-center justify-center p-4">
         <Card className="max-w-md w-full shadow-card">
           <CardContent className="pt-6 text-center">
             <p className="text-muted-foreground mb-4">
@@ -621,124 +611,14 @@ const EmployeeDashboard = () => {
   }
 
   return (
-    <div className="min-h-screen bg-secondary">
-      {/* PWA Install Banner */}
-      <div className="container mx-auto px-4 pt-4">
-        <PWAInstallBanner />
-      </div>
-
-      {/* Header - Mobile First */}
-      <header className="bg-background border-b border-border">
-        <div className="container mx-auto px-4 py-3 lg:py-4 flex items-center justify-between">
-          {/* Mobile: Avatar + Greeting | Desktop: Logo */}
-          <div className="flex items-center gap-3">
-            <img src={logo} alt="Realize Consultadoria" className="h-10 lg:h-16 w-auto" />
-            <div className="lg:hidden">
-              <p className="font-medium text-sm">Olá, {firstName}!</p>
-              <p className="text-xs text-muted-foreground">{employee.companies?.name}</p>
-            </div>
-          </div>
-
-          {/* Desktop: User info | Mobile: Dropdown menu */}
-          <div className="flex items-center gap-3 lg:gap-4">
-            <div className="text-right hidden lg:block">
-              <p className="font-medium">{employee.name}</p>
-              <p className="text-sm text-muted-foreground">{employee.companies?.name}</p>
-            </div>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="flex items-center gap-1 px-2">
-                  <User className="h-5 w-5" />
-                  <ChevronDown className="h-3 w-3 text-muted-foreground" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-48">
-                <DropdownMenuItem
-                  onClick={() => setIsChangePasswordOpen(true)}
-                  className="cursor-pointer"
-                >
-                  <Key className="h-4 w-4 mr-2" />
-                  Alterar Palavra-passe
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem
-                  onClick={handleLogout}
-                  className=" cursor-pointer text-destructive focus:text-destructive"
-                >
-                  <LogOut className="h-4 w-4 mr-2" />
-                  Sair
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </div>
-        </div>
-      </header>
-
-      {/* Barra de Suporte - Mobile First */}
-      <div className="bg-background border-b border-border">
-        <div className="container mx-auto px-4 py-3">
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-            <div className="flex items-center gap-2">
-              <Headset className="h-5 w-5 text-gold" />
-              <span className="font-display text-lg font-semibold">Suporte</span>
-            </div>
-            <div className="grid grid-cols-2 gap-2 sm:flex">
-              <Button
-                variant="gold"
-                size="sm"
-                className="h-10 sm:h-9"
-                onClick={() => setIsTicketDialogOpen(true)}
-              >
-                <Plus className="h-4 w-4 mr-2" />
-                <span>Novo Ticket</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-10 sm:h-9"
-                onClick={() => navigate('/colaborador/tickets')}
-              >
-                <MessageSquare className="h-4 w-4 mr-2" />
-                <span>Meus Tickets</span>
-                {ticketCount > 0 && (
-                  <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
-                    {ticketCount}
-                  </Badge>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-10 sm:h-9"
-                onClick={() => navigate('/colaborador/documentos')}
-              >
-                <FolderOpen className="h-4 w-4 mr-2" />
-                <span>Documentos</span>
-              </Button>
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-10 sm:h-9"
-                onClick={() => navigate(ROUTES.EMPLOYEE.TIMECLOCK)}
-              >
-                <Clock className="h-4 w-4 mr-2" />
-                <span>Ponto</span>
-              </Button>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <main className="container mx-auto px-4 py-6 lg:py-8">
-        {/* Mobile First Layout: Stack on mobile, grid on desktop */}
+    <div>
+      <main>
+        {/* Uma coluna no telemóvel; calendário ao lado no computador */}
         <div className="flex flex-col lg:grid lg:grid-cols-[1fr_320px] gap-6 items-start">
           {/* Main Content Column */}
-          <div className="w-full space-y-6 order-2 lg:order-1">
+          <div className="w-full space-y-6">
             {/* Vacation Balance - Full width */}
             <VacationBalanceCard employeeId={employee.id} />
-
-            {/* Avisos */}
-            <AvisosSection companyId={employee.company_id} employeeId={employee.id} />
 
             {/* Os Meus Pedidos */}
             <div>
@@ -857,19 +737,40 @@ const EmployeeDashboard = () => {
                 </Dialog>
               </div>
 
+              {/* Filtro: pendentes / próximos / passados */}
+              <Tabs
+                value={filter}
+                onValueChange={v => setFilter(v as RequestFilter)}
+                className="mb-4"
+              >
+                <TabsList className="grid h-11 w-full grid-cols-4">
+                  {REQUEST_FILTERS.map(f => (
+                    <TabsTrigger key={f.value} value={f.value} className="text-xs sm:text-sm">
+                      {f.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+
               {/* Absences List */}
               <Card className="shadow-card">
                 <CardHeader className="pb-3">
-                  <CardTitle className="font-display text-lg lg:text-xl">Histórico</CardTitle>
+                  <CardTitle className="font-display text-lg lg:text-xl">
+                    {filter === 'all'
+                      ? 'Histórico'
+                      : REQUEST_FILTERS.find(f => f.value === filter)?.label}
+                  </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  {absences.length === 0 ? (
+                  {visibleAbsences.length === 0 ? (
                     <p className="text-muted-foreground text-center py-8">
-                      Ainda não tem pedidos registados.
+                      {absences.length === 0
+                        ? 'Ainda não tem pedidos registados.'
+                        : 'Sem pedidos neste filtro.'}
                     </p>
                   ) : (
                     <div className="space-y-3 lg:space-y-4">
-                      {absences.map(absence => (
+                      {visibleAbsences.map(absence => (
                         <div
                           key={absence.id}
                           className="p-3 lg:p-4 border border-border rounded-lg"
@@ -1091,26 +992,8 @@ const EmployeeDashboard = () => {
             </div>
           </div>
 
-          {/* Sidebar Column - Info + Calendar */}
-          <div className="w-full space-y-6 order-1 lg:order-2">
-            {/* Info Card - Hidden on mobile, show key info in header instead */}
-            <Card className="shadow-card hidden lg:block">
-              <CardHeader className="pb-3">
-                <CardTitle className="font-display text-lg">Informações</CardTitle>
-              </CardHeader>
-              <CardContent className="space-y-3">
-                <div>
-                  <p className="text-sm text-muted-foreground">Nome</p>
-                  <p className="font-medium">{employee.name}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted-foreground">Empresa</p>
-                  <p className="font-medium">{employee.companies?.name}</p>
-                </div>
-              </CardContent>
-            </Card>
-
-            {/* Calendar - Shows first on mobile */}
+          {/* Calendário: depois da lista no telemóvel, ao lado no computador */}
+          <div className="w-full space-y-6">
             <EmployeeCalendar absences={absences} holidays={holidays} />
           </div>
         </div>
@@ -1129,24 +1012,6 @@ const EmployeeDashboard = () => {
         onOpenChange={setAddDocsDialogOpen}
         absenceId={absenceIdForUpload}
         onSuccess={loadEmployeeData}
-      />
-
-      {/* New Ticket Dialog */}
-      <NewTicketDialog
-        open={isTicketDialogOpen}
-        onOpenChange={setIsTicketDialogOpen}
-        employeeId={employee.id}
-        companyId={employee.company_id}
-        employeeName={employee.name}
-        employeeEmail={employee.email}
-        companyName={employee.companies?.name || ''}
-        onSuccess={loadEmployeeData}
-      />
-
-      <ChangePasswordDialog
-        open={isChangePasswordOpen}
-        onOpenChange={setIsChangePasswordOpen}
-        employeeEmail={employeeEmail}
       />
 
       <AbsenceEditDialog

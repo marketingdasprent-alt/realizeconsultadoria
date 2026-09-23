@@ -685,6 +685,16 @@ export type Database = {
           uploaded_by: string;
           uploaded_by_name: string | null;
           uploaded_by_role: string | null;
+          status: string;
+          document_number: string | null;
+          issue_date: string | null;
+          expiry_date: string | null;
+          period_month: string | null;
+          is_current: boolean;
+          reviewed_by: string | null;
+          reviewed_at: string | null;
+          review_notes: string | null;
+          replaces_document_id: string | null;
         };
         Insert: {
           category?: string | null;
@@ -699,6 +709,16 @@ export type Database = {
           uploaded_by: string;
           uploaded_by_name?: string | null;
           uploaded_by_role?: string | null;
+          status?: string;
+          document_number?: string | null;
+          issue_date?: string | null;
+          expiry_date?: string | null;
+          period_month?: string | null;
+          is_current?: boolean;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          review_notes?: string | null;
+          replaces_document_id?: string | null;
         };
         Update: {
           category?: string | null;
@@ -713,6 +733,16 @@ export type Database = {
           uploaded_by?: string;
           uploaded_by_name?: string | null;
           uploaded_by_role?: string | null;
+          status?: string;
+          document_number?: string | null;
+          issue_date?: string | null;
+          expiry_date?: string | null;
+          period_month?: string | null;
+          is_current?: boolean;
+          reviewed_by?: string | null;
+          reviewed_at?: string | null;
+          review_notes?: string | null;
+          replaces_document_id?: string | null;
         };
         Relationships: [
           {
@@ -1961,6 +1991,19 @@ export type Database = {
           _user_id: string;
         };
         Returns: boolean;
+      };
+      review_employee_document: {
+        Args: {
+          _document_id: string;
+          _decision: string;
+          _category?: string | null;
+          _document_number?: string | null;
+          _issue_date?: string | null;
+          _expiry_date?: string | null;
+          _period_month?: string | null;
+          _notes?: string | null;
+        };
+        Returns: undefined;
       };
       reschedule_vacation: {
         Args: {

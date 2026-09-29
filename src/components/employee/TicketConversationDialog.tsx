@@ -173,7 +173,7 @@ const TicketConversationDialog = ({
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
           <div className="flex items-center gap-2 pr-6">
-            <DialogTitle className="font-display text-base lg:text-lg flex-1 min-w-0 truncate">
+            <DialogTitle className="text-base lg:text-lg flex-1 min-w-0 truncate">
               {ticket.subject}
             </DialogTitle>
             <Badge variant={statusColors[ticket.status]} className="shrink-0 text-[10px]">

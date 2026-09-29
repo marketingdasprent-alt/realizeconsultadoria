@@ -759,7 +759,7 @@ const EmployeeDashboard = () => {
                   </DialogTrigger>
                   <DialogContent className="w-[95vw] max-w-lg h-[90dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto">
                     <DialogHeader>
-                      <DialogTitle className="font-display text-xl lg:text-2xl">
+                      <DialogTitle className="text-xl lg:text-2xl">
                         Novo Pedido de Ausência
                       </DialogTitle>
                     </DialogHeader>

@@ -131,7 +131,7 @@ const AddDocumentsDialog = ({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="max-w-lg">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Anexar Documentos</DialogTitle>
+          <DialogTitle className="text-xl">Anexar Documentos</DialogTitle>
           <DialogDescription>
             Adicione documentos justificativos a este pedido de ausência.
           </DialogDescription>

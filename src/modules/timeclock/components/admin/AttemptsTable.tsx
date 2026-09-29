@@ -73,9 +73,7 @@ export const AttemptsTable: React.FC<AttemptsTableProps> = ({ attempts }) => {
                 <TableCell className="text-right">
                   {a.accuracy_m !== null ? `${Math.round(a.accuracy_m)} m` : '—'}
                 </TableCell>
-                <TableCell className="whitespace-nowrap text-xs">
-                  {a.ip_address ?? '—'} {a.ip_country && `(${a.ip_country})`}
-                </TableCell>
+                <TableCell className="whitespace-nowrap text-xs">{a.ip_address ?? '—'}</TableCell>
               </TableRow>
             );
           })}

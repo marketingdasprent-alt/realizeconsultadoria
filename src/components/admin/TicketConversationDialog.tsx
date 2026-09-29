@@ -157,7 +157,7 @@ const TicketConversationDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[85vh] flex flex-col">
         <DialogHeader>
-          <DialogTitle className="font-display text-lg pr-6">{ticket.subject}</DialogTitle>
+          <DialogTitle className="text-lg pr-6">{ticket.subject}</DialogTitle>
           <p className="text-sm text-muted-foreground">
             {ticket.employees.name} • {ticket.employees.email}
           </p>

@@ -277,9 +277,7 @@ const NewTicketDialog = ({
     <Dialog open={open} onOpenChange={handleClose}>
       <DialogContent className="w-[95vw] max-w-lg h-[90dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl lg:text-2xl">
-            Novo Ticket de Suporte
-          </DialogTitle>
+          <DialogTitle className="text-xl lg:text-2xl">Novo Ticket de Suporte</DialogTitle>
         </DialogHeader>
         <div className="space-y-4 mt-4">
           <div>

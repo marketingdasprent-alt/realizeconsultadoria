@@ -202,7 +202,7 @@ const CalendarPrintDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl flex items-center gap-2">
+          <DialogTitle className="text-xl flex items-center gap-2">
             <CalendarRange className="h-5 w-5" />
             Imprimir Mapa de Férias
           </DialogTitle>

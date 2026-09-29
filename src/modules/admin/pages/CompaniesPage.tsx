@@ -157,7 +157,7 @@ const CompaniesPage = () => {
             )}
             <DialogContent className="max-w-lg">
               <DialogHeader>
-                <DialogTitle className="font-display text-2xl">
+                <DialogTitle className="text-2xl">
                   {editingCompany ? 'Editar Empresa' : 'Nova Empresa'}
                 </DialogTitle>
               </DialogHeader>

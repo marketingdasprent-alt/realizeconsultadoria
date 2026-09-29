@@ -368,7 +368,7 @@ const AdminBulkAbsenceDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-2xl h-[90dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl flex items-center gap-2">
+          <DialogTitle className="text-xl flex items-center gap-2">
             <Users className="h-5 w-5" />
             Marcação em Massa
           </DialogTitle>

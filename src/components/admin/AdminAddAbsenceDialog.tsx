@@ -273,7 +273,7 @@ const AdminAddAbsenceDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="w-[95vw] max-w-lg h-[90dvh] sm:h-auto sm:max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">Adicionar Pedido de Ausência</DialogTitle>
+          <DialogTitle className="text-xl">Adicionar Pedido de Ausência</DialogTitle>
           <DialogDescription>
             Como administrador, pode criar pedidos sem a restrição de 48 horas. O pedido ficará
             pendente de aprovação.

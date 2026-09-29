@@ -20,7 +20,7 @@ export default defineConfig(({ mode }) => ({
         name: 'Realize - Portal de Gestão',
         short_name: 'Realize',
         description:
-          'Portal de gestão de férias e ausências para colaboradores da Realize Consultadoria.',
+          'Portal do colaborador da Realize Consultadoria: ponto, férias e ausências, documentos e recibos.',
         theme_color: '#B7933D',
         background_color: '#ffffff',
         display: 'standalone',

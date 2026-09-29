@@ -12,6 +12,7 @@ import {
   Lock,
   Scale,
   Clock,
+  FileCheck,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -42,6 +43,7 @@ const allNavItems: NavItem[] = [
   { href: ROUTES.ADMIN.LEGAL, icon: Scale, label: 'Jurídico', moduleKey: 'legal' },
   { href: ROUTES.ADMIN.COMPANIES, icon: Building2, label: 'Empresas', moduleKey: 'companies' },
   { href: ROUTES.ADMIN.EMPLOYEES, icon: Users, label: 'Colaboradores', moduleKey: 'employees' },
+  { href: ROUTES.ADMIN.DOCUMENTS, icon: FileCheck, label: 'Documentos', moduleKey: 'employees' },
   { href: ROUTES.ADMIN.ACCESSES, icon: Lock, label: 'Acessos', moduleKey: 'accesses' },
   { href: ROUTES.ADMIN.REQUESTS, icon: ClipboardList, label: 'Pedidos', moduleKey: 'requests' },
   { href: ROUTES.ADMIN.TIMECLOCK, icon: Clock, label: 'Ponto', moduleKey: 'timeclock' },

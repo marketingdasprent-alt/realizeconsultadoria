@@ -189,7 +189,7 @@ export default function EmployeeAvisoDialog({
     <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-2xl">Avisos de {employeeName}</DialogTitle>
+          <DialogTitle className="text-2xl">Avisos de {employeeName}</DialogTitle>
         </DialogHeader>
 
         <div className="space-y-6 mt-4">

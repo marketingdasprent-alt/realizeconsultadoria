@@ -159,7 +159,7 @@ const VacationDaysDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-md">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl flex items-center gap-2">
+          <DialogTitle className="text-xl flex items-center gap-2">
             <Calendar className="h-5 w-5 text-gold" />
             Gerir Dias de Férias
           </DialogTitle>

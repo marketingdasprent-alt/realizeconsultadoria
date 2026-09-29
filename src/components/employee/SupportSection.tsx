@@ -275,7 +275,7 @@ const SupportSection = ({
           </DialogTrigger>
           <DialogContent className="max-w-lg">
             <DialogHeader>
-              <DialogTitle className="font-display text-2xl">Novo Ticket de Suporte</DialogTitle>
+              <DialogTitle className="text-2xl">Novo Ticket de Suporte</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 mt-4">
               <div>

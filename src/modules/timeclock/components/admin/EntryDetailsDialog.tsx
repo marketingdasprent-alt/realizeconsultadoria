@@ -76,10 +76,9 @@ export const EntryDetailsDialog: React.FC<EntryDetailsDialogProps> = ({ entry, o
           <Row label="Distância">
             {entry.distance_m !== null ? `${Math.round(entry.distance_m)} m` : null}
           </Row>
+          {/* Cidade/país do IP fica só na BD (regra antifraude >400 km): em rede móvel
+              aponta para a central do operador e confundia os utilizadores. */}
           <Row label="IP">{entry.ip_address}</Row>
-          <Row label="País / cidade IP">
-            {[entry.ip_country, entry.ip_city].filter(Boolean).join(' / ') || null}
-          </Row>
           <Row label="VPN / proxy">
             {entry.ip_is_proxy === null ? 'Não verificado' : entry.ip_is_proxy ? 'Sim' : 'Não'}
           </Row>

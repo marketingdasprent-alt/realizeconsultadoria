@@ -206,7 +206,7 @@ const AbsenceDocumentsDialog = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-lg max-h-[90vh] overflow-y-auto">
         <DialogHeader>
-          <DialogTitle className="font-display text-xl">
+          <DialogTitle className="text-xl">
             Documentos do Pedido
             {employeeName && (
               <span className="text-muted-foreground font-normal text-base block mt-1">

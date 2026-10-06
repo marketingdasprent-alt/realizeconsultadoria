@@ -205,7 +205,11 @@ export const summarizeDays = <T extends TimeClockEntry>(
 };
 
 const normalizeText = (value: string): string =>
-  value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 
 /**
  * Pesquisa por nome sem acentos nem maiúsculas; todas as palavras têm de aparecer
@@ -223,20 +227,6 @@ export const formatMinutes = (minutes: number): string => {
   const h = Math.floor(safe / 60);
   const m = safe % 60;
   return `${h}h${String(m).padStart(2, '0')}`;
-};
-
-const normalizeText = (value: string): string =>
-  value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
-
-/**
- * Pesquisa por nome sem acentos nem maiúsculas; todas as palavras têm de aparecer
- * ("joao bahia" encontra "João Victor Da Silva Bahia"). Pesquisa vazia aceita tudo.
- */
-export const matchesNameSearch = (name: string | null | undefined, query: string): boolean => {
-  const words = normalizeText(query).split(/\s+/).filter(Boolean);
-  if (words.length === 0) return true;
-  const target = normalizeText(name ?? '');
-  return words.every(word => target.includes(word));
 };
 
 /** Distância legível: "45 m" ou "2,3 km". */

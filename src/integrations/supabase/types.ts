@@ -1141,6 +1141,46 @@ export type Database = {
           },
         ];
       };
+      notification_emails_timeclock: {
+        Row: {
+          created_at: string;
+
+          created_by: string | null;
+
+          email: string;
+
+          id: string;
+
+          is_active: boolean;
+        };
+
+        Insert: {
+          created_at?: string;
+
+          created_by?: string | null;
+
+          email: string;
+
+          id?: string;
+
+          is_active?: boolean;
+        };
+
+        Update: {
+          created_at?: string;
+
+          created_by?: string | null;
+
+          email?: string;
+
+          id?: string;
+
+          is_active?: boolean;
+        };
+
+        Relationships: [];
+      };
+
       notifications: {
         Row: {
           company_id: string | null;
@@ -1629,6 +1669,76 @@ export type Database = {
           },
         ];
       };
+      time_clock_config_history: {
+        Row: {
+          action: string;
+
+          changed_at: string;
+
+          changed_by: string | null;
+
+          changed_by_name: string | null;
+
+          changed_fields: string[];
+
+          id: string;
+
+          new_data: Json | null;
+
+          old_data: Json | null;
+
+          record_id: string;
+
+          table_name: string;
+        };
+
+        Insert: {
+          action: string;
+
+          changed_at?: string;
+
+          changed_by?: string | null;
+
+          changed_by_name?: string | null;
+
+          changed_fields?: string[];
+
+          id?: string;
+
+          new_data?: Json | null;
+
+          old_data?: Json | null;
+
+          record_id: string;
+
+          table_name: string;
+        };
+
+        Update: {
+          action?: string;
+
+          changed_at?: string;
+
+          changed_by?: string | null;
+
+          changed_by_name?: string | null;
+
+          changed_fields?: string[];
+
+          id?: string;
+
+          new_data?: Json | null;
+
+          old_data?: Json | null;
+
+          record_id?: string;
+
+          table_name?: string;
+        };
+
+        Relationships: [];
+      };
+
       time_clock_entries: {
         Row: {
           accuracy_m: number | null;
@@ -1656,6 +1766,8 @@ export type Database = {
           updated_at: string;
           updated_by: string | null;
           user_agent: string | null;
+          work_mode: string;
+          employee_note: string | null;
         };
         Insert: {
           accuracy_m?: number | null;
@@ -1683,6 +1795,8 @@ export type Database = {
           updated_at?: string;
           updated_by?: string | null;
           user_agent?: string | null;
+          work_mode?: string;
+          employee_note?: string | null;
         };
         Update: {
           accuracy_m?: number | null;
@@ -1710,6 +1824,8 @@ export type Database = {
           updated_at?: string;
           updated_by?: string | null;
           user_agent?: string | null;
+          work_mode?: string;
+          employee_note?: string | null;
         };
         Relationships: [
           {
@@ -1981,9 +2097,17 @@ export type Database = {
         };
         Returns: string;
       };
+      time_clock_admin_review: {
+        Args: { _decision: string; _entry_ids: string[]; _reason?: string | null };
+        Returns: number;
+      };
       time_clock_admin_set_status: {
         Args: { _entry_id: string; _reason: string; _status: string };
         Returns: undefined;
+      };
+      time_clock_swap_own_entry: {
+        Args: { _entry_id: string };
+        Returns: string;
       };
       time_clock_admin_update_entry: {
         Args: {

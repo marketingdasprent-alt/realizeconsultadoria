@@ -14,6 +14,7 @@ import {
   ENTRY_STATUS_LABELS,
   ENTRY_TYPE_LABELS,
   FLAG_INFO,
+  formatDistance,
   getFlagLabel,
   type TimeClockEntryWithRelations,
 } from '@/lib/timeclock';
@@ -56,6 +57,11 @@ export const EntryDetailsDialog: React.FC<EntryDetailsDialogProps> = ({ entry, o
         <div>
           <Row label="Estado">{ENTRY_STATUS_LABELS[entry.status] ?? entry.status}</Row>
           <Row label="Origem">{ENTRY_SOURCE_LABELS[entry.source] ?? entry.source}</Row>
+          <Row label="Modo">
+            {entry.work_mode === 'remote'
+              ? 'Trabalho remoto (fora do local)'
+              : 'No local de trabalho'}
+          </Row>
           <Row label="Local">{entry.location?.name}</Row>
           <Row label="Localização">
             {hasCoords ? (
@@ -74,7 +80,7 @@ export const EntryDetailsDialog: React.FC<EntryDetailsDialogProps> = ({ entry, o
             {entry.accuracy_m !== null ? `${Math.round(entry.accuracy_m)} m` : null}
           </Row>
           <Row label="Distância">
-            {entry.distance_m !== null ? `${Math.round(entry.distance_m)} m` : null}
+            {entry.distance_m !== null ? formatDistance(entry.distance_m) : null}
           </Row>
           {/* Cidade/país do IP fica só na BD (regra antifraude >400 km): em rede móvel
               aponta para a central do operador e confundia os utilizadores. */}
@@ -84,6 +90,7 @@ export const EntryDetailsDialog: React.FC<EntryDetailsDialogProps> = ({ entry, o
           </Row>
           <Row label="Dispositivo">{entry.device_id}</Row>
           <Row label="Navegador">{entry.user_agent}</Row>
+          <Row label="Nota do colaborador">{entry.employee_note}</Row>
           <Row label="Notas">{entry.notes}</Row>
           <Row label="Gravado em">{format(new Date(entry.created_at), 'dd/MM/yyyy HH:mm:ss')}</Row>
         </div>

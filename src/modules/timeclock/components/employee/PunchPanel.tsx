@@ -21,13 +21,25 @@ const PHASE_LABELS: Record<string, string> = {
 /**
  * Registo manual na app (só localização). O registo por tag NFC faz-se
  * encostando o telemóvel à tag com a app fechada (abre /ponto/nfc).
+ * O tipo (Entrada/Saída) é decidido no servidor; o botão só o antecipa.
  */
 export const PunchPanel: React.FC<PunchPanelProps> = ({ lastEntry, nextType, onPunched }) => {
-  const { phase, outcome, isBusy, punch } = usePunch();
+  const { phase, outcome, isBusy, punch, requestRemote, swap } = usePunch();
 
   const handlePunch = async () => {
-    const result = await punch('gps', undefined, nextType);
+    const result = await punch('gps');
     if (result?.ok) onPunched();
+  };
+
+  const handleRemote = async (note: string) => {
+    const result = await requestRemote(note);
+    if (result?.ok) onPunched();
+  };
+
+  const handleSwap = async () => {
+    const error = await swap();
+    if (!error) onPunched();
+    return error;
   };
 
   const isIn = lastEntry?.entry_type === 'in' && nextType === 'out';
@@ -61,7 +73,8 @@ export const PunchPanel: React.FC<PunchPanelProps> = ({ lastEntry, nextType, onP
           Registar {ENTRY_TYPE_LABELS[nextType]} manualmente
         </Button>
         <p className="text-xs text-muted-foreground">
-          O registo manual só é aceite dentro do raio do local de trabalho.
+          No local de trabalho o registo é aceite logo. Fora dele pode registar como trabalho
+          remoto, que fica a aguardar aprovação.
         </p>
 
         {isBusy && (
@@ -69,7 +82,14 @@ export const PunchPanel: React.FC<PunchPanelProps> = ({ lastEntry, nextType, onP
             <Loader2 className="h-4 w-4 animate-spin" /> {PHASE_LABELS[phase]}
           </div>
         )}
-        {outcome && !isBusy && <PunchResult outcome={outcome} />}
+        {outcome && !isBusy && (
+          <PunchResult
+            outcome={outcome}
+            isBusy={isBusy}
+            onRequestRemote={handleRemote}
+            onSwap={handleSwap}
+          />
+        )}
       </CardContent>
     </Card>
   );

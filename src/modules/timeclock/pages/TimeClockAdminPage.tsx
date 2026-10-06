@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { Clock } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -9,11 +9,24 @@ import { HistoryTab } from '../components/admin/HistoryTab';
 import { LocationsTab } from '../components/admin/LocationsTab';
 import { ReviewTab } from '../components/admin/ReviewTab';
 import { TimesheetTab } from '../components/admin/TimesheetTab';
+import { useTimeClockReview } from '../hooks/useTimeClockReview';
+
+/** ?tab= em português (usado no link dos emails de aprovação). */
+const TAB_PARAMS: Record<string, string> = {
+  folha: 'timesheet',
+  revisao: 'review',
+  locais: 'locations',
+  historico: 'history',
+};
+const PARAM_BY_TAB = Object.fromEntries(Object.entries(TAB_PARAMS).map(([k, v]) => [v, k]));
 
 const TimeClockAdminPage: React.FC = () => {
   const navigate = useNavigate();
   const { toast } = useToast();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { canView, canExecuteTopic, isLoading } = useAdminPermissions();
+  const allowed = !isLoading && canView('timeclock');
+  const review = useTimeClockReview(allowed);
 
   useEffect(() => {
     if (!isLoading && !canView('timeclock')) {
@@ -26,10 +39,18 @@ const TimeClockAdminPage: React.FC = () => {
     }
   }, [canView, isLoading, navigate, toast]);
 
-  if (isLoading || !canView('timeclock')) return null;
+  if (!allowed) return null;
 
   const canEdit = canExecuteTopic('timeclock', 'edit');
   const canManageLocations = canExecuteTopic('timeclock', 'locations');
+  const tab = TAB_PARAMS[searchParams.get('tab') ?? ''] ?? 'timesheet';
+  const toReview = review.pending.length + review.flagged.length;
+
+  const changeTab = (value: string) => {
+    // Decisões tomadas na folha de ponto também mudam a lista de revisão.
+    if (value === 'review') review.refetch();
+    setSearchParams(value === 'timesheet' ? {} : { tab: PARAM_BY_TAB[value] }, { replace: true });
+  };
 
   return (
     <div className="space-y-6">
@@ -38,14 +59,21 @@ const TimeClockAdminPage: React.FC = () => {
           <Clock className="h-6 w-6 text-gold" /> Controlo de Ponto
         </h1>
         <p className="text-muted-foreground mt-1">
-          Folha de ponto dos colaboradores, registos em revisão, locais e tags NFC.
+          Folha de ponto dos colaboradores, aprovações, locais e tags NFC.
         </p>
       </div>
 
-      <Tabs defaultValue="timesheet">
+      <Tabs value={tab} onValueChange={changeTab}>
         <TabsList className="flex-wrap h-auto">
           <TabsTrigger value="timesheet">Folha de Ponto</TabsTrigger>
-          <TabsTrigger value="review">Revisão</TabsTrigger>
+          <TabsTrigger value="review" className="gap-2">
+            Revisão
+            {toReview > 0 && (
+              <span className="rounded-full bg-destructive px-1.5 text-xs font-semibold text-destructive-foreground">
+                {toReview}
+              </span>
+            )}
+          </TabsTrigger>
           <TabsTrigger value="locations">Locais & Tags</TabsTrigger>
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
@@ -53,7 +81,7 @@ const TimeClockAdminPage: React.FC = () => {
           <TimesheetTab canEdit={canEdit} />
         </TabsContent>
         <TabsContent value="review" className="mt-4">
-          <ReviewTab canEdit={canEdit} />
+          <ReviewTab canEdit={canEdit} review={review} />
         </TabsContent>
         <TabsContent value="locations" className="mt-4">
           <LocationsTab canManage={canManageLocations} />

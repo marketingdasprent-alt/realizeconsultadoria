@@ -21,7 +21,7 @@ const PHASE_LABELS: Record<string, string> = {
 const TimeClockNfcPage: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { phase, outcome, isBusy, punch } = usePunch();
+  const { phase, outcome, isBusy, punch, requestRemote, swap } = usePunch();
   const started = useRef(false);
 
   // Captura a leitura uma única vez e retira-a do URL/histórico do browser,
@@ -57,10 +57,17 @@ const TimeClockNfcPage: React.FC = () => {
                 <p className="text-sm text-muted-foreground">{PHASE_LABELS[phase]}</p>
               </div>
             ) : (
-              outcome && <PunchResult outcome={outcome} />
+              outcome && (
+                <PunchResult
+                  outcome={outcome}
+                  isBusy={isBusy}
+                  onRequestRemote={note => requestRemote(note)}
+                  onSwap={swap}
+                />
+              )
             )}
 
-            {phase === 'error' && payload && (
+            {phase === 'error' && payload && !outcome?.canRequestRemote && (
               <Button variant="outline" className="w-full" onClick={() => punch('nfc', payload)}>
                 <RotateCcw className="h-4 w-4 mr-2" /> Tentar novamente
               </Button>

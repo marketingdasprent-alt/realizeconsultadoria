@@ -10,6 +10,7 @@ import { ROUTES } from '@/lib/constants';
 import { parseTagUrl } from '@/lib/nfc';
 import { usePunch } from '../hooks/usePunch';
 import { EmployeeTimeClockHeader } from '../components/employee/EmployeeTimeClockHeader';
+import { NfcBrowserHint } from '../components/employee/NfcBrowserHint';
 import { PunchResult } from '../components/employee/PunchResult';
 
 const PHASE_LABELS: Record<string, string> = {
@@ -71,6 +72,9 @@ const TimeClockNfcPage: React.FC = () => {
               <Button variant="outline" className="w-full" onClick={() => punch('nfc', payload)}>
                 <RotateCcw className="h-4 w-4 mr-2" /> Tentar novamente
               </Button>
+            )}
+            {payload && !isBusy && phase !== 'idle' && (
+              <NfcBrowserHint isRegistered={phase === 'success'} />
             )}
             <Button
               variant="gold"

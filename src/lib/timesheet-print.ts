@@ -230,7 +230,8 @@ export const generateTimesheetPrintHtml = (opts: TimesheetPrintOptions): string 
 </head>
 <body>
   <div class="toolbar">
-    <button class="primary" onclick="window.print()">🖨 Imprimir</button>
+    <button class="primary" id="save-pdf">⬇ Guardar PDF</button>
+    <button class="secondary" onclick="window.print()">🖨 Imprimir</button>
     <button class="secondary" onclick="window.close()">Fechar</button>
     <span class="gen">${opts.sheets.length} colaborador(es) · gerado em ${generatedOn}</span>
   </div>

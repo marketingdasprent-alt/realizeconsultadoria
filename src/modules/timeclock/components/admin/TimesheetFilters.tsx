@@ -1,6 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { Loader2, Plus, Printer } from 'lucide-react';
+import { Download, FileText, Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import type { TimesheetFilters as Filters } from '../../hooks/useTimesheet';
+import type { ReportAction } from '../../hooks/useTimesheetPrint';
 import { NameSearchInput } from './NameSearchInput';
 
 interface Option {
@@ -27,10 +28,10 @@ interface TimesheetFiltersProps {
   canEdit: boolean;
   search: string;
   onSearchChange: (value: string) => void;
-  isPrinting: boolean;
+  busyAction: ReportAction | null;
   onChange: (filters: Filters) => void;
   onCreate: () => void;
-  onPrint: () => void;
+  onReport: (action: ReportAction) => void;
 }
 
 const ALL = '__all__';
@@ -42,10 +43,10 @@ export const TimesheetFilters: React.FC<TimesheetFiltersProps> = ({
   canEdit,
   search,
   onSearchChange,
-  isPrinting,
+  busyAction,
   onChange,
   onCreate,
-  onPrint,
+  onReport,
 }) => (
   <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
     <NameSearchInput id="ts-search" value={search} onChange={onSearchChange} className="lg:w-64" />
@@ -111,13 +112,21 @@ export const TimesheetFilters: React.FC<TimesheetFiltersProps> = ({
       <Label htmlFor="ts-flagged">Só com alertas</Label>
     </div>
     <div className="flex gap-2 lg:ml-auto">
-      <Button variant="outline" onClick={onPrint} disabled={isPrinting}>
-        {isPrinting ? (
+      <Button variant="outline" onClick={() => onReport('view')} disabled={!!busyAction}>
+        {busyAction === 'view' ? (
           <Loader2 className="h-4 w-4 mr-2 animate-spin" />
         ) : (
-          <Printer className="h-4 w-4 mr-2" />
+          <FileText className="h-4 w-4 mr-2" />
         )}
-        Imprimir folhas
+        Ver relatório
+      </Button>
+      <Button variant="outline" onClick={() => onReport('pdf')} disabled={!!busyAction}>
+        {busyAction === 'pdf' ? (
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        ) : (
+          <Download className="h-4 w-4 mr-2" />
+        )}
+        Descarregar PDF
       </Button>
       {canEdit && (
         <Button onClick={onCreate}>

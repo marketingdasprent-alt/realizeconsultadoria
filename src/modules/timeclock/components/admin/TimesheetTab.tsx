@@ -5,7 +5,7 @@ import { matchesNameSearch } from '@/lib/timeclock';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useTimesheet, type TimesheetFilters as Filters } from '../../hooks/useTimesheet';
-import { useTimesheetPrint } from '../../hooks/useTimesheetPrint';
+import { useTimesheetPrint, type ReportAction } from '../../hooks/useTimesheetPrint';
 import { EmployeeTimesheetCard } from './EmployeeTimesheetCard';
 import { EntryDialogs, type EntryDialogState } from './EntryDialogs';
 import { TimesheetFilters } from './TimesheetFilters';
@@ -26,7 +26,7 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
   const { companies } = useCompanies();
   const { employees } = useEmployees();
   const { sheets, entries, isLoading, error, refetch } = useTimesheet(filters);
-  const { print, isPrinting } = useTimesheetPrint();
+  const { view, downloadPdf, busyAction } = useTimesheetPrint();
   const visibleSheets = useMemo(
     () => sheets.filter(sheet => matchesNameSearch(sheet.employeeName, search)),
     [sheets, search]
@@ -41,16 +41,17 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
     [employees, filters.companyId]
   );
 
-  // Uma folha por colaborador dos filtros (ativos, ou inativos com registos no mês).
-  const handlePrint = () => {
-    const withEntries = new Set(entries.map(e => e.employee_id));
+  // Uma folha por colaborador ativo que cumpra os filtros (inativos nunca entram).
+  const handleReport = (action: ReportAction) => {
     const toPrint = employees
-      .filter(e => e.is_active || withEntries.has(e.id))
+      .filter(e => e.is_active)
       .filter(e => !filters.companyId || e.company_id === filters.companyId)
       .filter(e => !filters.employeeId || e.id === filters.employeeId)
       .filter(e => matchesNameSearch(e.name, search))
       .sort((a, b) => a.name.localeCompare(b.name, 'pt'));
-    print({ month: filters.month, employees: toPrint, entries, companies });
+    const params = { month: filters.month, employees: toPrint, entries, companies };
+    if (action === 'pdf') downloadPdf(params);
+    else view(params);
   };
 
   return (
@@ -62,10 +63,10 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
         canEdit={canEdit}
         search={search}
         onSearchChange={setSearch}
-        isPrinting={isPrinting}
+        busyAction={busyAction}
         onChange={setFilters}
         onCreate={() => setDialog({ mode: 'create', entry: null })}
-        onPrint={handlePrint}
+        onReport={handleReport}
       />
 
       {error && <p className="text-sm text-destructive">{error}</p>}

@@ -1,11 +1,13 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { matchesNameSearch } from '@/lib/timeclock';
 import { useCurrentEmployee } from '../../hooks/useCurrentEmployee';
 import type { UseTimeClockReviewResult } from '../../hooks/useTimeClockReview';
 import { ApprovalEmailsCard } from './ApprovalEmailsCard';
 import { AttemptsTable } from './AttemptsTable';
 import { EntryDialogs, type EntryDialogState } from './EntryDialogs';
+import { NameSearchInput } from './NameSearchInput';
 import { ReviewEntriesCard } from './ReviewEntriesCard';
 
 interface ReviewTabProps {
@@ -17,6 +19,15 @@ export const ReviewTab: React.FC<ReviewTabProps> = ({ canEdit, review }) => {
   const { pending, flagged, attempts, isLoading, error, refetch } = review;
   const { employee } = useCurrentEmployee();
   const [dialog, setDialog] = useState<EntryDialogState | null>(null);
+  const [search, setSearch] = useState('');
+  const filtered = useMemo(
+    () => ({
+      pending: pending.filter(e => matchesNameSearch(e.employee?.name, search)),
+      flagged: flagged.filter(e => matchesNameSearch(e.employee?.name, search)),
+      attempts: attempts.filter(a => matchesNameSearch(a.employee?.name, search)),
+    }),
+    [pending, flagged, attempts, search]
+  );
   const openDialog = (mode: EntryDialogState['mode'], entry: EntryDialogState['entry']) =>
     setDialog({ mode, entry });
 
@@ -31,13 +42,14 @@ export const ReviewTab: React.FC<ReviewTabProps> = ({ canEdit, review }) => {
   return (
     <div className="space-y-6">
       {error && <p className="text-sm text-destructive">{error}</p>}
+      <NameSearchInput id="review-search" value={search} onChange={setSearch} className="sm:w-72" />
 
       <ReviewEntriesCard
         title="A aguardar aprovação"
         description="Registos feitos fora do local de trabalho (teletrabalho, cliente, deslocação). Contam provisoriamente; se forem rejeitados deixam de contar."
         emptyMessage="Nenhum registo remoto por aprovar."
         approveLabel="Aprovar"
-        entries={pending}
+        entries={filtered.pending}
         canEdit={canEdit}
         ownEmployeeId={employee?.id ?? null}
         onAction={openDialog}
@@ -49,7 +61,7 @@ export const ReviewTab: React.FC<ReviewTabProps> = ({ canEdit, review }) => {
         description="Aceites, mas com sinais suspeitos (VPN, IP longe do local, GPS com precisão irreal, coordenadas repetidas, dispositivo partilhado...). Confirme ou rejeite."
         emptyMessage="Nada para rever."
         approveLabel="Confirmar"
-        entries={flagged}
+        entries={filtered.flagged}
         canEdit={canEdit}
         ownEmployeeId={employee?.id ?? null}
         onAction={openDialog}
@@ -67,7 +79,7 @@ export const ReviewTab: React.FC<ReviewTabProps> = ({ canEdit, review }) => {
           </p>
         </CardHeader>
         <CardContent>
-          <AttemptsTable attempts={attempts} />
+          <AttemptsTable attempts={filtered.attempts} />
         </CardContent>
       </Card>
 

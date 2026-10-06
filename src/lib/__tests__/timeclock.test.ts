@@ -8,6 +8,7 @@ import {
   formatMinutes,
   getErrorMessage,
   getNextEntryType,
+  matchesNameSearch,
   summarizeDays,
   type TimeClockEntry,
 } from '../timeclock';
@@ -124,6 +125,16 @@ describe('helpers', () => {
   it('formats minutes as hours', () => {
     expect(formatMinutes(0)).toBe('0h00');
     expect(formatMinutes(485)).toBe('8h05');
+  });
+
+  it('searches names ignoring accents, case and word order', () => {
+    const name = 'João Victor Da Silva Bahia';
+    expect(matchesNameSearch(name, '')).toBe(true);
+    expect(matchesNameSearch(name, 'joao')).toBe(true);
+    expect(matchesNameSearch(name, 'BAHIA joão')).toBe(true);
+    expect(matchesNameSearch(name, 'silv')).toBe(true);
+    expect(matchesNameSearch(name, 'joao sousa')).toBe(false);
+    expect(matchesNameSearch(null, 'joao')).toBe(false);
   });
 
   it('formats distances in m or km', () => {

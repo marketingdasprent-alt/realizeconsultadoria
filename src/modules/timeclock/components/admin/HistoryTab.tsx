@@ -9,11 +9,13 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { matchesNameSearch } from '@/lib/timeclock';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useTimeClockConfigHistory } from '../../hooks/useTimeClockConfigHistory';
 import { useTimeClockHistory } from '../../hooks/useTimeClockHistory';
 import { ConfigHistoryList } from './ConfigHistoryList';
 import { HistoryChangeList } from './HistoryChangeList';
+import { NameSearchInput } from './NameSearchInput';
 
 const PERIODS = [7, 30, 90];
 
@@ -21,6 +23,7 @@ export const HistoryTab: React.FC = () => {
   const [days, setDays] = useState(30);
   const [onlyManual, setOnlyManual] = useState(true);
   const [scope, setScope] = useState<'entries' | 'config'>('entries');
+  const [search, setSearch] = useState('');
   const entriesHistory = useTimeClockHistory(days);
   const configHistory = useTimeClockConfigHistory(days, scope === 'config');
   const { items } = entriesHistory;
@@ -35,14 +38,13 @@ export const HistoryTab: React.FC = () => {
   // Por defeito esconde os registos criados pelo próprio colaborador (picagens normais).
   const visible = useMemo(
     () =>
-      onlyManual
-        ? items.filter(item => {
-            if (item.action !== 'create') return true;
-            const source = (item.new_data as Record<string, unknown> | null)?.source;
-            return source === 'admin';
-          })
-        : items,
-    [items, onlyManual]
+      items.filter(item => {
+        if (!matchesNameSearch(employeeNames[item.employee_id], search)) return false;
+        if (!onlyManual || item.action !== 'create') return true;
+        const source = (item.new_data as Record<string, unknown> | null)?.source;
+        return source === 'admin';
+      }),
+    [items, onlyManual, search, employeeNames]
   );
 
   return (
@@ -75,6 +77,14 @@ export const HistoryTab: React.FC = () => {
             </SelectContent>
           </Select>
         </div>
+        {scope === 'entries' && (
+          <NameSearchInput
+            id="hist-search"
+            value={search}
+            onChange={setSearch}
+            className="sm:w-64"
+          />
+        )}
         {scope === 'entries' && (
           <div className="flex items-center gap-2 sm:pb-2">
             <Switch id="hist-manual" checked={onlyManual} onCheckedChange={setOnlyManual} />

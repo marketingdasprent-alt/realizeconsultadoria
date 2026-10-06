@@ -13,6 +13,7 @@ import {
 } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import type { TimesheetFilters as Filters } from '../../hooks/useTimesheet';
+import { NameSearchInput } from './NameSearchInput';
 
 interface Option {
   id: string;
@@ -24,6 +25,8 @@ interface TimesheetFiltersProps {
   companies: Option[];
   employees: Option[];
   canEdit: boolean;
+  search: string;
+  onSearchChange: (value: string) => void;
   onChange: (filters: Filters) => void;
   onCreate: () => void;
 }
@@ -35,10 +38,13 @@ export const TimesheetFilters: React.FC<TimesheetFiltersProps> = ({
   companies,
   employees,
   canEdit,
+  search,
+  onSearchChange,
   onChange,
   onCreate,
 }) => (
-  <div className="flex flex-col gap-3 lg:flex-row lg:items-end">
+  <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
+    <NameSearchInput id="ts-search" value={search} onChange={onSearchChange} className="lg:w-64" />
     <div className="space-y-1">
       <Label htmlFor="ts-month">Mês</Label>
       <Input

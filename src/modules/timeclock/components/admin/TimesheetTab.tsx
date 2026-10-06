@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { startOfMonth } from 'date-fns';
 import { Loader2 } from 'lucide-react';
+import { matchesNameSearch } from '@/lib/timeclock';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useTimesheet, type TimesheetFilters as Filters } from '../../hooks/useTimesheet';
@@ -20,9 +21,14 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
     onlyFlagged: false,
   });
   const [dialog, setDialog] = useState<EntryDialogState | null>(null);
+  const [search, setSearch] = useState('');
   const { companies } = useCompanies();
   const { employees } = useEmployees();
   const { sheets, isLoading, error, refetch } = useTimesheet(filters);
+  const visibleSheets = useMemo(
+    () => sheets.filter(sheet => matchesNameSearch(sheet.employeeName, search)),
+    [sheets, search]
+  );
 
   const employeeOptions = useMemo(
     () =>
@@ -40,6 +46,8 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
         companies={companies.map(c => ({ id: c.id, name: c.name }))}
         employees={employeeOptions}
         canEdit={canEdit}
+        search={search}
+        onSearchChange={setSearch}
         onChange={setFilters}
         onCreate={() => setDialog({ mode: 'create', entry: null })}
       />
@@ -50,13 +58,15 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
         <div className="flex justify-center py-10">
           <Loader2 className="h-6 w-6 animate-spin text-primary" />
         </div>
-      ) : sheets.length === 0 ? (
+      ) : visibleSheets.length === 0 ? (
         <p className="text-center text-muted-foreground py-10">
-          Sem registos de ponto para estes filtros.
+          {sheets.length > 0 && search
+            ? `Nenhum colaborador com registos encontrado para "${search.trim()}".`
+            : 'Sem registos de ponto para estes filtros.'}
         </p>
       ) : (
         <div className="space-y-4">
-          {sheets.map(sheet => (
+          {visibleSheets.map(sheet => (
             <EmployeeTimesheetCard
               key={sheet.employeeId}
               sheet={sheet}

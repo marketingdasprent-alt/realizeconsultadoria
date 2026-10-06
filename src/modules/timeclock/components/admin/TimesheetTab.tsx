@@ -5,6 +5,7 @@ import { matchesNameSearch } from '@/lib/timeclock';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useEmployees } from '@/hooks/useEmployees';
 import { useTimesheet, type TimesheetFilters as Filters } from '../../hooks/useTimesheet';
+import { useTimesheetPrint } from '../../hooks/useTimesheetPrint';
 import { EmployeeTimesheetCard } from './EmployeeTimesheetCard';
 import { EntryDialogs, type EntryDialogState } from './EntryDialogs';
 import { TimesheetFilters } from './TimesheetFilters';
@@ -24,7 +25,8 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
   const [search, setSearch] = useState('');
   const { companies } = useCompanies();
   const { employees } = useEmployees();
-  const { sheets, isLoading, error, refetch } = useTimesheet(filters);
+  const { sheets, entries, isLoading, error, refetch } = useTimesheet(filters);
+  const { print, isPrinting } = useTimesheetPrint();
   const visibleSheets = useMemo(
     () => sheets.filter(sheet => matchesNameSearch(sheet.employeeName, search)),
     [sheets, search]
@@ -39,6 +41,18 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
     [employees, filters.companyId]
   );
 
+  // Uma folha por colaborador dos filtros (ativos, ou inativos com registos no mês).
+  const handlePrint = () => {
+    const withEntries = new Set(entries.map(e => e.employee_id));
+    const toPrint = employees
+      .filter(e => e.is_active || withEntries.has(e.id))
+      .filter(e => !filters.companyId || e.company_id === filters.companyId)
+      .filter(e => !filters.employeeId || e.id === filters.employeeId)
+      .filter(e => matchesNameSearch(e.name, search))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt'));
+    print({ month: filters.month, employees: toPrint, entries, companies });
+  };
+
   return (
     <div className="space-y-4">
       <TimesheetFilters
@@ -48,8 +62,10 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
         canEdit={canEdit}
         search={search}
         onSearchChange={setSearch}
+        isPrinting={isPrinting}
         onChange={setFilters}
         onCreate={() => setDialog({ mode: 'create', entry: null })}
+        onPrint={handlePrint}
       />
 
       {error && <p className="text-sm text-destructive">{error}</p>}

@@ -1,6 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { Plus } from 'lucide-react';
+import { Loader2, Plus, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -27,8 +27,10 @@ interface TimesheetFiltersProps {
   canEdit: boolean;
   search: string;
   onSearchChange: (value: string) => void;
+  isPrinting: boolean;
   onChange: (filters: Filters) => void;
   onCreate: () => void;
+  onPrint: () => void;
 }
 
 const ALL = '__all__';
@@ -40,8 +42,10 @@ export const TimesheetFilters: React.FC<TimesheetFiltersProps> = ({
   canEdit,
   search,
   onSearchChange,
+  isPrinting,
   onChange,
   onCreate,
+  onPrint,
 }) => (
   <div className="flex flex-col gap-3 lg:flex-row lg:flex-wrap lg:items-end">
     <NameSearchInput id="ts-search" value={search} onChange={onSearchChange} className="lg:w-64" />
@@ -106,10 +110,20 @@ export const TimesheetFilters: React.FC<TimesheetFiltersProps> = ({
       />
       <Label htmlFor="ts-flagged">Só com alertas</Label>
     </div>
-    {canEdit && (
-      <Button className="lg:ml-auto" onClick={onCreate}>
-        <Plus className="h-4 w-4 mr-2" /> Novo registo
+    <div className="flex gap-2 lg:ml-auto">
+      <Button variant="outline" onClick={onPrint} disabled={isPrinting}>
+        {isPrinting ? (
+          <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+        ) : (
+          <Printer className="h-4 w-4 mr-2" />
+        )}
+        Imprimir folhas
       </Button>
-    )}
+      {canEdit && (
+        <Button onClick={onCreate}>
+          <Plus className="h-4 w-4 mr-2" /> Novo registo
+        </Button>
+      )}
+    </div>
   </div>
 );

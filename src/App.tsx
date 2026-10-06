@@ -106,7 +106,7 @@ const App = () => (
               <Route
                 path="/ponto/nfc"
                 element={
-                  <ProtectedRoute requiredRole="employee" fallbackPath="/colaborador/login">
+                  <ProtectedRoute fallbackPath="/colaborador/login">
                     <TimeClockNfcPage />
                   </ProtectedRoute>
                 }

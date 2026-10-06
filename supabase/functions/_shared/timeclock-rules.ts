@@ -45,10 +45,16 @@ export interface PreviousPunch {
 
 export type PunchMethod = 'nfc' | 'gps';
 
+/** 'office' = dentro de um local (validado); 'remote' = fora, aguarda aprovação. */
+export type PunchMode = 'office' | 'remote';
+
 export interface PunchContext {
   method: PunchMethod;
+  /** Por omissão 'office'. */
+  mode?: PunchMode;
   position: PositionReading;
-  location: LocationRules;
+  /** Local mais próximo / da tag. Em 'remote' pode não existir (empresa sem locais). */
+  location: LocationRules | null;
   ip: string | null;
   ipInfo: IpInfo;
   previous: PreviousPunch | null;
@@ -63,14 +69,26 @@ export type RejectReason =
   | 'stale_position'
   | 'low_accuracy'
   | 'out_of_radius'
+  | 'no_location'
   | 'vpn_blocked';
 
 export interface PunchEvaluation {
   rejected: RejectReason | null;
   distanceM: number;
   flags: string[];
-  status: 'valid' | 'flagged';
+  status: 'valid' | 'flagged' | 'pending';
 }
+
+/**
+ * Recusas que o colaborador pode transformar num registo remoto (home office /
+ * serviço externo), que fica a aguardar aprovação de um admin.
+ */
+export const REMOTE_ELIGIBLE_REASONS = new Set([
+  'out_of_radius',
+  'low_accuracy',
+  'no_location',
+  'manual_not_allowed',
+]);
 
 /** Flags que, presentes, colocam o registo em revisão ('flagged'). */
 export const WARNING_FLAGS = new Set([
@@ -83,6 +101,8 @@ export const WARNING_FLAGS = new Set([
 ]);
 
 export const MAX_POSITION_AGE_MS = 2 * 60 * 1000;
+/** Uma entrada aberta há mais do que isto já não é fechada pela picagem seguinte. */
+export const MAX_OPEN_SHIFT_HOURS = 12;
 export const IP_FAR_THRESHOLD_KM = 400;
 export const IMPOSSIBLE_SPEED_KMH = 250;
 export const DUPLICATE_WINDOW_MS = 60 * 1000;
@@ -153,12 +173,13 @@ export const isValidPosition = (
 export const evaluatePunch = (ctx: PunchContext): PunchEvaluation => {
   const flags: string[] = [];
   const { position, location } = ctx;
+  const mode = ctx.mode ?? 'office';
 
   if (!isValidPosition(position)) {
     return { rejected: 'invalid_position', distanceM: NaN, flags, status: 'valid' };
   }
 
-  const distanceM = haversineMeters(position, location);
+  const distanceM = location ? haversineMeters(position, location) : NaN;
   const reject = (reason: RejectReason): PunchEvaluation => ({
     rejected: reason,
     distanceM,
@@ -167,26 +188,32 @@ export const evaluatePunch = (ctx: PunchContext): PunchEvaluation => {
   });
 
   if (Math.abs(position.ageMs) > MAX_POSITION_AGE_MS) return reject('stale_position');
-  if (position.accuracy > location.maxAccuracyM) return reject('low_accuracy');
 
-  // Com tag NFC a presença física já está provada; tolera-se a incerteza do
-  // GPS (o círculo de precisão tem de tocar no raio). Só GPS: estrito.
-  const tolerance = ctx.method === 'nfc' ? position.accuracy : 0;
-  if (distanceM - tolerance > location.radiusM) return reject('out_of_radius');
+  if (mode === 'office') {
+    if (!location) return reject('no_location');
+    if (position.accuracy > location.maxAccuracyM) return reject('low_accuracy');
+    // Com tag NFC a presença física já está provada; tolera-se a incerteza do
+    // GPS (o círculo de precisão tem de tocar no raio). Só GPS: estrito.
+    const tolerance = ctx.method === 'nfc' ? position.accuracy : 0;
+    if (distanceM - tolerance > location.radiusM) return reject('out_of_radius');
+  } else {
+    flags.push('remote');
+  }
 
-  const trusted = ipMatchesAny(ctx.ip, location.trustedIps);
+  const trusted = !!location && ipMatchesAny(ctx.ip, location.trustedIps);
   if (trusted) flags.push('trusted_network');
 
   if (!trusted && ctx.ipInfo.checked) {
     if (ctx.ipInfo.isProxy) {
-      if (location.blockVpn) return reject('vpn_blocked');
+      if (location?.blockVpn) return reject('vpn_blocked');
       flags.push('vpn_or_proxy');
     }
+    // IP muito longe da posição GPS indicada (no escritório ou em casa).
     if (Number.isFinite(ctx.ipInfo.lat) && Number.isFinite(ctx.ipInfo.lng)) {
       const ipKm =
         haversineMeters(
           { lat: ctx.ipInfo.lat as number, lng: ctx.ipInfo.lng as number },
-          location
+          position
         ) / 1000;
       if (ipKm > IP_FAR_THRESHOLD_KM) flags.push('ip_far_from_location');
     }
@@ -209,16 +236,26 @@ export const evaluatePunch = (ctx: PunchContext): PunchEvaluation => {
   if (ctx.deviceUsedByOthers) flags.push('shared_device');
   if (ctx.method === 'gps') flags.push('gps_only');
 
-  const status = flags.some(f => WARNING_FLAGS.has(f)) ? 'flagged' : 'valid';
+  const status =
+    mode === 'remote' ? 'pending' : flags.some(f => WARNING_FLAGS.has(f)) ? 'flagged' : 'valid';
   return { rejected: null, distanceM, flags, status };
 };
 
-/** Próximo tipo de registo: 'out' se o último foi 'in' há menos de 16h. */
+/**
+ * Próximo tipo esperado: 'out' se o último foi 'in' há menos de 12 h.
+ * Só para mostrar ao colaborador — quem decide é a BD (time_clock_register_punch).
+ */
 export const nextEntryType = (
   last: { entry_type: string; punchedAtMs: number } | null,
   nowMs: number
 ): 'in' | 'out' => {
-  if (last && last.entry_type === 'in' && nowMs - last.punchedAtMs < 16 * 3_600_000) return 'out';
+  if (
+    last &&
+    last.entry_type === 'in' &&
+    nowMs - last.punchedAtMs < MAX_OPEN_SHIFT_HOURS * 3_600_000
+  ) {
+    return 'out';
+  }
   return 'in';
 };
 

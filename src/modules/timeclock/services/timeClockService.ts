@@ -6,6 +6,7 @@ import type {
   EntryType,
   PunchMethod,
   TimeClockAttempt,
+  TimeClockConfigHistory,
   TimeClockEntryWithRelations,
   TimeClockHistory,
 } from '@/lib/timeclock';
@@ -15,7 +16,10 @@ export interface PunchRequest {
   tag?: TagPayload;
   position: PositionPayload;
   device_id: string | null;
-  entry_type?: EntryType;
+  /** Confirma que é trabalho remoto (fica a aguardar aprovação). */
+  remote?: boolean;
+  /** Nota opcional do colaborador para o registo remoto. */
+  note?: string;
 }
 
 export interface PunchResponse {
@@ -28,8 +32,14 @@ export interface PunchResponse {
     status: string;
     flags: string[];
     distance_m: number | null;
-    location_name: string;
+    location_name: string | null;
+    work_mode: string;
+    created_at: string;
   };
+  /** Recusado por estar fora do local: pode repetir com remote: true. */
+  can_request_remote?: boolean;
+  distance_m?: number | null;
+  location_name?: string | null;
 }
 
 export interface EntryFilters {
@@ -211,5 +221,38 @@ export const timeClockService = {
       _reason: reason,
     });
     return { success: !error, error };
+  },
+
+  /**
+   * Aprova (→ válido) ou rejeita (→ anulado) vários registos pendentes/sinalizados.
+   */
+  review: async (entryIds: string[], decision: 'approve' | 'reject', reason?: string | null) => {
+    const { data, error } = await supabase.rpc('time_clock_admin_review', {
+      _entry_ids: entryIds,
+      _decision: decision,
+      _reason: reason ?? null,
+    });
+    return { count: (data as number | null) ?? 0, error };
+  },
+
+  /**
+   * O colaborador troca Entrada↔Saída do último registo (até 3 minutos depois).
+   */
+  swapOwnEntry: async (entryId: string) => {
+    const { data, error } = await supabase.rpc('time_clock_swap_own_entry', { _entry_id: entryId });
+    return { data: (data as EntryType | null) ?? null, error };
+  },
+
+  /**
+   * Alterações a locais e tags (raio, IPs, ativar/desativar, novas tags...).
+   */
+  getConfigHistory: async (fromIso: string) => {
+    const { data, error } = await supabase
+      .from('time_clock_config_history')
+      .select('*')
+      .gte('changed_at', fromIso)
+      .order('changed_at', { ascending: false })
+      .limit(200);
+    return { data: (data ?? []) as TimeClockConfigHistory[], error };
   },
 };

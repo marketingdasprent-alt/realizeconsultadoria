@@ -1,6 +1,7 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest';
 import {
+  REMOTE_ELIGIBLE_REASONS,
   evaluatePunch,
   haversineMeters,
   ipMatchesAny,
@@ -135,13 +136,62 @@ describe('evaluatePunch', () => {
   });
 });
 
+describe('evaluatePunch — trabalho remoto', () => {
+  const HOME = { lat: 38.7569, lng: -9.2549 }; // ~11 km do escritório
+
+  it('rejects outside the office with a reason that allows asking for remote', () => {
+    const office = evaluatePunch(baseContext({ position: { ...HOME, accuracy: 15, ageMs: 0 } }));
+    expect(office.rejected).toBe('out_of_radius');
+    expect(REMOTE_ELIGIBLE_REASONS.has(office.rejected!)).toBe(true);
+    expect(office.distanceM).toBeGreaterThan(10_000);
+  });
+
+  it('accepts a confirmed remote punch as pending, with the remote flag', () => {
+    const remote = evaluatePunch(
+      baseContext({ mode: 'remote', position: { ...HOME, accuracy: 15, ageMs: 0 } })
+    );
+    expect(remote.rejected).toBeNull();
+    expect(remote.status).toBe('pending');
+    expect(remote.flags).toContain('remote');
+  });
+
+  it('allows remote punches with poor GPS or no configured location', () => {
+    const poor = evaluatePunch(
+      baseContext({ mode: 'remote', position: { ...HOME, accuracy: 500, ageMs: 0 } })
+    );
+    expect(poor.status).toBe('pending');
+
+    expect(evaluatePunch(baseContext({ location: null })).rejected).toBe('no_location');
+    expect(evaluatePunch(baseContext({ mode: 'remote', location: null })).status).toBe('pending');
+  });
+
+  it('still blocks VPN and stale positions in remote mode', () => {
+    const location = { ...baseContext().location!, blockVpn: true };
+    const ipInfo = { checked: true, isProxy: true };
+    expect(evaluatePunch(baseContext({ mode: 'remote', location, ipInfo })).rejected).toBe(
+      'vpn_blocked'
+    );
+    expect(
+      evaluatePunch(
+        baseContext({ mode: 'remote', position: { ...HOME, accuracy: 10, ageMs: 5 * 60_000 } })
+      ).rejected
+    ).toBe('stale_position');
+  });
+
+  it('does not offer remote for tag or VPN problems', () => {
+    for (const reason of ['invalid_tag', 'replayed_tag', 'vpn_blocked', 'stale_position']) {
+      expect(REMOTE_ELIGIBLE_REASONS.has(reason)).toBe(false);
+    }
+  });
+});
+
 describe('nextEntryType', () => {
   const now = Date.UTC(2026, 8, 23, 18, 0);
-  it('alternates in → out within a shift and restarts after 16h', () => {
+  it('alternates in → out within a shift and restarts after 12h', () => {
     expect(nextEntryType(null, now)).toBe('in');
     expect(nextEntryType({ entry_type: 'in', punchedAtMs: now - 8 * 3_600_000 }, now)).toBe('out');
     expect(nextEntryType({ entry_type: 'out', punchedAtMs: now - 3_600_000 }, now)).toBe('in');
-    expect(nextEntryType({ entry_type: 'in', punchedAtMs: now - 20 * 3_600_000 }, now)).toBe('in');
+    expect(nextEntryType({ entry_type: 'in', punchedAtMs: now - 13 * 3_600_000 }, now)).toBe('in');
   });
 });
 

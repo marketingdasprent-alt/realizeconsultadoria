@@ -1,20 +1,35 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Loader2 } from 'lucide-react';
-import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { FLAG_INFO, getFlagLabel } from '@/lib/timeclock';
-import { useTimeClockReview } from '../../hooks/useTimeClockReview';
+import { matchesNameSearch } from '@/lib/timeclock';
+import { useCurrentEmployee } from '../../hooks/useCurrentEmployee';
+import type { UseTimeClockReviewResult } from '../../hooks/useTimeClockReview';
+import { ApprovalEmailsCard } from './ApprovalEmailsCard';
 import { AttemptsTable } from './AttemptsTable';
-import { EntryChip } from './EntryChip';
 import { EntryDialogs, type EntryDialogState } from './EntryDialogs';
+import { NameSearchInput } from './NameSearchInput';
+import { ReviewEntriesCard } from './ReviewEntriesCard';
 
 interface ReviewTabProps {
   canEdit: boolean;
+  review: UseTimeClockReviewResult;
 }
 
-export const ReviewTab: React.FC<ReviewTabProps> = ({ canEdit }) => {
-  const { flagged, attempts, isLoading, error, refetch } = useTimeClockReview();
+export const ReviewTab: React.FC<ReviewTabProps> = ({ canEdit, review }) => {
+  const { pending, flagged, attempts, isLoading, error, refetch } = review;
+  const { employee } = useCurrentEmployee();
   const [dialog, setDialog] = useState<EntryDialogState | null>(null);
+  const [search, setSearch] = useState('');
+  const filtered = useMemo(
+    () => ({
+      pending: pending.filter(e => matchesNameSearch(e.employee?.name, search)),
+      flagged: flagged.filter(e => matchesNameSearch(e.employee?.name, search)),
+      attempts: attempts.filter(a => matchesNameSearch(a.employee?.name, search)),
+    }),
+    [pending, flagged, attempts, search]
+  );
+  const openDialog = (mode: EntryDialogState['mode'], entry: EntryDialogState['entry']) =>
+    setDialog({ mode, entry });
 
   if (isLoading) {
     return (
@@ -27,44 +42,33 @@ export const ReviewTab: React.FC<ReviewTabProps> = ({ canEdit }) => {
   return (
     <div className="space-y-6">
       {error && <p className="text-sm text-destructive">{error}</p>}
+      <NameSearchInput id="review-search" value={search} onChange={setSearch} className="sm:w-72" />
 
-      <Card className="shadow-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="text-lg">Registos em revisão ({flagged.length})</CardTitle>
-          <p className="text-sm text-muted-foreground">
-            Aceites, mas com sinais suspeitos (VPN, IP longe do local, GPS com precisão irreal,
-            coordenadas repetidas, dispositivo partilhado...). Confirme ou anule.
-          </p>
-        </CardHeader>
-        <CardContent className="space-y-2">
-          {flagged.length === 0 && (
-            <p className="text-sm text-muted-foreground text-center py-6">Nada para rever.</p>
-          )}
-          {flagged.map(entry => (
-            <div
-              key={entry.id}
-              className="flex flex-col gap-2 rounded-lg border border-border p-3 sm:flex-row sm:items-center"
-            >
-              <span className="font-medium sm:w-48">{entry.employee?.name}</span>
-              <EntryChip
-                entry={entry}
-                canEdit={canEdit}
-                showDate
-                onAction={(mode, e) => setDialog({ mode, entry: e })}
-              />
-              <div className="flex flex-wrap gap-1 sm:ml-auto">
-                {entry.flags
-                  .filter(flag => FLAG_INFO[flag]?.warning)
-                  .map(flag => (
-                    <Badge key={flag} variant="destructive" className="text-xs">
-                      {getFlagLabel(flag)}
-                    </Badge>
-                  ))}
-              </div>
-            </div>
-          ))}
-        </CardContent>
-      </Card>
+      <ReviewEntriesCard
+        title="A aguardar aprovação"
+        description="Registos feitos fora do local de trabalho (teletrabalho, cliente, deslocação). Contam provisoriamente; se forem rejeitados deixam de contar."
+        emptyMessage="Nenhum registo remoto por aprovar."
+        approveLabel="Aprovar"
+        entries={filtered.pending}
+        canEdit={canEdit}
+        ownEmployeeId={employee?.id ?? null}
+        onAction={openDialog}
+        onChanged={refetch}
+      />
+
+      <ReviewEntriesCard
+        title="Registos com alertas"
+        description="Aceites, mas com sinais suspeitos (VPN, IP longe do local, GPS com precisão irreal, coordenadas repetidas, dispositivo partilhado...). Confirme ou rejeite."
+        emptyMessage="Nada para rever."
+        approveLabel="Confirmar"
+        entries={filtered.flagged}
+        canEdit={canEdit}
+        ownEmployeeId={employee?.id ?? null}
+        onAction={openDialog}
+        onChanged={refetch}
+      />
+
+      <ApprovalEmailsCard canEdit={canEdit} />
 
       <Card className="shadow-card">
         <CardHeader className="pb-3">
@@ -75,7 +79,7 @@ export const ReviewTab: React.FC<ReviewTabProps> = ({ canEdit }) => {
           </p>
         </CardHeader>
         <CardContent>
-          <AttemptsTable attempts={attempts} />
+          <AttemptsTable attempts={filtered.attempts} />
         </CardContent>
       </Card>
 

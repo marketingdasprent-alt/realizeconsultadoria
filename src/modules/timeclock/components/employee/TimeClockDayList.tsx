@@ -1,6 +1,7 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { House } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { ENTRY_TYPE_LABELS, formatMinutes, type DaySummary } from '@/lib/timeclock';
 
@@ -35,14 +36,27 @@ export const TimeClockDayList: React.FC<TimeClockDayListProps> = ({ days, emptyM
                 <Badge
                   key={entry.id}
                   variant={entry.entry_type === 'in' ? 'default' : 'secondary'}
-                  className={entry.status === 'voided' ? 'line-through opacity-60' : ''}
+                  className={`gap-1 ${entry.status === 'voided' ? 'line-through opacity-60' : ''} ${
+                    entry.status === 'pending'
+                      ? 'border-dashed border-sky-500 bg-sky-100 text-sky-900'
+                      : ''
+                  }`}
+                  title={
+                    entry.status === 'pending' ? 'Trabalho remoto a aguardar aprovação' : undefined
+                  }
                 >
+                  {entry.work_mode === 'remote' && <House className="h-3 w-3" />}
                   {ENTRY_TYPE_LABELS[entry.entry_type]}{' '}
                   {format(new Date(entry.punched_at), 'HH:mm')}
                   {entry.status === 'flagged' && ' ⚠'}
                 </Badge>
               ))}
           </div>
+          {day.hasPending && (
+            <p className="text-xs text-sky-700 mt-2">
+              Tem registos de trabalho remoto a aguardar aprovação dos RH.
+            </p>
+          )}
           {day.incomplete && (
             <p className="text-xs text-amber-600 mt-2">
               Dia com registo incompleto — fale com os RH se se esqueceu de picar.

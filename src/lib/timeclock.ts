@@ -10,6 +10,8 @@ export type TimeClockLocationInsert = Tables['time_clock_locations']['Insert'];
 export type TimeClockTag = Omit<Tables['time_clock_tags']['Row'], 'token_hash' | 'last_counter'>;
 export type TimeClockHistory = Tables['time_clock_entry_history']['Row'];
 export type TimeClockAttempt = Tables['time_clock_attempts']['Row'];
+export type TimeClockConfigHistory = Tables['time_clock_config_history']['Row'];
+export type NotificationEmail = Tables['notification_emails_timeclock']['Row'];
 
 export type EntryType = 'in' | 'out';
 export type PunchMethod = 'nfc' | 'gps';
@@ -31,6 +33,7 @@ export const ENTRY_SOURCE_LABELS: Record<string, string> = {
 export const ENTRY_STATUS_LABELS: Record<string, string> = {
   valid: 'Válido',
   flagged: 'Em revisão',
+  pending: 'Aguarda aprovação',
   voided: 'Anulado',
 };
 
@@ -40,6 +43,8 @@ export const HISTORY_ACTION_LABELS: Record<string, string> = {
   void: 'Anulado',
   restore: 'Restaurado',
   review: 'Revisto',
+  approve: 'Aprovado',
+  reject: 'Rejeitado',
   delete: 'Eliminado',
 };
 
@@ -55,6 +60,7 @@ export const FLAG_INFO: Record<string, { label: string; warning: boolean }> = {
   trusted_network: { label: 'Rede do local', warning: false },
   gps_only: { label: 'Sem tag (só GPS)', warning: false },
   ip_check_unavailable: { label: 'IP não verificado', warning: false },
+  remote: { label: 'Trabalho remoto', warning: false },
 };
 
 export const getFlagLabel = (flag: string): string => FLAG_INFO[flag]?.label ?? flag;
@@ -62,14 +68,15 @@ export const getFlagLabel = (flag: string): string => FLAG_INFO[flag]?.label ?? 
 /** Mensagens para os códigos devolvidos pela edge function `clock-punch`. */
 export const PUNCH_MESSAGES: Record<string, string> = {
   registered: 'Ponto registado com sucesso.',
+  pending_approval: 'Registado como trabalho remoto. Fica a aguardar aprovação dos RH.',
   duplicate: 'Este ponto já tinha sido registado há instantes.',
   missing_position:
     'Não foi possível obter a sua localização. Ative o GPS e permita o acesso à localização.',
   invalid_position: 'Localização inválida. Tente novamente.',
   stale_position: 'A localização obtida está desatualizada. Tente novamente.',
   low_accuracy:
-    'Sinal GPS fraco. Ative a localização de alta precisão ou aproxime-se de uma janela e tente de novo.',
-  out_of_radius: 'Está fora da área permitida para registar o ponto.',
+    'Sinal GPS fraco. No iPhone confirme que a "Localização exata" está ligada (Definições → Privacidade → Localização); aproxime-se de uma janela e tente de novo.',
+  out_of_radius: 'Está fora do local de trabalho.',
   vpn_blocked: 'Desative a VPN / proxy para registar o ponto.',
   invalid_tag: 'Tag NFC inválida ou desativada.',
   replayed_tag: 'Esta leitura da tag já foi usada. Encoste novamente o telemóvel à tag.',
@@ -112,7 +119,7 @@ export const getErrorMessage = (error: unknown, fallback: string): string => {
 };
 
 /** Turno máximo considerado para emparelhar entrada → saída. */
-export const MAX_SHIFT_MS = 16 * 60 * 60 * 1000;
+export const MAX_SHIFT_MS = 12 * 60 * 60 * 1000;
 
 export interface DaySummary {
   date: string; // yyyy-MM-dd (hora local)
@@ -123,6 +130,8 @@ export interface DaySummary {
   /** Entrada sem saída (ou saída sem entrada) — a rever. */
   incomplete: boolean;
   hasFlags: boolean;
+  /** Tem registos remotos a aguardar aprovação (contam provisoriamente). */
+  hasPending: boolean;
 }
 
 const dateKey = (iso: string) => format(new Date(iso), 'yyyy-MM-dd');
@@ -147,6 +156,7 @@ export const summarizeDays = <T extends TimeClockEntry>(
         openSince: null,
         incomplete: false,
         hasFlags: false,
+        hasPending: false,
       };
       days.set(key, day);
     }
@@ -162,6 +172,7 @@ export const summarizeDays = <T extends TimeClockEntry>(
     const day = getDay(dateKey(entry.punched_at));
     day.entries.push(entry);
     if (entry.status === 'flagged') day.hasFlags = true;
+    if (entry.status === 'pending') day.hasPending = true;
     if (entry.status === 'voided') continue;
 
     if (entry.entry_type === 'in') {
@@ -194,7 +205,11 @@ export const summarizeDays = <T extends TimeClockEntry>(
 };
 
 const normalizeText = (value: string): string =>
-  value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .trim();
 
 /**
  * Pesquisa por nome sem acentos nem maiúsculas; todas as palavras têm de aparecer
@@ -213,6 +228,13 @@ export const formatMinutes = (minutes: number): string => {
   const m = safe % 60;
   return `${h}h${String(m).padStart(2, '0')}`;
 };
+
+/** Distância legível: "45 m" ou "2,3 km". */
+export const formatDistance = (meters: number): string =>
+  meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1).replace('.', ',')} km`;
+
+/** Janela em que o colaborador pode trocar Entrada↔Saída (o servidor aceita até 3 min). */
+export const SWAP_WINDOW_MS = 170 * 1000;
 
 /** Próximo tipo de registo esperado para o colaborador. */
 export const getNextEntryType = (

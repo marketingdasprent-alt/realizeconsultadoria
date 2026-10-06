@@ -29,26 +29,40 @@ export const useMyTimeClock = (employeeId: string | null): UseMyTimeClockResult 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchEntries = useCallback(async () => {
-    if (!employeeId) return;
-    setIsLoading(true);
-    setError(null);
-    const now = new Date();
-    const from = addDays(startOfMonth(now), -1);
-    const to = addDays(now, 1);
-    const { data, error: fetchError } = await timeClockService.getMyEntries(
-      employeeId,
-      from.toISOString(),
-      to.toISOString()
-    );
-    if (fetchError) setError('Erro ao carregar os registos de ponto');
-    else setEntries(data);
-    setIsLoading(false);
-  }, [employeeId]);
+  const fetchEntries = useCallback(
+    async (silent = false) => {
+      if (!employeeId) return;
+      if (!silent) setIsLoading(true);
+      setError(null);
+      const now = new Date();
+      const from = addDays(startOfMonth(now), -1);
+      const to = addDays(now, 1);
+      const { data, error: fetchError } = await timeClockService.getMyEntries(
+        employeeId,
+        from.toISOString(),
+        to.toISOString()
+      );
+      if (fetchError) setError('Erro ao carregar os registos de ponto');
+      else setEntries(data);
+      setIsLoading(false);
+    },
+    [employeeId]
+  );
 
   useEffect(() => {
     fetchEntries();
   }, [fetchEntries]);
+
+  // Ao voltar à app (ex.: depois de picar na tag, que abre no browser) mostra o registo novo.
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') fetchEntries(true);
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [fetchEntries]);
+
+  const refetch = useCallback(() => fetchEntries(), [fetchEntries]);
 
   const derived = useMemo(() => {
     const days = summarizeDays(entries);
@@ -62,5 +76,5 @@ export const useMyTimeClock = (employeeId: string | null): UseMyTimeClockResult 
     };
   }, [entries]);
 
-  return { entries, ...derived, isLoading, error, refetch: fetchEntries };
+  return { entries, ...derived, isLoading, error, refetch };
 };

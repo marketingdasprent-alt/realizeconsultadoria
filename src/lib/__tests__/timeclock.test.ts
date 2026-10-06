@@ -4,6 +4,7 @@ import { parseTagUrl } from '../nfc';
 // O serviço de tags importa o cliente Supabase; no CI não há variáveis de ambiente.
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 import {
+  formatDistance,
   formatMinutes,
   getErrorMessage,
   getNextEntryType,
@@ -81,12 +82,53 @@ describe('summarizeDays', () => {
     const [day] = summarizeDays([entry('out', '2026-09-21T18:00:00')]);
     expect(day.incomplete).toBe(true);
   });
+
+  it('does not pair a forgotten check-out with the next day (no 20h days)', () => {
+    // Esqueceu-se da saída na segunda; na terça entra às 09:00 e sai às 18:00.
+    const days = summarizeDays(
+      [
+        entry('in', '2026-09-21T09:00:00'),
+        entry('in', '2026-09-22T09:00:00'),
+        entry('out', '2026-09-22T18:00:00'),
+      ],
+      new Date('2026-09-22T20:00:00')
+    );
+    const monday = days.find(d => d.date === '2026-09-21');
+    const tuesday = days.find(d => d.date === '2026-09-22');
+    expect(monday?.incomplete).toBe(true);
+    expect(monday?.workedMinutes).toBe(0);
+    expect(tuesday?.workedMinutes).toBe(9 * 60);
+    expect(tuesday?.incomplete).toBe(false);
+  });
+
+  it('does not count shifts longer than 12h', () => {
+    const [day] = summarizeDays([
+      entry('in', '2026-09-21T06:00:00'),
+      entry('out', '2026-09-21T19:00:00'),
+    ]);
+    expect(day.workedMinutes).toBe(0);
+    expect(day.incomplete).toBe(true);
+  });
+
+  it('counts pending remote entries provisionally and marks the day', () => {
+    const [day] = summarizeDays([
+      entry('in', '2026-09-21T09:00:00', 'pending'),
+      entry('out', '2026-09-21T17:00:00', 'pending'),
+    ]);
+    expect(day.hasPending).toBe(true);
+    expect(day.workedMinutes).toBe(8 * 60);
+  });
 });
 
 describe('helpers', () => {
   it('formats minutes as hours', () => {
     expect(formatMinutes(0)).toBe('0h00');
     expect(formatMinutes(485)).toBe('8h05');
+  });
+
+  it('formats distances in m or km', () => {
+    expect(formatDistance(45.4)).toBe('45 m');
+    expect(formatDistance(2345)).toBe('2,3 km');
   });
 
   it('suggests the next entry type', () => {

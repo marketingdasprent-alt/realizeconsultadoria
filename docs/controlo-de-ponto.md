@@ -10,9 +10,8 @@
 A app não lê NFC por dentro: com tag, o colaborador encosta sempre o telemóvel com a app fechada.
 
 A tag contém apenas um URL, por exemplo `https://realize.dasprent.pt/ponto/nfc?t=…`.
-Ao encostar, o sistema operativo abre esse URL (no Android abre diretamente a app, por causa do
-`assetlinks.json`). A página obtém o GPS e chama a edge function `clock-punch`, que decide **no
-servidor**:
+Ao encostar, o sistema operativo abre esse URL. A página obtém o GPS e chama a edge function
+`clock-punch`, que decide **no servidor**:
 
 1. Valida a tag (token estático ou mensagem cifrada NTAG 424).
 2. Confirma que o local é da empresa do colaborador.
@@ -20,9 +19,26 @@ servidor**:
 4. Verifica o IP (VPN/proxy/datacenter, país/distância) via proxycheck.io.
 5. Verifica o dispositivo (novo / partilhado entre colegas), coordenadas repetidas e viagens impossíveis.
 6. Rejeita (fica em *Tentativas rejeitadas*) ou grava; sinais fracos → registo **em revisão**.
+7. Fora do local (ou sem local configurado) o colaborador pode confirmar **trabalho remoto**: o
+   registo fica **a aguardar aprovação** e a lista de *Emails de aprovação* recebe um email.
 
 A hora gravada é sempre a do servidor. O histórico (`time_clock_entry_history`) é preenchido por
 trigger e é imutável; os admins só alteram registos através de RPCs que exigem motivo.
+
+### Onde abre a tag (browser ou app)
+
+O registo funciona igual no browser e na app instalada; só muda onde aparece.
+
+- **iPhone:** abre sempre no **Safari**. O iOS não deixa as tags abrirem apps adicionadas ao ecrã
+  principal. O Safari e a app não partilham a sessão: na primeira vez pede login no Safari.
+- **Android:** abre no **Chrome**, porque a app instalada pelo browser (PWA) não é reconhecida como
+  dona do domínio. Cada pessoa resolve uma vez: *Definições → Aplicações → Realize → Abrir por
+  predefinição → Abrir links suportados* (Samsung: *Definir como predefinição*). O Chrome e a app
+  partilham a sessão, por isso não pede login outra vez.
+- A página da tag mostra estas instruções quando o registo é feito no browser.
+- Para abrir **sempre** a app no Android é preciso publicar a app na Play Store (Trusted Web
+  Activity). O `assetlinks.json` já declara o pacote `com.realizeconsultadoria.myapp`, mas essa app
+  nunca foi publicada.
 
 ### Tipos de tag
 

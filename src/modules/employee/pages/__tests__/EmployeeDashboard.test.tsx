@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import EmployeeDashboard from '../EmployeeDashboard';
 
 vi.mock('@/integrations/supabase/client', () => {
@@ -127,6 +127,15 @@ vi.mock('@/components/employee/AvisosSection', () => ({ AvisosSection: () => nul
 vi.mock('@/components/PWAInstallBanner', () => ({ default: () => null }));
 
 describe('EmployeeDashboard', () => {
+  // Os pedidos de exemplo são de out/nov 2026: fixa o "hoje" para continuarem futuros.
+  beforeAll(() => {
+    vi.useFakeTimers({ toFake: ['Date'] });
+    vi.setSystemTime(new Date('2026-09-01T10:00:00'));
+  });
+  afterAll(() => {
+    vi.useRealTimers();
+  });
+
   it('mostra a ação de remarcar num pedido de férias aprovado', async () => {
     // Given: o colaborador tem férias futuras aprovadas
     render(

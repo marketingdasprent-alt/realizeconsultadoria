@@ -108,18 +108,27 @@ export const timeClockService = {
    * Folha de ponto (admin) filtrada por período, empresa, colaborador e estado.
    */
   getEntries: async ({ fromIso, toIso, companyId, employeeId, status }: EntryFilters) => {
-    let query = supabase
-      .from('time_clock_entries')
-      .select(ENTRY_SELECT)
-      .gte('punched_at', fromIso)
-      .lt('punched_at', toIso)
-      .order('punched_at', { ascending: true })
-      .limit(5000);
-    if (companyId) query = query.eq('company_id', companyId);
-    if (employeeId) query = query.eq('employee_id', employeeId);
-    if (status) query = query.eq('status', status);
-    const { data, error } = await query;
-    return { data: (data ?? []) as TimeClockEntryWithRelations[], error };
+    // A API do Supabase devolve no máximo 1000 linhas por pedido: paginar até ao fim
+    // (com 40+ colaboradores um mês tem milhares de picagens).
+    const PAGE = 1000;
+    const rows: TimeClockEntryWithRelations[] = [];
+    for (let from = 0; ; from += PAGE) {
+      let query = supabase
+        .from('time_clock_entries')
+        .select(ENTRY_SELECT)
+        .gte('punched_at', fromIso)
+        .lt('punched_at', toIso)
+        .order('punched_at', { ascending: true })
+        .order('id', { ascending: true })
+        .range(from, from + PAGE - 1);
+      if (companyId) query = query.eq('company_id', companyId);
+      if (employeeId) query = query.eq('employee_id', employeeId);
+      if (status) query = query.eq('status', status);
+      const { data, error } = await query;
+      if (error) return { data: rows, error };
+      rows.push(...((data ?? []) as TimeClockEntryWithRelations[]));
+      if (!data || data.length < PAGE) return { data: rows, error: null };
+    }
   },
 
   /**

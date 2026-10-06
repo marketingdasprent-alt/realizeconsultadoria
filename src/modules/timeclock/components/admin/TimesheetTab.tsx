@@ -41,11 +41,10 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
     [employees, filters.companyId]
   );
 
-  // Uma folha por colaborador dos filtros (ativos, ou inativos com registos no mês).
+  // Uma folha por colaborador ativo que cumpra os filtros (inativos nunca são impressos).
   const handlePrint = () => {
-    const withEntries = new Set(entries.map(e => e.employee_id));
     const toPrint = employees
-      .filter(e => e.is_active || withEntries.has(e.id))
+      .filter(e => e.is_active)
       .filter(e => !filters.companyId || e.company_id === filters.companyId)
       .filter(e => !filters.employeeId || e.id === filters.employeeId)
       .filter(e => matchesNameSearch(e.name, search))

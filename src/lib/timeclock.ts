@@ -204,6 +204,20 @@ export const summarizeDays = <T extends TimeClockEntry>(
   return Array.from(days.values()).sort((a, b) => b.date.localeCompare(a.date));
 };
 
+const normalizeText = (value: string): string =>
+  value.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+
+/**
+ * Pesquisa por nome sem acentos nem maiúsculas; todas as palavras têm de aparecer
+ * ("joao bahia" encontra "João Victor Da Silva Bahia"). Pesquisa vazia aceita tudo.
+ */
+export const matchesNameSearch = (name: string | null | undefined, query: string): boolean => {
+  const words = normalizeText(query).split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  const target = normalizeText(name ?? '');
+  return words.every(word => target.includes(word));
+};
+
 export const formatMinutes = (minutes: number): string => {
   const safe = Math.max(0, Math.round(minutes));
   const h = Math.floor(safe / 60);

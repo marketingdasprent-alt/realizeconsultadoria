@@ -9,6 +9,8 @@ import { SwapEntryButton } from './SwapEntryButton';
 interface PunchResultProps {
   outcome: PunchOutcome;
   isBusy?: boolean;
+  /** Observação escrita no registo (pré-preenche o pedido de trabalho remoto). */
+  note?: string;
   /** Repetir o registo recusado como trabalho remoto. */
   onRequestRemote?: (note: string) => void;
   /** Trocar Entrada↔Saída do registo acabado de fazer. */
@@ -33,6 +35,7 @@ const STATUS_STYLES = {
 export const PunchResult: React.FC<PunchResultProps> = ({
   outcome,
   isBusy = false,
+  note,
   onRequestRemote,
   onSwap,
 }) => {
@@ -53,6 +56,7 @@ export const PunchResult: React.FC<PunchResultProps> = ({
             distanceM={outcome.distanceM}
             locationName={outcome.locationName}
             isBusy={isBusy}
+            initialNote={note}
             onConfirm={onRequestRemote}
           />
         )}

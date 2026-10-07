@@ -1,14 +1,15 @@
 // Registo de ponto do colaborador.
 //
 // POST { method: 'nfc' | 'gps', tag?: { t } | { e, c }, position, device_id,
-//        remote?: boolean, note?: string }
+//        entry_type?: 'in' | 'out', remote?: boolean, note?: string }
 //
 // Toda a validação é feita aqui (service role): identidade, tag NFC,
 // distância ao local, precisão GPS, IP/VPN, dispositivo e anti-replay.
 // Fora do local (ou sem local) o pedido é recusado com `can_request_remote`;
 // o colaborador pode repetir com `remote: true` e o registo fica 'pending'
 // até um admin aprovar (com email para a lista de aprovações).
-// Entrada/Saída e duplicados são decididos na BD (time_clock_register_punch).
+// Entrada/Saída: o colaborador escolhe (com confirmação na app); sem tipo, a BD
+// deduz do último registo. Duplicados e lock decididos em time_clock_register_punch.
 // Respostas de negócio vêm sempre com HTTP 200 e { ok: boolean, code }.
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
@@ -40,6 +41,7 @@ interface PunchRequest {
   tag?: { t?: string; e?: string; c?: string };
   position?: { lat?: number; lng?: number; accuracy?: number; age_ms?: number };
   device_id?: string;
+  entry_type?: 'in' | 'out';
   remote?: boolean;
   note?: string;
 }
@@ -196,6 +198,7 @@ serve(async (req: Request) => {
   const method = body.method === 'nfc' ? 'nfc' : body.method === 'gps' ? 'gps' : null;
   if (!method) return json({ ok: false, code: 'bad_request' }, 400);
   const wantsRemote = body.remote === true;
+  const entryType = body.entry_type === 'in' || body.entry_type === 'out' ? body.entry_type : null;
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, 300) : null;
 
   const { data: employee } = await db
@@ -388,6 +391,7 @@ serve(async (req: Request) => {
     _payload: {
       employee_id: employee.id,
       company_id: employee.company_id,
+      entry_type: entryType,
       location_id: isRemote ? null : (location?.id ?? null),
       tag_id: tag?.id ?? null,
       source: method,
@@ -404,7 +408,7 @@ serve(async (req: Request) => {
       device_id: deviceId,
       user_agent: userAgent,
       work_mode: isRemote ? 'remote' : 'office',
-      employee_note: isRemote ? note : null,
+      employee_note: note || null,
       user_id: userId,
     },
   });
@@ -447,7 +451,7 @@ serve(async (req: Request) => {
       distanceM,
       locationName: location?.name ?? null,
       flags: entry.flags,
-      note: isRemote ? note : null,
+      note: note || null,
     });
     if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(task);
     else await task;

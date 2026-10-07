@@ -83,6 +83,29 @@ describe('buildTimesheetMonth', () => {
   });
 });
 
+describe('observações do colaborador', () => {
+  it('shows the employee note with its time, shortened to fit the page', () => {
+    const long =
+      'Esqueci-me de picar a saída do almoço porque fui a uma reunião no cliente em Lisboa e voltei tarde';
+    const month = buildTimesheetMonth(
+      [
+        entry('in', '2026-10-06T09:00:00'),
+        entry('in', '2026-10-06T14:00:00', { employee_note: long }),
+        entry('out', '2026-10-06T18:00:00', { employee_note: 'Saída normal' }),
+        entry('out', '2026-10-06T18:05:00', { status: 'voided', employee_note: 'Anulado' }),
+      ],
+      OCT,
+      [],
+      NOW
+    );
+    const notes = month.rows[5].notes.join(' | ');
+    expect(notes).toContain('14:00: "Esqueci-me de picar a saída do almoço');
+    expect(notes).toContain('…"');
+    expect(notes).toContain('18:00: "Saída normal"');
+    expect(notes).not.toContain('Anulado');
+  });
+});
+
 describe('generateTimesheetPrintHtml', () => {
   it('renders one A4 sheet per employee and escapes names', () => {
     const month = buildTimesheetMonth([], OCT, [], NOW);

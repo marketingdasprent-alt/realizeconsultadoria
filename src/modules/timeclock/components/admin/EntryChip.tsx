@@ -6,6 +6,7 @@ import {
   History,
   House,
   Info,
+  MessageSquare,
   MapPin,
   Nfc,
   Pencil,
@@ -67,6 +68,7 @@ export const EntryChip: React.FC<EntryChipProps> = ({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          title={entry.employee_note ? `Observação: ${entry.employee_note}` : undefined}
           className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium ${tone}`}
         >
           {entry.work_mode === 'remote' ? (
@@ -77,6 +79,7 @@ export const EntryChip: React.FC<EntryChipProps> = ({
           {ENTRY_TYPE_LABELS[entry.entry_type]}{' '}
           {format(new Date(entry.punched_at), showDate ? 'dd/MM HH:mm' : 'HH:mm')}
           {entry.status === 'flagged' && <AlertTriangle className="h-3 w-3" />}
+          {entry.employee_note && <MessageSquare className="h-3 w-3" aria-label="Tem observação" />}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-52">

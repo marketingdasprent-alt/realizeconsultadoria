@@ -118,6 +118,9 @@ export const getErrorMessage = (error: unknown, fallback: string): string => {
   return fallback;
 };
 
+/** Tamanho máximo da observação do colaborador (igual ao limite na BD e na edge function). */
+export const PUNCH_NOTE_MAX_LENGTH = 300;
+
 /** Turno máximo considerado para emparelhar entrada → saída. */
 export const MAX_SHIFT_MS = 12 * 60 * 60 * 1000;
 

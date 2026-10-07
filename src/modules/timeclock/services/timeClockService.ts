@@ -16,6 +16,8 @@ export interface PunchRequest {
   tag?: TagPayload;
   position: PositionPayload;
   device_id: string | null;
+  /** Entrada ou Saída, escolhido e confirmado pelo colaborador. */
+  entry_type?: EntryType;
   /** Confirma que é trabalho remoto (fica a aguardar aprovação). */
   remote?: boolean;
   /** Nota opcional do colaborador para o registo remoto. */

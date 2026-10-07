@@ -9,7 +9,14 @@ const PNG_1PX =
 const OCT = new Date('2026-10-01T00:00:00');
 
 let seq = 0;
-const entry = (entry_type: 'in' | 'out', local: string, status = 'valid'): TimeClockEntry =>
+const NOTE =
+  'Esqueci-me de picar a saída do almoço porque estive numa reunião no cliente e voltei mais tarde do que o previsto';
+const entry = (
+  entry_type: 'in' | 'out',
+  local: string,
+  status = 'valid',
+  employee_note: string | null = null
+): TimeClockEntry =>
   ({
     id: `e${++seq}`,
     employee_id: 'emp-1',
@@ -19,9 +26,10 @@ const entry = (entry_type: 'in' | 'out', local: string, status = 'valid'): TimeC
     status,
     flags: [],
     source: 'nfc',
+    employee_note,
   }) as TimeClockEntry;
 
-/** Mês cheio: 3 pares todos os dias (observações em todas as linhas) e um dia incompleto. */
+/** Mês cheio: 3 pares e 2 observações compridas todos os dias (o pior caso para caber numa página). */
 const busyMonth = () => {
   const entries: TimeClockEntry[] = [];
   for (let d = 1; d <= 31; d += 1) {
@@ -29,10 +37,10 @@ const busyMonth = () => {
     entries.push(
       entry('in', `${day}T08:00:00`),
       entry('out', `${day}T12:00:00`),
-      entry('in', `${day}T13:00:00`),
+      entry('in', `${day}T13:00:00`, 'valid', NOTE),
       entry('out', `${day}T17:00:00`),
       entry('in', `${day}T18:00:00`, d % 2 ? 'flagged' : 'valid'),
-      entry('out', `${day}T19:30:00`)
+      entry('out', `${day}T19:30:00`, 'valid', NOTE)
     );
   }
   return buildTimesheetMonth(

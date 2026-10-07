@@ -10,7 +10,7 @@ import { TimeClockDayList } from '../components/employee/TimeClockDayList';
 
 const EmployeeTimeClockPage: React.FC = () => {
   const { employee, isLoading: isLoadingEmployee } = useCurrentEmployee();
-  const { days, today, lastEntry, nextType, isLoading, error, refetch } = useMyTimeClock(
+  const { days, today, lastEntry, isLoading, error, refetch } = useMyTimeClock(
     employee?.id ?? null
   );
 
@@ -41,7 +41,7 @@ const EmployeeTimeClockPage: React.FC = () => {
     <div className="min-h-screen bg-secondary">
       <EmployeeTimeClockHeader subtitle={employee.companies?.name ?? undefined} />
       <main className="container mx-auto px-4 py-4 lg:py-6 max-w-3xl space-y-6">
-        <PunchPanel lastEntry={lastEntry} nextType={nextType} onPunched={refetch} />
+        <PunchPanel lastEntry={lastEntry} onPunched={refetch} />
 
         <Card className="shadow-card">
           <CardHeader className="pb-3">

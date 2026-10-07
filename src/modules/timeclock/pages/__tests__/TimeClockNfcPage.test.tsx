@@ -7,8 +7,23 @@ import TimeClockNfcPage from '../TimeClockNfcPage';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
 vi.mock('../../hooks/usePunch', () => ({ usePunch: vi.fn() }));
+vi.mock('../../hooks/useCurrentEmployee', () => ({
+  useCurrentEmployee: () => ({ employee: { id: 'emp-1' }, isLoading: false }),
+}));
+vi.mock('../../hooks/useMyTimeClock', () => ({
+  useMyTimeClock: () => ({ lastEntry: null, isLoading: false }),
+}));
+// O formulário tem testes próprios; aqui basta simular a submissão.
+vi.mock('../../components/employee/PunchForm', () => ({
+  PunchForm: ({ onSubmit }: { onSubmit: (c: { entryType: 'in'; note: string }) => void }) => (
+    <button onClick={() => onSubmit({ entryType: 'in', note: 'Esqueci a saída do almoço' })}>
+      Registar
+    </button>
+  ),
+}));
 
 const punch = vi.fn();
+const warmUp = vi.fn();
 const logout = vi.fn().mockResolvedValue(undefined);
 
 const LoginProbe = () => {
@@ -39,16 +54,27 @@ describe('TimeClockNfcPage', () => {
       phase: 'idle',
       outcome: null,
       isBusy: false,
+      lastNote: '',
       punch,
+      warmUp,
       requestRemote: vi.fn(),
       swap: vi.fn(),
       reset: vi.fn(),
     });
   });
 
-  it('registers the tag with an employee session', () => {
+  it('asks for Entrada/Saída and only registers after the employee submits', () => {
     renderAt('employee');
-    expect(punch).toHaveBeenCalledWith('nfc', { t: 'abc123' });
+    expect(punch).not.toHaveBeenCalled();
+    expect(warmUp).toHaveBeenCalled(); // GPS começa logo, para o registo ser rápido
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registar' }));
+
+    expect(punch).toHaveBeenCalledWith(
+      'nfc',
+      { entryType: 'in', note: 'Esqueci a saída do almoço' },
+      { t: 'abc123' }
+    );
   });
 
   it('does not send admins to the admin panel and keeps the tag for the employee login', async () => {

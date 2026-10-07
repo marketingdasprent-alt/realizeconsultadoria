@@ -20,7 +20,8 @@ const MARGIN = 10;
 const LOGO_H = 12;
 
 /** As fontes base do PDF só cobrem Latin-1: troca os poucos símbolos fora dele. */
-const pdfText = (value: string): string => value.replace(/–/g, '-').replace(/→/g, '->');
+const pdfText = (value: string): string =>
+  value.replace(/–/g, '-').replace(/→/g, '->').replace(/…/g, '...').replace(/[“”]/g, '"');
 
 const drawHeader = (doc: jsPDF, sheet: TimesheetPrintSheet, opts: TimesheetPrintOptions) => {
   if (opts.logoBase64) {
@@ -62,7 +63,7 @@ const drawFooter = (doc: jsPDF, sheet: TimesheetPrintSheet, tableEndY: number) =
   );
   doc.setFontSize(7).setTextColor(136, 136, 136);
   doc.text(
-    '* Registo inserido ou corrigido pelos RH. Horas calculadas pelos pares entrada/saída.',
+    '* Inserido ou corrigido pelos RH. Horas pelos pares entrada/saída. Observações resumidas (texto completo no registo).',
     MARGIN,
     tableEndY + 11
   );
@@ -115,7 +116,8 @@ const drawSheet = (doc: jsPDF, sheet: TimesheetPrintSheet, opts: TimesheetPrintO
       4: { cellWidth: 17, halign: 'center' },
       5: { cellWidth: 17, halign: 'center' },
       6: { cellWidth: 15, halign: 'center', fontStyle: 'bold' },
-      7: { fontSize: 7, textColor: [68, 68, 68] },
+      // Uma linha por dia (cortada com "...") para a folha caber sempre numa página.
+      7: { fontSize: 7, textColor: [68, 68, 68], overflow: 'ellipsize' },
     },
     didParseCell: data => {
       if (data.section !== 'body') return;

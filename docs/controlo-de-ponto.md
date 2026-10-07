@@ -9,6 +9,13 @@
 
 A app não lê NFC por dentro: com tag, o colaborador encosta sempre o telemóvel com a app fechada.
 
+Em ambos os casos abre o formulário **Registar Ponto**: o colaborador escolhe **Entrada** ou
+**Saída**, pode escrever **Observações** (até 300 caracteres) e marca a confirmação antes de
+**Registar**. O tipo deixou de ser adivinhado pelo último registo: assim, uma picagem esquecida
+(ex.: saída para almoço) afeta só esse dia, que fica "incompleto" para os RH corrigirem, em vez
+de inverter as picagens seguintes. As observações ficam no registo, no email de aprovação e na
+coluna Observações da folha impressa/PDF.
+
 A tag contém apenas um URL, por exemplo `https://realize.dasprent.pt/ponto/nfc?t=…`.
 Ao encostar, o sistema operativo abre esse URL. A página obtém o GPS e chama a edge function
 `clock-punch`, que decide **no servidor**:

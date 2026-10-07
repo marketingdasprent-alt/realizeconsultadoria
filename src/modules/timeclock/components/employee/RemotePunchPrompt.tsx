@@ -2,12 +2,14 @@ import React, { useState } from 'react';
 import { House, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
-import { formatDistance } from '@/lib/timeclock';
+import { formatDistance, PUNCH_NOTE_MAX_LENGTH } from '@/lib/timeclock';
 
 interface RemotePunchPromptProps {
   distanceM?: number | null;
   locationName?: string | null;
   isBusy: boolean;
+  /** Observação já escrita no formulário de registo. */
+  initialNote?: string;
   onConfirm: (note: string) => void;
 }
 
@@ -19,9 +21,10 @@ export const RemotePunchPrompt: React.FC<RemotePunchPromptProps> = ({
   distanceM,
   locationName,
   isBusy,
+  initialNote = '',
   onConfirm,
 }) => {
-  const [note, setNote] = useState('');
+  const [note, setNote] = useState(initialNote);
 
   return (
     <div className="space-y-3 rounded-lg border border-sky-300 bg-sky-50 p-4 dark:bg-sky-900/20">
@@ -37,7 +40,7 @@ export const RemotePunchPrompt: React.FC<RemotePunchPromptProps> = ({
       <Textarea
         value={note}
         onChange={e => setNote(e.target.value)}
-        maxLength={300}
+        maxLength={PUNCH_NOTE_MAX_LENGTH}
         rows={2}
         placeholder="Motivo (opcional) — ex.: teletrabalho, reunião no cliente…"
       />

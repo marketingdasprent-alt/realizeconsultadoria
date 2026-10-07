@@ -32,6 +32,12 @@ export interface TimesheetPrintMonth {
   incompleteDays: number;
 }
 
+/** Observações do colaborador cortadas a este tamanho para a folha caber numa página. */
+const PRINT_NOTE_MAX = 80;
+
+const shortNote = (note: string) =>
+  note.length > PRINT_NOTE_MAX ? `${note.slice(0, PRINT_NOTE_MAX - 1).trimEnd()}…` : note;
+
 /** Colunas Entrada/Saída impressas; pares a mais vão para as observações. */
 export const PRINT_PAIR_COLUMNS = 2;
 
@@ -84,6 +90,10 @@ export const buildTimesheetMonth = (
       if (summary?.openSince) notes.push('Em curso');
       if (dayEntries.some(e => e.status === 'pending')) notes.push('Remoto por aprovar');
       if (dayEntries.some(e => e.status === 'flagged')) notes.push('Com alertas');
+      for (const e of dayEntries) {
+        if (e.status === 'voided' || !e.employee_note) continue;
+        notes.push(`${format(new Date(e.punched_at), 'HH:mm')}: "${shortNote(e.employee_note)}"`);
+      }
 
       const workedMinutes = summary?.workedMinutes ?? 0;
       totalMinutes += workedMinutes;
@@ -137,7 +147,7 @@ const buildRow = (row: TimesheetPrintRow): string => {
   return `<tr class="${cls}">
     <td class="d">${row.day}</td><td class="wd">${escapeHtml(row.weekday)}</td>${times}
     <td class="h">${row.workedMinutes > 0 ? formatMinutes(row.workedMinutes) : ''}</td>
-    <td class="n">${escapeHtml(row.notes.join(' · '))}</td>
+    <td class="n" title="${escapeHtml(row.notes.join(' · '))}">${escapeHtml(row.notes.join(' · '))}</td>
   </tr>`;
 };
 
@@ -168,7 +178,7 @@ const buildSheet = (sheet: TimesheetPrintSheet, opts: TimesheetPrintOptions): st
       <span>Dias com registo: <strong>${month.workedDays}</strong></span>
       <span>Dias incompletos: <strong>${month.incompleteDays}</strong></span>
     </div>
-    <p class="legend">* Registo inserido ou corrigido pelos RH. Horas calculadas pelos pares entrada → saída.</p>
+    <p class="legend">* Registo inserido ou corrigido pelos RH. Horas calculadas pelos pares entrada → saída. Observações resumidas: o texto completo está no registo.</p>
     <div class="sign">
       <div><span></span>O colaborador</div>
       <div><span></span>A entidade empregadora</div>
@@ -211,6 +221,8 @@ export const generateTimesheetPrintHtml = (opts: TimesheetPrintOptions): string 
   td.t { width: 15mm; text-align: center; }
   td.h { width: 14mm; text-align: center; font-weight: 600; }
   td.n, th.n { text-align: left; font-size: 9px; color: #444; }
+  /* Uma linha por dia (cortada com …) para a folha caber sempre numa página. */
+  td.n { max-width: 0; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
   tr.we td { background: #f6f4ef; }
   tr.hol td { background: #fbf6e9; }
   .totals { display: flex; gap: 22px; justify-content: flex-end; font-size: 11px; margin-top: 6px; }

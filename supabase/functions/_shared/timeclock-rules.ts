@@ -104,6 +104,8 @@ export const MAX_POSITION_AGE_MS = 2 * 60 * 1000;
 /** Uma entrada aberta há mais do que isto já não é fechada pela picagem seguinte. */
 export const MAX_OPEN_SHIFT_HOURS = 12;
 export const IP_FAR_THRESHOLD_KM = 400;
+/** País da empresa: IPs daqui nunca dão o alerta "IP noutro país". */
+export const HOME_COUNTRY = 'PT';
 export const IMPOSSIBLE_SPEED_KMH = 250;
 export const DUPLICATE_WINDOW_MS = 60 * 1000;
 
@@ -208,8 +210,11 @@ export const evaluatePunch = (ctx: PunchContext): PunchEvaluation => {
       if (location?.blockVpn) return reject('vpn_blocked');
       flags.push('vpn_or_proxy');
     }
-    // IP muito longe da posição GPS indicada (no escritório ou em casa).
-    if (Number.isFinite(ctx.ipInfo.lat) && Number.isFinite(ctx.ipInfo.lng)) {
+    // IP de outro país e longe da posição GPS (ex.: VPN não detetada). Em Portugal a
+    // localização do IP de dados móveis é pouco fiável (já apareceu nos Açores com a
+    // pessoa no escritório), por isso IPs portugueses não dão este alerta.
+    const foreignIp = !!ctx.ipInfo.country && ctx.ipInfo.country.toUpperCase() !== HOME_COUNTRY;
+    if (foreignIp && Number.isFinite(ctx.ipInfo.lat) && Number.isFinite(ctx.ipInfo.lng)) {
       const ipKm =
         haversineMeters(
           { lat: ctx.ipInfo.lat as number, lng: ctx.ipInfo.lng as number },

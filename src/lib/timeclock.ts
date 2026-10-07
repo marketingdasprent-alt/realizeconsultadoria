@@ -51,7 +51,7 @@ export const HISTORY_ACTION_LABELS: Record<string, string> = {
 /** warning = coloca o registo em revisão; os restantes são informativos. */
 export const FLAG_INFO: Record<string, { label: string; warning: boolean }> = {
   vpn_or_proxy: { label: 'VPN / proxy', warning: true },
-  ip_far_from_location: { label: 'IP longe do local', warning: true },
+  ip_far_from_location: { label: 'IP de outro país', warning: true },
   suspicious_accuracy: { label: 'Precisão GPS suspeita', warning: true },
   repeated_coordinates: { label: 'Coordenadas repetidas', warning: true },
   impossible_travel: { label: 'Deslocação impossível', warning: true },

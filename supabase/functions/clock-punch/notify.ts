@@ -9,7 +9,7 @@ const REVIEW_URL = 'https://realize.dasprent.pt/admin/ponto?tab=revisao';
 const FLAG_LABELS: Record<string, string> = {
   remote: 'Fora do local de trabalho',
   vpn_or_proxy: 'VPN / proxy',
-  ip_far_from_location: 'IP longe da posição GPS',
+  ip_far_from_location: 'IP de outro país',
   suspicious_accuracy: 'Precisão GPS suspeita',
   repeated_coordinates: 'Coordenadas repetidas',
   impossible_travel: 'Deslocação impossível',

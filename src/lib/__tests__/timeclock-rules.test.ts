@@ -88,13 +88,28 @@ describe('evaluatePunch', () => {
   });
 
   it('flags VPN by default and blocks it when configured', () => {
-    const ipInfo = { checked: true, isProxy: true, lat: 52.37, lng: 4.89 }; // Amesterdão
+    const ipInfo = { checked: true, isProxy: true, country: 'NL', lat: 52.37, lng: 4.89 }; // Amesterdão
     const flagged = evaluatePunch(baseContext({ ipInfo }));
     expect(flagged.status).toBe('flagged');
     expect(flagged.flags).toEqual(expect.arrayContaining(['vpn_or_proxy', 'ip_far_from_location']));
 
     const location = { ...baseContext().location, blockVpn: true };
     expect(evaluatePunch(baseContext({ ipInfo, location })).rejected).toBe('vpn_blocked');
+  });
+
+  it('does not flag Portuguese mobile IPs located far away (e.g. Azores)', () => {
+    // Caso real: Android em dados móveis, IP em Ribeira Seca (Açores), pessoa no escritório.
+    const ipInfo = { checked: true, isProxy: false, country: 'PT', lat: 37.76, lng: -25.53 };
+    const result = evaluatePunch(baseContext({ ipInfo }));
+    expect(result.flags).not.toContain('ip_far_from_location');
+    expect(result.status).toBe('valid');
+  });
+
+  it('flags a foreign IP far from the GPS position', () => {
+    const ipInfo = { checked: true, isProxy: false, country: 'BR', lat: -23.55, lng: -46.63 };
+    const result = evaluatePunch(baseContext({ ipInfo }));
+    expect(result.flags).toContain('ip_far_from_location');
+    expect(result.status).toBe('flagged');
   });
 
   it('trusts the office network and skips IP checks', () => {

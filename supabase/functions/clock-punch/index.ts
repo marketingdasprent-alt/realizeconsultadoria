@@ -124,6 +124,7 @@ const lookupIp = async (ip: string | null): Promise<IpInfo> => {
       lat: typeof info.latitude === 'number' ? info.latitude : null,
       lng: typeof info.longitude === 'number' ? info.longitude : null,
       isProxy: info.proxy === 'yes' || info.type === 'VPN' || info.type === 'Hosting',
+      proxyType: typeof info.type === 'string' ? info.type : null,
     };
   } catch {
     return { checked: false };

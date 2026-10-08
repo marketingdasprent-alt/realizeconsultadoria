@@ -35,7 +35,20 @@ export interface IpInfo {
   lat?: number | null;
   lng?: number | null;
   isProxy?: boolean | null;
+  /** Tipo devolvido pelo proxycheck ('VPN', 'TOR', 'SOCKS5', 'Hosting', ...). */
+  proxyType?: string | null;
 }
+
+/**
+ * Só estes tipos contam como VPN a sério. Os IPs dos operadores móveis são
+ * partilhados por milhares de clientes (CGNAT) e aparecem muitas vezes como
+ * "SOCKS5/HTTP" por causa de apps de proxy instaladas por outra pessoa; bloquear
+ * por isso recusava gente dentro do escritório.
+ */
+export const ANONYMIZER_TYPES = new Set(['VPN', 'TOR']);
+
+export const isAnonymizer = (info: IpInfo): boolean =>
+  !!info.isProxy && ANONYMIZER_TYPES.has((info.proxyType ?? '').toUpperCase());
 
 export interface PreviousPunch {
   lat: number | null;
@@ -206,9 +219,12 @@ export const evaluatePunch = (ctx: PunchContext): PunchEvaluation => {
   if (trusted) flags.push('trusted_network');
 
   if (!trusted && ctx.ipInfo.checked) {
-    if (ctx.ipInfo.isProxy) {
+    if (isAnonymizer(ctx.ipInfo)) {
       if (location?.blockVpn) return reject('vpn_blocked');
       flags.push('vpn_or_proxy');
+    } else if (ctx.ipInfo.isProxy) {
+      // Informativo: IP partilhado marcado como proxy, sem revisão nem bloqueio.
+      flags.push('shared_ip_proxy');
     }
     // IP de outro país e longe da posição GPS (ex.: VPN não detetada). Em Portugal a
     // localização do IP de dados móveis é pouco fiável (já apareceu nos Açores com a

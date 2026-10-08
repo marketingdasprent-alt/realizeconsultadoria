@@ -88,13 +88,43 @@ describe('evaluatePunch', () => {
   });
 
   it('flags VPN by default and blocks it when configured', () => {
-    const ipInfo = { checked: true, isProxy: true, country: 'NL', lat: 52.37, lng: 4.89 }; // Amesterdão
+    const ipInfo = {
+      checked: true,
+      isProxy: true,
+      proxyType: 'VPN',
+      country: 'NL',
+      lat: 52.37,
+      lng: 4.89,
+    }; // Amesterdão
     const flagged = evaluatePunch(baseContext({ ipInfo }));
     expect(flagged.status).toBe('flagged');
     expect(flagged.flags).toEqual(expect.arrayContaining(['vpn_or_proxy', 'ip_far_from_location']));
 
     const location = { ...baseContext().location, blockVpn: true };
     expect(evaluatePunch(baseContext({ ipInfo, location })).rejected).toBe('vpn_blocked');
+  });
+
+  it('does not block or review a mobile-carrier IP marked as SOCKS proxy (CGNAT)', () => {
+    // Caso real: iPhone em dados móveis NOS no escritório; proxycheck diz "SOCKS5 / Webshare".
+    const location = { ...baseContext().location!, blockVpn: true };
+    const ipInfo = { checked: true, isProxy: true, proxyType: 'SOCKS5', country: 'PT' };
+    const result = evaluatePunch(baseContext({ location, ipInfo }));
+    expect(result.rejected).toBeNull();
+    expect(result.status).toBe('valid');
+    expect(result.flags).toContain('shared_ip_proxy');
+    expect(result.flags).not.toContain('vpn_or_proxy');
+  });
+
+  it('blocks Tor like a VPN, and treats an unknown proxy type as shared', () => {
+    const location = { ...baseContext().location!, blockVpn: true };
+    expect(
+      evaluatePunch(
+        baseContext({ location, ipInfo: { checked: true, isProxy: true, proxyType: 'TOR' } })
+      ).rejected
+    ).toBe('vpn_blocked');
+    expect(
+      evaluatePunch(baseContext({ location, ipInfo: { checked: true, isProxy: true } })).rejected
+    ).toBeNull();
   });
 
   it('does not flag Portuguese mobile IPs located far away (e.g. Azores)', () => {
@@ -115,7 +145,7 @@ describe('evaluatePunch', () => {
   it('trusts the office network and skips IP checks', () => {
     const location = { ...baseContext().location, blockVpn: true, trustedIps: ['85.240.10.0/24'] };
     const result = evaluatePunch(
-      baseContext({ location, ipInfo: { checked: true, isProxy: true } })
+      baseContext({ location, ipInfo: { checked: true, isProxy: true, proxyType: 'VPN' } })
     );
     expect(result.rejected).toBeNull();
     expect(result.flags).toContain('trusted_network');
@@ -182,7 +212,7 @@ describe('evaluatePunch — trabalho remoto', () => {
 
   it('still blocks VPN and stale positions in remote mode', () => {
     const location = { ...baseContext().location!, blockVpn: true };
-    const ipInfo = { checked: true, isProxy: true };
+    const ipInfo = { checked: true, isProxy: true, proxyType: 'VPN' };
     expect(evaluatePunch(baseContext({ mode: 'remote', location, ipInfo })).rejected).toBe(
       'vpn_blocked'
     );

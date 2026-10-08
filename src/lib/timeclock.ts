@@ -50,7 +50,8 @@ export const HISTORY_ACTION_LABELS: Record<string, string> = {
 
 /** warning = coloca o registo em revisão; os restantes são informativos. */
 export const FLAG_INFO: Record<string, { label: string; warning: boolean }> = {
-  vpn_or_proxy: { label: 'VPN / proxy', warning: true },
+  vpn_or_proxy: { label: 'VPN / Tor', warning: true },
+  shared_ip_proxy: { label: 'IP partilhado marcado como proxy', warning: false },
   ip_far_from_location: { label: 'IP de outro país', warning: true },
   suspicious_accuracy: { label: 'Precisão GPS suspeita', warning: true },
   repeated_coordinates: { label: 'Coordenadas repetidas', warning: true },
@@ -77,7 +78,7 @@ export const PUNCH_MESSAGES: Record<string, string> = {
   low_accuracy:
     'Sinal GPS fraco. No iPhone confirme que a "Localização exata" está ligada (Definições → Privacidade → Localização); aproxime-se de uma janela e tente de novo.',
   out_of_radius: 'Está fora do local de trabalho.',
-  vpn_blocked: 'Desative a VPN / proxy para registar o ponto.',
+  vpn_blocked: 'Desative a VPN para registar o ponto.',
   invalid_tag: 'Tag NFC inválida ou desativada.',
   replayed_tag: 'Esta leitura da tag já foi usada. Encoste novamente o telemóvel à tag.',
   tag_other_company: 'Esta tag pertence a outra empresa.',

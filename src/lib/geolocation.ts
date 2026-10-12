@@ -47,6 +47,7 @@ export const getBestPosition = ({
     }
 
     const hardLimitMs = maxWaitMs + 7000;
+    const startedAt = Date.now();
     let best: GeolocationPosition | null = null;
     let settled = false;
     let watchId: number | null = null;
@@ -58,8 +59,17 @@ export const getBestPosition = ({
       settled = true;
       if (watchId !== null) navigator.geolocation.clearWatch(watchId);
       timers.forEach(clearTimeout);
-      if (best && !error) resolve(toPayload(best));
-      else reject(error ?? new Error('Não foi possível obter a localização.'));
+      if (best && !error) {
+        // Pedimos sempre leituras novas (maximumAge 0). Em alguns Android o carimbo
+        // de hora vem do relógio do GPS e, com o relógio do telemóvel desacertado,
+        // a leitura parecia ter minutos ("posição antiga"). A idade real nunca
+        // passa do tempo que estivemos a ler.
+        const payload = toPayload(best);
+        resolve({
+          ...payload,
+          age_ms: Math.max(0, Math.min(payload.age_ms, Date.now() - startedAt)),
+        });
+      } else reject(error ?? new Error('Não foi possível obter a localização.'));
     };
 
     // Ao fim de maxWaitMs usa a melhor leitura; se ainda não há nenhuma, espera até ao limite.

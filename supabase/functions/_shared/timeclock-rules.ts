@@ -81,6 +81,7 @@ export type RejectReason =
   | 'invalid_position'
   | 'stale_position'
   | 'low_accuracy'
+  | 'approximate_location'
   | 'out_of_radius'
   | 'no_location'
   | 'vpn_blocked';
@@ -99,6 +100,7 @@ export interface PunchEvaluation {
 export const REMOTE_ELIGIBLE_REASONS = new Set([
   'out_of_radius',
   'low_accuracy',
+  'approximate_location',
   'no_location',
   'manual_not_allowed',
 ]);
@@ -106,6 +108,7 @@ export const REMOTE_ELIGIBLE_REASONS = new Set([
 /** Flags que, presentes, colocam o registo em revisão ('flagged'). */
 export const WARNING_FLAGS = new Set([
   'vpn_or_proxy',
+  'imprecise_gps',
   'ip_far_from_location',
   'suspicious_accuracy',
   'repeated_coordinates',
@@ -114,6 +117,11 @@ export const WARNING_FLAGS = new Set([
 ]);
 
 export const MAX_POSITION_AGE_MS = 2 * 60 * 1000;
+/**
+ * Precisão a partir da qual a leitura é "localização aproximada" (iPhone sem
+ * "Localização exata", Android com localização aproximada): erra quilómetros.
+ */
+export const APPROXIMATE_LOCATION_M = 1000;
 /** Uma entrada aberta há mais do que isto já não é fechada pela picagem seguinte. */
 export const MAX_OPEN_SHIFT_HOURS = 12;
 export const IP_FAR_THRESHOLD_KM = 400;
@@ -206,11 +214,21 @@ export const evaluatePunch = (ctx: PunchContext): PunchEvaluation => {
 
   if (mode === 'office') {
     if (!location) return reject('no_location');
-    if (position.accuracy > location.maxAccuracyM) return reject('low_accuracy');
-    // Com tag NFC a presença física já está provada; tolera-se a incerteza do
-    // GPS (o círculo de precisão tem de tocar no raio). Só GPS: estrito.
-    const tolerance = ctx.method === 'nfc' ? position.accuracy : 0;
-    if (distanceM - tolerance > location.radiusM) return reject('out_of_radius');
+    if (ctx.method === 'nfc') {
+      // A tag prova a presença física. Com GPS impreciso (dentro de edifícios ou
+      // localização aproximada) não se recusa: fica registado para os RH reverem.
+      if (position.accuracy > location.maxAccuracyM) {
+        flags.push('imprecise_gps');
+      } else if (distanceM - position.accuracy > location.radiusM) {
+        // GPS bom: o círculo de precisão tem de tocar no raio.
+        return reject('out_of_radius');
+      }
+    } else {
+      // Só GPS: estrito.
+      if (position.accuracy >= APPROXIMATE_LOCATION_M) return reject('approximate_location');
+      if (position.accuracy > location.maxAccuracyM) return reject('low_accuracy');
+      if (distanceM > location.radiusM) return reject('out_of_radius');
+    }
   } else {
     flags.push('remote');
   }

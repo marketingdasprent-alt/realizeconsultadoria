@@ -53,7 +53,7 @@ export interface EntryFilters {
 }
 
 export type TimeClockAttemptWithRelations = TimeClockAttempt & {
-  employee?: { name: string } | null;
+  employee?: { name: string; company_id?: string | null } | null;
   location?: { name: string } | null;
 };
 
@@ -149,7 +149,7 @@ export const timeClockService = {
   getAttempts: async (fromIso: string, toIso: string) => {
     const { data, error } = await supabase
       .from('time_clock_attempts')
-      .select('*, employee:employees(name), location:time_clock_locations(name)')
+      .select('*, employee:employees(name, company_id), location:time_clock_locations(name)')
       .gte('created_at', fromIso)
       .lt('created_at', toIso)
       .order('created_at', { ascending: false })

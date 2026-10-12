@@ -52,6 +52,7 @@ export const HISTORY_ACTION_LABELS: Record<string, string> = {
 export const FLAG_INFO: Record<string, { label: string; warning: boolean }> = {
   vpn_or_proxy: { label: 'VPN / Tor', warning: true },
   shared_ip_proxy: { label: 'IP partilhado marcado como proxy', warning: false },
+  imprecise_gps: { label: 'GPS impreciso (registou na tag)', warning: true },
   ip_far_from_location: { label: 'IP de outro país', warning: true },
   suspicious_accuracy: { label: 'Precisão GPS suspeita', warning: true },
   repeated_coordinates: { label: 'Coordenadas repetidas', warning: true },
@@ -78,6 +79,8 @@ export const PUNCH_MESSAGES: Record<string, string> = {
   low_accuracy:
     'Sinal GPS fraco. No iPhone confirme que a "Localização exata" está ligada (Definições → Privacidade → Localização); aproxime-se de uma janela e tente de novo.',
   out_of_radius: 'Está fora do local de trabalho.',
+  approximate_location:
+    'O telemóvel está a enviar só a localização aproximada (erra mais de 1 km). iPhone: Definições → Privacidade e segurança → Serviços de localização → Safari (ou Realize) → ative "Localização exata". Android: Definições → Localização → ative "Localização precisa". Ou encoste o telemóvel à tag.',
   vpn_blocked: 'Desative a VPN para registar o ponto.',
   invalid_tag: 'Tag NFC inválida ou desativada.',
   replayed_tag: 'Esta leitura da tag já foi usada. Encoste novamente o telemóvel à tag.',
@@ -96,6 +99,7 @@ export const REJECT_REASON_LABELS: Record<string, string> = {
   invalid_position: 'Localização inválida',
   stale_position: 'Localização antiga',
   low_accuracy: 'GPS impreciso',
+  approximate_location: 'Localização aproximada',
   out_of_radius: 'Fora do raio',
   vpn_blocked: 'VPN bloqueada',
   invalid_tag: 'Tag inválida',
@@ -104,6 +108,31 @@ export const REJECT_REASON_LABELS: Record<string, string> = {
   no_location: 'Sem locais configurados',
   manual_not_allowed: 'Só GPS não permitido',
   ntag424_not_configured: 'Chave NTAG 424 em falta',
+};
+
+/** A partir desta distância já não é "fora do raio": não há local configurado perto. */
+export const NO_NEARBY_LOCATION_M = 1000;
+
+/**
+ * Mensagem de recusa com contexto: longe de todos os locais configurados, o mais
+ * provável é o local de trabalho da pessoa ainda não existir no sistema.
+ */
+export const getPunchFailureMessage = (
+  code: string,
+  distanceM?: number | null,
+  locationName?: string | null
+): string => {
+  if (
+    code === 'out_of_radius' &&
+    typeof distanceM === 'number' &&
+    distanceM >= NO_NEARBY_LOCATION_M
+  ) {
+    const nearest = locationName
+      ? ` (o mais próximo, ${locationName}, fica a ${formatDistance(distanceM)})`
+      : '';
+    return `Não há nenhum local de trabalho registado perto de si${nearest}. Se está no seu local de trabalho habitual, avise os RH para o adicionarem.`;
+  }
+  return getPunchMessage(code);
 };
 
 export const getPunchMessage = (code: string): string =>

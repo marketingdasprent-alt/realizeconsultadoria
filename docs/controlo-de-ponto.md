@@ -32,6 +32,19 @@ Ao encostar, o sistema operativo abre esse URL. A página obtém o GPS e chama a
 A hora gravada é sempre a do servidor. O histórico (`time_clock_entry_history`) é preenchido por
 trigger e é imutável; os admins só alteram registos através de RPCs que exigem motivo.
 
+### Locais em falta e GPS
+
+- **Locais em falta** (Ponto → Locais & Tags): quando várias picagens são recusadas no mesmo sítio
+  (2+ tentativas a menos de 150 m, GPS com precisão ≤ 100 m, últimos 30 dias), aparece o sítio com
+  quem tentou e um botão **Criar local aqui** (ou **Aumentar raio** se for mesmo ao lado de um local).
+  É quase sempre um local de trabalho por configurar.
+- Longe de todos os locais (> 1 km), o colaborador vê "Não há nenhum local de trabalho registado perto
+  de si… avise os RH", em vez de "Está fora do local de trabalho".
+- **Tag + GPS impreciso**: a tag prova a presença, por isso o registo é aceite e fica em revisão
+  (`imprecise_gps`) em vez de recusado.
+- **Localização aproximada** (precisão ≥ 1 km, típico do iPhone sem "Localização exata"): recusa com
+  instruções para ativar a localização exata, ou registar na tag.
+
 ### Onde abre a tag (browser ou app)
 
 O registo funciona igual no browser e na app instalada; só muda onde aparece.

@@ -74,6 +74,23 @@ describe('evaluatePunch', () => {
     expect(evaluatePunch({ ...ctx, method: 'gps' }).rejected).toBe('out_of_radius');
   });
 
+  it('accepts an NFC punch with imprecise GPS, for review (the tag proves presence)', () => {
+    // Caso real: iPhone na tag do escritório com GPS a ±10 km.
+    const ctx = baseContext({ method: 'nfc', position: { ...NEAR, accuracy: 10_516, ageMs: 0 } });
+    const result = evaluatePunch(ctx);
+    expect(result.rejected).toBeNull();
+    expect(result.flags).toContain('imprecise_gps');
+    expect(result.status).toBe('flagged');
+  });
+
+  it('tells manual punches with approximate location apart from merely weak GPS', () => {
+    const approx = evaluatePunch(baseContext({ position: { ...NEAR, accuracy: 1_986, ageMs: 0 } }));
+    expect(approx.rejected).toBe('approximate_location');
+    expect(REMOTE_ELIGIBLE_REASONS.has('approximate_location')).toBe(true);
+    const weak = evaluatePunch(baseContext({ position: { ...NEAR, accuracy: 150, ageMs: 0 } }));
+    expect(weak.rejected).toBe('low_accuracy');
+  });
+
   it('rejects poor accuracy and stale positions', () => {
     expect(
       evaluatePunch(baseContext({ position: { ...NEAR, accuracy: 150, ageMs: 0 } })).rejected

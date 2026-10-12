@@ -19,6 +19,8 @@ import { LocationFormFields } from './LocationFormFields';
 
 interface LocationFormDialogProps {
   location?: TimeClockLocation | null;
+  /** Valores iniciais de um local novo (ex.: a partir de uma sugestão). */
+  initial?: Partial<TimeClockLocationInput>;
   companies: Array<{ id: string; name: string }>;
   onClose: () => void;
   onSaved: () => void;
@@ -33,6 +35,7 @@ const parseIpList = (raw: string | undefined): string[] =>
 
 export const LocationFormDialog: React.FC<LocationFormDialogProps> = ({
   location,
+  initial,
   companies,
   onClose,
   onSaved,
@@ -47,12 +50,12 @@ export const LocationFormDialog: React.FC<LocationFormDialogProps> = ({
   } = useForm<TimeClockLocationInput>({
     resolver: zodResolver(timeClockLocationSchema),
     defaultValues: {
-      company_id: location?.company_id ?? '',
-      name: location?.name ?? '',
-      address: location?.address ?? '',
-      latitude: location?.latitude,
-      longitude: location?.longitude,
-      radius_m: location?.radius_m ?? 50,
+      company_id: location?.company_id ?? initial?.company_id ?? '',
+      name: location?.name ?? initial?.name ?? '',
+      address: location?.address ?? initial?.address ?? '',
+      latitude: location?.latitude ?? initial?.latitude,
+      longitude: location?.longitude ?? initial?.longitude,
+      radius_m: location?.radius_m ?? initial?.radius_m ?? 50,
       max_accuracy_m: location?.max_accuracy_m ?? 100,
       allow_manual: location?.allow_manual ?? true,
       block_vpn: location?.block_vpn ?? false,

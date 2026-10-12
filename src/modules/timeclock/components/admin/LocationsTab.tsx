@@ -3,7 +3,10 @@ import { Loader2, Plus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useToast } from '@/hooks/use-toast';
+import type { LocationSuggestion } from '@/lib/location-suggestions';
+import type { TimeClockLocationInput } from '@/lib/schemas';
 import { getErrorMessage } from '@/lib/timeclock';
+import { useLocationSuggestions } from '../../hooks/useLocationSuggestions';
 import { useTimeClockLocations } from '../../hooks/useTimeClockLocations';
 import {
   timeClockLocationService,
@@ -11,6 +14,7 @@ import {
 } from '../../services/timeClockLocationService';
 import { LocationCard } from './LocationCard';
 import { LocationFormDialog } from './LocationFormDialog';
+import { LocationSuggestionsCard } from './LocationSuggestionsCard';
 import { TagCreateDialog } from './TagCreateDialog';
 
 interface LocationsTabProps {
@@ -18,7 +22,11 @@ interface LocationsTabProps {
 }
 
 type DialogState =
-  | { kind: 'location'; location: TimeClockLocationWithTags | null }
+  | {
+      kind: 'location';
+      location: TimeClockLocationWithTags | null;
+      initial?: Partial<TimeClockLocationInput>;
+    }
   | { kind: 'tag'; location: TimeClockLocationWithTags }
   | null;
 
@@ -26,7 +34,36 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ canManage }) => {
   const { toast } = useToast();
   const { companies } = useCompanies();
   const { locations, isLoading, error, refetch } = useTimeClockLocations();
+  const suggestions = useLocationSuggestions(locations, canManage);
   const [dialog, setDialog] = useState<DialogState>(null);
+
+  const fail = (err: unknown) => {
+    toast({
+      title: 'Erro',
+      description: getErrorMessage(err, 'Operação falhou'),
+      variant: 'destructive',
+    });
+  };
+
+  const createFromSuggestion = (s: LocationSuggestion) =>
+    setDialog({
+      kind: 'location',
+      location: null,
+      initial: { company_id: s.companyId ?? '', latitude: s.lat, longitude: s.lng, radius_m: 50 },
+    });
+
+  const enlargeRadius = async (s: LocationSuggestion) => {
+    if (!s.nearest || !s.suggestedRadiusM) return;
+    const { error: updateError } = await timeClockLocationService.update(s.nearest.id, {
+      radius_m: s.suggestedRadiusM,
+    });
+    if (updateError) {
+      fail(updateError);
+      return;
+    }
+    toast({ title: `Raio de ${s.nearest.name} aumentado para ${s.suggestedRadiusM} m` });
+    refetch();
+  };
 
   const handleDelete = async (location: TimeClockLocationWithTags) => {
     if (
@@ -35,11 +72,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ canManage }) => {
       return;
     const { error: deleteError } = await timeClockLocationService.delete(location.id);
     if (deleteError) {
-      toast({
-        title: 'Erro',
-        description: getErrorMessage(deleteError, 'Operação falhou'),
-        variant: 'destructive',
-      });
+      fail(deleteError);
       return;
     }
     toast({ title: 'Local eliminado' });
@@ -59,6 +92,13 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ canManage }) => {
           </Button>
         )}
       </div>
+
+      <LocationSuggestionsCard
+        suggestions={suggestions.suggestions}
+        canManage={canManage}
+        onCreate={createFromSuggestion}
+        onEnlarge={enlargeRadius}
+      />
 
       {error && <p className="text-sm text-destructive">{error}</p>}
       {isLoading ? (
@@ -86,6 +126,7 @@ export const LocationsTab: React.FC<LocationsTabProps> = ({ canManage }) => {
       {dialog?.kind === 'location' && (
         <LocationFormDialog
           location={dialog.location}
+          initial={dialog.initial}
           companies={companies.map(c => ({ id: c.id, name: c.name }))}
           onClose={() => setDialog(null)}
           onSaved={() => {

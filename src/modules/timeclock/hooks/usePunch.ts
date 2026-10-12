@@ -3,6 +3,7 @@ import { getBestPosition, getDeviceId, type PositionPayload } from '@/lib/geoloc
 import type { TagPayload } from '@/lib/nfc';
 import {
   getErrorMessage,
+  getPunchFailureMessage,
   getPunchMessage,
   type EntryType,
   type PunchMethod,
@@ -135,7 +136,7 @@ export const usePunch = (): UsePunchResult => {
         return finish({
           ok: data.ok,
           code: data.code,
-          message: getPunchMessage(data.code),
+          message: getPunchFailureMessage(data.code, data.distance_m, data.location_name),
           entry: data.entry,
           canRequestRemote: data.can_request_remote === true,
           distanceM: data.distance_m ?? null,

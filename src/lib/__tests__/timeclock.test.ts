@@ -6,6 +6,7 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 import {
   formatDistance,
   formatMinutes,
+  getPunchFailureMessage,
   getErrorMessage,
   getNextEntryType,
   summarizeDays,
@@ -124,6 +125,16 @@ describe('helpers', () => {
   it('formats minutes as hours', () => {
     expect(formatMinutes(0)).toBe('0h00');
     expect(formatMinutes(485)).toBe('8h05');
+  });
+
+  it('explains a far-away rejection as a missing workplace, not as being outside', () => {
+    expect(getPunchFailureMessage('out_of_radius', 10_266, 'Premium Ride')).toBe(
+      'Não há nenhum local de trabalho registado perto de si (o mais próximo, Premium Ride, fica a 10,3 km). Se está no seu local de trabalho habitual, avise os RH para o adicionarem.'
+    );
+    expect(getPunchFailureMessage('out_of_radius', 80, 'Rua Das Oliveiras')).toBe(
+      'Está fora do local de trabalho.'
+    );
+    expect(getPunchFailureMessage('approximate_location')).toContain('Localização exata');
   });
 
   it('formats distances in m or km', () => {

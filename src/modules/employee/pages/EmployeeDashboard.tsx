@@ -75,6 +75,7 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { WorkdayClockButton } from '@/modules/timeclock/components/employee/WorkdayClockButton';
 
 interface SelectedFile {
   file: File;
@@ -640,7 +641,8 @@ const EmployeeDashboard = () => {
           </div>
 
           {/* Desktop: User info | Mobile: Dropdown menu */}
-          <div className="flex items-center gap-3 lg:gap-4">
+          <div className="flex items-center gap-2 lg:gap-4">
+            <WorkdayClockButton />
             <div className="text-right hidden lg:block">
               <p className="font-medium">{employee.name}</p>
               <p className="text-sm text-muted-foreground">{employee.companies?.name}</p>

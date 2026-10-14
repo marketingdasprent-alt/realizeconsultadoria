@@ -1,12 +1,8 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import {
-  ENTRY_STATUS_LABELS,
-  ENTRY_TYPE_LABELS,
-  HISTORY_ACTION_LABELS,
-  type TimeClockHistory,
-} from '@/lib/timeclock';
+import { ENTRY_STATUS_LABELS, HISTORY_ACTION_LABELS, type TimeClockHistory } from '@/lib/timeclock';
+import { getEntryLabel } from '@/lib/workday';
 
 interface HistoryChangeListProps {
   items: TimeClockHistory[];
@@ -16,16 +12,26 @@ interface HistoryChangeListProps {
 
 const FIELD_LABELS: Record<string, string> = {
   punched_at: 'Hora',
-  entry_type: 'Tipo',
+  type: 'Tipo',
   status: 'Estado',
   notes: 'Notas',
 };
+
+/** entry_type + kind mostrados juntos: Início / Pausa / Retoma / Fim. */
+const typeLabel = (data: Record<string, unknown>): string =>
+  data.entry_type
+    ? getEntryLabel({ entry_type: String(data.entry_type), kind: String(data.kind ?? 'work') })
+    : '—';
+
+const changedFields = (fields: string[]): string[] =>
+  [...new Set(fields.map(f => (f === 'entry_type' || f === 'kind' ? 'type' : f)))].filter(
+    f => FIELD_LABELS[f]
+  );
 
 const formatValue = (field: string, value: unknown): string => {
   if (value === null || value === undefined || value === '') return '—';
   if (field === 'punched_at' && typeof value === 'string')
     return format(new Date(value), 'dd/MM/yyyy HH:mm');
-  if (field === 'entry_type') return ENTRY_TYPE_LABELS[String(value)] ?? String(value);
   if (field === 'status') return ENTRY_STATUS_LABELS[String(value)] ?? String(value);
   return String(value);
 };
@@ -46,7 +52,9 @@ export const HistoryChangeList: React.FC<HistoryChangeListProps> = ({ items, emp
       {items.map(item => {
         const oldData = asRecord(item.old_data);
         const newData = asRecord(item.new_data);
-        const fields = item.changed_fields.filter(f => FIELD_LABELS[f]);
+        const fields = changedFields(item.changed_fields);
+        const show = (field: string, data: Record<string, unknown>) =>
+          field === 'type' ? typeLabel(data) : formatValue(field, data[field]);
         return (
           <li key={item.id} className="rounded-lg border border-border p-3 text-sm">
             <div className="flex flex-wrap items-center gap-2">
@@ -69,8 +77,8 @@ export const HistoryChangeList: React.FC<HistoryChangeListProps> = ({ items, emp
             </div>
             {item.action === 'create' && (
               <p className="mt-1 text-muted-foreground">
-                {formatValue('entry_type', newData.entry_type)} às{' '}
-                {formatValue('punched_at', newData.punched_at)} ({String(newData.source ?? '')})
+                {typeLabel(newData)} às {formatValue('punched_at', newData.punched_at)} (
+                {String(newData.source ?? '')})
               </p>
             )}
             {fields.length > 0 && item.action !== 'create' && (
@@ -78,10 +86,8 @@ export const HistoryChangeList: React.FC<HistoryChangeListProps> = ({ items, emp
                 {fields.map(field => (
                   <li key={field}>
                     <span className="text-muted-foreground">{FIELD_LABELS[field]}:</span>{' '}
-                    <span className="line-through opacity-70">
-                      {formatValue(field, oldData[field])}
-                    </span>{' '}
-                    → <span className="font-medium">{formatValue(field, newData[field])}</span>
+                    <span className="line-through opacity-70">{show(field, oldData)}</span> →{' '}
+                    <span className="font-medium">{show(field, newData)}</span>
                   </li>
                 ))}
               </ul>

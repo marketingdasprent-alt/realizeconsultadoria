@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo-realize.png';
 import EmployeeDocumentsSection from '@/components/employee/EmployeeDocumentsSection';
+import { WorkdayClockButton } from '@/modules/timeclock/components/employee/WorkdayClockButton';
 
 interface Employee {
   id: string;
@@ -95,14 +96,17 @@ const EmployeeDocumentsPage = () => {
                 </p>
               </div>
             </div>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-9 w-9 lg:h-10 lg:w-10"
-              onClick={handleLogout}
-            >
-              <LogOut className="h-5 w-5" />
-            </Button>
+            <div className="flex items-center gap-2 lg:gap-3">
+              <WorkdayClockButton />
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-9 w-9 lg:h-10 lg:w-10"
+                onClick={handleLogout}
+              >
+                <LogOut className="h-5 w-5" />
+              </Button>
+            </div>
           </div>
         </div>
       </header>

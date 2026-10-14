@@ -10,36 +10,40 @@ import type {
   TimeClockEntryWithRelations,
   TimeClockHistory,
 } from '@/lib/timeclock';
+import type { EntryKind, WorkdayAction, WorkdayStatus } from '@/lib/workday';
 
 export interface PunchRequest {
   method: PunchMethod;
+  /** Iniciar dia / Pausa / Retomar / Terminar dia. */
+  action: WorkdayAction;
   tag?: TagPayload;
-  position: PositionPayload;
+  /** null sem GPS: o ponto regista-se na mesma e fica a aguardar aprovação. */
+  position: PositionPayload | null;
   device_id: string | null;
-  /** Entrada ou Saída, escolhido e confirmado pelo colaborador. */
-  entry_type?: EntryType;
-  /** Confirma que é trabalho remoto (fica a aguardar aprovação). */
-  remote?: boolean;
-  /** Nota opcional do colaborador para o registo remoto. */
+  /** Observação opcional do colaborador. */
   note?: string;
+}
+
+export interface PunchEntry {
+  id: string;
+  entry_type: EntryType;
+  kind: EntryKind;
+  punched_at: string;
+  status: string;
+  flags: string[];
+  distance_m: number | null;
+  location_name: string | null;
+  work_mode: string;
+  created_at: string;
 }
 
 export interface PunchResponse {
   ok: boolean;
   code: string;
-  entry?: {
-    id: string;
-    entry_type: EntryType;
-    punched_at: string;
-    status: string;
-    flags: string[];
-    distance_m: number | null;
-    location_name: string | null;
-    work_mode: string;
-    created_at: string;
-  };
-  /** Recusado por estar fora do local: pode repetir com remote: true. */
-  can_request_remote?: boolean;
+  entry?: PunchEntry | null;
+  /** Estado da jornada depois do registo (ou o atual, quando o pedido chegou desatualizado). */
+  state?: WorkdayStatus;
+  /** Local mais próximo e distância: explicam porque ficou a aguardar aprovação. */
   distance_m?: number | null;
   location_name?: string | null;
 }
@@ -179,6 +183,7 @@ export const timeClockService = {
   createEntry: async (params: {
     employeeId: string;
     entryType: EntryType;
+    kind: EntryKind;
     punchedAtIso: string;
     reason: string;
     notes?: string | null;
@@ -186,6 +191,7 @@ export const timeClockService = {
     const { data, error } = await supabase.rpc('time_clock_admin_create_entry', {
       _employee_id: params.employeeId,
       _entry_type: params.entryType,
+      _kind: params.kind,
       _punched_at: params.punchedAtIso,
       _reason: params.reason,
       _notes: params.notes ?? null,
@@ -199,6 +205,7 @@ export const timeClockService = {
   updateEntry: async (params: {
     entryId: string;
     entryType: EntryType;
+    kind: EntryKind;
     punchedAtIso: string;
     reason: string;
     notes?: string | null;
@@ -206,6 +213,7 @@ export const timeClockService = {
     const { error } = await supabase.rpc('time_clock_admin_update_entry', {
       _entry_id: params.entryId,
       _entry_type: params.entryType,
+      _kind: params.kind,
       _punched_at: params.punchedAtIso,
       _reason: params.reason,
       _notes: params.notes ?? null,
@@ -238,11 +246,11 @@ export const timeClockService = {
   },
 
   /**
-   * O colaborador troca Entrada↔Saída do último registo (até 3 minutos depois).
+   * O colaborador desfaz o último registo (até 3 minutos depois). Devolve o estado da jornada.
    */
-  swapOwnEntry: async (entryId: string) => {
-    const { data, error } = await supabase.rpc('time_clock_swap_own_entry', { _entry_id: entryId });
-    return { data: (data as EntryType | null) ?? null, error };
+  undoOwnEntry: async (entryId: string) => {
+    const { data, error } = await supabase.rpc('time_clock_undo_own_entry', { _entry_id: entryId });
+    return { data: (data as WorkdayStatus | null) ?? null, error };
   },
 
   /**

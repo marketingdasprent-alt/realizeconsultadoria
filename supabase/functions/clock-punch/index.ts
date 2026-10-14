@@ -1,30 +1,33 @@
-// Registo de ponto do colaborador.
+// Registo de ponto do colaborador — jornada como no Bitrix24.
 //
-// POST { method: 'nfc' | 'gps', tag?: { t } | { e, c }, position, device_id,
-//        entry_type?: 'in' | 'out', remote?: boolean, note?: string }
+// POST { method: 'nfc' | 'gps', action: 'start' | 'pause' | 'resume' | 'stop',
+//        tag?: { t } | { e, c }, position?: { lat, lng, accuracy, age_ms } | null,
+//        device_id, note?: string }
+// (versões antigas da app enviam entry_type: 'in' | 'out' em vez de action.)
 //
-// Toda a validação é feita aqui (service role): identidade, tag NFC,
-// distância ao local, precisão GPS, IP/VPN, dispositivo e anti-replay.
-// Fora do local (ou sem local) o pedido é recusado com `can_request_remote`;
-// o colaborador pode repetir com `remote: true` e o registo fica 'pending'
-// até um admin aprovar (com email para a lista de aprovações).
-// Entrada/Saída: o colaborador escolhe (com confirmação na app); sem tipo, a BD
-// deduz do último registo. Duplicados e lock decididos em time_clock_register_punch.
+// Toda a validação é feita aqui (service role): identidade, tag NFC, distância
+// ao local, precisão GPS, IP/VPN, dispositivo e anti-replay. O ponto regista-se
+// sempre (decidePunch): fora dos locais ou sem GPS fica 'pending' até um admin
+// aprovar, com email para a lista de aprovações. Só se recusa tag inválida ou
+// repetida, tag de outra empresa e VPN/Tor quando o local o bloqueia.
+// A sequência (dia por iniciar → a trabalhar ⇄ em pausa → terminado), os
+// duplicados e o lock são decididos em time_clock_register_punch.
 // Respostas de negócio vêm sempre com HTTP 200 e { ok: boolean, code }.
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { hexToBytes, verifySunMessage } from '../_shared/ntag424.ts';
 import {
-  REMOTE_ELIGIBLE_REASONS,
-  evaluatePunch,
+  WORKDAY_ACTIONS,
+  decidePunch,
   haversineMeters,
+  ipMatchesAny,
   isValidPosition,
   sha256Hex,
   type IpInfo,
   type LocationRules,
   type PositionReading,
-  type PunchContext,
+  type WorkdayAction,
 } from '../_shared/timeclock-rules.ts';
 import { notifyApprovers } from './notify.ts';
 
@@ -38,11 +41,12 @@ const corsHeaders = {
 
 interface PunchRequest {
   method?: 'nfc' | 'gps';
+  action?: string;
   tag?: { t?: string; e?: string; c?: string };
-  position?: { lat?: number; lng?: number; accuracy?: number; age_ms?: number };
+  position?: { lat?: number; lng?: number; accuracy?: number; age_ms?: number } | null;
   device_id?: string;
+  /** Versões antigas da app: Entrada/Saída em vez de action. */
   entry_type?: 'in' | 'out';
-  remote?: boolean;
   note?: string;
 }
 
@@ -69,6 +73,7 @@ interface ResolvedTag {
 interface EntryRow {
   id: string;
   entry_type: 'in' | 'out';
+  kind: 'work' | 'break';
   punched_at: string;
   status: string;
   flags: string[];
@@ -76,6 +81,13 @@ interface EntryRow {
   source: string;
   work_mode: string;
   created_at: string;
+}
+
+interface RegisterResult {
+  duplicate?: boolean;
+  error?: 'invalid_state';
+  state?: 'closed' | 'working' | 'paused';
+  entry?: EntryRow | null;
 }
 
 const json = (body: unknown, status = 200) =>
@@ -95,6 +107,9 @@ const toRules = (l: LocationRow): LocationRules => ({
   blockVpn: l.block_vpn,
   trustedIps: l.trusted_ips ?? [],
 });
+
+const finiteOrNull = (value: number | undefined): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
 
 const getClientIp = (req: Request): string | null => {
   const forwarded = req.headers.get('x-forwarded-for');
@@ -198,7 +213,8 @@ serve(async (req: Request) => {
   }
   const method = body.method === 'nfc' ? 'nfc' : body.method === 'gps' ? 'gps' : null;
   if (!method) return json({ ok: false, code: 'bad_request' }, 400);
-  const wantsRemote = body.remote === true;
+  const action = WORKDAY_ACTIONS.find(a => a === body.action) ?? null;
+  if (body.action !== undefined && !action) return json({ ok: false, code: 'bad_request' }, 400);
   const entryType = body.entry_type === 'in' || body.entry_type === 'out' ? body.entry_type : null;
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, 300) : null;
 
@@ -219,6 +235,10 @@ serve(async (req: Request) => {
     accuracy: body.position?.accuracy,
     ageMs: body.position?.age_ms,
   };
+  const hasPosition = isValidPosition(position);
+  const latitude = hasPosition ? finiteOrNull(position.lat) : null;
+  const longitude = hasPosition ? finiteOrNull(position.lng) : null;
+  const accuracyM = hasPosition ? finiteOrNull(position.accuracy) : null;
 
   const logAttempt = async (
     reason: string,
@@ -228,8 +248,7 @@ serve(async (req: Request) => {
       distance_m?: number;
       flags?: string[];
       ip_country?: string | null;
-    } = {},
-    response: Record<string, unknown> = {}
+    } = {}
   ) => {
     await db.from('time_clock_attempts').insert({
       employee_id: employee.id,
@@ -239,21 +258,27 @@ serve(async (req: Request) => {
       flags: extra.flags ?? [],
       location_id: extra.location_id ?? null,
       tag_id: extra.tag_id ?? null,
-      latitude: Number.isFinite(position.lat) ? position.lat : null,
-      longitude: Number.isFinite(position.lng) ? position.lng : null,
-      accuracy_m: Number.isFinite(position.accuracy) ? position.accuracy : null,
+      latitude,
+      longitude,
+      accuracy_m: accuracyM,
       distance_m: Number.isFinite(extra.distance_m) ? extra.distance_m : null,
       ip_address: ip,
       ip_country: extra.ip_country ?? null,
       device_id: deviceId,
       user_agent: userAgent,
     });
-    return json({ ok: false, code: reason, ...response });
+    return json({ ok: false, code: reason });
   };
 
-  if (!isValidPosition(position)) return logAttempt('missing_position');
+  // 1. Locais da empresa (Wi-Fi do escritório, local mais próximo) e tag.
+  const { data: locationRows } = await db
+    .from('time_clock_locations')
+    .select(LOCATION_COLUMNS)
+    .eq('company_id', employee.company_id)
+    .eq('is_active', true);
+  const locations = (locationRows as LocationRow[] | null) ?? [];
+  const networkLocation = locations.find(l => ipMatchesAny(ip, l.trusted_ips ?? [])) ?? null;
 
-  // 1. Local: o da tag (NFC) ou o mais próximo da empresa (registo manual).
   let tag: ResolvedTag | null = null;
   let location: LocationRow | null = null;
   if (method === 'nfc') {
@@ -265,23 +290,21 @@ serve(async (req: Request) => {
     if (location.company_id !== employee.company_id) {
       return logAttempt('tag_other_company', { tag_id: tag.id, location_id: location.id });
     }
-  } else {
-    const { data: locations } = await db
-      .from('time_clock_locations')
-      .select(LOCATION_COLUMNS)
-      .eq('company_id', employee.company_id)
-      .eq('is_active', true);
+  } else if (hasPosition) {
     const here = { lat: position.lat, lng: position.lng };
-    location =
-      (locations as LocationRow[] | null)?.reduce<LocationRow | null>(
-        (best, l) =>
-          !best ||
-          haversineMeters(here, { lat: l.latitude, lng: l.longitude }) <
-            haversineMeters(here, { lat: best.latitude, lng: best.longitude })
-            ? l
-            : best,
-        null
-      ) ?? null;
+    location = locations.reduce<LocationRow | null>(
+      (best, l) =>
+        !best ||
+        haversineMeters(here, { lat: l.latitude, lng: l.longitude }) <
+          haversineMeters(here, { lat: best.latitude, lng: best.longitude })
+          ? l
+          : best,
+      null
+    );
+  } else {
+    // Sem GPS não há "mais próximo": o local da rede do escritório ou um com
+    // bloqueio de VPN (para a regra da VPN continuar a valer).
+    location = networkLocation ?? locations.find(l => l.block_vpn) ?? null;
   }
 
   // 2. Contexto: IP, último registo, dispositivo, coordenadas repetidas.
@@ -311,22 +334,28 @@ serve(async (req: Request) => {
           .neq('employee_id', employee.id)
           .gte('punched_at', since60d)
       : Promise.resolve({ count: 0 }),
-    db
-      .from('time_clock_entries')
-      .select('id', { count: 'exact', head: true })
-      .eq('employee_id', employee.id)
-      .eq('latitude', position.lat)
-      .eq('longitude', position.lng),
+    latitude !== null && longitude !== null
+      ? db
+          .from('time_clock_entries')
+          .select('id', { count: 'exact', head: true })
+          .eq('employee_id', employee.id)
+          .eq('latitude', latitude)
+          .eq('longitude', longitude)
+      : Promise.resolve({ count: 0 }),
   ]);
 
+  // 3. Regras: regista sempre; fora dos locais ou sem GPS fica a aguardar aprovação.
   const now = Date.now();
   const last = lastRes.data;
-  const context: PunchContext = {
+  const decision = decidePunch({
     method,
+    action,
     position,
     location: location ? toRules(location) : null,
     ip,
     ipInfo,
+    trustedNetwork: !!networkLocation,
+    manualNotAllowed: method === 'gps' && !!location && !location.allow_manual,
     previous: last
       ? {
           lat: last.latitude,
@@ -338,35 +367,18 @@ serve(async (req: Request) => {
     repeatedCoordinates: (repeatedRes.count ?? 0) > 0,
     deviceSeenBefore: !deviceId || (deviceSeenRes.count ?? 0) > 0,
     deviceUsedByOthers: (deviceOthersRes.count ?? 0) > 0,
-  };
-
-  // 3. Regras: primeiro como registo no local; se for recusado por estar fora,
-  //    o colaborador pode confirmar que é trabalho remoto (fica pendente).
-  const manualBlocked = method === 'gps' && location && !location.allow_manual;
-  let evaluation = manualBlocked ? null : evaluatePunch({ ...context, mode: 'office' });
-  const officeReason = manualBlocked ? 'manual_not_allowed' : (evaluation?.rejected ?? null);
-  const attemptExtra = {
-    location_id: location?.id,
-    tag_id: tag?.id,
-    distance_m: evaluation?.distanceM,
-    flags: evaluation?.flags,
-    ip_country: ipInfo.country,
-  };
-
-  if (officeReason) {
-    if (!REMOTE_ELIGIBLE_REASONS.has(officeReason)) return logAttempt(officeReason, attemptExtra);
-    if (!wantsRemote) {
-      return logAttempt(officeReason, attemptExtra, {
-        can_request_remote: true,
-        distance_m: Number.isFinite(evaluation?.distanceM) ? evaluation?.distanceM : null,
-        location_name: location?.name ?? null,
-      });
-    }
-    evaluation = evaluatePunch({ ...context, mode: 'remote' });
-    if (evaluation.rejected) return logAttempt(evaluation.rejected, attemptExtra);
+  });
+  if (decision.rejected) {
+    return logAttempt(decision.rejected, {
+      location_id: location?.id,
+      tag_id: tag?.id,
+      distance_m: decision.distanceM,
+      flags: decision.flags,
+      ip_country: ipInfo.country,
+    });
   }
-  if (!evaluation) return json({ ok: false, code: 'server_error' }, 500);
-  const isRemote = evaluation.status === 'pending';
+  const officeLocation =
+    decision.presence === 'network' ? networkLocation : decision.presence ? location : null;
 
   // 4. Anti-replay NTAG 424: só avança se o contador ainda for maior (evita corridas).
   if (tag) {
@@ -384,23 +396,23 @@ serve(async (req: Request) => {
     }
   }
 
-  // 5. Gravar (tipo, duplicados e lock decididos na BD).
-  const distanceM = Number.isFinite(evaluation.distanceM)
-    ? Math.round(evaluation.distanceM * 10) / 10
+  // 5. Gravar (sequência, duplicados e lock decididos na BD).
+  const distanceM = Number.isFinite(decision.distanceM)
+    ? Math.round(decision.distanceM * 10) / 10
     : null;
-  const { data: result, error: rpcError } = await db.rpc('time_clock_register_punch', {
+  const { data, error: rpcError } = await db.rpc('time_clock_register_punch', {
     _payload: {
       employee_id: employee.id,
       company_id: employee.company_id,
-      entry_type: entryType,
-      location_id: isRemote ? null : (location?.id ?? null),
+      ...(action ? { action } : { entry_type: entryType }),
+      location_id: officeLocation?.id ?? null,
       tag_id: tag?.id ?? null,
       source: method,
-      status: evaluation.status,
-      flags: evaluation.flags,
-      latitude: position.lat,
-      longitude: position.lng,
-      accuracy_m: position.accuracy,
+      status: decision.status,
+      flags: decision.flags,
+      latitude,
+      longitude,
+      accuracy_m: accuracyM,
       distance_m: distanceM,
       ip_address: ip,
       ip_country: ipInfo.country ?? null,
@@ -408,22 +420,23 @@ serve(async (req: Request) => {
       ip_is_proxy: ipInfo.checked ? !!ipInfo.isProxy : null,
       device_id: deviceId,
       user_agent: userAgent,
-      work_mode: isRemote ? 'remote' : 'office',
+      work_mode: officeLocation ? 'office' : 'remote',
       employee_note: note || null,
       user_id: userId,
     },
   });
+  const result = data as RegisterResult | null;
 
-  if (rpcError || !result?.entry) {
+  if (rpcError || !result) {
     console.error('clock-punch register error:', rpcError);
     return json({ ok: false, code: 'server_error' }, 500);
   }
 
-  const entry = result.entry as EntryRow;
-  const locationName = isRemote ? 'Fora do local de trabalho' : (location?.name ?? null);
-  const response = {
+  const locationName = officeLocation?.name ?? 'Fora do local de trabalho';
+  const toResponse = (entry: EntryRow) => ({
     id: entry.id,
     entry_type: entry.entry_type,
+    kind: entry.kind ?? 'work',
     punched_at: entry.punched_at,
     status: entry.status,
     flags: entry.flags,
@@ -432,9 +445,26 @@ serve(async (req: Request) => {
     work_mode: entry.work_mode,
     created_at: entry.created_at,
     location_name: locationName,
-  };
+  });
 
-  if (result.duplicate) return json({ ok: true, code: 'duplicate', entry: response });
+  // O ecrã estava desatualizado (ex.: dia terminado noutro telemóvel).
+  if (result.error === 'invalid_state') {
+    return json({
+      ok: false,
+      code: 'invalid_state',
+      state: result.state,
+      entry: result.entry ? toResponse(result.entry) : null,
+    });
+  }
+  if (!result.entry) {
+    console.error('clock-punch register: resposta sem registo', result);
+    return json({ ok: false, code: 'server_error' }, 500);
+  }
+
+  const entry = result.entry;
+  if (result.duplicate) {
+    return json({ ok: true, code: 'duplicate', state: result.state, entry: toResponse(entry) });
+  }
 
   // 6. Avisar os admins quando o registo precisa de decisão (sem atrasar a resposta).
   if (entry.status === 'pending' || entry.status === 'flagged') {
@@ -443,12 +473,13 @@ serve(async (req: Request) => {
       employeeName: employee.name,
       companyName: company?.name ?? null,
       entryType: entry.entry_type,
+      kind: entry.kind ?? 'work',
       punchedAt: entry.punched_at,
       status: entry.status,
       workMode: entry.work_mode,
-      latitude: position.lat,
-      longitude: position.lng,
-      accuracyM: position.accuracy,
+      latitude,
+      longitude,
+      accuracyM,
       distanceM,
       locationName: location?.name ?? null,
       flags: entry.flags,
@@ -461,6 +492,10 @@ serve(async (req: Request) => {
   return json({
     ok: true,
     code: entry.status === 'pending' ? 'pending_approval' : 'registered',
-    entry: response,
+    state: result.state,
+    entry: toResponse(entry),
+    // Para explicar porque ficou a aguardar aprovação ("a 10,3 km de Premium Ride").
+    distance_m: distanceM,
+    location_name: location?.name ?? null,
   });
 });

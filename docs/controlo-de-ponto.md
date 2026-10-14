@@ -1,49 +1,67 @@
-# Controlo de Ponto (NFC + GPS)
+# Controlo de Ponto (jornada como no Bitrix24)
 
 ## Como funciona
 
-| Forma de registo | Onde funciona | Prova de presença |
+O colaborador regista a **jornada** com quatro botões, como no Bitrix24:
+
+| Estado | Botões | Relógio |
 |---|---|---|
-| **Encostar o telemóvel à tag** (app fechada) | Android e iPhone (XS ou mais recente) | Tag + GPS no raio |
-| **"Registar manualmente"** dentro da app | Todos | Só GPS no raio (se o local permitir) |
+| Dia não iniciado | **Iniciar dia** | cinzento |
+| A trabalhar | **Pausa** · **Terminar dia** | verde, cronómetro do tempo trabalhado |
+| Em pausa | **Retomar** · **Terminar dia** | âmbar, cronómetro da pausa |
+| Dia terminado | **Iniciar dia** (novo turno) | cinzento, total do dia |
 
-A app não lê NFC por dentro: com tag, o colaborador encosta sempre o telemóvel com a app fechada.
+- O **relógio no canto superior** (Início, Tickets, Documentos) mostra a hora e o estado; ao
+  carregar abre o painel. A página **O Meu Ponto** tem o mesmo painel e o mês.
+- Encostar o telemóvel à **tag** abre a página da tag com o mesmo painel: o primeiro registo leva a
+  leitura da tag (prova de presença).
+- Só aparecem os botões que fazem sentido, e a base valida a sequência
+  (`time_clock_register_punch`): não se pausa um dia por iniciar nem se inicia dois. Um dia aberto ou
+  em pausa há mais de 12 h conta como terminado (esquecimento) e fica "incompleto" para os RH.
+- **Desfazer** durante 3 minutos (`time_clock_undo_own_entry`): anula o último registo próprio.
+- **Adicionar observação** (até 300 caracteres) é opcional e vai para o registo, o email e a folha.
+- As horas contam de Início/Retoma até Pausa/Fim: as pausas ficam fora e aparecem à parte.
 
-Em ambos os casos abre o formulário **Registar Ponto**: o colaborador escolhe **Entrada** ou
-**Saída**, pode escrever **Observações** (até 300 caracteres) e marca a confirmação antes de
-**Registar**. O tipo deixou de ser adivinhado pelo último registo: assim, uma picagem esquecida
-(ex.: saída para almoço) afeta só esse dia, que fica "incompleto" para os RH corrigirem, em vez
-de inverter as picagens seguintes. As observações ficam no registo, no email de aprovação e na
-coluna Observações da folha impressa/PDF.
+Cada ação é um registo em `time_clock_entries` com `entry_type` + `kind`:
+Início = in/work, Pausa = out/break, Retoma = in/break, Fim = out/work. Os registos antigos são
+todos `work` (Entrada = Início, Saída = Fim) e continuam a contar igual.
 
-A tag contém apenas um URL, por exemplo `https://realize.dasprent.pt/ponto/nfc?t=…`.
-Ao encostar, o sistema operativo abre esse URL. A página obtém o GPS e chama a edge function
-`clock-punch`, que decide **no servidor**:
+### Regista sempre; revê-se depois
 
-1. Valida a tag (token estático ou mensagem cifrada NTAG 424).
-2. Confirma que o local é da empresa do colaborador.
-3. Calcula a distância ao local (Haversine) e exige precisão GPS mínima.
-4. Verifica o IP (VPN/proxy/datacenter, país/distância) via proxycheck.io.
-5. Verifica o dispositivo (novo / partilhado entre colegas), coordenadas repetidas e viagens impossíveis.
-6. Rejeita (fica em *Tentativas rejeitadas*) ou grava; sinais fracos → registo **em revisão**.
-7. Fora do local (ou sem local configurado) o colaborador pode confirmar **trabalho remoto**: o
-   registo fica **a aguardar aprovação** e a lista de *Emails de aprovação* recebe um email.
+Como no Bitrix24, o ponto **nunca falha por GPS ou distância**. A edge function `clock-punch`
+decide no servidor (`decidePunch`):
+
+| Situação | Resultado |
+|---|---|
+| GPS dentro do raio de um local | válido |
+| Tag NFC (com GPS a confirmar, ou GPS fraco) | válido / em revisão |
+| Tag sem GPS | em revisão (`no_gps`) |
+| IP na rede de confiança de um local (Wi-Fi do escritório) | válido, mesmo sem GPS |
+| Fora dos locais, sem GPS, GPS fraco ou localização aproximada | **registado, a aguardar aprovação**, com o motivo |
+| **Pausa** em qualquer sítio | válida (parar o relógio não acrescenta horas) |
+| VPN/Tor num local com "Bloquear VPN" | recusado |
+| Tag inválida, repetida ou de outra empresa | recusado |
+
+O motivo fica nas flags (`outside_location`, `no_gps`, `stale_gps`, `weak_gps`,
+`approximate_location`, `no_location_configured`, `tag_required`) e o colaborador vê-o logo
+("Está a 10,3 km de Premium Ride…", "Não foi possível obter a sua localização…") com a dica para
+a próxima vez. Os pendentes vão para **Ponto → Revisão** e para a lista de *Emails de aprovação*.
+
+Verificações feitas em cada registo: tag (token estático ou NTAG 424), local da empresa, distância
+(Haversine) e precisão GPS, IP (VPN/Tor/país) via proxycheck.io, dispositivo novo/partilhado,
+coordenadas repetidas e viagens impossíveis. Sinais fracos → **em revisão**.
 
 A hora gravada é sempre a do servidor. O histórico (`time_clock_entry_history`) é preenchido por
-trigger e é imutável; os admins só alteram registos através de RPCs que exigem motivo.
+trigger e é imutável; os admins só alteram registos através de RPCs que exigem motivo (o formulário
+do admin tem os quatro tipos: Início do dia, Pausa, Retoma, Fim do dia).
 
 ### Locais em falta e GPS
 
-- **Locais em falta** (Ponto → Locais & Tags): quando várias picagens são recusadas no mesmo sítio
-  (2+ tentativas a menos de 150 m, GPS com precisão ≤ 100 m, últimos 30 dias), aparece o sítio com
-  quem tentou e um botão **Criar local aqui** (ou **Aumentar raio** se for mesmo ao lado de um local).
-  É quase sempre um local de trabalho por configurar.
-- Longe de todos os locais (> 1 km), o colaborador vê "Não há nenhum local de trabalho registado perto
-  de si… avise os RH", em vez de "Está fora do local de trabalho".
-- **Tag + GPS impreciso**: a tag prova a presença, por isso o registo é aceite e fica em revisão
-  (`imprecise_gps`) em vez de recusado.
-- **Localização aproximada** (precisão ≥ 1 km, típico do iPhone sem "Localização exata"): recusa com
-  instruções para ativar a localização exata, ou registar na tag.
+- **Locais em falta** (Ponto → Locais & Tags): sítios com várias tentativas fora dos locais
+  (2+ a menos de 150 m, GPS ≤ 100 m, últimos 30 dias), com **Criar local aqui** ou **Aumentar raio**.
+  Enquanto um local de trabalho não existir, os registos lá feitos ficam a aguardar aprovação.
+- **Wi-Fi do escritório**: pôr o IP público do escritório em "IPs de confiança" do local valida os
+  registos feitos nessa rede mesmo sem GPS (exceto em locais que exigem a tag).
 
 ### Onde abre a tag (browser ou app)
 
@@ -78,8 +96,9 @@ O registo funciona igual no browser e na app instalada; só muda onde aparece.
 
 ## Ativação (uma vez)
 
-1. **Base de dados** — correr `supabase/migrations/20260923120000_create_time_clock.sql` no SQL
-   Editor do projeto `jvvnsoasylusbmxfotci`.
+1. **Base de dados** — correr no SQL Editor do projeto `jvvnsoasylusbmxfotci`, por ordem, as
+   migrações `supabase/migrations/2026*_time_clock*.sql` (a da jornada com pausas é
+   `20261014120000_time_clock_workday.sql`; tem de estar aplicada antes de publicar `clock-punch`).
 2. **Edge functions**
    ```bash
    supabase functions deploy clock-punch --project-ref jvvnsoasylusbmxfotci

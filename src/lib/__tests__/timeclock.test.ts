@@ -6,25 +6,31 @@ vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
 import {
   formatDistance,
   formatMinutes,
-  getPunchFailureMessage,
   getErrorMessage,
-  getNextEntryType,
   summarizeDays,
   type TimeClockEntry,
 } from '../timeclock';
 
 let seq = 0;
-const entry = (entry_type: 'in' | 'out', local: string, status = 'valid'): TimeClockEntry =>
+const entry = (
+  entry_type: 'in' | 'out',
+  local: string,
+  status = 'valid',
+  kind: 'work' | 'break' = 'work'
+): TimeClockEntry =>
   ({
     id: `e${++seq}`,
     employee_id: 'emp-1',
     company_id: 'c-1',
     entry_type,
+    kind,
     punched_at: new Date(local).toISOString(),
     status,
     flags: [],
     source: 'nfc',
   }) as TimeClockEntry;
+const pause = (local: string) => entry('out', local, 'valid', 'break');
+const resume = (local: string) => entry('in', local, 'valid', 'break');
 
 describe('summarizeDays', () => {
   it('sums paired in/out intervals per day, including breaks', () => {
@@ -111,6 +117,50 @@ describe('summarizeDays', () => {
     expect(day.incomplete).toBe(true);
   });
 
+  it('keeps pauses out of the worked time and sums them separately', () => {
+    const [day] = summarizeDays([
+      entry('in', '2026-10-14T09:00:00'),
+      pause('2026-10-14T12:30:00'),
+      resume('2026-10-14T13:15:00'),
+      entry('out', '2026-10-14T18:00:00'),
+    ]);
+    expect(day.workedMinutes).toBe(3 * 60 + 30 + 4 * 60 + 45);
+    expect(day.breakMinutes).toBe(45);
+    expect(day.incomplete).toBe(false);
+  });
+
+  it('accepts ending the day during a pause', () => {
+    const [day] = summarizeDays([
+      entry('in', '2026-10-14T09:00:00'),
+      pause('2026-10-14T17:00:00'),
+      entry('out', '2026-10-14T17:05:00'),
+    ]);
+    expect(day.workedMinutes).toBe(8 * 60);
+    expect(day.incomplete).toBe(false);
+  });
+
+  it('shows a current pause and flags a pause that was never ended', () => {
+    const [current] = summarizeDays(
+      [entry('in', '2026-10-14T09:00:00'), pause('2026-10-14T12:30:00')],
+      new Date('2026-10-14T12:40:00')
+    );
+    expect(current.pausedSince).not.toBeNull();
+    expect(current.incomplete).toBe(false);
+
+    const days = summarizeDays(
+      [
+        entry('in', '2026-10-13T09:00:00'),
+        pause('2026-10-13T12:30:00'),
+        entry('in', '2026-10-14T09:00:00'),
+      ],
+      new Date('2026-10-14T10:00:00')
+    );
+    const monday = days.find(d => d.date === '2026-10-13');
+    expect(monday?.workedMinutes).toBe(3 * 60 + 30);
+    expect(monday?.incomplete).toBe(true);
+    expect(monday?.pausedSince).toBeNull();
+  });
+
   it('counts pending remote entries provisionally and marks the day', () => {
     const [day] = summarizeDays([
       entry('in', '2026-09-21T09:00:00', 'pending'),
@@ -127,26 +177,9 @@ describe('helpers', () => {
     expect(formatMinutes(485)).toBe('8h05');
   });
 
-  it('explains a far-away rejection as a missing workplace, not as being outside', () => {
-    expect(getPunchFailureMessage('out_of_radius', 10_266, 'Premium Ride')).toBe(
-      'Não há nenhum local de trabalho registado perto de si (o mais próximo, Premium Ride, fica a 10,3 km). Se está no seu local de trabalho habitual, avise os RH para o adicionarem.'
-    );
-    expect(getPunchFailureMessage('out_of_radius', 80, 'Rua Das Oliveiras')).toBe(
-      'Está fora do local de trabalho.'
-    );
-    expect(getPunchFailureMessage('approximate_location')).toContain('Localização exata');
-  });
-
   it('formats distances in m or km', () => {
     expect(formatDistance(45.4)).toBe('45 m');
     expect(formatDistance(2345)).toBe('2,3 km');
-  });
-
-  it('suggests the next entry type', () => {
-    const now = new Date('2026-09-23T12:00:00');
-    expect(getNextEntryType(null, now)).toBe('in');
-    expect(getNextEntryType(entry('in', '2026-09-23T09:00:00'), now)).toBe('out');
-    expect(getNextEntryType(entry('out', '2026-09-23T11:00:00'), now)).toBe('in');
   });
 
   it('extracts messages from Error and PostgrestError-like objects', () => {

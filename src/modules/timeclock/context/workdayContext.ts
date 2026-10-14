@@ -10,6 +10,8 @@ export interface RunOptions {
   note?: string;
   method?: PunchMethod;
   tag?: TagPayload;
+  /** Hora de um registo esquecido (ISO); a nota é o motivo. */
+  at?: string;
 }
 
 export interface WorkdayContextValue {
@@ -22,11 +24,9 @@ export interface WorkdayContextValue {
   outcome: PunchOutcome | null;
   isBusy: boolean;
   run: (action: WorkdayAction, options?: RunOptions) => Promise<PunchOutcome | null>;
-  /** Desfaz o registo acabado de fazer. Devolve a mensagem de erro, ou null. */
-  undo: () => Promise<string | null>;
   warmUp: () => void;
   refetch: () => Promise<void>;
-  /** Muda a cada registo novo ou desfeito (para outras listas recarregarem). */
+  /** Muda a cada registo novo (para outras listas recarregarem). */
   version: number;
 }
 

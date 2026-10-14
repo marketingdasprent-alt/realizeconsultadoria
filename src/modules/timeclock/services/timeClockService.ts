@@ -20,8 +20,10 @@ export interface PunchRequest {
   /** null sem GPS: o ponto regista-se na mesma e fica a aguardar aprovação. */
   position: PositionPayload | null;
   device_id: string | null;
-  /** Observação opcional do colaborador. */
+  /** Observação opcional do colaborador (obrigatória com `at`: é o motivo). */
   note?: string;
+  /** Hora de um registo esquecido (ISO), indicada no ✎; fica a aguardar aprovação. */
+  at?: string;
 }
 
 export interface PunchEntry {
@@ -32,6 +34,8 @@ export interface PunchEntry {
   status: string;
   flags: string[];
   distance_m: number | null;
+  /** Morada aproximada (OpenStreetMap) quando o registo foi fora dos locais. */
+  address: string | null;
   location_name: string | null;
   work_mode: string;
   created_at: string;
@@ -243,14 +247,6 @@ export const timeClockService = {
       _reason: reason ?? null,
     });
     return { count: (data as number | null) ?? 0, error };
-  },
-
-  /**
-   * O colaborador desfaz o último registo (até 3 minutos depois). Devolve o estado da jornada.
-   */
-  undoOwnEntry: async (entryId: string) => {
-    const { data, error } = await supabase.rpc('time_clock_undo_own_entry', { _entry_id: entryId });
-    return { data: (data as WorkdayStatus | null) ?? null, error };
   },
 
   /**

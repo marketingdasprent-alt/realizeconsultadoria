@@ -46,7 +46,6 @@ describe('TimeClockNfcPage', () => {
       outcome: null,
       isBusy: false,
       run,
-      undo: vi.fn(),
       warmUp,
       refetch: vi.fn(),
       version: 0,

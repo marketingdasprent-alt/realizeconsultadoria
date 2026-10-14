@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { getBestPosition } from '@/lib/geolocation';
 import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
 import { WorkdayProvider } from '../../../context/WorkdayProvider';
@@ -15,7 +15,6 @@ vi.mock('../../../services/timeClockService', () => ({
     getCurrentEmployee: vi.fn(),
     getMyEntries: vi.fn(),
     punch: vi.fn(),
-    undoOwnEntry: vi.fn(),
   },
 }));
 
@@ -47,7 +46,9 @@ const entry = (
     flags: [],
     source: 'gps',
     work_mode: 'office',
-    location: { name: 'Escritório Leiria' },
+    latitude: 39.749,
+    address: null,
+    location: { name: 'Rua Das Oliveiras' },
     ...extra,
   }) as TimeClockEntryWithRelations;
 
@@ -63,12 +64,11 @@ const punchResponse = (e: TimeClockEntryWithRelations, code = 'registered'): Pun
     status: e.status,
     flags: e.flags,
     distance_m: 12,
-    location_name: 'Escritório Leiria',
+    address: e.address,
+    location_name: 'Rua Das Oliveiras',
     work_mode: e.work_mode,
     created_at: e.created_at,
   },
-  distance_m: 12,
-  location_name: 'Escritório Leiria',
 });
 
 const renderPanel = (ui = <WorkdayPanel />) =>
@@ -94,6 +94,10 @@ describe('WorkdayPanel', () => {
     });
   });
 
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
   it('starts the day with one tap and switches to Pausa / Terminar dia', async () => {
     const started = entry('in', 'work', new Date().toISOString());
     vi.mocked(timeClockService.punch).mockResolvedValue({
@@ -108,7 +112,7 @@ describe('WorkdayPanel', () => {
     vi.mocked(timeClockService.getMyEntries).mockResolvedValue({ data: [started], error: null });
     fireEvent.click(screen.getByRole('button', { name: 'Iniciar dia' }));
 
-    await waitFor(() => expect(screen.getByText(/Dia iniciado às/)).toBeInTheDocument());
+    expect(await screen.findByText('A trabalhar')).toBeInTheDocument();
     expect(timeClockService.punch).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'start',
@@ -117,9 +121,9 @@ describe('WorkdayPanel', () => {
         position: expect.objectContaining({ lat: 39.749, accuracy: 12 }),
       })
     );
-    expect(await screen.findByText('A trabalhar')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Pausa' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Terminar dia' })).toBeInTheDocument();
+    expect(screen.getByText('Rua Das Oliveiras')).toBeInTheDocument();
   });
 
   it('shows Retomar while paused, with the pause timer', async () => {
@@ -136,12 +140,14 @@ describe('WorkdayPanel', () => {
     expect(screen.queryByRole('button', { name: 'Iniciar dia' })).not.toBeInTheDocument();
   });
 
-  it('registers even without GPS and explains why it waits for approval', async () => {
+  it('registers without GPS quietly: no approval message, the timeline says why', async () => {
     vi.mocked(getBestPosition).mockRejectedValue(new Error('Permissão de localização negada.'));
     const pending = entry('in', 'work', new Date().toISOString(), {
       status: 'pending',
       work_mode: 'remote',
       flags: ['no_gps', 'remote'],
+      latitude: null,
+      location: null,
     });
     vi.mocked(timeClockService.punch).mockResolvedValue({
       data: punchResponse(pending, 'pending_approval'),
@@ -149,29 +155,82 @@ describe('WorkdayPanel', () => {
     });
     renderPanel();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Iniciar dia' }));
+    const startButton = await screen.findByRole('button', { name: 'Iniciar dia' });
+    vi.mocked(timeClockService.getMyEntries).mockResolvedValue({ data: [pending], error: null });
+    fireEvent.click(startButton);
 
-    await waitFor(() => expect(screen.getByText(/aguarda aprovação dos RH/)).toBeInTheDocument());
-    expect(screen.getByText(/Não foi possível obter a sua localização/)).toBeInTheDocument();
+    expect(await screen.findByText('Sem localização')).toBeInTheDocument();
     expect(timeClockService.punch).toHaveBeenCalledWith(
       expect.objectContaining({ action: 'start', position: null })
     );
+    expect(screen.queryByText(/aprova/i)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Desfazer/)).not.toBeInTheDocument();
   });
 
-  it('undoes the last registration', async () => {
-    const started = entry('in', 'work', new Date().toISOString());
-    vi.mocked(timeClockService.punch).mockResolvedValue({
-      data: punchResponse(started),
+  it('shows where the person was instead of "a aprovar"', async () => {
+    vi.mocked(timeClockService.getMyEntries).mockResolvedValue({
+      data: [
+        entry('in', 'work', minutesAgo(60), {
+          status: 'pending',
+          flags: ['outside_location', 'remote'],
+          location: null,
+          address: 'Rua da Ferraria 3, Leiria',
+        }),
+      ],
       error: null,
     });
-    vi.mocked(timeClockService.undoOwnEntry).mockResolvedValue({ data: 'closed', error: null });
     renderPanel();
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Iniciar dia' }));
-    fireEvent.click(await screen.findByRole('button', { name: /Desfazer/ }));
+    expect(await screen.findByText('Rua da Ferraria 3, Leiria')).toBeInTheDocument();
+    expect(screen.getByText('Moradas © OpenStreetMap')).toBeInTheDocument();
+    expect(screen.queryByText(/a aprovar/)).not.toBeInTheDocument();
+  });
 
-    await waitFor(() => expect(timeClockService.undoOwnEntry).toHaveBeenCalledWith(started.id));
-    await waitFor(() => expect(screen.queryByText(/Dia iniciado às/)).not.toBeInTheDocument());
+  it('continues a day ended by mistake and registers the forgotten return (✎)', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-10-14T17:38:00'));
+    // Almoço gravado como fim do dia; esqueceu-se de registar o regresso às 14:00.
+    const lunch = entry('out', 'work', new Date('2026-10-14T13:01:00').toISOString());
+    vi.mocked(timeClockService.getMyEntries).mockResolvedValue({
+      data: [entry('in', 'work', new Date('2026-10-14T08:44:00').toISOString()), lunch],
+      error: null,
+    });
+    const back = entry('in', 'break', new Date('2026-10-14T14:00:00').toISOString(), {
+      status: 'pending',
+      flags: ['manual_time'],
+    });
+    vi.mocked(timeClockService.punch).mockResolvedValue({
+      data: punchResponse(back, 'pending_approval'),
+      error: null,
+    });
+    renderPanel();
+
+    expect(await screen.findByText('Dia terminado')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Iniciar dia' })).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Registar com outra hora' }));
+    fireEvent.change(screen.getByLabelText('Hora do registo'), { target: { value: '14:00' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Retomar dia' }));
+    expect(await screen.findByText('Escreva o motivo da correção.')).toBeInTheDocument();
+    expect(timeClockService.punch).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText('Motivo da correção'), {
+      target: { value: 'Esqueci-me de registar o regresso do almoço' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Retomar dia' }));
+
+    await waitFor(() =>
+      expect(timeClockService.punch).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'resume',
+          at: new Date('2026-10-14T14:00:00').toISOString(),
+          note: 'Esqueci-me de registar o regresso do almoço',
+        })
+      )
+    );
+    await waitFor(() =>
+      expect(screen.queryByLabelText('Motivo da correção')).not.toBeInTheDocument()
+    );
   });
 });
 
@@ -207,6 +266,6 @@ describe('WorkdayClockButton', () => {
     fireEvent.click(trigger);
 
     expect(await screen.findByRole('button', { name: 'Terminar dia' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Ver o meu ponto/ })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Ver o meu ponto' })).toBeInTheDocument();
   });
 });

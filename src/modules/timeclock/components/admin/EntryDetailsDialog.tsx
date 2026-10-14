@@ -62,6 +62,7 @@ export const EntryDetailsDialog: React.FC<EntryDetailsDialogProps> = ({ entry, o
               : 'No local de trabalho'}
           </Row>
           <Row label="Local">{entry.location?.name}</Row>
+          <Row label="Morada">{entry.address ? `${entry.address} (© OpenStreetMap)` : null}</Row>
           <Row label="Localização">
             {hasCoords ? (
               <a

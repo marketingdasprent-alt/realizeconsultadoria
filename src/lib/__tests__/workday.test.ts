@@ -1,13 +1,14 @@
 import { describe, expect, it } from 'vitest';
-import type { TimeClockEntry } from '../timeclock';
+import type { TimeClockEntry, TimeClockEntryWithRelations } from '../timeclock';
 import {
-  ALLOWED_ACTIONS,
+  buildCorrection,
   deriveWorkday,
   formatTimer,
+  getActionLabel,
+  getAllowedActions,
   getEntryAction,
   getEntryLabel,
-  getPendingReason,
-  getPendingTip,
+  getEntryPlace,
   getWorkdayStatus,
 } from '../workday';
 
@@ -46,9 +47,12 @@ describe('workday labels', () => {
   });
 
   it('offers only the buttons that make sense in each state', () => {
-    expect(ALLOWED_ACTIONS.closed).toEqual(['start']);
-    expect(ALLOWED_ACTIONS.working).toEqual(['pause', 'stop']);
-    expect(ALLOWED_ACTIONS.paused).toEqual(['resume', 'stop']);
+    expect(getAllowedActions({ status: 'closed', canContinue: false })).toEqual(['start']);
+    expect(getAllowedActions({ status: 'closed', canContinue: true })).toEqual(['resume']);
+    expect(getAllowedActions({ status: 'working', canContinue: false })).toEqual(['pause', 'stop']);
+    expect(getAllowedActions({ status: 'paused', canContinue: false })).toEqual(['resume', 'stop']);
+    expect(getActionLabel('resume', 'closed')).toBe('Retomar dia');
+    expect(getActionLabel('resume', 'paused')).toBe('Retomar');
   });
 
   it('formats the running timer', () => {
@@ -144,16 +148,68 @@ describe('deriveWorkday', () => {
   });
 });
 
-describe('pending explanations', () => {
-  it('explains why the punch waits for approval', () => {
-    expect(getPendingReason(['no_gps'])).toContain('localização');
-    expect(getPendingReason(['outside_location'], 80, 'Rua Das Oliveiras')).toBe(
-      'Está a 80 m de Rua Das Oliveiras, fora do raio.'
+describe('Retomar dia (terminou por engano)', () => {
+  it('can continue a day that ended today, as Bitrix24 does', () => {
+    // A saída para o almoço ficou gravada como fim do dia (versão antiga).
+    const entries = [start('2026-10-14T08:44:00'), stop('2026-10-14T13:01:00')];
+    const day = deriveWorkday(entries, new Date('2026-10-14T17:38:00'));
+    expect(day.status).toBe('closed');
+    expect(day.endedAt).toBe(new Date('2026-10-14T13:01:00').toISOString());
+    expect(day.canContinue).toBe(true);
+    expect(getAllowedActions(day)).toEqual(['resume']);
+  });
+
+  it('starts a new day after yesterday or after 12 hours', () => {
+    const yesterday = [start('2026-10-13T09:00:00'), stop('2026-10-13T18:00:00')];
+    expect(deriveWorkday(yesterday, new Date('2026-10-14T08:00:00')).canContinue).toBe(false);
+    const early = [start('2026-10-14T00:10:00'), stop('2026-10-14T01:00:00')];
+    expect(deriveWorkday(early, new Date('2026-10-14T13:30:00')).canContinue).toBe(false);
+    expect(deriveWorkday([], new Date('2026-10-14T08:00:00')).canContinue).toBe(false);
+  });
+});
+
+describe('buildCorrection (✎ registo esquecido)', () => {
+  const now = new Date('2026-10-14T17:38:00');
+  const lunch = stop('2026-10-14T13:01:00');
+
+  it('turns 14:00 + motivo into today 14:00', () => {
+    expect(buildCorrection('14:00', 'Esqueci-me de retomar', lunch, now)).toEqual({
+      at: new Date('2026-10-14T14:00:00').toISOString(),
+    });
+  });
+
+  it('explains what is wrong before sending', () => {
+    expect(buildCorrection('', 'motivo', lunch, now)).toEqual({ error: 'Indique a hora.' });
+    expect(buildCorrection('18:00', 'motivo', lunch, now)).toEqual({
+      error: 'A hora não pode ser no futuro.',
+    });
+    expect(buildCorrection('12:30', 'motivo', lunch, now)).toEqual({
+      error: 'Tem de ser depois do último registo (13:01).',
+    });
+    expect(buildCorrection('14:00', '  ', lunch, now)).toEqual({
+      error: 'Escreva o motivo da correção.',
+    });
+    expect('error' in buildCorrection('05:00', 'motivo', null, now)).toBe(true);
+  });
+});
+
+describe('getEntryPlace', () => {
+  const entry = (extra: Partial<TimeClockEntryWithRelations>) =>
+    ({
+      ...start('2026-10-14T09:00:00'),
+      latitude: 39.7,
+      address: null,
+      ...extra,
+    }) as TimeClockEntryWithRelations;
+
+  it('shows the workplace, else the street, else that there was no GPS', () => {
+    expect(getEntryPlace(entry({ location: { name: 'Rua Das Oliveiras' }, address: 'x' }))).toBe(
+      'Rua Das Oliveiras'
     );
-    expect(getPendingReason(['outside_location'], 10_266, 'Premium Ride')).toBe(
-      'Não há nenhum local de trabalho registado perto de si (o mais próximo, Premium Ride, fica a 10,3 km). Se está no seu local habitual, avise os RH para o adicionarem.'
+    expect(getEntryPlace(entry({ address: 'Rua da Ferraria 3, Leiria' }))).toBe(
+      'Rua da Ferraria 3, Leiria'
     );
-    expect(getPendingTip(['approximate_location'])).toContain('Localização exata');
-    expect(getPendingTip(['outside_location'])).toBeNull();
+    expect(getEntryPlace(entry({ latitude: null }))).toBe('Sem localização');
+    expect(getEntryPlace(entry({ latitude: null, source: 'admin' }))).toBeNull();
   });
 });

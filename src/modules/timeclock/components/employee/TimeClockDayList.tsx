@@ -1,7 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { House } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { formatMinutes, type DaySummary } from '@/lib/timeclock';
 import { getEntryLabel } from '@/lib/workday';
@@ -20,7 +19,7 @@ export const TimeClockDayList: React.FC<TimeClockDayListProps> = ({ days, emptyM
   return (
     <div className="space-y-3">
       {days.map(day => (
-        <div key={day.date} className="rounded-lg border border-border p-3">
+        <div key={day.date} className="rounded-2xl p-3 ring-1 ring-border/70">
           <div className="flex items-center justify-between gap-2 mb-2">
             <span className="font-medium text-sm capitalize">
               {format(new Date(`${day.date}T12:00:00`), "EEEE, d 'de' MMMM", { locale: pt })}
@@ -31,23 +30,19 @@ export const TimeClockDayList: React.FC<TimeClockDayListProps> = ({ days, emptyM
               {day.pausedSince && ' · em pausa'}
             </span>
           </div>
-          <div className="flex flex-wrap gap-2">
+          <div className="flex flex-wrap gap-1.5">
             {[...day.entries]
               .sort((a, b) => a.punched_at.localeCompare(b.punched_at))
               .map(entry => (
                 <Badge
                   key={entry.id}
                   variant={entry.entry_type === 'in' ? 'default' : 'secondary'}
-                  className={`gap-1 ${entry.status === 'voided' ? 'line-through opacity-60' : ''} ${
-                    entry.status === 'pending'
-                      ? 'border-dashed border-sky-500 bg-sky-100 text-sky-900'
-                      : ''
+                  className={`rounded-full font-medium ${
+                    entry.status === 'voided' ? 'line-through opacity-60' : ''
                   }`}
-                  title={entry.status === 'pending' ? 'A aguardar aprovação dos RH' : undefined}
+                  title={entry.status === 'voided' ? 'Anulado' : undefined}
                 >
-                  {entry.work_mode === 'remote' && <House className="h-3 w-3" />}
                   {getEntryLabel(entry)} {format(new Date(entry.punched_at), 'HH:mm')}
-                  {entry.status === 'flagged' && ' ⚠'}
                 </Badge>
               ))}
           </div>
@@ -56,14 +51,9 @@ export const TimeClockDayList: React.FC<TimeClockDayListProps> = ({ days, emptyM
               Pausas: {formatMinutes(day.breakMinutes)} (não contam como trabalho)
             </p>
           )}
-          {day.hasPending && (
-            <p className="text-xs text-sky-700 mt-2">
-              Tem registos a aguardar aprovação dos RH (fora do local ou sem GPS).
-            </p>
-          )}
           {day.incomplete && (
             <p className="text-xs text-amber-600 mt-2">
-              Dia com registo incompleto — fale com os RH se se esqueceu de picar.
+              Dia com registo incompleto — use o ✎ no ponto ou fale com os RH.
             </p>
           )}
         </div>

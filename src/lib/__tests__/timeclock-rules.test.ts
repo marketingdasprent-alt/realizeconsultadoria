@@ -2,11 +2,14 @@
 import { describe, expect, it } from 'vitest';
 import {
   REMOTE_ELIGIBLE_REASONS,
+  applyManualTime,
   decidePunch,
   evaluatePunch,
+  formatOsmAddress,
   haversineMeters,
   ipMatchesAny,
   nextEntryType,
+  parseManualTime,
   sha256Hex,
   type DecideContext,
   type PunchContext,
@@ -370,6 +373,57 @@ describe('decidePunch — regista sempre (como o Bitrix24)', () => {
     expect(allowed.rejected).toBeNull();
     expect(allowed.status).toBe('flagged');
     expect(allowed.flags).toContain('vpn_or_proxy');
+  });
+});
+
+describe('correção de hora (✎)', () => {
+  const now = Date.UTC(2026, 9, 14, 16, 40);
+
+  it('accepts a time in the last 12 hours and nothing else', () => {
+    expect(parseManualTime(undefined, now)).toBeNull();
+    expect(parseManualTime('', now)).toBeNull();
+    expect(parseManualTime('2026-10-14T13:00:00Z', now)).toBe(Date.UTC(2026, 9, 14, 13, 0));
+    expect(parseManualTime('2026-10-14T16:50:00Z', now)).toBe('invalid'); // futuro
+    expect(parseManualTime('2026-10-14T04:00:00Z', now)).toBe('invalid'); // > 12 h
+    expect(parseManualTime('ontem', now)).toBe('invalid');
+    expect(parseManualTime(1_700_000_000_000, now)).toBe('invalid');
+  });
+
+  it('always waits for HR approval, flagged as manual_time', () => {
+    const valid = {
+      rejected: null,
+      status: 'valid',
+      flags: ['gps_only'],
+      distanceM: 12,
+      presence: 'location',
+    } as const;
+    const result = applyManualTime({ ...valid, flags: [...valid.flags] });
+    expect(result.status).toBe('pending');
+    expect(result.flags).toEqual(['gps_only', 'manual_time']);
+    expect(applyManualTime(result).flags).toEqual(['gps_only', 'manual_time']);
+  });
+});
+
+describe('formatOsmAddress', () => {
+  it('builds a short street + place line', () => {
+    expect(
+      formatOsmAddress({
+        road: 'Rua das Oliveiras',
+        house_number: '12',
+        suburb: 'Marrazes',
+        city: 'Leiria',
+      })
+    ).toBe('Rua das Oliveiras 12, Leiria');
+    expect(
+      formatOsmAddress({ road: 'Rua da Ferraria', village: 'São Romão', municipality: 'Leiria' })
+    ).toBe('Rua da Ferraria, São Romão');
+    expect(formatOsmAddress({ neighbourhood: 'Quinta do Lago', town: 'Oeiras' })).toBe(
+      'Quinta do Lago, Oeiras'
+    );
+    expect(formatOsmAddress({ city: 'Leiria' })).toBe('Leiria');
+    expect(formatOsmAddress({ hamlet: 'Leiria', city: 'Leiria' })).toBe('Leiria');
+    expect(formatOsmAddress({})).toBeNull();
+    expect(formatOsmAddress(null)).toBeNull();
   });
 });
 

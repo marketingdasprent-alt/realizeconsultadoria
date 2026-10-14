@@ -420,6 +420,72 @@ export const decidePunch = (ctx: DecideContext): PunchDecision => {
   return notValidated(ctx, flags, NaN, ctx.method === 'nfc');
 };
 
+/** Hora indicada pelo colaborador (✎): até 12 h para trás e nunca no futuro. */
+export const MANUAL_TIME_MAX_AGE_MS = MAX_OPEN_SHIFT_HOURS * 3_600_000;
+
+/**
+ * Lê a hora indicada (ISO). null se não foi indicada; 'invalid' se não é uma data ou
+ * está fora da janela. A BD confirma ainda que é depois do último registo.
+ */
+export const parseManualTime = (value: unknown, nowMs: number): number | null | 'invalid' => {
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value !== 'string') return 'invalid';
+  const ms = Date.parse(value);
+  if (!Number.isFinite(ms) || ms > nowMs + 60_000 || ms < nowMs - MANUAL_TIME_MAX_AGE_MS) {
+    return 'invalid';
+  }
+  return ms;
+};
+
+/** Correção de hora: fica sempre a aguardar aprovação dos RH, com a flag manual_time. */
+export const applyManualTime = (decision: PunchDecision): PunchDecision => ({
+  ...decision,
+  status: 'pending',
+  flags: decision.flags.includes('manual_time')
+    ? decision.flags
+    : [...decision.flags, 'manual_time'],
+});
+
+/** Campos da morada devolvidos pelo Nominatim (OpenStreetMap) que interessam aqui. */
+export interface OsmAddress {
+  road?: string;
+  pedestrian?: string;
+  square?: string;
+  footway?: string;
+  path?: string;
+  house_number?: string;
+  neighbourhood?: string;
+  quarter?: string;
+  hamlet?: string;
+  suburb?: string;
+  village?: string;
+  town?: string;
+  city?: string;
+  municipality?: string;
+  county?: string;
+}
+
+/** Morada curta para o colaborador e os RH: "Rua das Oliveiras 12, Leiria". */
+export const formatOsmAddress = (address: OsmAddress | null | undefined): string | null => {
+  if (!address) return null;
+  const street =
+    address.road ?? address.pedestrian ?? address.square ?? address.footway ?? address.path;
+  const line = street
+    ? [street, address.house_number].filter(Boolean).join(' ')
+    : (address.neighbourhood ?? address.quarter ?? address.hamlet ?? null);
+  const place =
+    address.city ??
+    address.town ??
+    address.village ??
+    address.municipality ??
+    address.suburb ??
+    address.county ??
+    null;
+  const parts = [line, place].filter((part): part is string => !!part);
+  if (parts.length === 2 && parts[0] === parts[1]) parts.pop();
+  return parts.length > 0 ? parts.join(', ').slice(0, 200) : null;
+};
+
 /**
  * Próximo tipo esperado: 'out' se o último foi 'in' há menos de 12 h.
  * Só para mostrar ao colaborador — quem decide é a BD (time_clock_register_punch).

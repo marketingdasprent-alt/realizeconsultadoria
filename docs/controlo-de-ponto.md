@@ -9,7 +9,8 @@ O colaborador regista a **jornada** com quatro botões, como no Bitrix24:
 | Dia não iniciado | **Iniciar dia** | cinzento |
 | A trabalhar | **Pausa** · **Terminar dia** | verde, cronómetro do tempo trabalhado |
 | Em pausa | **Retomar** · **Terminar dia** | âmbar, cronómetro da pausa |
-| Dia terminado | **Iniciar dia** (novo turno) | cinzento, total do dia |
+| Dia terminado hoje | **Retomar dia** (o fim passa a pausa) | cinzento, total do dia |
+| Dia terminado ontem (ou há 12 h) | **Iniciar dia** | cinzento |
 
 - O **relógio no canto superior** (Início, Tickets, Documentos) mostra a hora e o estado; ao
   carregar abre o painel. A página **O Meu Ponto** tem o mesmo painel e o mês.
@@ -18,8 +19,17 @@ O colaborador regista a **jornada** com quatro botões, como no Bitrix24:
 - Só aparecem os botões que fazem sentido, e a base valida a sequência
   (`time_clock_register_punch`): não se pausa um dia por iniciar nem se inicia dois. Um dia aberto ou
   em pausa há mais de 12 h conta como terminado (esquecimento) e fica "incompleto" para os RH.
-- **Desfazer** durante 3 minutos (`time_clock_undo_own_entry`): anula o último registo próprio.
+- **Retomar dia** (como o "Continuar dia de trabalho" do Bitrix24): carregou em Terminar dia por
+  engano, ou a saída para o almoço ficou como fim do dia, e voltou no mesmo dia → o Fim passa a
+  Pausa (fica no histórico) e regista-se a Retoma. As horas não mudam.
+- **Lápis ✎ — registo esquecido**: ao lado do cronómetro. O colaborador indica a hora (hoje, depois
+  do último registo, nas últimas 12 h) e o motivo, e escolhe o botão (ex.: "Retomar dia" às 14:00).
+  O registo fica com a hora indicada, a aguardar aprovação (`manual_time`), e os RH veem a hora a
+  que foi gravado.
 - **Adicionar observação** (até 300 caracteres) é opcional e vai para o registo, o email e a folha.
+- O colaborador não vê mensagens de aprovação nem alertas: a lista do dia mostra cada registo com
+  o sítio — o local de trabalho, a morada aproximada (rua e localidade, do OpenStreetMap) ou "Sem
+  localização". Só aparecem erros quando o registo não foi feito (sem internet, tag inválida, VPN).
 - As horas contam de Início/Retoma até Pausa/Fim: as pausas ficam fora e aparecem à parte.
 
 Cada ação é um registo em `time_clock_entries` com `entry_type` + `kind`:
@@ -39,6 +49,7 @@ decide no servidor (`decidePunch`):
 | IP na rede de confiança de um local (Wi-Fi do escritório) | válido, mesmo sem GPS |
 | Fora dos locais, sem GPS, GPS fraco ou localização aproximada | **registado, a aguardar aprovação**, com o motivo |
 | **Pausa** em qualquer sítio | válida (parar o relógio não acrescenta horas) |
+| Hora indicada no ✎ (registo esquecido) | **a aguardar aprovação** (`manual_time`) |
 | VPN/Tor num local com "Bloquear VPN" | recusado |
 | Tag inválida, repetida ou de outra empresa | recusado |
 
@@ -97,8 +108,10 @@ O registo funciona igual no browser e na app instalada; só muda onde aparece.
 ## Ativação (uma vez)
 
 1. **Base de dados** — correr no SQL Editor do projeto `jvvnsoasylusbmxfotci`, por ordem, as
-   migrações `supabase/migrations/2026*_time_clock*.sql` (a da jornada com pausas é
-   `20261014120000_time_clock_workday.sql`; tem de estar aplicada antes de publicar `clock-punch`).
+   migrações `supabase/migrations/2026*_time_clock*.sql` (a jornada com pausas é
+   `20261014120000_time_clock_workday.sql`; Retomar dia, ✎ e morada são
+   `20261014190000_time_clock_continue_and_correct.sql`). Cada uma tem de estar aplicada antes
+   de publicar a `clock-punch` que a usa, e a função antes do site.
 2. **Edge functions**
    ```bash
    supabase functions deploy clock-punch --project-ref jvvnsoasylusbmxfotci
@@ -136,5 +149,9 @@ O registo funciona igual no browser e na app instalada; só muda onde aparece.
 - A localização só é recolhida no momento do registo (sem rastreamento contínuo). Informar os
   colaboradores por escrito sobre os dados recolhidos (GPS, IP, identificador do dispositivo) e a
   finalidade.
+- Morada aproximada: nos registos fora dos locais de trabalho, as coordenadas (arredondadas a
+  ~1 m) são enviadas pelo servidor ao Nominatim do OpenStreetMap para obter a rua e a localidade.
+  Não vai nenhum dado do colaborador além das coordenadas. A atribuição "© OpenStreetMap" aparece
+  junto das moradas, como pede a política do Nominatim.
 - Código do Trabalho, art. 202.º: registo de tempos de trabalho conservado **5 anos** — não
   eliminar colaboradores com registos; desativá-los.

@@ -1742,6 +1742,7 @@ export type Database = {
       time_clock_entries: {
         Row: {
           accuracy_m: number | null;
+          address: string | null;
           company_id: string;
           created_at: string;
           created_by: string | null;
@@ -1772,6 +1773,7 @@ export type Database = {
         };
         Insert: {
           accuracy_m?: number | null;
+          address?: string | null;
           company_id: string;
           created_at?: string;
           created_by?: string | null;
@@ -1802,6 +1804,7 @@ export type Database = {
         };
         Update: {
           accuracy_m?: number | null;
+          address?: string | null;
           company_id?: string;
           created_at?: string;
           created_by?: string | null;

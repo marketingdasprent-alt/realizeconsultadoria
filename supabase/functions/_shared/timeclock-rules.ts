@@ -1,14 +1,15 @@
 // Regras de validação do registo de ponto (partilhadas entre a edge function
 // `clock-punch` e os testes Vitest). Sem dependências de Deno/Node.
 //
-// Filosofia antifraude:
-//   * A validação do raio é SEMPRE feita no servidor (o cliente não decide).
-//   * Sinais fortes (fora do raio, precisão fraca, posição antiga, tag
-//     inválida) → rejeição.
+// Filosofia (como o Bitrix24): o ponto regista-se SEMPRE e revê-se depois.
+//   * A validação do raio é feita no servidor (o cliente não decide).
+//   * Presença comprovada (GPS dentro do raio, tag NFC ou Wi-Fi do escritório)
+//     → válido. Fora dos locais, sem GPS ou com GPS fraco → registado na mesma,
+//     a aguardar aprovação, com o motivo nas flags (decidePunch).
 //   * Sinais fracos (VPN, IP longe, coordenadas repetidas, viagem impossível,
 //     dispositivo partilhado) → o registo entra como 'flagged' para revisão.
-//     Não se bloqueia por defeito porque há falsos positivos legítimos
-//     (ex.: iCloud Private Relay aparece como VPN; IPs móveis geolocalizam mal).
+//   * Só se recusa o que é fraude evidente: tag inválida/repetida, tag de outra
+//     empresa e VPN/Tor quando o local o bloqueia.
 
 export interface GeoPoint {
   lat: number;
@@ -70,6 +71,11 @@ export interface PunchContext {
   location: LocationRules | null;
   ip: string | null;
   ipInfo: IpInfo;
+  /**
+   * IP na rede de confiança de algum local da empresa. Se omitido, vê-se só a
+   * lista do próprio local.
+   */
+  trustedNetwork?: boolean;
   previous: PreviousPunch | null;
   nowMs: number;
   repeatedCoordinates: boolean;
@@ -108,6 +114,8 @@ export const REMOTE_ELIGIBLE_REASONS = new Set([
 /** Flags que, presentes, colocam o registo em revisão ('flagged'). */
 export const WARNING_FLAGS = new Set([
   'vpn_or_proxy',
+  'no_gps',
+  'stale_gps',
   'imprecise_gps',
   'ip_far_from_location',
   'suspicious_accuracy',
@@ -233,7 +241,7 @@ export const evaluatePunch = (ctx: PunchContext): PunchEvaluation => {
     flags.push('remote');
   }
 
-  const trusted = !!location && ipMatchesAny(ctx.ip, location.trustedIps);
+  const trusted = ctx.trustedNetwork ?? (!!location && ipMatchesAny(ctx.ip, location.trustedIps));
   if (trusted) flags.push('trusted_network');
 
   if (!trusted && ctx.ipInfo.checked) {
@@ -278,6 +286,138 @@ export const evaluatePunch = (ctx: PunchContext): PunchEvaluation => {
   const status =
     mode === 'remote' ? 'pending' : flags.some(f => WARNING_FLAGS.has(f)) ? 'flagged' : 'valid';
   return { rejected: null, distanceM, flags, status };
+};
+
+/** Ações da jornada (como o Bitrix24): Iniciar dia, Pausa, Retomar, Terminar dia. */
+export type WorkdayAction = 'start' | 'pause' | 'resume' | 'stop';
+
+export const WORKDAY_ACTIONS: readonly WorkdayAction[] = ['start', 'pause', 'resume', 'stop'];
+
+/** Motivo (flag) por que o registo não ficou validado num local de trabalho. */
+const NOT_VALIDATED_FLAG: Record<string, string> = {
+  out_of_radius: 'outside_location',
+  low_accuracy: 'weak_gps',
+  approximate_location: 'approximate_location',
+  no_location: 'no_location_configured',
+  manual_not_allowed: 'tag_required',
+};
+
+/** Sem GPS: não é motivo de revisão quando a presença está comprovada por outra via. */
+const NO_GPS_FLAGS = ['no_gps', 'stale_gps'];
+
+/**
+ * Como ficou comprovada a presença: GPS dentro do raio (ou tag com GPS a
+ * confirmar), só a tag, Wi-Fi do escritório, ou não comprovada (null).
+ */
+export type Presence = 'location' | 'tag' | 'network' | null;
+
+export interface PunchDecision {
+  rejected: 'vpn_blocked' | null;
+  status: 'valid' | 'flagged' | 'pending';
+  flags: string[];
+  distanceM: number;
+  presence: Presence;
+}
+
+export interface DecideContext extends Omit<PunchContext, 'position' | 'mode' | 'trustedNetwork'> {
+  /** null = app antiga (Entrada/Saída), tratada como início/fim. */
+  action: WorkdayAction | null;
+  /** Leitura GPS (pode faltar: GPS desligado, permissão negada, PC sem GPS). */
+  position: Partial<PositionReading> | null;
+  /** O local exige a tag (registo manual não permitido). */
+  manualNotAllowed: boolean;
+  /** O IP pertence à rede de confiança de um local (Wi-Fi do escritório). */
+  trustedNetwork: boolean;
+}
+
+const hasWarnings = (flags: string[], ignore: string[] = []) =>
+  flags.some(f => WARNING_FLAGS.has(f) && !ignore.includes(f));
+
+const blocked = (flags: string[], distanceM: number): PunchDecision => ({
+  rejected: 'vpn_blocked',
+  status: 'valid',
+  flags,
+  distanceM,
+  presence: null,
+});
+
+/** Presença não comprovada pelo GPS: decide pela rede, pela tag ou pela ação. */
+const notValidated = (
+  ctx: DecideContext,
+  flags: string[],
+  distanceM: number,
+  tagPresence: boolean
+): PunchDecision => {
+  const review = hasWarnings(flags, NO_GPS_FLAGS) ? 'flagged' : 'valid';
+  const decision = (status: PunchDecision['status'], presence: Presence): PunchDecision => ({
+    rejected: null,
+    status,
+    flags,
+    distanceM,
+    presence,
+  });
+  // Wi-Fi do escritório comprova a presença (exceto onde o local exige a tag).
+  if (ctx.trustedNetwork && !ctx.manualNotAllowed) return decision(review, 'network');
+  // Parar o relógio não acrescenta horas: a pausa nunca precisa de aprovação.
+  if (ctx.action === 'pause') return decision(review, tagPresence ? 'tag' : null);
+  // A tag prova a presença; sem GPS para a confirmar, os RH revêem.
+  if (tagPresence) return decision('flagged', 'tag');
+  flags.push('remote');
+  return decision('pending', null);
+};
+
+/**
+ * Decide como registar. Como no Bitrix24, o ponto nunca falha por GPS ou distância:
+ *  - presença comprovada (GPS dentro do raio, tag ou Wi-Fi do escritório) →
+ *    válido, ou em revisão se houver alertas;
+ *  - fora dos locais ou sem GPS → registado na mesma, a aguardar aprovação, com o
+ *    motivo nas flags (a pausa fica logo válida);
+ *  - só recusa VPN/Tor quando o local o bloqueia.
+ */
+export const decidePunch = (ctx: DecideContext): PunchDecision => {
+  const { position } = ctx;
+  const validPosition = isValidPosition(position);
+
+  if (validPosition && Math.abs(position.ageMs) <= MAX_POSITION_AGE_MS) {
+    const base = { ...ctx, position };
+    const office = evaluatePunch({ ...base, mode: 'office' });
+    if (office.rejected === 'vpn_blocked') return blocked(office.flags, office.distanceM);
+    const reason = office.rejected ?? (ctx.manualNotAllowed ? 'manual_not_allowed' : null);
+    if (!reason) {
+      return {
+        rejected: null,
+        status: office.status,
+        flags: office.flags,
+        distanceM: office.distanceM,
+        presence: 'location',
+      };
+    }
+    // Fora do raio (ou sem local/GPS fraco): avalia como remoto para recolher os alertas.
+    const remote = evaluatePunch({ ...base, mode: 'remote' });
+    const flags = remote.flags.filter(f => f !== 'remote');
+    if (remote.rejected === 'vpn_blocked') return blocked(flags, remote.distanceM);
+    flags.push(NOT_VALIDATED_FLAG[reason] ?? 'outside_location');
+    return notValidated(ctx, flags, remote.distanceM, false);
+  }
+
+  // Sem GPS (ou leitura antiga): avaliam-se só a rede, a VPN e o dispositivo.
+  const flags = [validPosition ? 'stale_gps' : 'no_gps'];
+  if (ctx.trustedNetwork) {
+    flags.push('trusted_network');
+  } else if (ctx.ipInfo.checked) {
+    if (isAnonymizer(ctx.ipInfo)) {
+      if (ctx.location?.blockVpn) return blocked(flags, NaN);
+      flags.push('vpn_or_proxy');
+    } else if (ctx.ipInfo.isProxy) {
+      flags.push('shared_ip_proxy');
+    }
+  } else {
+    flags.push('ip_check_unavailable');
+  }
+  if (!ctx.deviceSeenBefore) flags.push('new_device');
+  if (ctx.deviceUsedByOthers) flags.push('shared_device');
+  if (ctx.method === 'gps') flags.push('gps_only');
+  return notValidated(ctx, flags, NaN, ctx.method === 'nfc');
 };
 
 /**

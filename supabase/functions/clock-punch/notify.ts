@@ -1,5 +1,5 @@
-// Email aos admins quando um registo de ponto precisa de decisão:
-// remoto (aguarda aprovação) ou no escritório com sinais suspeitos (em revisão).
+// Email aos admins quando um registo de ponto precisa de decisão: fora do local
+// ou sem GPS (aguarda aprovação) ou com sinais suspeitos (em revisão).
 // Destinatários: tabela notification_emails_timeclock. Envio via Brevo.
 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
@@ -8,6 +8,13 @@ const REVIEW_URL = 'https://realize.dasprent.pt/admin/ponto?tab=revisao';
 
 const FLAG_LABELS: Record<string, string> = {
   remote: 'Fora do local de trabalho',
+  outside_location: 'Fora do local de trabalho',
+  no_gps: 'Sem GPS',
+  stale_gps: 'GPS desatualizado',
+  weak_gps: 'GPS fraco',
+  approximate_location: 'Localização aproximada (erra mais de 1 km)',
+  no_location_configured: 'Empresa sem locais de ponto configurados',
+  tag_required: 'Registo sem a tag num local que a exige',
   vpn_or_proxy: 'VPN / Tor',
   imprecise_gps: 'GPS impreciso (registou na tag)',
   shared_ip_proxy: 'IP partilhado marcado como proxy',
@@ -20,16 +27,38 @@ const FLAG_LABELS: Record<string, string> = {
   gps_only: 'Sem tag (só GPS)',
 };
 
+/** Iniciar dia / Pausa / Retomar / Terminar dia a partir do tipo e do kind. */
+export const ACTION_LABELS: Record<string, string> = {
+  'in:work': 'Início do dia',
+  'out:break': 'Pausa',
+  'in:break': 'Retoma',
+  'out:work': 'Fim do dia',
+};
+
+/** Porque é que o registo ficou a aguardar aprovação (frase do email). */
+const pendingReason = (flags: string[]): string => {
+  if (flags.includes('no_gps') || flags.includes('stale_gps')) return 'sem localização GPS';
+  if (flags.includes('approximate_location')) return 'com a localização aproximada do telemóvel';
+  if (flags.includes('weak_gps')) return 'com sinal GPS fraco';
+  if (flags.includes('tag_required')) return 'sem a tag, num local que a exige';
+  if (flags.includes('no_location_configured')) {
+    return 'numa empresa sem locais de ponto configurados';
+  }
+  return 'fora do local de trabalho';
+};
+
 export interface PunchNotification {
   employeeName: string;
   companyName: string | null;
   entryType: 'in' | 'out';
+  kind: 'work' | 'break';
   punchedAt: string;
   status: string;
   workMode: string;
-  latitude: number;
-  longitude: number;
-  accuracyM: number;
+  /** null quando o registo foi feito sem GPS. */
+  latitude: number | null;
+  longitude: number | null;
+  accuracyM: number | null;
   /** Distância ao local mais próximo, em metros (null se a empresa não tem locais). */
   distanceM: number | null;
   locationName: string | null;
@@ -52,22 +81,28 @@ const formatDistance = (m: number | null, locationName: string | null): string =
 const row = (label: string, value: string) =>
   `<tr><td style="padding:6px 12px 6px 0;color:#666;white-space:nowrap;vertical-align:top">${label}</td><td style="padding:6px 0;color:#111">${value}</td></tr>`;
 
+const where = (n: PunchNotification): string => {
+  if (n.latitude === null || n.longitude === null) return 'Sem GPS (localização não enviada)';
+  const maps = `https://www.google.com/maps?q=${n.latitude},${n.longitude}`;
+  const accuracy = n.accuracyM === null ? '' : ` · precisão GPS ±${Math.round(n.accuracyM)} m`;
+  return `<a href="${maps}" style="color:#B7933D">Ver no mapa</a> · ${formatDistance(n.distanceM, n.locationName)}${accuracy}`;
+};
+
 export const buildEmail = (n: PunchNotification) => {
-  const remote = n.workMode === 'remote';
-  const type = n.entryType === 'in' ? 'Entrada' : 'Saída';
+  const remote = n.status === 'pending';
+  const type =
+    ACTION_LABELS[`${n.entryType}:${n.kind}`] ?? (n.entryType === 'in' ? 'Entrada' : 'Saída');
   const when = new Date(n.punchedAt).toLocaleString('pt-PT', {
     timeZone: 'Europe/Lisbon',
     dateStyle: 'short',
     timeStyle: 'short',
   });
-  const maps = `https://www.google.com/maps?q=${n.latitude},${n.longitude}`;
-  const flags = n.flags
-    .filter(f => FLAG_LABELS[f])
-    .map(f => FLAG_LABELS[f])
-    .join(' · ');
+  const flags = [...new Set(n.flags.filter(f => FLAG_LABELS[f]).map(f => FLAG_LABELS[f]))].join(
+    ' · '
+  );
 
   const subject = remote
-    ? `Ponto remoto a aprovar — ${n.employeeName} (${type} ${when})`
+    ? `Ponto a aprovar — ${n.employeeName} (${type} ${when})`
     : `Ponto com alertas — ${n.employeeName} (${type} ${when})`;
 
   const html = `<!DOCTYPE html><html><body style="margin:0;background:#f4f4f4;font-family:Arial,sans-serif">
@@ -76,13 +111,13 @@ export const buildEmail = (n: PunchNotification) => {
 <tr><td style="padding:24px">
 <p style="margin:0 0 16px;font-size:16px;color:#111">${
     remote
-      ? `<strong>${escapeHtml(n.employeeName)}</strong> registou ponto <strong>fora do local de trabalho</strong>. O registo aguarda a sua aprovação.`
+      ? `<strong>${escapeHtml(n.employeeName)}</strong> registou ponto <strong>${pendingReason(n.flags)}</strong>. O registo aguarda a sua aprovação.`
       : `O registo de <strong>${escapeHtml(n.employeeName)}</strong> tem sinais a rever.`
   }</p>
 <table cellpadding="0" cellspacing="0" style="font-size:14px">
 ${row('Registo', `${type} · ${when}`)}
 ${n.companyName ? row('Empresa', escapeHtml(n.companyName)) : ''}
-${row('Onde', `<a href="${maps}" style="color:#B7933D">Ver no mapa</a> · ${formatDistance(n.distanceM, n.locationName)} · precisão GPS ±${Math.round(n.accuracyM)} m`)}
+${row('Onde', where(n))}
 ${flags ? row('Alertas', escapeHtml(flags)) : ''}
 ${n.note ? row('Nota do colaborador', escapeHtml(n.note)) : ''}
 </table>

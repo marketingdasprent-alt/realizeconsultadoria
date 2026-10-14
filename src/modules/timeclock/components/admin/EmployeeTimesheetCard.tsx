@@ -83,6 +83,14 @@ export const EmployeeTimesheetCard: React.FC<EmployeeTimesheetCardProps> = ({
                   {day.openSince && (
                     <span className="block text-xs text-muted-foreground">em curso</span>
                   )}
+                  {day.pausedSince && (
+                    <span className="block text-xs text-muted-foreground">em pausa</span>
+                  )}
+                  {day.breakMinutes > 0 && (
+                    <span className="block text-xs text-muted-foreground">
+                      pausas {formatMinutes(day.breakMinutes)}
+                    </span>
+                  )}
                 </TableCell>
               </TableRow>
             ))}

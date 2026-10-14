@@ -3,7 +3,8 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { House } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
-import { ENTRY_TYPE_LABELS, formatMinutes, type DaySummary } from '@/lib/timeclock';
+import { formatMinutes, type DaySummary } from '@/lib/timeclock';
+import { getEntryLabel } from '@/lib/workday';
 
 interface TimeClockDayListProps {
   days: DaySummary[];
@@ -27,6 +28,7 @@ export const TimeClockDayList: React.FC<TimeClockDayListProps> = ({ days, emptyM
             <span className="text-sm font-semibold text-gold">
               {formatMinutes(day.workedMinutes)}
               {day.openSince && ' + em curso'}
+              {day.pausedSince && ' · em pausa'}
             </span>
           </div>
           <div className="flex flex-wrap gap-2">
@@ -41,20 +43,22 @@ export const TimeClockDayList: React.FC<TimeClockDayListProps> = ({ days, emptyM
                       ? 'border-dashed border-sky-500 bg-sky-100 text-sky-900'
                       : ''
                   }`}
-                  title={
-                    entry.status === 'pending' ? 'Trabalho remoto a aguardar aprovação' : undefined
-                  }
+                  title={entry.status === 'pending' ? 'A aguardar aprovação dos RH' : undefined}
                 >
                   {entry.work_mode === 'remote' && <House className="h-3 w-3" />}
-                  {ENTRY_TYPE_LABELS[entry.entry_type]}{' '}
-                  {format(new Date(entry.punched_at), 'HH:mm')}
+                  {getEntryLabel(entry)} {format(new Date(entry.punched_at), 'HH:mm')}
                   {entry.status === 'flagged' && ' ⚠'}
                 </Badge>
               ))}
           </div>
+          {day.breakMinutes > 0 && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Pausas: {formatMinutes(day.breakMinutes)} (não contam como trabalho)
+            </p>
+          )}
           {day.hasPending && (
             <p className="text-xs text-sky-700 mt-2">
-              Tem registos de trabalho remoto a aguardar aprovação dos RH.
+              Tem registos a aguardar aprovação dos RH (fora do local ou sem GPS).
             </p>
           )}
           {day.incomplete && (

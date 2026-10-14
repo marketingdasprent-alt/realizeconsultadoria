@@ -1,20 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { addDays, format, startOfMonth } from 'date-fns';
-import {
-  getNextEntryType,
-  summarizeDays,
-  type DaySummary,
-  type EntryType,
-  type TimeClockEntryWithRelations,
-} from '@/lib/timeclock';
+import { summarizeDays, type DaySummary, type TimeClockEntryWithRelations } from '@/lib/timeclock';
 import { timeClockService } from '../services/timeClockService';
 
 interface UseMyTimeClockResult {
   entries: TimeClockEntryWithRelations[];
   days: DaySummary[];
   today: DaySummary | null;
-  lastEntry: TimeClockEntryWithRelations | null;
-  nextType: EntryType;
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
@@ -67,13 +59,7 @@ export const useMyTimeClock = (employeeId: string | null): UseMyTimeClockResult 
   const derived = useMemo(() => {
     const days = summarizeDays(entries);
     const todayKey = format(new Date(), 'yyyy-MM-dd');
-    const lastEntry = entries.find(e => e.status !== 'voided') ?? null; // lista vem desc
-    return {
-      days,
-      today: days.find(d => d.date === todayKey) ?? null,
-      lastEntry,
-      nextType: getNextEntryType(lastEntry),
-    };
+    return { days, today: days.find(d => d.date === todayKey) ?? null };
   }, [entries]);
 
   return { entries, ...derived, isLoading, error, refetch };

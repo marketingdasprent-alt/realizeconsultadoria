@@ -62,35 +62,34 @@ export const FLAG_INFO: Record<string, { label: string; warning: boolean }> = {
   trusted_network: { label: 'Rede do local', warning: false },
   gps_only: { label: 'Sem tag (só GPS)', warning: false },
   ip_check_unavailable: { label: 'IP não verificado', warning: false },
-  remote: { label: 'Trabalho remoto', warning: false },
+  remote: { label: 'Fora do local (a aprovar)', warning: false },
+  outside_location: { label: 'Fora do local', warning: false },
+  no_gps: { label: 'Sem GPS', warning: true },
+  stale_gps: { label: 'GPS desatualizado', warning: true },
+  weak_gps: { label: 'GPS fraco', warning: false },
+  approximate_location: { label: 'Localização aproximada', warning: false },
+  no_location_configured: { label: 'Sem locais configurados', warning: false },
+  tag_required: { label: 'Sem tag (local exige tag)', warning: false },
 };
 
 export const getFlagLabel = (flag: string): string => FLAG_INFO[flag]?.label ?? flag;
 
 /** Mensagens para os códigos devolvidos pela edge function `clock-punch`. */
 export const PUNCH_MESSAGES: Record<string, string> = {
-  registered: 'Ponto registado com sucesso.',
-  pending_approval: 'Registado como trabalho remoto. Fica a aguardar aprovação dos RH.',
-  duplicate: 'Este ponto já tinha sido registado há instantes.',
-  missing_position:
-    'Não foi possível obter a sua localização. Ative o GPS e permita o acesso à localização.',
-  invalid_position: 'Localização inválida. Tente novamente.',
-  stale_position: 'A localização obtida está desatualizada. Tente novamente.',
-  low_accuracy:
-    'Sinal GPS fraco. No iPhone confirme que a "Localização exata" está ligada (Definições → Privacidade → Localização); aproxime-se de uma janela e tente de novo.',
-  out_of_radius: 'Está fora do local de trabalho.',
-  approximate_location:
-    'O telemóvel está a enviar só a localização aproximada (erra mais de 1 km). iPhone: Definições → Privacidade e segurança → Serviços de localização → Safari (ou Realize) → ative "Localização exata". Android: Definições → Localização → ative "Localização precisa". Ou encoste o telemóvel à tag.',
+  registered: 'Ponto registado.',
+  pending_approval: 'Registado. Fica a aguardar aprovação dos RH.',
+  duplicate: 'Este registo já tinha sido feito há instantes.',
+  invalid_state:
+    'O seu dia mudou entretanto (registo feito noutro telemóvel?). O painel foi atualizado: confirme e tente de novo.',
   vpn_blocked: 'Desative a VPN para registar o ponto.',
   invalid_tag: 'Tag NFC inválida ou desativada.',
   replayed_tag: 'Esta leitura da tag já foi usada. Encoste novamente o telemóvel à tag.',
   tag_other_company: 'Esta tag pertence a outra empresa.',
-  no_location: 'A sua empresa ainda não tem locais de ponto configurados.',
-  manual_not_allowed: 'Neste local o ponto só pode ser registado através da tag NFC.',
   ntag424_not_configured: 'Tag segura não configurada no servidor. Contacte o administrador.',
   not_employee: 'Esta conta não está associada a um colaborador.',
   inactive_employee: 'A sua conta de colaborador está inativa.',
   unauthorized: 'Sessão expirada. Inicie sessão novamente.',
+  network: 'Sem ligação ao servidor. Verifique a internet e tente novamente.',
 };
 
 /** Etiquetas curtas para os motivos de tentativas rejeitadas (vista admin). */
@@ -112,28 +111,6 @@ export const REJECT_REASON_LABELS: Record<string, string> = {
 
 /** A partir desta distância já não é "fora do raio": não há local configurado perto. */
 export const NO_NEARBY_LOCATION_M = 1000;
-
-/**
- * Mensagem de recusa com contexto: longe de todos os locais configurados, o mais
- * provável é o local de trabalho da pessoa ainda não existir no sistema.
- */
-export const getPunchFailureMessage = (
-  code: string,
-  distanceM?: number | null,
-  locationName?: string | null
-): string => {
-  if (
-    code === 'out_of_radius' &&
-    typeof distanceM === 'number' &&
-    distanceM >= NO_NEARBY_LOCATION_M
-  ) {
-    const nearest = locationName
-      ? ` (o mais próximo, ${locationName}, fica a ${formatDistance(distanceM)})`
-      : '';
-    return `Não há nenhum local de trabalho registado perto de si${nearest}. Se está no seu local de trabalho habitual, avise os RH para o adicionarem.`;
-  }
-  return getPunchMessage(code);
-};
 
 export const getPunchMessage = (code: string): string =>
   PUNCH_MESSAGES[code] ?? 'Não foi possível registar o ponto. Tente novamente.';
@@ -158,8 +135,12 @@ export interface DaySummary {
   date: string; // yyyy-MM-dd (hora local)
   entries: TimeClockEntry[];
   workedMinutes: number;
+  /** Tempo em pausa (pausa → retoma); não conta como trabalhado. */
+  breakMinutes: number;
   /** Entrada ainda sem saída (turno em curso). */
   openSince: string | null;
+  /** Em pausa desde (ainda sem retoma nem fim do dia). */
+  pausedSince: string | null;
   /** Entrada sem saída (ou saída sem entrada) — a rever. */
   incomplete: boolean;
   hasFlags: boolean;
@@ -171,7 +152,8 @@ const dateKey = (iso: string) => format(new Date(iso), 'yyyy-MM-dd');
 
 /**
  * Agrupa registos por dia e calcula horas trabalhadas emparelhando
- * entrada → saída. Registos anulados são mostrados mas não contam.
+ * entrada → saída (início/retoma → pausa/fim): as pausas ficam fora.
+ * Registos anulados são mostrados mas não contam.
  * Um turno que atravessa a meia-noite conta para o dia da entrada.
  */
 export const summarizeDays = <T extends TimeClockEntry>(
@@ -186,7 +168,9 @@ export const summarizeDays = <T extends TimeClockEntry>(
         date: key,
         entries: [],
         workedMinutes: 0,
+        breakMinutes: 0,
         openSince: null,
+        pausedSince: null,
         incomplete: false,
         hasFlags: false,
         hasPending: false,
@@ -200,35 +184,59 @@ export const summarizeDays = <T extends TimeClockEntry>(
     (a, b) => new Date(a.punched_at).getTime() - new Date(b.punched_at).getTime()
   );
 
+  const ms = (from: TimeClockEntry, to: TimeClockEntry) =>
+    new Date(to.punched_at).getTime() - new Date(from.punched_at).getTime();
+  const within = (elapsed: number) => elapsed >= 0 && elapsed <= MAX_SHIFT_MS;
+  const dayOf = (entry: TimeClockEntry) => getDay(dateKey(entry.punched_at));
+
   let open: TimeClockEntry | null = null;
+  // Pausa ainda sem retoma nem fim do dia.
+  let pause: TimeClockEntry | null = null;
   for (const entry of sorted) {
-    const day = getDay(dateKey(entry.punched_at));
+    const day = dayOf(entry);
     day.entries.push(entry);
     if (entry.status === 'flagged') day.hasFlags = true;
     if (entry.status === 'pending') day.hasPending = true;
     if (entry.status === 'voided') continue;
 
+    const sincePause = pause ? ms(pause, entry) : -1;
+    const pauseOk = pause !== null && within(sincePause);
+    if (pause && !pauseOk) dayOf(pause).incomplete = true;
+
     if (entry.entry_type === 'in') {
-      if (open) getDay(dateKey(open.punched_at)).incomplete = true;
+      if (open) dayOf(open).incomplete = true;
+      if (pause && pauseOk) {
+        // Retoma: a pausa fica fora das horas. Novo início sem terminar o dia: a rever.
+        if (entry.kind === 'break') dayOf(pause).breakMinutes += Math.round(sincePause / 60000);
+        else dayOf(pause).incomplete = true;
+      }
+      pause = null;
       open = entry;
       continue;
     }
 
-    const elapsed = open
-      ? new Date(entry.punched_at).getTime() - new Date(open.punched_at).getTime()
-      : -1;
-    if (open && elapsed >= 0 && elapsed <= MAX_SHIFT_MS) {
-      getDay(dateKey(open.punched_at)).workedMinutes += Math.round(elapsed / 60000);
-    } else {
+    const elapsed = open ? ms(open, entry) : -1;
+    if (open && within(elapsed)) {
+      dayOf(open).workedMinutes += Math.round(elapsed / 60000);
+    } else if (!(pauseOk && entry.kind !== 'break')) {
+      // Terminar o dia durante a pausa é normal; outra saída sem entrada não.
       day.incomplete = true;
     }
+    pause = entry.kind === 'break' ? entry : null;
     open = null;
   }
 
   if (open) {
-    const day = getDay(dateKey(open.punched_at));
+    const day = dayOf(open);
     if (now.getTime() - new Date(open.punched_at).getTime() < MAX_SHIFT_MS) {
       day.openSince = open.punched_at;
+    } else {
+      day.incomplete = true;
+    }
+  } else if (pause) {
+    const day = dayOf(pause);
+    if (now.getTime() - new Date(pause.punched_at).getTime() < MAX_SHIFT_MS) {
+      day.pausedSince = pause.punched_at;
     } else {
       day.incomplete = true;
     }
@@ -265,15 +273,3 @@ export const formatMinutes = (minutes: number): string => {
 /** Distância legível: "45 m" ou "2,3 km". */
 export const formatDistance = (meters: number): string =>
   meters < 1000 ? `${Math.round(meters)} m` : `${(meters / 1000).toFixed(1).replace('.', ',')} km`;
-
-/** Janela em que o colaborador pode trocar Entrada↔Saída (o servidor aceita até 3 min). */
-export const SWAP_WINDOW_MS = 170 * 1000;
-
-/** Próximo tipo de registo esperado para o colaborador. */
-export const getNextEntryType = (
-  lastEntry: TimeClockEntry | null,
-  now: Date = new Date()
-): EntryType => {
-  if (!lastEntry || lastEntry.entry_type !== 'in') return 'in';
-  return now.getTime() - new Date(lastEntry.punched_at).getTime() < MAX_SHIFT_MS ? 'out' : 'in';
-};

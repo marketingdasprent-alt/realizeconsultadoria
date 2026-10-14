@@ -1751,6 +1751,7 @@ export type Database = {
           entry_type: string;
           flags: string[];
           id: string;
+          kind: string;
           ip_address: string | null;
           ip_city: string | null;
           ip_country: string | null;
@@ -1780,6 +1781,7 @@ export type Database = {
           entry_type: string;
           flags?: string[];
           id?: string;
+          kind?: string;
           ip_address?: string | null;
           ip_city?: string | null;
           ip_country?: string | null;
@@ -1809,6 +1811,7 @@ export type Database = {
           entry_type?: string;
           flags?: string[];
           id?: string;
+          kind?: string;
           ip_address?: string | null;
           ip_city?: string | null;
           ip_country?: string | null;
@@ -2090,6 +2093,7 @@ export type Database = {
         Args: {
           _employee_id: string;
           _entry_type: string;
+          _kind?: string;
           _location_id?: string | null;
           _notes?: string | null;
           _punched_at: string;
@@ -2109,10 +2113,15 @@ export type Database = {
         Args: { _entry_id: string };
         Returns: string;
       };
+      time_clock_undo_own_entry: {
+        Args: { _entry_id: string };
+        Returns: string;
+      };
       time_clock_admin_update_entry: {
         Args: {
           _entry_id: string;
           _entry_type: string;
+          _kind?: string | null;
           _notes?: string | null;
           _punched_at: string;
           _reason: string;

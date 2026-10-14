@@ -127,7 +127,8 @@ const timeClockReason = z
 
 export const timeEntrySchema = z.object({
   employee_id: z.string().min(1, 'Selecione o colaborador'),
-  entry_type: z.enum(['in', 'out']),
+  /** Início do dia / Pausa / Retoma / Fim do dia. */
+  action: z.enum(['start', 'pause', 'resume', 'stop']),
   date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'Data inválida'),
   time: z.string().regex(/^\d{2}:\d{2}$/, 'Hora inválida'),
   notes: z.string().max(500, 'Notas demasiado longas').optional(),

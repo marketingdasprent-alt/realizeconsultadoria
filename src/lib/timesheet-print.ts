@@ -44,17 +44,28 @@ export const PRINT_PAIR_COLUMNS = 2;
 const timeLabel = (entry: TimeClockEntry): string =>
   `${format(new Date(entry.punched_at), 'HH:mm')}${entry.source === 'admin' ? '*' : ''}`;
 
-/** Emparelha entrada → saída pela ordem do dia (registos anulados não contam). */
+/**
+ * Emparelha entrada → saída pela ordem do dia (início/retoma → pausa/fim; registos
+ * anulados não contam). Terminar o dia durante uma pausa não abre um par vazio:
+ * a pausa já fechou o último par.
+ */
 const buildPairs = (entries: TimeClockEntry[]): TimesheetPrintPair[] => {
   const pairs: TimesheetPrintPair[] = [];
   const sorted = [...entries]
     .filter(e => e.status !== 'voided')
     .sort((a, b) => a.punched_at.localeCompare(b.punched_at));
+  let previous: TimeClockEntry | null = null;
   for (const entry of sorted) {
     const last = pairs[pairs.length - 1];
+    const stopDuringPause =
+      entry.entry_type === 'out' &&
+      entry.kind !== 'break' &&
+      previous?.kind === 'break' &&
+      previous.entry_type === 'out';
     if (entry.entry_type === 'in') pairs.push({ in: timeLabel(entry), out: null });
     else if (last && last.in && !last.out) last.out = timeLabel(entry);
-    else pairs.push({ in: null, out: timeLabel(entry) });
+    else if (!stopDuringPause) pairs.push({ in: null, out: timeLabel(entry) });
+    previous = entry;
   }
   return pairs;
 };
@@ -86,9 +97,11 @@ export const buildTimesheetMonth = (
       if (extra.length) {
         notes.push(`Também: ${extra.map(p => `${p.in ?? '—'}–${p.out ?? '—'}`).join(', ')}`);
       }
+      if (summary?.breakMinutes) notes.push(`Pausas ${formatMinutes(summary.breakMinutes)}`);
       if (summary?.incomplete) notes.push('Registo incompleto');
       if (summary?.openSince) notes.push('Em curso');
-      if (dayEntries.some(e => e.status === 'pending')) notes.push('Remoto por aprovar');
+      if (summary?.pausedSince) notes.push('Em pausa');
+      if (dayEntries.some(e => e.status === 'pending')) notes.push('Por aprovar');
       if (dayEntries.some(e => e.status === 'flagged')) notes.push('Com alertas');
       for (const e of dayEntries) {
         if (e.status === 'voided' || !e.employee_note) continue;

@@ -2,11 +2,13 @@
 import { describe, expect, it } from 'vitest';
 import {
   REMOTE_ELIGIBLE_REASONS,
+  decidePunch,
   evaluatePunch,
   haversineMeters,
   ipMatchesAny,
   nextEntryType,
   sha256Hex,
+  type DecideContext,
   type PunchContext,
 } from '../../../supabase/functions/_shared/timeclock-rules';
 
@@ -244,6 +246,130 @@ describe('evaluatePunch — trabalho remoto', () => {
     for (const reason of ['invalid_tag', 'replayed_tag', 'vpn_blocked', 'stale_position']) {
       expect(REMOTE_ELIGIBLE_REASONS.has(reason)).toBe(false);
     }
+  });
+});
+
+describe('decidePunch — regista sempre (como o Bitrix24)', () => {
+  const HOME = { lat: 38.7569, lng: -9.2549 }; // ~11 km do escritório
+  const decideContext = (overrides: Partial<DecideContext> = {}): DecideContext => ({
+    ...baseContext(),
+    action: 'start',
+    manualNotAllowed: false,
+    trustedNetwork: false,
+    ...overrides,
+  });
+  const vpn = { checked: true, isProxy: true, proxyType: 'VPN' };
+
+  it('validates a punch inside the radius', () => {
+    const result = decidePunch(decideContext());
+    expect(result).toMatchObject({ rejected: null, status: 'valid', presence: 'location' });
+  });
+
+  it('registers outside the office as pending instead of refusing', () => {
+    const result = decidePunch(decideContext({ position: { ...HOME, accuracy: 15, ageMs: 0 } }));
+    expect(result.rejected).toBeNull();
+    expect(result.status).toBe('pending');
+    expect(result.presence).toBeNull();
+    expect(result.flags).toEqual(expect.arrayContaining(['outside_location', 'remote']));
+    expect(result.distanceM).toBeGreaterThan(10_000);
+  });
+
+  it('never asks approval for a pause, wherever it is made', () => {
+    const outside = decidePunch(
+      decideContext({ action: 'pause', position: { ...HOME, accuracy: 15, ageMs: 0 } })
+    );
+    expect(outside.status).toBe('valid');
+    expect(outside.flags).toContain('outside_location');
+    expect(outside.flags).not.toContain('remote');
+
+    const noGps = decidePunch(decideContext({ action: 'pause', position: null }));
+    expect(noGps.status).toBe('valid');
+    expect(noGps.flags).toContain('no_gps');
+  });
+
+  it('registers without GPS as pending, with the reason in the flags', () => {
+    const result = decidePunch(decideContext({ position: null }));
+    expect(result.status).toBe('pending');
+    expect(result.flags).toEqual(expect.arrayContaining(['no_gps', 'remote', 'gps_only']));
+
+    const stale = decidePunch(
+      decideContext({ position: { ...NEAR, accuracy: 10, ageMs: 5 * 60_000 } })
+    );
+    expect(stale.status).toBe('pending');
+    expect(stale.flags).toContain('stale_gps');
+  });
+
+  it('turns weak or approximate GPS into pending with a clear reason', () => {
+    const weak = decidePunch(decideContext({ position: { ...NEAR, accuracy: 150, ageMs: 0 } }));
+    expect(weak.status).toBe('pending');
+    expect(weak.flags).toContain('weak_gps');
+
+    const approx = decidePunch(decideContext({ position: { ...NEAR, accuracy: 1_986, ageMs: 0 } }));
+    expect(approx.status).toBe('pending');
+    expect(approx.flags).toContain('approximate_location');
+  });
+
+  it('accepts the office Wi-Fi as presence, with or without GPS', () => {
+    const noGps = decidePunch(decideContext({ position: null, trustedNetwork: true }));
+    expect(noGps).toMatchObject({ status: 'valid', presence: 'network' });
+    expect(noGps.flags).toEqual(expect.arrayContaining(['no_gps', 'trusted_network']));
+
+    const badGps = decidePunch(
+      decideContext({ trustedNetwork: true, position: { ...HOME, accuracy: 15, ageMs: 0 } })
+    );
+    expect(badGps).toMatchObject({ status: 'valid', presence: 'network' });
+    expect(badGps.flags).toContain('outside_location');
+
+    const shared = decidePunch(
+      decideContext({ position: null, trustedNetwork: true, deviceUsedByOthers: true })
+    );
+    expect(shared.status).toBe('flagged');
+  });
+
+  it('accepts a tag without GPS for review (flagged), and a tag pause as valid', () => {
+    const tag = decidePunch(decideContext({ method: 'nfc', position: null }));
+    expect(tag).toMatchObject({ status: 'flagged', presence: 'tag' });
+    const pause = decidePunch(decideContext({ method: 'nfc', action: 'pause', position: null }));
+    expect(pause).toMatchObject({ status: 'valid', presence: 'tag' });
+  });
+
+  it('keeps tag-only locations: manual punch inside the radius waits for approval', () => {
+    const result = decidePunch(decideContext({ manualNotAllowed: true }));
+    expect(result.status).toBe('pending');
+    expect(result.flags).toContain('tag_required');
+    const onWifi = decidePunch(decideContext({ manualNotAllowed: true, trustedNetwork: true }));
+    expect(onWifi.status).toBe('pending');
+  });
+
+  it('registers companies without locations as pending', () => {
+    const result = decidePunch(decideContext({ location: null }));
+    expect(result.status).toBe('pending');
+    expect(result.flags).toContain('no_location_configured');
+  });
+
+  it('treats old app versions (no action) like a start', () => {
+    const result = decidePunch(
+      decideContext({ action: null, position: { ...HOME, accuracy: 15, ageMs: 0 } })
+    );
+    expect(result.status).toBe('pending');
+  });
+
+  it('only refuses VPN/Tor when the location blocks it', () => {
+    const location = { ...baseContext().location!, blockVpn: true };
+    expect(decidePunch(decideContext({ location, ipInfo: vpn })).rejected).toBe('vpn_blocked');
+    expect(
+      decidePunch(
+        decideContext({ location, ipInfo: vpn, position: { ...HOME, accuracy: 15, ageMs: 0 } })
+      ).rejected
+    ).toBe('vpn_blocked');
+    expect(decidePunch(decideContext({ location, ipInfo: vpn, position: null })).rejected).toBe(
+      'vpn_blocked'
+    );
+
+    const allowed = decidePunch(decideContext({ ipInfo: vpn }));
+    expect(allowed.rejected).toBeNull();
+    expect(allowed.status).toBe('flagged');
+    expect(allowed.flags).toContain('vpn_or_proxy');
   });
 });
 

@@ -22,7 +22,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ENTRY_TYPE_LABELS, type TimeClockEntryWithRelations } from '@/lib/timeclock';
+import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
+import { getEntryLabel } from '@/lib/workday';
 
 export type EntryDialogMode =
   | 'details'
@@ -76,7 +77,7 @@ export const EntryChip: React.FC<EntryChipProps> = ({
           ) : (
             <SourceIcon className="h-3 w-3" />
           )}
-          {ENTRY_TYPE_LABELS[entry.entry_type]}{' '}
+          {getEntryLabel(entry)}{' '}
           {format(new Date(entry.punched_at), showDate ? 'dd/MM HH:mm' : 'HH:mm')}
           {entry.status === 'flagged' && <AlertTriangle className="h-3 w-3" />}
           {entry.employee_note && <MessageSquare className="h-3 w-3" aria-label="Tem observação" />}

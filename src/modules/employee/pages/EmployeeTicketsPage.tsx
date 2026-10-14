@@ -22,6 +22,7 @@ import { supabase } from '@/integrations/supabase/client';
 import logo from '@/assets/logo-realize.png';
 import NewTicketDialog from '@/components/employee/NewTicketDialog';
 import TicketConversationDialog from '@/components/employee/TicketConversationDialog';
+import { WorkdayClockButton } from '@/modules/timeclock/components/employee/WorkdayClockButton';
 
 interface SupportTicket {
   id: string;
@@ -264,6 +265,7 @@ const EmployeeTicketsPage = () => {
               </div>
             </div>
             <div className="flex items-center gap-2 lg:gap-3">
+              <WorkdayClockButton />
               <Button
                 variant="gold"
                 size="sm"

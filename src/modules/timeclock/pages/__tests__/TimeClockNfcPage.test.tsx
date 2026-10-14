@@ -2,27 +2,14 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useAuth } from '@/contexts/AuthContext';
-import { usePunch } from '../../hooks/usePunch';
+import { deriveWorkday } from '@/lib/workday';
+import { useWorkday } from '../../context/useWorkday';
 import TimeClockNfcPage from '../TimeClockNfcPage';
 
 vi.mock('@/contexts/AuthContext', () => ({ useAuth: vi.fn() }));
-vi.mock('../../hooks/usePunch', () => ({ usePunch: vi.fn() }));
-vi.mock('../../hooks/useCurrentEmployee', () => ({
-  useCurrentEmployee: () => ({ employee: { id: 'emp-1' }, isLoading: false }),
-}));
-vi.mock('../../hooks/useMyTimeClock', () => ({
-  useMyTimeClock: () => ({ lastEntry: null, isLoading: false }),
-}));
-// O formulário tem testes próprios; aqui basta simular a submissão.
-vi.mock('../../components/employee/PunchForm', () => ({
-  PunchForm: ({ onSubmit }: { onSubmit: (c: { entryType: 'in'; note: string }) => void }) => (
-    <button onClick={() => onSubmit({ entryType: 'in', note: 'Esqueci a saída do almoço' })}>
-      Registar
-    </button>
-  ),
-}));
+vi.mock('../../context/useWorkday', () => ({ useWorkday: vi.fn() }));
 
-const punch = vi.fn();
+const run = vi.fn().mockResolvedValue(null);
 const warmUp = vi.fn();
 const logout = vi.fn().mockResolvedValue(undefined);
 
@@ -50,36 +37,38 @@ const renderAt = (role: string) => {
 describe('TimeClockNfcPage', () => {
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(usePunch).mockReturnValue({
+    vi.mocked(useWorkday).mockReturnValue({
+      employee: { id: 'emp-1', name: 'Ana', company_id: 'c-1', companies: null },
+      isLoading: false,
+      entries: [],
+      workday: deriveWorkday([]),
       phase: 'idle',
       outcome: null,
       isBusy: false,
-      lastNote: '',
-      punch,
+      run,
+      undo: vi.fn(),
       warmUp,
-      requestRemote: vi.fn(),
-      swap: vi.fn(),
-      reset: vi.fn(),
+      refetch: vi.fn(),
+      version: 0,
     });
   });
 
-  it('asks for Entrada/Saída and only registers after the employee submits', () => {
+  it('shows the workday buttons and registers with the tag only when the employee taps', async () => {
     renderAt('employee');
-    expect(punch).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
     expect(warmUp).toHaveBeenCalled(); // GPS começa logo, para o registo ser rápido
+    expect(screen.getByText(/Tag lida/)).toBeInTheDocument();
 
-    fireEvent.click(screen.getByRole('button', { name: 'Registar' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Iniciar dia' }));
 
-    expect(punch).toHaveBeenCalledWith(
-      'nfc',
-      { entryType: 'in', note: 'Esqueci a saída do almoço' },
-      { t: 'abc123' }
-    );
+    await waitFor(() => {
+      expect(run).toHaveBeenCalledWith('start', { note: '', method: 'nfc', tag: { t: 'abc123' } });
+    });
   });
 
   it('does not send admins to the admin panel and keeps the tag for the employee login', async () => {
     renderAt('admin');
-    expect(punch).not.toHaveBeenCalled();
+    expect(run).not.toHaveBeenCalled();
     expect(screen.getByText(/esta sessão não é de colaborador/)).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('button', { name: /Entrar como colaborador/ }));

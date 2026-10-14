@@ -16,11 +16,8 @@ import {
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
-import {
-  ENTRY_TYPE_LABELS,
-  getErrorMessage,
-  type TimeClockEntryWithRelations,
-} from '@/lib/timeclock';
+import { getErrorMessage, type TimeClockEntryWithRelations } from '@/lib/timeclock';
+import { getEntryLabel } from '@/lib/workday';
 import { timeClockReasonSchema, type TimeClockReasonInput } from '@/lib/schemas';
 import { timeClockService } from '../../services/timeClockService';
 
@@ -109,7 +106,7 @@ export const EntryStatusDialog: React.FC<EntryStatusDialogProps> = ({
         <DialogHeader>
           <DialogTitle>{copy.title}</DialogTitle>
           <DialogDescription>
-            {entry.employee?.name} · {ENTRY_TYPE_LABELS[entry.entry_type]}{' '}
+            {entry.employee?.name} · {getEntryLabel(entry)}{' '}
             {format(new Date(entry.punched_at), 'dd/MM/yyyy HH:mm')}. {copy.description}
           </DialogDescription>
         </DialogHeader>

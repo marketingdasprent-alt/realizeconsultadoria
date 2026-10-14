@@ -12,12 +12,12 @@ import {
 import {
   ENTRY_SOURCE_LABELS,
   ENTRY_STATUS_LABELS,
-  ENTRY_TYPE_LABELS,
   FLAG_INFO,
   formatDistance,
   getFlagLabel,
   type TimeClockEntryWithRelations,
 } from '@/lib/timeclock';
+import { getEntryLabel } from '@/lib/workday';
 
 interface EntryDetailsDialogProps {
   entry: TimeClockEntryWithRelations;
@@ -38,8 +38,7 @@ export const EntryDetailsDialog: React.FC<EntryDetailsDialogProps> = ({ entry, o
       <DialogContent className="max-w-lg max-h-[85vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle>
-            {ENTRY_TYPE_LABELS[entry.entry_type]} ·{' '}
-            {format(new Date(entry.punched_at), 'dd/MM/yyyy HH:mm:ss')}
+            {getEntryLabel(entry)} · {format(new Date(entry.punched_at), 'dd/MM/yyyy HH:mm:ss')}
           </DialogTitle>
           <DialogDescription>{entry.employee?.name}</DialogDescription>
         </DialogHeader>

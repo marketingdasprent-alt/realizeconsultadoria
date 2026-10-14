@@ -1,18 +1,21 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatMinutes } from '@/lib/timeclock';
-import { useCurrentEmployee } from '../hooks/useCurrentEmployee';
+import { useWorkday } from '../context/useWorkday';
 import { useMyTimeClock } from '../hooks/useMyTimeClock';
 import { EmployeeTimeClockHeader } from '../components/employee/EmployeeTimeClockHeader';
-import { PunchPanel } from '../components/employee/PunchPanel';
 import { TimeClockDayList } from '../components/employee/TimeClockDayList';
+import { WorkdayPanel } from '../components/employee/WorkdayPanel';
 
 const EmployeeTimeClockPage: React.FC = () => {
-  const { employee, isLoading: isLoadingEmployee } = useCurrentEmployee();
-  const { days, today, lastEntry, isLoading, error, refetch } = useMyTimeClock(
-    employee?.id ?? null
-  );
+  const { employee, isLoading: isLoadingEmployee, version } = useWorkday();
+  const { days, isLoading, error, refetch } = useMyTimeClock(employee?.id ?? null);
+
+  // Registo novo ou desfeito no painel (ou no relógio do cabeçalho): atualiza o mês.
+  useEffect(() => {
+    if (version > 0) refetch();
+  }, [version, refetch]);
 
   const currentMonthKey = new Date().toISOString().slice(0, 7);
   const monthDays = useMemo(
@@ -41,14 +44,9 @@ const EmployeeTimeClockPage: React.FC = () => {
     <div className="min-h-screen bg-secondary">
       <EmployeeTimeClockHeader subtitle={employee.companies?.name ?? undefined} />
       <main className="container mx-auto px-4 py-4 lg:py-6 max-w-3xl space-y-6">
-        <PunchPanel lastEntry={lastEntry} onPunched={refetch} />
-
         <Card className="shadow-card">
-          <CardHeader className="pb-3">
-            <CardTitle className="font-display text-lg">Hoje</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <TimeClockDayList days={today ? [today] : []} emptyMessage="Sem registos hoje." />
+          <CardContent className="pt-6">
+            <WorkdayPanel />
           </CardContent>
         </Card>
 

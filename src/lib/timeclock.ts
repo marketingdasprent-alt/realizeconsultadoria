@@ -70,6 +70,7 @@ export const FLAG_INFO: Record<string, { label: string; warning: boolean }> = {
   approximate_location: { label: 'Localização aproximada', warning: false },
   no_location_configured: { label: 'Sem locais configurados', warning: false },
   tag_required: { label: 'Sem tag (local exige tag)', warning: false },
+  manual_time: { label: 'Hora indicada pelo colaborador', warning: true },
 };
 
 export const getFlagLabel = (flag: string): string => FLAG_INFO[flag]?.label ?? flag;
@@ -81,6 +82,8 @@ export const PUNCH_MESSAGES: Record<string, string> = {
   duplicate: 'Este registo já tinha sido feito há instantes.',
   invalid_state:
     'O seu dia mudou entretanto (registo feito noutro telemóvel?). O painel foi atualizado: confirme e tente de novo.',
+  invalid_time: 'A hora indicada tem de ser depois do último registo, de hoje e não no futuro.',
+  note_required: 'Escreva o motivo da correção.',
   vpn_blocked: 'Desative a VPN para registar o ponto.',
   invalid_tag: 'Tag NFC inválida ou desativada.',
   replayed_tag: 'Esta leitura da tag já foi usada. Encoste novamente o telemóvel à tag.',
@@ -108,9 +111,6 @@ export const REJECT_REASON_LABELS: Record<string, string> = {
   manual_not_allowed: 'Só GPS não permitido',
   ntag424_not_configured: 'Chave NTAG 424 em falta',
 };
-
-/** A partir desta distância já não é "fora do raio": não há local configurado perto. */
-export const NO_NEARBY_LOCATION_M = 1000;
 
 export const getPunchMessage = (code: string): string =>
   PUNCH_MESSAGES[code] ?? 'Não foi possível registar o ponto. Tente novamente.';

@@ -1,7 +1,7 @@
 import { useCallback, useRef, useState } from 'react';
 import { getBestPosition, getDeviceId, type PositionPayload } from '@/lib/geolocation';
 import type { TagPayload } from '@/lib/nfc';
-import { getErrorMessage, getPunchMessage, type PunchMethod } from '@/lib/timeclock';
+import { getPunchMessage, type PunchMethod } from '@/lib/timeclock';
 import type { WorkdayAction, WorkdayStatus } from '@/lib/workday';
 import { timeClockService, type PunchEntry } from '../services/timeClockService';
 
@@ -13,6 +13,8 @@ export interface PunchInput {
   method: PunchMethod;
   note?: string;
   tag?: TagPayload;
+  /** Hora de um registo esquecido (ISO); `note` é o motivo. */
+  at?: string;
 }
 
 export interface PunchOutcome {
@@ -22,11 +24,6 @@ export interface PunchOutcome {
   message: string;
   entry: PunchEntry | null;
   state: WorkdayStatus | null;
-  /** Local mais próximo e distância (explicam porque ficou a aguardar aprovação). */
-  distanceM: number | null;
-  locationName: string | null;
-  /** Porque não houve GPS (o ponto foi registado na mesma). */
-  gpsError: string | null;
 }
 
 interface UsePunchResult {
@@ -37,7 +34,7 @@ interface UsePunchResult {
   punch: (input: PunchInput) => Promise<PunchOutcome | null>;
   /** Começa já a ler o GPS (ao abrir o painel), para o registo ser imediato. */
   warmUp: () => void;
-  /** Esquece o último resultado (ex.: depois de desfazer). */
+  /** Esquece o último resultado. */
   clear: () => void;
 }
 
@@ -57,7 +54,8 @@ export const usePunch = (): UsePunchResult => {
   const inFlight = useRef(false);
   const warm = useRef<{ startedAt: number; reading: Promise<Reading> } | null>(null);
 
-  const readPosition = useCallback(async () => {
+  /** Posição para o registo, ou null sem GPS (o ponto regista-se na mesma). */
+  const readPosition = useCallback(async (): Promise<PositionPayload | null> => {
     const warmed = warm.current;
     warm.current = null;
     try {
@@ -68,9 +66,9 @@ export const usePunch = (): UsePunchResult => {
         if (ageOf(reading) >= REUSE_POSITION_MS) reading = null;
       }
       reading ??= { position: await getBestPosition(), capturedAt: Date.now() };
-      return { position: { ...reading.position, age_ms: ageOf(reading) }, gpsError: null };
-    } catch (error: unknown) {
-      return { position: null, gpsError: getErrorMessage(error, 'Localização indisponível.') };
+      return { ...reading.position, age_ms: ageOf(reading) };
+    } catch {
+      return null;
     }
   }, []);
 
@@ -81,7 +79,7 @@ export const usePunch = (): UsePunchResult => {
       setOutcome(null);
       try {
         setPhase('locating');
-        const { position, gpsError } = await readPosition();
+        const position = await readPosition();
 
         setPhase('sending');
         const note = input.note?.trim();
@@ -92,6 +90,7 @@ export const usePunch = (): UsePunchResult => {
           position,
           device_id: getDeviceId(),
           ...(note ? { note } : {}),
+          ...(input.at ? { at: input.at } : {}),
         });
         const code = error || !data ? 'network' : data.code;
         const result: PunchOutcome = {
@@ -101,9 +100,6 @@ export const usePunch = (): UsePunchResult => {
           message: getPunchMessage(code),
           entry: data?.entry ?? null,
           state: data?.state ?? null,
-          distanceM: data?.distance_m ?? null,
-          locationName: data?.location_name ?? null,
-          gpsError,
         };
         setOutcome(result);
         setPhase('done');

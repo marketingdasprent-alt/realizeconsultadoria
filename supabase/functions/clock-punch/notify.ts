@@ -25,6 +25,7 @@ const FLAG_LABELS: Record<string, string> = {
   shared_device: 'Telemóvel usado por outro colaborador',
   new_device: 'Telemóvel novo',
   gps_only: 'Sem tag (só GPS)',
+  manual_time: 'Hora indicada pelo colaborador',
 };
 
 /** Iniciar dia / Pausa / Retomar / Terminar dia a partir do tipo e do kind. */
@@ -37,6 +38,7 @@ export const ACTION_LABELS: Record<string, string> = {
 
 /** Porque é que o registo ficou a aguardar aprovação (frase do email). */
 const pendingReason = (flags: string[]): string => {
+  if (flags.includes('manual_time')) return 'com a hora indicada manualmente (registo esquecido)';
   if (flags.includes('no_gps') || flags.includes('stale_gps')) return 'sem localização GPS';
   if (flags.includes('approximate_location')) return 'com a localização aproximada do telemóvel';
   if (flags.includes('weak_gps')) return 'com sinal GPS fraco';
@@ -62,6 +64,10 @@ export interface PunchNotification {
   /** Distância ao local mais próximo, em metros (null se a empresa não tem locais). */
   distanceM: number | null;
   locationName: string | null;
+  /** Morada aproximada (OpenStreetMap) quando registou fora dos locais. */
+  address: string | null;
+  /** Quando foi gravado (difere da hora do registo se a hora foi indicada). */
+  recordedAt: string | null;
   flags: string[];
   note: string | null;
 }
@@ -92,11 +98,14 @@ export const buildEmail = (n: PunchNotification) => {
   const remote = n.status === 'pending';
   const type =
     ACTION_LABELS[`${n.entryType}:${n.kind}`] ?? (n.entryType === 'in' ? 'Entrada' : 'Saída');
-  const when = new Date(n.punchedAt).toLocaleString('pt-PT', {
-    timeZone: 'Europe/Lisbon',
-    dateStyle: 'short',
-    timeStyle: 'short',
-  });
+  const format = (iso: string) =>
+    new Date(iso).toLocaleString('pt-PT', {
+      timeZone: 'Europe/Lisbon',
+      dateStyle: 'short',
+      timeStyle: 'short',
+    });
+  const when = format(n.punchedAt);
+  const recordedAt = n.flags.includes('manual_time') ? n.recordedAt : null;
   const flags = [...new Set(n.flags.filter(f => FLAG_LABELS[f]).map(f => FLAG_LABELS[f]))].join(
     ' · '
   );
@@ -117,6 +126,8 @@ export const buildEmail = (n: PunchNotification) => {
 <table cellpadding="0" cellspacing="0" style="font-size:14px">
 ${row('Registo', `${type} · ${when}`)}
 ${n.companyName ? row('Empresa', escapeHtml(n.companyName)) : ''}
+${recordedAt ? row('Registado às', format(recordedAt)) : ''}
+${n.address ? row('Morada', escapeHtml(n.address)) : ''}
 ${row('Onde', where(n))}
 ${flags ? row('Alertas', escapeHtml(flags)) : ''}
 ${n.note ? row('Nota do colaborador', escapeHtml(n.note)) : ''}

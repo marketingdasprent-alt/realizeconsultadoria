@@ -26,7 +26,7 @@ export const WorkdayClockButton: React.FC = () => {
           type="button"
           variant="outline"
           size="sm"
-          className="h-9 gap-2 px-2.5"
+          className="h-9 gap-2 rounded-full border-border/70 bg-background/80 px-3 shadow-sm hover:bg-secondary"
           aria-label={`Ponto: ${statusText}`}
         >
           <span
@@ -34,13 +34,16 @@ export const WorkdayClockButton: React.FC = () => {
             aria-hidden
           />
           <span className="font-semibold tabular-nums">{format(now, 'HH:mm')}</span>
-          <span className="hidden text-xs text-muted-foreground sm:inline">{statusText}</span>
+          <span className="hidden text-xs font-normal text-muted-foreground sm:inline">
+            {statusText}
+          </span>
         </Button>
       </PopoverTrigger>
       <PopoverContent
         align="end"
+        sideOffset={8}
         collisionPadding={12}
-        className="w-[min(22rem,calc(100vw-1.5rem))]"
+        className="w-[min(23rem,calc(100vw-1.5rem))] rounded-3xl border-border/60 p-3 shadow-xl"
       >
         <WorkdayPanel showPageLink onNavigate={() => setIsOpen(false)} />
       </PopoverContent>

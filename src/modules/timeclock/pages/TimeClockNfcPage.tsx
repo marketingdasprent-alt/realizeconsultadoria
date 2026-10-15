@@ -53,8 +53,8 @@ const TimeClockNfcPage: React.FC = () => {
     <div className="min-h-screen bg-secondary">
       <EmployeeTimeClockHeader subtitle="Registar Ponto · tag NFC" />
       <main className="container mx-auto px-4 py-8 max-w-md">
-        <Card className="shadow-card">
-          <CardContent className="pt-6 space-y-4">
+        <Card className="rounded-3xl shadow-card">
+          <CardContent className="p-3 sm:p-4 space-y-3">
             {!payload ? (
               <p className="text-sm text-destructive">
                 Este link não contém uma leitura de tag válida. Encoste novamente o telemóvel à tag.
@@ -75,7 +75,7 @@ const TimeClockNfcPage: React.FC = () => {
             {!wrongAccount && (
               <Button
                 variant="outline"
-                className="w-full"
+                className="h-11 w-full rounded-xl"
                 disabled={isBusy}
                 onClick={() => navigate(ROUTES.EMPLOYEE.TIMECLOCK, { replace: true })}
               >

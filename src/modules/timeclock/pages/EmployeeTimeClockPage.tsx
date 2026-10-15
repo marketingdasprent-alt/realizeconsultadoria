@@ -44,13 +44,13 @@ const EmployeeTimeClockPage: React.FC = () => {
     <div className="min-h-screen bg-secondary">
       <EmployeeTimeClockHeader subtitle={employee.companies?.name ?? undefined} />
       <main className="container mx-auto px-4 py-4 lg:py-6 max-w-3xl space-y-6">
-        <Card className="shadow-card">
-          <CardContent className="pt-6">
+        <Card className="rounded-3xl shadow-card">
+          <CardContent className="p-3 sm:p-4">
             <WorkdayPanel />
           </CardContent>
         </Card>
 
-        <Card className="shadow-card">
+        <Card className="rounded-3xl shadow-card">
           <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
             <CardTitle className="font-display text-lg">Este mês</CardTitle>
             <span className="text-sm font-semibold text-gold">{formatMinutes(monthMinutes)}</span>

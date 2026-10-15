@@ -1,14 +1,14 @@
-// Jornada de trabalho como no Bitrix24: Iniciar dia → Pausa ⇄ Retomar → Terminar dia.
-// Cada ação é um registo em time_clock_entries (entry_type + kind). Quem valida a
-// sequência é a BD (time_clock_register_punch); aqui só se deriva o estado para
-// mostrar o relógio, os botões e os nomes dos registos.
+// Jornada de trabalho como no Bitrix24: Iniciar dia → Pausa ⇄ Retomar → Terminar dia
+// (e "Retomar dia" se terminou por engano). Cada ação é um registo em
+// time_clock_entries (entry_type + kind). Quem valida a sequência é a BD
+// (time_clock_register_punch); aqui só se deriva o estado para mostrar o relógio,
+// os botões e os nomes dos registos.
 import { format } from 'date-fns';
 import {
   MAX_SHIFT_MS,
-  NO_NEARBY_LOCATION_M,
-  formatDistance,
   type EntryType,
   type TimeClockEntry,
+  type TimeClockEntryWithRelations,
 } from './timeclock';
 
 export type WorkdayAction = 'start' | 'pause' | 'resume' | 'stop';
@@ -50,26 +50,12 @@ export const ACTION_EVENT_LABELS: Record<WorkdayAction, string> = {
   stop: 'Fim',
 };
 
-/** Confirmação depois de registar. */
-export const ACTION_DONE_LABELS: Record<WorkdayAction, string> = {
-  start: 'Dia iniciado',
-  pause: 'Pausa iniciada',
-  resume: 'Trabalho retomado',
-  stop: 'Dia terminado',
-};
-
 export const getEntryLabel = (entry: EntryLike): string =>
   ACTION_EVENT_LABELS[getEntryAction(entry)];
 
-/** Ações possíveis em cada estado (a mesma regra da BD). */
-export const ALLOWED_ACTIONS: Record<WorkdayStatus, WorkdayAction[]> = {
-  closed: ['start'],
-  working: ['pause', 'stop'],
-  paused: ['resume', 'stop'],
-};
-
-/** O colaborador pode desfazer o último registo durante este tempo (a BD aceita 3 min). */
-export const UNDO_WINDOW_MS = 170 * 1000;
+/** Texto do botão: "Retomar dia" quando se retoma um dia já terminado. */
+export const getActionLabel = (action: WorkdayAction, status: WorkdayStatus): string =>
+  action === 'resume' && status === 'closed' ? 'Retomar dia' : ACTION_BUTTON_LABELS[action];
 
 const timeOf = (entry: { punched_at: string }) => new Date(entry.punched_at).getTime();
 
@@ -95,12 +81,23 @@ export interface Workday<T extends TimeClockEntry = TimeClockEntry> {
   startedAt: string | null;
   /** Hora a que terminou o dia, se já terminou hoje. */
   endedAt: string | null;
+  /** Terminou o dia hoje: pode retomá-lo (o fim passa a pausa), como no Bitrix24. */
+  canContinue: boolean;
   /** Tempo trabalhado e em pausa até `now` (o segmento em curso conta). */
   workedMs: number;
   breakMs: number;
   /** Registos de hoje / do dia em curso, por ordem. */
   entries: T[];
 }
+
+/** Ações possíveis em cada estado (a mesma regra da BD). */
+export const getAllowedActions = (
+  workday: Pick<Workday, 'status' | 'canContinue'>
+): WorkdayAction[] => {
+  if (workday.status === 'working') return ['pause', 'stop'];
+  if (workday.status === 'paused') return ['resume', 'stop'];
+  return workday.canContinue ? ['resume'] : ['start'];
+};
 
 /** Divide os registos em dias de trabalho: de um início até ao fim (ou 12 h sem nada). */
 const splitSessions = <T extends TimeClockEntry>(live: T[]): T[][] => {
@@ -158,9 +155,8 @@ export const deriveWorkday = <T extends TimeClockEntry>(
   const sessions = splitSessions(live);
   const open = status !== 'closed' ? sessions[sessions.length - 1] : null;
   const todayKey = format(now, 'yyyy-MM-dd');
-  const today = sessions.filter(
-    s => s === open || format(new Date(s[0].punched_at), 'yyyy-MM-dd') === todayKey
-  );
+  const isToday = (entry: T) => format(new Date(entry.punched_at), 'yyyy-MM-dd') === todayKey;
+  const today = sessions.filter(s => s === open || isToday(s[0]));
 
   let workedMs = 0;
   let breakMs = 0;
@@ -178,6 +174,13 @@ export const deriveWorkday = <T extends TimeClockEntry>(
     since: status !== 'closed' && last ? last.punched_at : null,
     startedAt: todayEntries[0]?.punched_at ?? null,
     endedAt: status === 'closed' && lastToday && isStop(lastToday) ? lastToday.punched_at : null,
+    // A mesma regra da BD: o fim do dia foi hoje e há menos de 12 h.
+    canContinue:
+      status === 'closed' &&
+      !!last &&
+      isStop(last) &&
+      isToday(last) &&
+      now.getTime() - timeOf(last) < MAX_SHIFT_MS,
     workedMs,
     breakMs,
     entries: todayEntries,
@@ -191,47 +194,44 @@ export const formatTimer = (ms: number): string => {
   return parts.map(n => String(n).padStart(2, '0')).join(':');
 };
 
-/** Porque é que o registo ficou a aguardar aprovação (mostrado ao colaborador). */
-export const getPendingReason = (
-  flags: string[],
-  distanceM?: number | null,
-  locationName?: string | null
-): string => {
-  if (flags.includes('no_gps')) {
-    return 'Não foi possível obter a sua localização (GPS desligado ou sem permissão).';
+/**
+ * Registo esquecido (✎): a hora indicada ("14:00") tem de ser de hoje, antes de agora,
+ * nas últimas 12 h e depois do último registo, e o motivo é obrigatório (como na BD).
+ */
+export const buildCorrection = (
+  time: string,
+  reason: string,
+  last: { punched_at: string } | null,
+  now: Date = new Date()
+): { at: string } | { error: string } => {
+  const match = /^(\d{2}):(\d{2})$/.exec(time);
+  if (!match) return { error: 'Indique a hora.' };
+  const at = new Date(now);
+  at.setHours(Number(match[1]), Number(match[2]), 0, 0);
+  if (at.getTime() > now.getTime()) return { error: 'A hora não pode ser no futuro.' };
+  if (now.getTime() - at.getTime() > MAX_SHIFT_MS) {
+    return { error: 'Só é possível corrigir as últimas 12 horas. Fale com os RH.' };
   }
-  if (flags.includes('stale_gps')) return 'A localização do telemóvel estava desatualizada.';
-  if (flags.includes('approximate_location')) {
-    return 'O telemóvel só enviou a localização aproximada (erra mais de 1 km).';
+  if (last && at.getTime() <= timeOf(last)) {
+    return {
+      error: `Tem de ser depois do último registo (${format(new Date(last.punched_at), 'HH:mm')}).`,
+    };
   }
-  if (flags.includes('weak_gps')) return 'O sinal GPS estava fraco para confirmar o local.';
-  if (flags.includes('tag_required')) {
-    return 'Neste local o ponto faz-se encostando o telemóvel à tag.';
-  }
-  if (flags.includes('no_location_configured')) {
-    return 'A sua empresa ainda não tem locais de ponto configurados.';
-  }
-  if (typeof distanceM === 'number' && Number.isFinite(distanceM)) {
-    if (distanceM >= NO_NEARBY_LOCATION_M) {
-      const nearest = locationName
-        ? ` (o mais próximo, ${locationName}, fica a ${formatDistance(distanceM)})`
-        : '';
-      return `Não há nenhum local de trabalho registado perto de si${nearest}. Se está no seu local habitual, avise os RH para o adicionarem.`;
-    }
-    const where = locationName ? ` de ${locationName}` : ' do local de trabalho';
-    return `Está a ${formatDistance(distanceM)}${where}, fora do raio.`;
-  }
-  return 'Está fora do local de trabalho.';
+  if (reason.trim().length < 3) return { error: 'Escreva o motivo da correção.' };
+  return { at: at.toISOString() };
 };
 
-/** O que fazer para o próximo registo ficar validado logo. */
-export const getPendingTip = (flags: string[]): string | null => {
-  if (flags.includes('no_gps') || flags.includes('stale_gps')) {
-    return 'Ligue a localização (GPS) e permita o acesso à localização para o ponto ficar validado logo.';
-  }
-  if (flags.includes('approximate_location')) {
-    return 'iPhone: Definições → Privacidade e segurança → Serviços de localização → Safari (ou Realize) → ative "Localização exata". Android: Definições → Localização → ative "Localização precisa".';
-  }
-  if (flags.includes('weak_gps')) return 'Aproxime-se de uma janela ou encoste o telemóvel à tag.';
+/** O colaborador indicou a hora deste registo (✎): os RH confirmam. */
+export const isManualTime = (entry: Pick<TimeClockEntry, 'flags'>): boolean =>
+  entry.flags.includes('manual_time');
+
+/**
+ * Onde foi feito o registo, para o colaborador: o local de trabalho, a morada
+ * aproximada (OpenStreetMap) ou "Sem localização" quando não houve GPS.
+ */
+export const getEntryPlace = (entry: TimeClockEntryWithRelations): string | null => {
+  if (entry.location?.name) return entry.location.name;
+  if (entry.address) return entry.address;
+  if (entry.source !== 'admin' && entry.latitude === null) return 'Sem localização';
   return null;
 };

@@ -1,5 +1,6 @@
 import React from 'react';
-import { Check, House, X } from 'lucide-react';
+import { format } from 'date-fns';
+import { Check, House, MapPin, X } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -9,6 +10,7 @@ import {
   getFlagLabel,
   type TimeClockEntryWithRelations,
 } from '@/lib/timeclock';
+import { isManualTime } from '@/lib/workday';
 import { EntryChip, type EntryDialogMode } from './EntryChip';
 
 interface ReviewEntryRowProps {
@@ -70,6 +72,17 @@ export const ReviewEntryRow: React.FC<ReviewEntryRowProps> = ({
             </Badge>
           ))}
         </div>
+        {!entry.location && entry.address && (
+          <p className="flex items-center gap-1 text-xs text-muted-foreground">
+            <MapPin className="h-3 w-3 shrink-0" /> {entry.address}
+          </p>
+        )}
+        {isManualTime(entry) && (
+          <p className="text-xs text-muted-foreground">
+            Hora indicada pelo colaborador · registado às{' '}
+            {format(new Date(entry.created_at), 'HH:mm')}
+          </p>
+        )}
         {entry.employee_note && (
           <p className="text-muted-foreground italic">“{entry.employee_note}”</p>
         )}

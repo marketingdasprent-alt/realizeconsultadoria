@@ -2,7 +2,7 @@
 //
 // POST { method: 'nfc' | 'gps', action: 'start' | 'pause' | 'resume' | 'stop',
 //        tag?: { t } | { e, c }, position?: { lat, lng, accuracy, age_ms } | null,
-//        device_id, note?: string }
+//        device_id, note?: string, at?: ISO }
 // (versões antigas da app enviam entry_type: 'in' | 'out' em vez de action.)
 //
 // Toda a validação é feita aqui (service role): identidade, tag NFC, distância
@@ -10,8 +10,11 @@
 // sempre (decidePunch): fora dos locais ou sem GPS fica 'pending' até um admin
 // aprovar, com email para a lista de aprovações. Só se recusa tag inválida ou
 // repetida, tag de outra empresa e VPN/Tor quando o local o bloqueia.
-// A sequência (dia por iniciar → a trabalhar ⇄ em pausa → terminado), os
-// duplicados e o lock são decididos em time_clock_register_punch.
+// `at` é a hora indicada pelo colaborador para um registo esquecido (✎): exige
+// motivo e fica sempre a aguardar aprovação. Fora dos locais guarda-se a morada
+// aproximada (OpenStreetMap) para mostrar onde a pessoa estava.
+// A sequência (dia por iniciar → a trabalhar ⇄ em pausa → terminado, "Retomar
+// dia"), os duplicados e o lock são decididos em time_clock_register_punch.
 // Respostas de negócio vêm sempre com HTTP 200 e { ok: boolean, code }.
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
@@ -19,15 +22,17 @@ import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supa
 import { hexToBytes, verifySunMessage } from '../_shared/ntag424.ts';
 import {
   WORKDAY_ACTIONS,
+  applyManualTime,
   decidePunch,
+  formatOsmAddress,
   haversineMeters,
   ipMatchesAny,
   isValidPosition,
+  parseManualTime,
   sha256Hex,
   type IpInfo,
   type LocationRules,
   type PositionReading,
-  type WorkdayAction,
 } from '../_shared/timeclock-rules.ts';
 import { notifyApprovers } from './notify.ts';
 
@@ -48,6 +53,8 @@ interface PunchRequest {
   /** Versões antigas da app: Entrada/Saída em vez de action. */
   entry_type?: 'in' | 'out';
   note?: string;
+  /** Hora indicada pelo colaborador (registo esquecido); exige motivo em `note`. */
+  at?: string;
 }
 
 interface LocationRow {
@@ -78,6 +85,7 @@ interface EntryRow {
   status: string;
   flags: string[];
   distance_m: number | null;
+  address: string | null;
   source: string;
   work_mode: string;
   created_at: string;
@@ -85,7 +93,7 @@ interface EntryRow {
 
 interface RegisterResult {
   duplicate?: boolean;
-  error?: 'invalid_state';
+  error?: 'invalid_state' | 'invalid_time';
   state?: 'closed' | 'working' | 'paused';
   entry?: EntryRow | null;
 }
@@ -143,6 +151,32 @@ const lookupIp = async (ip: string | null): Promise<IpInfo> => {
     };
   } catch {
     return { checked: false };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
+ * Morada aproximada (rua, localidade) via Nominatim do OpenStreetMap, para mostrar
+ * onde estava quem registou fora dos locais. Timeout curto; nunca bloqueia o registo.
+ * Política do Nominatim: identificar a aplicação e não passar de 1 pedido/s.
+ */
+const reverseGeocode = async (lat: number, lng: number): Promise<string | null> => {
+  const url =
+    'https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1' +
+    `&accept-language=pt-PT&lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2000);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'RealizeConsultadoria-Ponto/1.0 (+https://realize.dasprent.pt)' },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return formatOsmAddress(data?.address);
+  } catch {
+    return null;
   } finally {
     clearTimeout(timer);
   }
@@ -217,6 +251,13 @@ serve(async (req: Request) => {
   if (body.action !== undefined && !action) return json({ ok: false, code: 'bad_request' }, 400);
   const entryType = body.entry_type === 'in' || body.entry_type === 'out' ? body.entry_type : null;
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, 300) : null;
+  // Registo esquecido: hora indicada (até 12 h para trás), só com ação e com motivo.
+  const manualAt = parseManualTime(body.at, Date.now());
+  if (manualAt === 'invalid') return json({ ok: false, code: 'invalid_time' });
+  if (manualAt !== null && !action) return json({ ok: false, code: 'bad_request' }, 400);
+  if (manualAt !== null && (note?.length ?? 0) < 3) {
+    return json({ ok: false, code: 'note_required' });
+  }
 
   const { data: employee } = await db
     .from('employees')
@@ -307,42 +348,58 @@ serve(async (req: Request) => {
     location = networkLocation ?? locations.find(l => l.block_vpn) ?? null;
   }
 
-  // 2. Contexto: IP, último registo, dispositivo, coordenadas repetidas.
+  // Morada só quando não está claramente dentro do local mais próximo (poupa o Nominatim).
+  const insideNearest =
+    !!location &&
+    latitude !== null &&
+    longitude !== null &&
+    haversineMeters(
+      { lat: latitude, lng: longitude },
+      { lat: location.latitude, lng: location.longitude }
+    ) <= location.radius_m &&
+    (accuracyM ?? Infinity) <= location.max_accuracy_m;
+
+  // 2. Contexto: IP, último registo, dispositivo, coordenadas repetidas, morada.
   const since60d = new Date(Date.now() - 60 * 86_400_000).toISOString();
-  const [ipInfo, lastRes, deviceSeenRes, deviceOthersRes, repeatedRes] = await Promise.all([
-    lookupIp(ip),
-    db
-      .from('time_clock_entries')
-      .select('punched_at, latitude, longitude')
-      .eq('employee_id', employee.id)
-      .neq('status', 'voided')
-      .order('punched_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    deviceId
-      ? db
-          .from('time_clock_entries')
-          .select('id', { count: 'exact', head: true })
-          .eq('employee_id', employee.id)
-          .eq('device_id', deviceId)
-      : Promise.resolve({ count: 0 }),
-    deviceId
-      ? db
-          .from('time_clock_entries')
-          .select('id', { count: 'exact', head: true })
-          .eq('device_id', deviceId)
-          .neq('employee_id', employee.id)
-          .gte('punched_at', since60d)
-      : Promise.resolve({ count: 0 }),
-    latitude !== null && longitude !== null
-      ? db
-          .from('time_clock_entries')
-          .select('id', { count: 'exact', head: true })
-          .eq('employee_id', employee.id)
-          .eq('latitude', latitude)
-          .eq('longitude', longitude)
-      : Promise.resolve({ count: 0 }),
-  ]);
+  const [ipInfo, lastRes, deviceSeenRes, deviceOthersRes, repeatedRes, address] = await Promise.all(
+    [
+      lookupIp(ip),
+      db
+        .from('time_clock_entries')
+        .select('punched_at, latitude, longitude')
+        .eq('employee_id', employee.id)
+        .neq('status', 'voided')
+        .order('punched_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      deviceId
+        ? db
+            .from('time_clock_entries')
+            .select('id', { count: 'exact', head: true })
+            .eq('employee_id', employee.id)
+            .eq('device_id', deviceId)
+        : Promise.resolve({ count: 0 }),
+      deviceId
+        ? db
+            .from('time_clock_entries')
+            .select('id', { count: 'exact', head: true })
+            .eq('device_id', deviceId)
+            .neq('employee_id', employee.id)
+            .gte('punched_at', since60d)
+        : Promise.resolve({ count: 0 }),
+      latitude !== null && longitude !== null
+        ? db
+            .from('time_clock_entries')
+            .select('id', { count: 'exact', head: true })
+            .eq('employee_id', employee.id)
+            .eq('latitude', latitude)
+            .eq('longitude', longitude)
+        : Promise.resolve({ count: 0 }),
+      method === 'gps' && latitude !== null && longitude !== null && !insideNearest
+        ? reverseGeocode(latitude, longitude)
+        : Promise.resolve(null),
+    ]
+  );
 
   // 3. Regras: regista sempre; fora dos locais ou sem GPS fica a aguardar aprovação.
   const now = Date.now();
@@ -379,6 +436,8 @@ serve(async (req: Request) => {
   }
   const officeLocation =
     decision.presence === 'network' ? networkLocation : decision.presence ? location : null;
+  // Registo esquecido com hora indicada: os RH confirmam sempre.
+  const { status, flags } = manualAt !== null ? applyManualTime(decision) : decision;
 
   // 4. Anti-replay NTAG 424: só avança se o contador ainda for maior (evita corridas).
   if (tag) {
@@ -405,15 +464,17 @@ serve(async (req: Request) => {
       employee_id: employee.id,
       company_id: employee.company_id,
       ...(action ? { action } : { entry_type: entryType }),
+      ...(manualAt !== null ? { punched_at: new Date(manualAt).toISOString() } : {}),
       location_id: officeLocation?.id ?? null,
       tag_id: tag?.id ?? null,
       source: method,
-      status: decision.status,
-      flags: decision.flags,
+      status,
+      flags,
       latitude,
       longitude,
       accuracy_m: accuracyM,
       distance_m: distanceM,
+      address,
       ip_address: ip,
       ip_country: ipInfo.country ?? null,
       ip_city: ipInfo.city ?? null,
@@ -441,17 +502,19 @@ serve(async (req: Request) => {
     status: entry.status,
     flags: entry.flags,
     distance_m: entry.distance_m,
+    address: entry.address ?? null,
     source: entry.source,
     work_mode: entry.work_mode,
     created_at: entry.created_at,
     location_name: locationName,
   });
 
-  // O ecrã estava desatualizado (ex.: dia terminado noutro telemóvel).
-  if (result.error === 'invalid_state') {
+  // O ecrã estava desatualizado (ex.: dia terminado noutro telemóvel) ou a hora
+  // indicada não é depois do último registo.
+  if (result.error) {
     return json({
       ok: false,
-      code: 'invalid_state',
+      code: result.error,
       state: result.state,
       entry: result.entry ? toResponse(result.entry) : null,
     });
@@ -482,6 +545,8 @@ serve(async (req: Request) => {
       accuracyM,
       distanceM,
       locationName: location?.name ?? null,
+      address: entry.address ?? null,
+      recordedAt: entry.created_at,
       flags: entry.flags,
       note: note || null,
     });

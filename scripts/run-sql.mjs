@@ -48,7 +48,9 @@ const main = async () => {
   }
   const token = readToken();
   if (!token) {
-    console.error('Falta o token: defina SUPABASE_ACCESS_TOKEN (supabase.com → Account → Access Tokens).');
+    console.error(
+      'Falta o token: defina SUPABASE_ACCESS_TOKEN (supabase.com → Account → Access Tokens).'
+    );
     return 2;
   }
 

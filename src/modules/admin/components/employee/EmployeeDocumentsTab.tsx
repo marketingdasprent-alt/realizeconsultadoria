@@ -1,15 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
-import { Upload, FileText, Trash2, Download, Loader2, FolderOpen } from 'lucide-react';
+import { useState } from 'react';
+import { format } from 'date-fns';
+import { ExternalLink, FileText, FolderOpen, Loader2, Trash2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -18,377 +11,134 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-
-interface EmployeeDocument {
-  id: string;
-  file_name: string;
-  file_path: string;
-  file_size: number;
-  mime_type: string;
-  category: string | null;
-  description: string | null;
-  created_at: string;
-}
+import {
+  formatPeriodMonth,
+  getDocumentCategoryLabel,
+  PAYSLIP_CATEGORY,
+  type EmployeeDocument,
+} from '@/lib/documents';
+import { getErrorMessage } from '@/lib/timeclock';
+import { AdminUploadDocumentDialog } from '@/modules/documents/components/admin/AdminUploadDocumentDialog';
+import { DocumentStatusBadge, ExpiryBadge } from '@/modules/documents/components/DocumentBadges';
+import { useDocumentDownload } from '@/modules/documents/hooks/useDocumentDownload';
+import { useEmployeeDocuments } from '@/modules/documents/hooks/useEmployeeDocuments';
+import { documentService } from '@/modules/documents/services/documentService';
 
 interface EmployeeDocumentsTabProps {
   employeeId: string;
 }
 
-const DOCUMENT_CATEGORIES = [
-  { value: 'contrato', label: 'Contrato' },
-  { value: 'ficha_admissao', label: 'Ficha de Admissão' },
-  { value: 'certificado', label: 'Certificado' },
-  { value: 'documento_identificacao', label: 'Documento de Identificação' },
-  { value: 'comunicado', label: 'Comunicado' },
-  { value: 'outro', label: 'Outro' },
-];
-
+/** Ficha do colaborador (BO): todos os documentos, com estado e validade. */
 const EmployeeDocumentsTab = ({ employeeId }: EmployeeDocumentsTabProps) => {
   const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
-  const [documents, setDocuments] = useState<EmployeeDocument[]>([]);
-  const [selectedCategory, setSelectedCategory] = useState<string>('');
-  const [description, setDescription] = useState('');
-
-  useEffect(() => {
-    fetchDocuments();
-  }, [employeeId]);
-
-  const fetchDocuments = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('employee_documents')
-        .select('*')
-        .eq('employee_id', employeeId)
-        .order('created_at', { ascending: false });
-
-      if (error) throw error;
-      setDocuments(data || []);
-    } catch (error) {
-      console.error('Error fetching documents:', error);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const sanitizeFileName = (fileName: string): string => {
-    const normalized = fileName.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
-    return normalized.replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_.-]/g, '');
-  };
-
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Utilizador não autenticado');
-
-      // Upload to storage with sanitized filename
-      const sanitizedName = sanitizeFileName(file.name);
-      const filePath = `${employeeId}/documents/${Date.now()}_${sanitizedName}`;
-      const { error: uploadError } = await supabase.storage
-        .from('employee-files')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Save metadata. Mark the document as a company upload so the employee's
-      // "Meus Documentos" view can label it "Submetido pela empresa".
-      const { error: dbError } = await supabase.from('employee_documents').insert({
-        employee_id: employeeId,
-        file_name: file.name,
-        file_path: filePath,
-        file_size: file.size,
-        mime_type: file.type,
-        category: selectedCategory || null,
-        description: description || null,
-        uploaded_by: userData.user.id,
-        uploaded_by_role: 'admin',
-        uploaded_by_name: userData.user.email || null,
-      });
-
-      if (dbError) throw dbError;
-
-      toast({ title: 'Documento carregado com sucesso!' });
-      setSelectedCategory('');
-      setDescription('');
-      fetchDocuments();
-    } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  const handleDownload = async (doc: EmployeeDocument) => {
-    try {
-      const cleanPath = doc.file_path.startsWith('/') ? doc.file_path.substring(1) : doc.file_path;
-      const buckets = [
-        'employee-files',
-        'absence-documents',
-        'equipment_invoices',
-        'legal_documents',
-        'employees',
-        'documents',
-      ];
-
-      let signedUrl = null;
-      let finalError = null;
-
-      for (const bucket of buckets) {
-        console.log(`A tentar bucket '${bucket}':`, cleanPath);
-
-        // Tentativa 1: URL Assinada (Privado)
-        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(cleanPath, 60);
-
-        if (!error && data?.signedUrl) {
-          signedUrl = data.signedUrl;
-          console.log(`Ficheiro encontrado no bucket '${bucket}' (via URL assinada)`);
-          break;
-        }
-
-        // Tentativa 2: URL Pública (Caso o bucket seja público)
-        const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(cleanPath);
-
-        if (publicData?.publicUrl) {
-          try {
-            const resp = await fetch(publicData.publicUrl, { method: 'HEAD' });
-            if (resp.ok) {
-              signedUrl = publicData.publicUrl;
-              console.log(`Ficheiro encontrado no bucket '${bucket}' (via URL pública)`);
-              break;
-            }
-          } catch (e) {
-            // Ignorar erro de fetch head
-          }
-        }
-
-        if (error) {
-          finalError = error;
-        }
-      }
-
-      if (!signedUrl) {
-        throw finalError || new Error('Ficheiro não encontrado em nenhum local de armazenamento.');
-      }
-
-      const a = document.createElement('a');
-      a.href = signedUrl;
-      a.download = doc.file_name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch (error: any) {
-      console.error('Erro crítico no download:', error);
-      toast({
-        title: 'Erro ao descarregar',
-        description: `Não foi possível encontrar o ficheiro. (Caminho: ${doc.file_path})`,
-        variant: 'destructive',
-      });
-    }
-  };
+  const { all, isLoading, refetch } = useEmployeeDocuments(employeeId);
+  const { openingId, open } = useDocumentDownload();
+  const [uploadOpen, setUploadOpen] = useState(false);
 
   const handleDelete = async (doc: EmployeeDocument) => {
-    try {
-      // Bulk-uploaded documents share a single physical file across many
-      // employee_documents rows. Only delete the file from storage when no
-      // other record still references it, otherwise their downloads break.
-      const { count, error: countError } = await supabase
-        .from('employee_documents')
-        .select('id', { count: 'exact', head: true })
-        .eq('file_path', doc.file_path)
-        .neq('id', doc.id);
-
-      if (countError) throw countError;
-
-      if (!count) {
-        const { error: storageError } = await supabase.storage
-          .from('employee-files')
-          .remove([doc.file_path]);
-
-        if (storageError) throw storageError;
-      }
-
-      // Delete from database
-      const { error: dbError } = await supabase
-        .from('employee_documents')
-        .delete()
-        .eq('id', doc.id);
-
-      if (dbError) throw dbError;
-
-      toast({ title: 'Documento eliminado!' });
-      fetchDocuments();
-    } catch (error: any) {
+    if (!window.confirm(`Eliminar "${doc.file_name}"?`)) return;
+    const { error } = await documentService.remove(doc);
+    if (error) {
       toast({
         title: 'Erro ao eliminar',
-        description: error.message,
+        description: getErrorMessage(error, ''),
         variant: 'destructive',
       });
+      return;
     }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  };
-
-  const getCategoryLabel = (value: string | null) => {
-    if (!value) return '-';
-    return DOCUMENT_CATEGORIES.find(c => c.value === value)?.label || value;
+    toast({ title: 'Documento eliminado' });
+    refetch();
   };
 
   return (
     <div className="space-y-6">
-      {/* Upload Card */}
       <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-xl flex items-center gap-2">
-            <Upload className="h-5 w-5 text-gold" />
-            Carregar Documento
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4">
-            <div className="sm:col-span-2 md:col-span-1">
-              <label className="block text-sm font-medium mb-1">Categoria</label>
-              <Select value={selectedCategory} onValueChange={setSelectedCategory}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione..." />
-                </SelectTrigger>
-                <SelectContent>
-                  {DOCUMENT_CATEGORIES.map(cat => (
-                    <SelectItem key={cat.value} value={cat.value}>
-                      {cat.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="sm:col-span-2 md:col-span-2">
-              <label className="block text-sm font-medium mb-1">Descrição</label>
-              <Input
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Descrição opcional..."
-              />
-            </div>
-            <div className="flex items-end">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <Button
-                variant="gold"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="w-full"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />A carregar...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Selecionar
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
-
-      {/* Documents List */}
-      <Card>
-        <CardHeader>
+        <CardHeader className="flex flex-row items-center justify-between space-y-0">
           <CardTitle className="font-display text-xl flex items-center gap-2">
             <FolderOpen className="h-5 w-5 text-gold" />
-            Documentos da Empresa
+            Documentos
           </CardTitle>
+          <Button variant="gold" onClick={() => setUploadOpen(true)}>
+            <Upload className="h-4 w-4 mr-2" /> Carregar
+          </Button>
         </CardHeader>
         <CardContent className="p-0">
           {isLoading ? (
             <div className="flex items-center justify-center py-8">
               <Loader2 className="h-6 w-6 animate-spin text-gold" />
             </div>
-          ) : documents.length === 0 ? (
+          ) : all.length === 0 ? (
             <div className="text-center py-8 text-muted-foreground">
               <FileText className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>Nenhum documento carregado</p>
+              <p>Nenhum documento</p>
             </div>
           ) : (
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>Ficheiro</TableHead>
-                  <TableHead className="hidden sm:table-cell">Categoria</TableHead>
-                  <TableHead className="hidden md:table-cell">Tamanho</TableHead>
-                  <TableHead className="hidden md:table-cell">Data</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
+                  <TableHead>Documento</TableHead>
+                  <TableHead className="hidden md:table-cell">Nº / Mês</TableHead>
+                  <TableHead>Estado</TableHead>
+                  <TableHead className="hidden sm:table-cell">Data</TableHead>
+                  <TableHead className="w-[90px]" />
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {documents.map(doc => (
-                  <TableRow key={doc.id}>
+                {all.map(doc => (
+                  <TableRow
+                    key={doc.id}
+                    className={doc.status === 'approved' && !doc.is_current ? 'opacity-60' : ''}
+                  >
                     <TableCell>
-                      <div className="flex items-center gap-2">
-                        <FileText className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium truncate max-w-[200px]">{doc.file_name}</p>
-                          {doc.description && (
-                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                              {doc.description}
-                            </p>
+                      <p className="font-medium">{getDocumentCategoryLabel(doc.category)}</p>
+                      <p className="max-w-[240px] truncate text-xs text-muted-foreground">
+                        {doc.file_name}
+                        {doc.uploaded_by_role === 'employee' && ' · enviado pelo colaborador'}
+                      </p>
+                    </TableCell>
+                    <TableCell className="hidden md:table-cell text-sm">
+                      {doc.category === PAYSLIP_CATEGORY
+                        ? formatPeriodMonth(doc.period_month)
+                        : (doc.document_number ?? '—')}
+                    </TableCell>
+                    <TableCell>
+                      <div className="flex flex-wrap gap-1">
+                        <DocumentStatusBadge status={doc.status} />
+                        {doc.is_current && doc.status === 'approved' && (
+                          <ExpiryBadge expiryDate={doc.expiry_date} />
+                        )}
+                        {doc.status === 'approved' &&
+                          !doc.is_current &&
+                          doc.category !== PAYSLIP_CATEGORY && (
+                            <span className="text-xs text-muted-foreground">substituído</span>
                           )}
-                        </div>
                       </div>
                     </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      {getCategoryLabel(doc.category)}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {formatFileSize(doc.file_size)}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {formatDate(doc.created_at)}
+                    <TableCell className="hidden sm:table-cell text-sm">
+                      {format(new Date(doc.created_at), 'dd/MM/yyyy')}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1">
-                        <Button variant="ghost" size="icon" onClick={() => handleDownload(doc)}>
-                          <Download className="h-4 w-4" />
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => open(doc)}
+                          disabled={openingId === doc.id}
+                          aria-label="Abrir"
+                        >
+                          {openingId === doc.id ? (
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                          ) : (
+                            <ExternalLink className="h-4 w-4" />
+                          )}
                         </Button>
                         <Button
                           variant="ghost"
                           size="icon"
                           onClick={() => handleDelete(doc)}
                           className="text-destructive hover:text-destructive"
+                          aria-label="Eliminar"
                         >
                           <Trash2 className="h-4 w-4" />
                         </Button>
@@ -401,6 +151,13 @@ const EmployeeDocumentsTab = ({ employeeId }: EmployeeDocumentsTabProps) => {
           )}
         </CardContent>
       </Card>
+
+      <AdminUploadDocumentDialog
+        open={uploadOpen}
+        onOpenChange={setUploadOpen}
+        employeeId={employeeId}
+        onUploaded={refetch}
+      />
     </div>
   );
 };

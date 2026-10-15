@@ -123,8 +123,6 @@ vi.mock('@/integrations/supabase/client', () => {
 
 vi.mock('@/components/employee/VacationBalanceCard', () => ({ default: () => null }));
 vi.mock('@/components/employee/EmployeeCalendar', () => ({ default: () => null }));
-vi.mock('@/components/employee/AvisosSection', () => ({ AvisosSection: () => null }));
-vi.mock('@/components/PWAInstallBanner', () => ({ default: () => null }));
 
 describe('EmployeeDashboard', () => {
   // Os pedidos de exemplo são de out/nov 2026: fixa o "hoje" para continuarem futuros.

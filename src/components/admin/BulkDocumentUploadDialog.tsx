@@ -19,20 +19,15 @@ import {
 } from '@/components/ui/select';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { ADMIN_UPLOAD_CATEGORIES } from '@/lib/documents';
 
 interface BulkDocumentUploadDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
 }
 
-const DOCUMENT_CATEGORIES = [
-  { value: 'contrato', label: 'Contrato' },
-  { value: 'ficha_admissao', label: 'Ficha de Admissão' },
-  { value: 'certificado', label: 'Certificado' },
-  { value: 'documento_identificacao', label: 'Documento de Identificação' },
-  { value: 'comunicado', label: 'Comunicado' },
-  { value: 'outro', label: 'Outro' },
-];
+// Documentos enviados a toda a empresa: comunicados, certificados e afins.
+const DOCUMENT_CATEGORIES = ADMIN_UPLOAD_CATEGORIES.filter(c => !c.unique);
 
 const BulkDocumentUploadDialog = ({ open, onOpenChange }: BulkDocumentUploadDialogProps) => {
   const { toast } = useToast();

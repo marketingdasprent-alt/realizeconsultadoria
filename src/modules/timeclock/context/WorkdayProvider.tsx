@@ -3,12 +3,41 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { addDays, startOfDay } from 'date-fns';
 import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
-import { deriveWorkday, type WorkdayAction } from '@/lib/workday';
+import { ACTION_ENTRY, deriveWorkday, type WorkdayAction } from '@/lib/workday';
 import { useCurrentEmployee } from '../hooks/useCurrentEmployee';
 import { useNow } from '../hooks/useNow';
 import { usePunch } from '../hooks/usePunch';
 import { timeClockService } from '../services/timeClockService';
 import { WorkdayContext, type RunOptions, type WorkdayContextValue } from './workdayContext';
+
+/**
+ * Registo provisório, mostrado logo ao carregar no botão: o servidor (GPS, VPN, regras) leva
+ * alguns segundos e o estado/linha do dia não deve esperar por isso. Sai quando a resposta
+ * chega (substituído pelo registo real, ou retirado se for recusado).
+ */
+const optimisticEntry = (
+  action: WorkdayAction,
+  employeeId: string
+): TimeClockEntryWithRelations => {
+  const now = new Date().toISOString();
+  const { entryType, kind } = ACTION_ENTRY[action];
+  return {
+    id: `a-registar-${Date.now()}`,
+    employee_id: employeeId,
+    entry_type: entryType,
+    kind,
+    punched_at: now,
+    created_at: now,
+    status: 'approved',
+    flags: [],
+    source: 'gps',
+    latitude: null,
+    longitude: null,
+    // Legenda na linha do dia enquanto o servidor confirma.
+    address: 'A registar…',
+    location: null,
+  } as TimeClockEntryWithRelations;
+};
 
 /** Um erro de registo fica visível este tempo (ou até ao registo seguinte). */
 const OUTCOME_VISIBLE_MS = 60 * 1000;
@@ -55,6 +84,9 @@ export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const run = useCallback(
     async (action: WorkdayAction, options: RunOptions = {}) => {
+      // Na hora: o estado e a linha do dia mudam já (não para horas corrigidas, que vão a aprovação).
+      const provisional = employeeId && !options.at ? optimisticEntry(action, employeeId) : null;
+      if (provisional) setEntries(list => [...list, provisional]);
       const result = await punch({
         action,
         method: options.method ?? 'gps',
@@ -66,10 +98,13 @@ export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ child
       if (result && (result.entry || result.code === 'invalid_state')) {
         await refetch();
         setVersion(v => v + 1);
+      } else if (provisional) {
+        // Recusado ou sem rede: desfaz (a mensagem do motivo aparece no painel).
+        setEntries(list => list.filter(e => e.id !== provisional.id));
       }
       return result;
     },
-    [punch, refetch]
+    [punch, refetch, employeeId]
   );
 
   const workday = useMemo(() => deriveWorkday(entries, now), [entries, now]);

@@ -11,6 +11,6 @@ export interface EmployeeOutletContext {
   refresh: () => Promise<void>;
 }
 
-/** Colaborador autenticado, fornecido pelo EmployeeLayout às páginas filhas. */
+/** Colaborador autenticado, fornecido pelo WorkspaceLayout às páginas filhas. */
 export const useEmployeeOutlet = (): EmployeeOutletContext =>
   useOutletContext<EmployeeOutletContext>();

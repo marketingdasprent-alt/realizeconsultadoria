@@ -1,0 +1,99 @@
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
+
+/*
+ * Realize 2.0 — design system da área do colaborador.
+ * A classe rz-theme fica no <html> enquanto a área está aberta (WorkspaceShell),
+ * para os popovers e diálogos (renderizados fora da app, em portais) herdarem os tokens.
+ * Paleta: aurora índigo/violeta + dourado Realize como acento; cantos bem arredondados.
+ */
+html.rz-theme {
+  --rz-primary: 252 78% 60%;
+  --rz-primary-soft: 252 100% 97%;
+  --rz-ink: 246 32% 14%;
+  --rz-ink-muted: 245 12% 46%;
+  --rz-line: 248 26% 91%;
+  --rz-canvas: 248 45% 97.5%;
+  --rz-gold: 39 62% 56%;
+  --rz-aurora:
+    radial-gradient(1100px 560px at 88% -12%, hsla(39, 85%, 62%, 0.3), transparent 62%),
+    radial-gradient(900px 700px at -12% 112%, hsla(192, 90%, 56%, 0.32), transparent 60%),
+    radial-gradient(700px 500px at 40% 40%, hsla(282, 80%, 60%, 0.18), transparent 70%),
+    linear-gradient(140deg, hsl(250 64% 15%) 0%, hsl(258 56% 29%) 48%, hsl(232 68% 38%) 100%);
+
+  /* Tokens do shadcn dentro da área: violeta como cor principal, cantos maiores. */
+  --primary: 252 78% 60%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 252 78% 60%;
+  --secondary: 248 45% 97%;
+  --secondary-foreground: 246 32% 14%;
+  --muted: 248 35% 96%;
+  --muted-foreground: 245 12% 46%;
+  --accent: 252 100% 97%;
+  --accent-foreground: 252 60% 38%;
+  --border: 248 26% 91%;
+  --input: 248 26% 88%;
+  --foreground: 246 32% 14%;
+  --card-foreground: 246 32% 14%;
+  --popover-foreground: 246 32% 14%;
+  --radius: 0.875rem;
+}
+
+html.rz-theme body {
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  color: hsl(var(--rz-ink));
+  background: hsl(250 64% 15%);
+}
+
+html.rz-theme h1,
+html.rz-theme h2,
+html.rz-theme h3,
+html.rz-theme h4,
+html.rz-theme h5,
+html.rz-theme h6 {
+  font-family: inherit;
+  letter-spacing: -0.015em;
+}
+
+/* Barra de deslocamento discreta nas colunas do Messenger e nos painéis. */
+.rz-scroll {
+  scrollbar-width: thin;
+  scrollbar-color: hsl(248 20% 82%) transparent;
+}
+.rz-scroll::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.rz-scroll::-webkit-scrollbar-thumb {
+  background: hsl(248 20% 84%);
+  border-radius: 999px;
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+
+/* Vidro sobre a aurora (barra superior e menu lateral). */
+.rz-glass {
+  background: hsla(0, 0%, 100%, 0.1);
+  border: 1px solid hsla(0, 0%, 100%, 0.14);
+  backdrop-filter: blur(12px);
+}
+
+@keyframes rz-rise {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.rz-rise {
+  animation: rz-rise 0.28s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .rz-rise {
+    animation: none;
+  }
+}

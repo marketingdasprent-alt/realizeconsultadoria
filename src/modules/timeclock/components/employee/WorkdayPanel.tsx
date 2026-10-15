@@ -18,6 +18,8 @@ interface WorkdayPanelProps {
   showPageLink?: boolean;
   /** Chamado antes de navegar (ex.: fechar o popover). */
   onNavigate?: () => void;
+  /** Sem a lista de registos do dia (menu do perfil). */
+  hideTimeline?: boolean;
 }
 
 const EMPTY_CORRECTION: CorrectionValue = { time: '', reason: '' };
@@ -27,7 +29,12 @@ const EMPTY_CORRECTION: CorrectionValue = { time: '', reason: '' };
  * esquecido), botões Iniciar dia / Pausa / Retomar / Terminar dia / Retomar dia e
  * os registos do dia com o sítio de cada um.
  */
-export const WorkdayPanel: React.FC<WorkdayPanelProps> = ({ tag, showPageLink, onNavigate }) => {
+export const WorkdayPanel: React.FC<WorkdayPanelProps> = ({
+  tag,
+  showPageLink,
+  onNavigate,
+  hideTimeline = false,
+}) => {
   const navigate = useNavigate();
   const { employee, isLoading, entries, workday, phase, outcome, run, warmUp } = useWorkday();
   const [pendingAction, setPendingAction] = useState<WorkdayAction | null>(null);
@@ -125,7 +132,7 @@ export const WorkdayPanel: React.FC<WorkdayPanelProps> = ({ tag, showPageLink, o
         />
         {outcome && !outcome.ok && phase === 'done' && <WorkdayError message={outcome.message} />}
       </section>
-      <WorkdayTimeline entries={workday.entries} />
+      {!hideTimeline && <WorkdayTimeline entries={workday.entries} />}
     </div>
   );
 };

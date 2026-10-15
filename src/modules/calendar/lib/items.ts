@@ -1,0 +1,135 @@
+// Conversão das várias fontes (eventos, ausências, feriados, tarefas) em blocos do calendário.
+import { endOfDay, startOfDay } from 'date-fns';
+import type { Holiday } from '@/lib/vacation-utils';
+import { absenceTypeLabels } from '@/lib/absence-types';
+import type { AbsenceRow } from '@/modules/absences/lib/absenceRules';
+import type { Task } from '@/modules/tasks/types';
+import type { CalendarEvent, CalendarItem, CalendarLayer, EventColor } from '../types';
+import { expandOccurrences } from './recurrence';
+
+export const EVENT_TONES: Record<EventColor, string> = {
+  violet: 'bg-violet-100 text-violet-800',
+  sky: 'bg-sky-100 text-sky-800',
+  emerald: 'bg-emerald-100 text-emerald-800',
+  amber: 'bg-amber-100 text-amber-900',
+  rose: 'bg-rose-100 text-rose-800',
+  slate: 'bg-slate-200 text-slate-700',
+};
+
+export const EVENT_DOTS: Record<EventColor, string> = {
+  violet: 'bg-violet-500',
+  sky: 'bg-sky-500',
+  emerald: 'bg-emerald-500',
+  amber: 'bg-amber-500',
+  rose: 'bg-rose-500',
+  slate: 'bg-slate-500',
+};
+
+export const LAYERS: { key: CalendarLayer; label: string; dot: string }[] = [
+  { key: 'mine', label: 'Os meus eventos', dot: 'bg-violet-500' },
+  { key: 'invites', label: 'Convites', dot: 'bg-sky-500' },
+  { key: 'company', label: 'Eventos da empresa', dot: 'bg-indigo-500' },
+  { key: 'absences', label: 'As minhas férias e ausências', dot: 'bg-emerald-500' },
+  { key: 'team', label: 'Ausências da equipa', dot: 'bg-slate-400' },
+  { key: 'holidays', label: 'Feriados', dot: 'bg-rose-400' },
+  { key: 'tasks', label: 'Prazos de tarefas', dot: 'bg-amber-500' },
+];
+
+const dateOnly = (iso: string, end = false) => {
+  const day = new Date(`${iso}T00:00:00`);
+  return end ? endOfDay(day) : startOfDay(day);
+};
+
+interface BuildInput {
+  from: Date;
+  to: Date;
+  myUserId: string;
+  events: CalendarEvent[];
+  absences: AbsenceRow[];
+  teamAbsences: { id: string; employee_id: string; start_date: string; end_date: string }[];
+  holidays: Holiday[];
+  tasks: Task[];
+  nameOfEmployee: (employeeId: string) => string | null;
+  myEmployeeId: string;
+}
+
+export const buildItems = (input: BuildInput): CalendarItem[] => {
+  const items: CalendarItem[] = [];
+  for (const event of input.events) {
+    const layer: CalendarLayer =
+      event.ownerId === input.myUserId
+        ? 'mine'
+        : event.attendees.some(a => a.userId === input.myUserId)
+          ? 'invites'
+          : 'company';
+    for (const occ of expandOccurrences(event, input.from, input.to)) {
+      items.push({
+        key: `${event.id}-${occ.start.getTime()}`,
+        layer,
+        title: event.title,
+        start: occ.start,
+        end: occ.end,
+        allDay: event.allDay,
+        tone: EVENT_TONES[event.color],
+        event,
+      });
+    }
+  }
+  for (const absence of input.absences) {
+    if (absence.status === 'rejected') continue;
+    items.push({
+      key: `abs-${absence.id}`,
+      layer: 'absences',
+      title: `${absenceTypeLabels[absence.absence_type] ?? 'Ausência'}${absence.status === 'pending' ? ' (pendente)' : ''}`,
+      start: dateOnly(absence.start_date),
+      end: dateOnly(absence.end_date, true),
+      allDay: true,
+      tone:
+        absence.status === 'pending'
+          ? 'bg-amber-50 text-amber-800 ring-1 ring-dashed ring-amber-300'
+          : 'bg-emerald-100 text-emerald-800',
+    });
+  }
+  for (const absence of input.teamAbsences) {
+    if (absence.employee_id === input.myEmployeeId) continue;
+    const name = input.nameOfEmployee(absence.employee_id);
+    if (!name) continue;
+    items.push({
+      key: `team-${absence.id}`,
+      layer: 'team',
+      title: `${name.split(' ')[0]} · ausente`,
+      start: dateOnly(absence.start_date),
+      end: dateOnly(absence.end_date, true),
+      allDay: true,
+      tone: 'bg-slate-100 text-slate-600',
+    });
+  }
+  for (const holiday of input.holidays) {
+    items.push({
+      key: `hol-${holiday.id}`,
+      layer: 'holidays',
+      title: holiday.name,
+      start: dateOnly(holiday.date),
+      end: dateOnly(holiday.date, true),
+      allDay: true,
+      tone: 'bg-rose-50 text-rose-700',
+    });
+  }
+  for (const task of input.tasks) {
+    if (!task.dueAt || task.status === 'done') continue;
+    const due = new Date(task.dueAt);
+    items.push({
+      key: `task-${task.id}`,
+      layer: 'tasks',
+      title: `✓ ${task.title}`,
+      start: due,
+      end: due,
+      allDay: false,
+      tone: 'bg-amber-100 text-amber-900',
+      taskId: task.id,
+    });
+  }
+  return items
+    .filter(item => item.start <= input.to && item.end >= input.from)
+    .sort((a, b) => Number(b.allDay) - Number(a.allDay) || a.start.getTime() - b.start.getTime());
+};

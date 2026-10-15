@@ -57,6 +57,16 @@ export default {
           DEFAULT: 'hsl(var(--card))',
           foreground: 'hsl(var(--card-foreground))',
         },
+        // Realize 2.0 (área do colaborador): tokens em src/modules/workspace/workspace.css
+        rz: {
+          primary: 'hsl(var(--rz-primary))',
+          'primary-soft': 'hsl(var(--rz-primary-soft))',
+          ink: 'hsl(var(--rz-ink))',
+          muted: 'hsl(var(--rz-ink-muted))',
+          line: 'hsl(var(--rz-line))',
+          canvas: 'hsl(var(--rz-canvas))',
+          gold: 'hsl(var(--rz-gold))',
+        },
         sidebar: {
           DEFAULT: 'hsl(var(--sidebar-background))',
           foreground: 'hsl(var(--sidebar-foreground))',
@@ -71,6 +81,16 @@ export default {
       fontFamily: {
         display: ['Cormorant Garamond', 'serif'],
         body: ['Inter', 'sans-serif'],
+        jakarta: ['"Plus Jakarta Sans"', 'Inter', 'sans-serif'],
+      },
+      backgroundImage: {
+        'rz-aurora': 'var(--rz-aurora)',
+      },
+      boxShadow: {
+        'rz-panel': '0 24px 60px -24px hsla(250, 60%, 12%, 0.45)',
+        'rz-soft':
+          '0 1px 2px hsla(250, 40%, 20%, 0.06), 0 8px 24px -12px hsla(250, 40%, 20%, 0.18)',
+        'rz-pop': '0 24px 48px -16px hsla(250, 50%, 18%, 0.35)',
       },
       borderRadius: {
         lg: 'var(--radius)',

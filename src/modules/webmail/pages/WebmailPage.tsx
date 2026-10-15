@@ -1,0 +1,201 @@
+import React, { useEffect, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
+import { Loader2, MailOpen } from 'lucide-react';
+import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
+import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import { ConnectMailDialog } from '../components/ConnectMailDialog';
+import { MailAccountDialog } from '../components/MailAccountDialog';
+import { MailComposer } from '../components/MailComposer';
+import { MailList } from '../components/MailList';
+import { MailReader, type ReaderAction } from '../components/MailReader';
+import { MailSidebar } from '../components/MailSidebar';
+import { MailToTaskOrEvent, type MailConversion } from '../components/MailToTaskOrEvent';
+import { ProviderGrid } from '../components/ProviderGrid';
+import { useMailAccounts } from '../hooks/useMailAccounts';
+import { useMailActions } from '../hooks/useMailActions';
+import { useMailbox, useMailMessage } from '../hooks/useMailbox';
+import { FOLDERS, draftFrom, mailKey } from '../lib/mailFormat';
+import { providerOf, type MailProvider } from '../lib/providers';
+import type { ComposeDraft, MailAccount, MailFolder, MailSummary } from '../types';
+
+/** Webmail (briefing §9): caixas ligadas, caixa unificada, ler, escrever e organizar. */
+const WebmailPage: React.FC = () => {
+  const mail = useMailAccounts();
+  const actions = useMailActions();
+  const [params, setParams] = useSearchParams();
+  const [scope, setScope] = useState<string | null>(null);
+  const [folder, setFolder] = useState<MailFolder>('inbox');
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [active, setActive] = useState<MailSummary | null>(null);
+  const [draft, setDraft] = useState<ComposeDraft | null>(null);
+  const [connect, setConnect] = useState<MailProvider | null>(null);
+  const [settings, setSettings] = useState<MailAccount | null>(null);
+  const [conversion, setConversion] = useState<MailConversion | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  const accounts = mail.accounts;
+  const current = scope ?? (accounts.length > 1 ? 'all' : (accounts[0]?.id ?? 'all'));
+  const box = useMailbox(accounts, current, folder, query);
+  const selected = active
+    ? (box.messages.find(m => mailKey(m) === mailKey(active)) ?? active)
+    : null;
+  const { message, isLoading: messageLoading } = useMailMessage(active);
+
+  useEffect(() => {
+    const timer = window.setTimeout(() => setQuery(search), 400);
+    return () => window.clearTimeout(timer);
+  }, [search]);
+
+  // Regresso da autorização do Google/Microsoft (?mail=ligada | erro).
+  const result = params.get('mail');
+  useEffect(() => {
+    if (!result) return;
+    if (result === 'ligada') toast({ title: 'Caixa de correio ligada' });
+    else
+      toast({
+        title: 'A caixa não foi ligada',
+        description: 'Tente novamente.',
+        variant: 'destructive',
+      });
+    setParams({}, { replace: true });
+    void mail.refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao chegar com ?mail=
+  }, [result]);
+
+  const open = (summary: MailSummary) => {
+    setActive(summary);
+    void actions.setRead(summary, true);
+  };
+  const choose = (next: () => void) => {
+    next();
+    setActive(null);
+    setMenuOpen(false);
+  };
+  const onAction = (action: ReaderAction) => {
+    if (!selected) return;
+    const email = accounts.find(a => a.id === selected.accountId)?.email ?? '';
+    if (action === 'star') return void actions.toggleStar(selected);
+    if (action === 'trash' || action === 'unread') {
+      void (action === 'trash' ? actions.trash(selected) : actions.setRead(selected, false));
+      return setActive(null);
+    }
+    if (!message) return;
+    if (action === 'task' || action === 'event') return setConversion({ kind: action, message });
+    setDraft(draftFrom(message, action, email));
+  };
+
+  if (mail.isLoading)
+    return <Loader2 className="mx-auto mt-24 h-7 w-7 animate-spin text-rz-primary" />;
+
+  const connectDialog = (
+    <ConnectMailDialog
+      provider={connect}
+      onClose={() => setConnect(null)}
+      onOAuth={provider => mail.startOAuth(provider.key)}
+      onImap={mail.connectImap}
+      onSwitch={setConnect}
+    />
+  );
+  if (!accounts.length || params.get('ligar'))
+    return (
+      <>
+        <ProviderGrid
+          onPick={setConnect}
+          onBack={accounts.length ? () => setParams({}) : undefined}
+        />
+        {connectDialog}
+      </>
+    );
+
+  const sidebar = (className: string) => (
+    <MailSidebar
+      accounts={accounts}
+      scope={current}
+      folder={folder}
+      onScope={id => choose(() => setScope(id))}
+      onFolder={key => choose(() => setFolder(key))}
+      onCompose={() => {
+        setMenuOpen(false);
+        setDraft({ accountId: current === 'all' ? undefined : current });
+      }}
+      onConnect={() => setParams({ ligar: '1' })}
+      onSettings={setSettings}
+      className={className}
+    />
+  );
+
+  return (
+    <div className="flex h-full">
+      {sidebar('hidden w-[250px] shrink-0 border-r border-rz-line lg:flex')}
+      <MailList
+        title={FOLDERS.find(f => f.key === folder)?.label ?? 'Email'}
+        messages={box.messages}
+        accounts={accounts}
+        activeKey={active ? mailKey(active) : null}
+        showAccount={current === 'all'}
+        search={search}
+        onSearch={setSearch}
+        onOpen={open}
+        onToggleStar={actions.toggleStar}
+        onRefresh={() => void box.refetch()}
+        onMenu={() => setMenuOpen(true)}
+        isLoading={box.isLoading}
+        isRefreshing={box.isRefreshing}
+        hasMore={box.hasMore}
+        isLoadingMore={box.isLoadingMore}
+        onLoadMore={() => void box.loadMore()}
+        errors={box.errors}
+        className={cn(
+          'w-full border-r border-rz-line md:w-[340px] xl:w-[400px]',
+          active && 'hidden md:flex'
+        )}
+      />
+      <div className={cn('min-w-0 flex-1', active ? 'flex' : 'hidden md:flex')}>
+        {selected ? (
+          <MailReader
+            summary={selected}
+            message={message}
+            isLoading={messageLoading}
+            onBack={() => setActive(null)}
+            onAction={onAction}
+            onDownload={id => void actions.download(selected, id)}
+          />
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-rz-muted">
+            <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-rz-primary-soft text-rz-primary">
+              <MailOpen className="h-8 w-8" />
+            </span>
+            <p className="text-sm">Escolha um email para ler.</p>
+          </div>
+        )}
+      </div>
+
+      <Sheet open={menuOpen} onOpenChange={setMenuOpen}>
+        <SheetContent side="left" className="w-[290px] border-0 p-0">
+          <SheetTitle className="sr-only">Caixas e pastas</SheetTitle>
+          {sidebar('h-full pt-12')}
+        </SheetContent>
+      </Sheet>
+      <MailComposer
+        draft={draft}
+        accounts={accounts}
+        onClose={() => setDraft(null)}
+        onSend={actions.send}
+        toBase64={actions.toBase64}
+      />
+      <MailAccountDialog
+        account={settings}
+        onClose={() => setSettings(null)}
+        onSave={mail.update}
+        onReconnect={account => mail.startOAuth(providerOf(account.provider).key)}
+        onDisconnect={account => mail.disconnect(account.id)}
+      />
+      <MailToTaskOrEvent value={conversion} onClose={() => setConversion(null)} />
+      {connectDialog}
+    </div>
+  );
+};
+
+export default WebmailPage;

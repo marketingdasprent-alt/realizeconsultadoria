@@ -1,0 +1,214 @@
+// Webmail no Supabase: contas (tabela mail_accounts, sem o segredo) e as edge functions
+// mail-oauth (ligar Google/Microsoft) e mail-api (ler, enviar, organizar).
+import { supabase } from '@/integrations/supabase/client';
+import type { MailProviderKey } from '../lib/providers';
+import type {
+  ComposeInput,
+  ImapConnectInput,
+  MailAccount,
+  MailAddress,
+  MailFolder,
+  MailMessage,
+  MailSummary,
+} from '../types';
+
+/** Colunas que o colaborador pode ler (secret_id fica de fora por GRANT). */
+const ACCOUNT_COLUMNS =
+  'id, provider, auth_method, email, display_name, signature, status, last_error, last_sync_at, is_default, color';
+
+export interface MailError {
+  code: string;
+  message: string;
+}
+
+export const MAIL_ERRORS: Record<string, string> = {
+  unavailable: 'O serviço de email ainda não está ativo. Fale com o administrador.',
+  not_configured: 'A ligação a este fornecedor ainda não foi configurada pelo administrador.',
+  reauth: 'A autorização desta caixa expirou. Volte a ligá-la.',
+  imap_login_failed: 'Não foi possível entrar com estes dados. Confirme o email e a palavra-passe.',
+  smtp_port_blocked: 'O envio só funciona por SMTP com SSL na porta 465.',
+  too_large: 'Os anexos ultrapassam 10 MB.',
+  not_found: 'Esta caixa de correio já não existe.',
+};
+
+export const mailErrorText = (error: MailError | null) =>
+  error ? (MAIL_ERRORS[error.code] ?? error.message) : '';
+
+type Row = Record<string, unknown>;
+const str = (value: unknown) => (typeof value === 'string' ? value : '');
+const address = (value: unknown): MailAddress | null =>
+  value && typeof value === 'object' && 'email' in value
+    ? {
+        name: (value as Row).name ? str((value as Row).name) : null,
+        email: str((value as Row).email),
+      }
+    : null;
+const addresses = (value: unknown) =>
+  Array.isArray(value) ? (value.map(address).filter(Boolean) as MailAddress[]) : [];
+
+const toAccount = (row: Row): MailAccount => ({
+  id: str(row.id),
+  provider: row.provider as MailProviderKey,
+  authMethod: row.auth_method as MailAccount['authMethod'],
+  email: str(row.email),
+  displayName: (row.display_name as string | null) ?? null,
+  signature: (row.signature as string | null) ?? null,
+  status: row.status as MailAccount['status'],
+  lastError: (row.last_error as string | null) ?? null,
+  lastSyncAt: (row.last_sync_at as string | null) ?? null,
+  isDefault: !!row.is_default,
+  color: row.color as MailAccount['color'],
+});
+
+const toSummary = (accountId: string, row: Row): MailSummary => ({
+  id: str(row.id),
+  accountId,
+  threadId: (row.thread_id as string | null) ?? null,
+  from: address(row.from),
+  to: addresses(row.to),
+  subject: str(row.subject),
+  snippet: str(row.snippet),
+  date: str(row.date),
+  unread: !!row.unread,
+  starred: !!row.starred,
+  hasAttachments: !!row.has_attachments,
+});
+
+const toMessage = (accountId: string, row: Row): MailMessage => ({
+  ...toSummary(accountId, row),
+  cc: addresses(row.cc),
+  replyTo: addresses(row.reply_to),
+  html: (row.html as string | null) ?? null,
+  text: (row.text as string | null) ?? null,
+  attachments: Array.isArray(row.attachments)
+    ? (row.attachments as Row[]).map(a => ({
+        id: str(a.id),
+        filename: str(a.filename),
+        mime: str(a.mime),
+        size: Number(a.size) || 0,
+      }))
+    : [],
+});
+
+/** Chama uma edge function; respostas de negócio vêm como { ok, code, message, data }. */
+const call = async <T>(
+  fn: 'mail-api' | 'mail-oauth',
+  body: Row
+): Promise<{ data: T | null; error: MailError | null }> => {
+  const { data, error } = await supabase.functions.invoke(fn, { body });
+  if (error || !data) return { data: null, error: { code: 'unavailable', message: '' } };
+  const result = data as Row;
+  if (!result.ok)
+    return {
+      data: null,
+      error: { code: str(result.code) || 'error', message: str(result.message) },
+    };
+  return { data: (result.data ?? null) as T | null, error: null };
+};
+
+export const mailService = {
+  listAccounts: async () => {
+    const { data, error } = await supabase
+      .from('mail_accounts')
+      .select(ACCOUNT_COLUMNS)
+      .order('created_at');
+    return { data: ((data ?? []) as Row[]).map(toAccount), error };
+  },
+
+  updateAccount: async (
+    id: string,
+    patch: Partial<Pick<MailAccount, 'displayName' | 'signature' | 'isDefault' | 'color'>>
+  ) => {
+    const { error } = await supabase
+      .from('mail_accounts')
+      .update({
+        ...(patch.displayName !== undefined && { display_name: patch.displayName }),
+        ...(patch.signature !== undefined && { signature: patch.signature }),
+        ...(patch.isDefault !== undefined && { is_default: patch.isDefault }),
+        ...(patch.color !== undefined && { color: patch.color }),
+      })
+      .eq('id', id);
+    return { error };
+  },
+
+  /** Endereço da janela de autorização do Google ou da Microsoft. */
+  startOAuth: (provider: MailProviderKey, redirectTo: string) =>
+    call<{ url: string }>('mail-oauth', { action: 'start', provider, redirect_to: redirectTo }),
+
+  connectImap: (input: ImapConnectInput) =>
+    call<{ id: string }>('mail-api', {
+      action: 'connect-imap',
+      provider: input.provider,
+      email: input.email,
+      password: input.password,
+      imap_host: input.imapHost,
+      imap_port: input.imapPort,
+      smtp_host: input.smtpHost,
+      smtp_port: input.smtpPort,
+      display_name: input.displayName,
+    }),
+
+  disconnect: (accountId: string) =>
+    call('mail-api', { action: 'disconnect', account_id: accountId }),
+
+  list: async (accountId: string, folder: MailFolder, query: string, pageToken: string | null) => {
+    const { data, error } = await call<{ messages: Row[]; next_page_token: string | null }>(
+      'mail-api',
+      { action: 'list', account_id: accountId, folder, query, page_token: pageToken ?? undefined }
+    );
+    return {
+      data: data
+        ? {
+            messages: data.messages.map(row => toSummary(accountId, row)),
+            nextPageToken: data.next_page_token,
+          }
+        : null,
+      error,
+    };
+  },
+
+  get: async (accountId: string, messageId: string) => {
+    const { data, error } = await call<Row>('mail-api', {
+      action: 'get',
+      account_id: accountId,
+      message_id: messageId,
+    });
+    return { data: data ? toMessage(accountId, data) : null, error };
+  },
+
+  attachment: (accountId: string, messageId: string, attachmentId: string) =>
+    call<{ filename: string; mime: string; base64: string }>('mail-api', {
+      action: 'attachment',
+      account_id: accountId,
+      message_id: messageId,
+      attachment_id: attachmentId,
+    }),
+
+  send: (input: ComposeInput, html: string) =>
+    call<{ id: string | null }>('mail-api', {
+      action: 'send',
+      account_id: input.accountId,
+      to: input.to,
+      cc: input.cc,
+      bcc: input.bcc,
+      subject: input.subject,
+      text: input.text,
+      html,
+      in_reply_to: input.inReplyTo,
+      attachments: input.attachments,
+    }),
+
+  setRead: (accountId: string, messageId: string, read: boolean) =>
+    call('mail-api', { action: 'set-read', account_id: accountId, message_id: messageId, read }),
+
+  setStarred: (accountId: string, messageId: string, starred: boolean) =>
+    call('mail-api', {
+      action: 'set-starred',
+      account_id: accountId,
+      message_id: messageId,
+      starred,
+    }),
+
+  trash: (accountId: string, messageId: string) =>
+    call('mail-api', { action: 'trash', account_id: accountId, message_id: messageId }),
+};

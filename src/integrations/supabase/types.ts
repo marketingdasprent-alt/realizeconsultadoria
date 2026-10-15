@@ -413,6 +413,47 @@ export type Database = {
         };
         Relationships: [];
       };
+      appreciations: {
+        Row: {
+          company_id: string;
+          created_at: string;
+          id: string;
+          is_public: boolean;
+          kind: string;
+          message: string | null;
+          recipient_id: string;
+          sender_id: string | null;
+        };
+        Insert: {
+          company_id: string;
+          created_at?: string;
+          id?: string;
+          is_public?: boolean;
+          kind: string;
+          message?: string | null;
+          recipient_id: string;
+          sender_id?: string | null;
+        };
+        Update: {
+          company_id?: string;
+          created_at?: string;
+          id?: string;
+          is_public?: boolean;
+          kind?: string;
+          message?: string | null;
+          recipient_id?: string;
+          sender_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'appreciations_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       assignment_items: {
         Row: {
           assignment_id: string;
@@ -533,6 +574,336 @@ export type Database = {
             columns: ['employee_id'];
             isOneToOne: false;
             referencedRelation: 'employees';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      calendar_event_attendees: {
+        Row: {
+          event_id: string;
+          response: string;
+          user_id: string;
+        };
+        Insert: {
+          event_id: string;
+          response?: string;
+          user_id: string;
+        };
+        Update: {
+          event_id?: string;
+          response?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'calendar_event_attendees_event_id_fkey';
+            columns: ['event_id'];
+            isOneToOne: false;
+            referencedRelation: 'calendar_events';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      calendar_events: {
+        Row: {
+          all_day: boolean;
+          color: string;
+          company_id: string;
+          created_at: string;
+          description: string | null;
+          ends_at: string;
+          id: string;
+          location: string | null;
+          meeting_url: string | null;
+          owner_id: string;
+          recurrence: string | null;
+          recurrence_until: string | null;
+          reminder_minutes: number | null;
+          starts_at: string;
+          task_id: string | null;
+          title: string;
+          updated_at: string;
+          visibility: string;
+        };
+        Insert: {
+          all_day?: boolean;
+          color?: string;
+          company_id: string;
+          created_at?: string;
+          description?: string | null;
+          ends_at: string;
+          id?: string;
+          location?: string | null;
+          meeting_url?: string | null;
+          owner_id: string;
+          recurrence?: string | null;
+          recurrence_until?: string | null;
+          reminder_minutes?: number | null;
+          starts_at: string;
+          task_id?: string | null;
+          title: string;
+          updated_at?: string;
+          visibility?: string;
+        };
+        Update: {
+          all_day?: boolean;
+          color?: string;
+          company_id?: string;
+          created_at?: string;
+          description?: string | null;
+          ends_at?: string;
+          id?: string;
+          location?: string | null;
+          meeting_url?: string | null;
+          owner_id?: string;
+          recurrence?: string | null;
+          recurrence_until?: string | null;
+          reminder_minutes?: number | null;
+          starts_at?: string;
+          task_id?: string | null;
+          title?: string;
+          updated_at?: string;
+          visibility?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'calendar_events_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'calendar_events_task_id_fkey';
+            columns: ['task_id'];
+            isOneToOne: false;
+            referencedRelation: 'tasks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      calendar_reminders_sent: {
+        Row: {
+          event_id: string;
+          occurrence_start: string;
+        };
+        Insert: {
+          event_id: string;
+          occurrence_start: string;
+        };
+        Update: {
+          event_id?: string;
+          occurrence_start?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'calendar_reminders_sent_event_id_fkey';
+            columns: ['event_id'];
+            isOneToOne: false;
+            referencedRelation: 'calendar_events';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      chat_conversations: {
+        Row: {
+          company_id: string;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          direct_key: string | null;
+          id: string;
+          is_default: boolean;
+          kind: string;
+          last_message_at: string | null;
+          last_message_id: string | null;
+          title: string | null;
+        };
+        Insert: {
+          company_id: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          direct_key?: string | null;
+          id?: string;
+          is_default?: boolean;
+          kind: string;
+          last_message_at?: string | null;
+          last_message_id?: string | null;
+          title?: string | null;
+        };
+        Update: {
+          company_id?: string;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          direct_key?: string | null;
+          id?: string;
+          is_default?: boolean;
+          kind?: string;
+          last_message_at?: string | null;
+          last_message_id?: string | null;
+          title?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'chat_conversations_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'chat_conversations_last_message_fk';
+            columns: ['last_message_id'];
+            isOneToOne: false;
+            referencedRelation: 'chat_messages';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      chat_members: {
+        Row: {
+          conversation_id: string;
+          is_archived: boolean;
+          is_muted: boolean;
+          is_pinned: boolean;
+          joined_at: string;
+          last_read_at: string;
+          role: string;
+          user_id: string;
+        };
+        Insert: {
+          conversation_id: string;
+          is_archived?: boolean;
+          is_muted?: boolean;
+          is_pinned?: boolean;
+          joined_at?: string;
+          last_read_at?: string;
+          role?: string;
+          user_id: string;
+        };
+        Update: {
+          conversation_id?: string;
+          is_archived?: boolean;
+          is_muted?: boolean;
+          is_pinned?: boolean;
+          joined_at?: string;
+          last_read_at?: string;
+          role?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'chat_members_conversation_id_fkey';
+            columns: ['conversation_id'];
+            isOneToOne: false;
+            referencedRelation: 'chat_conversations';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      chat_messages: {
+        Row: {
+          attachment_mime: string | null;
+          attachment_name: string | null;
+          attachment_path: string | null;
+          attachment_size: number | null;
+          body: string | null;
+          conversation_id: string;
+          created_at: string;
+          deleted_at: string | null;
+          duration_sec: number | null;
+          edited_at: string | null;
+          id: string;
+          kind: string;
+          reply_to_id: string | null;
+          sender_id: string | null;
+        };
+        Insert: {
+          attachment_mime?: string | null;
+          attachment_name?: string | null;
+          attachment_path?: string | null;
+          attachment_size?: number | null;
+          body?: string | null;
+          conversation_id: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          duration_sec?: number | null;
+          edited_at?: string | null;
+          id?: string;
+          kind?: string;
+          reply_to_id?: string | null;
+          sender_id?: string | null;
+        };
+        Update: {
+          attachment_mime?: string | null;
+          attachment_name?: string | null;
+          attachment_path?: string | null;
+          attachment_size?: number | null;
+          body?: string | null;
+          conversation_id?: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          duration_sec?: number | null;
+          edited_at?: string | null;
+          id?: string;
+          kind?: string;
+          reply_to_id?: string | null;
+          sender_id?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'chat_messages_conversation_id_fkey';
+            columns: ['conversation_id'];
+            isOneToOne: false;
+            referencedRelation: 'chat_conversations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'chat_messages_reply_to_id_fkey';
+            columns: ['reply_to_id'];
+            isOneToOne: false;
+            referencedRelation: 'chat_messages';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      chat_reactions: {
+        Row: {
+          conversation_id: string;
+          created_at: string;
+          emoji: string;
+          message_id: string;
+          user_id: string;
+        };
+        Insert: {
+          conversation_id: string;
+          created_at?: string;
+          emoji: string;
+          message_id: string;
+          user_id: string;
+        };
+        Update: {
+          conversation_id?: string;
+          created_at?: string;
+          emoji?: string;
+          message_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'chat_reactions_conversation_id_fkey';
+            columns: ['conversation_id'];
+            isOneToOne: false;
+            referencedRelation: 'chat_conversations';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'chat_reactions_message_id_fkey';
+            columns: ['message_id'];
+            isOneToOne: false;
+            referencedRelation: 'chat_messages';
             referencedColumns: ['id'];
           },
         ];
@@ -1025,6 +1396,117 @@ export type Database = {
           },
         ];
       };
+      feed_comments: {
+        Row: {
+          author_id: string | null;
+          body: string;
+          created_at: string;
+          deleted_at: string | null;
+          id: string;
+          post_id: string;
+        };
+        Insert: {
+          author_id?: string | null;
+          body: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          id?: string;
+          post_id: string;
+        };
+        Update: {
+          author_id?: string | null;
+          body?: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          id?: string;
+          post_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'feed_comments_post_id_fkey';
+            columns: ['post_id'];
+            isOneToOne: false;
+            referencedRelation: 'feed_posts';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      feed_posts: {
+        Row: {
+          attachments: Json;
+          audience: string;
+          author_id: string | null;
+          body: string | null;
+          company_id: string;
+          created_at: string;
+          deleted_at: string | null;
+          department: string | null;
+          edited_at: string | null;
+          id: string;
+        };
+        Insert: {
+          attachments?: Json;
+          audience?: string;
+          author_id?: string | null;
+          body?: string | null;
+          company_id: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          department?: string | null;
+          edited_at?: string | null;
+          id?: string;
+        };
+        Update: {
+          attachments?: Json;
+          audience?: string;
+          author_id?: string | null;
+          body?: string | null;
+          company_id?: string;
+          created_at?: string;
+          deleted_at?: string | null;
+          department?: string | null;
+          edited_at?: string | null;
+          id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'feed_posts_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      feed_reactions: {
+        Row: {
+          created_at: string;
+          emoji: string;
+          post_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          emoji: string;
+          post_id: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          emoji?: string;
+          post_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'feed_reactions_post_id_fkey';
+            columns: ['post_id'];
+            isOneToOne: false;
+            referencedRelation: 'feed_posts';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       holidays: {
         Row: {
           created_at: string;
@@ -1049,6 +1531,113 @@ export type Database = {
           is_national?: boolean;
           name?: string;
           year?: number;
+        };
+        Relationships: [];
+      };
+      mail_accounts: {
+        Row: {
+          auth_method: string;
+          color: string;
+          company_id: string | null;
+          created_at: string;
+          display_name: string | null;
+          email: string;
+          id: string;
+          imap_host: string | null;
+          imap_port: number | null;
+          is_default: boolean;
+          last_error: string | null;
+          last_sync_at: string | null;
+          provider: string;
+          secret_id: string | null;
+          signature: string | null;
+          smtp_host: string | null;
+          smtp_port: number | null;
+          status: string;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          auth_method: string;
+          color?: string;
+          company_id?: string | null;
+          created_at?: string;
+          display_name?: string | null;
+          email: string;
+          id?: string;
+          imap_host?: string | null;
+          imap_port?: number | null;
+          is_default?: boolean;
+          last_error?: string | null;
+          last_sync_at?: string | null;
+          provider: string;
+          secret_id?: string | null;
+          signature?: string | null;
+          smtp_host?: string | null;
+          smtp_port?: number | null;
+          status?: string;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          auth_method?: string;
+          color?: string;
+          company_id?: string | null;
+          created_at?: string;
+          display_name?: string | null;
+          email?: string;
+          id?: string;
+          imap_host?: string | null;
+          imap_port?: number | null;
+          is_default?: boolean;
+          last_error?: string | null;
+          last_sync_at?: string | null;
+          provider?: string;
+          secret_id?: string | null;
+          signature?: string | null;
+          smtp_host?: string | null;
+          smtp_port?: number | null;
+          status?: string;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'mail_accounts_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      mail_oauth_states: {
+        Row: {
+          code_verifier: string;
+          created_at: string;
+          mail_provider: string;
+          oauth_provider: string;
+          redirect_to: string;
+          state: string;
+          user_id: string;
+        };
+        Insert: {
+          code_verifier: string;
+          created_at?: string;
+          mail_provider: string;
+          oauth_provider: string;
+          redirect_to: string;
+          state: string;
+          user_id: string;
+        };
+        Update: {
+          code_verifier?: string;
+          created_at?: string;
+          mail_provider?: string;
+          oauth_provider?: string;
+          redirect_to?: string;
+          state?: string;
+          user_id?: string;
         };
         Relationships: [];
       };
@@ -1617,6 +2206,215 @@ export type Database = {
         };
         Relationships: [];
       };
+      task_attachments: {
+        Row: {
+          created_at: string;
+          id: string;
+          mime: string | null;
+          name: string;
+          path: string;
+          size: number;
+          task_id: string;
+          uploaded_by: string | null;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          mime?: string | null;
+          name: string;
+          path: string;
+          size?: number;
+          task_id: string;
+          uploaded_by?: string | null;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          mime?: string | null;
+          name?: string;
+          path?: string;
+          size?: number;
+          task_id?: string;
+          uploaded_by?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'task_attachments_task_id_fkey';
+            columns: ['task_id'];
+            isOneToOne: false;
+            referencedRelation: 'tasks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      task_checklist_items: {
+        Row: {
+          created_at: string;
+          done: boolean;
+          id: string;
+          position: number;
+          task_id: string;
+          text: string;
+        };
+        Insert: {
+          created_at?: string;
+          done?: boolean;
+          id?: string;
+          position?: number;
+          task_id: string;
+          text: string;
+        };
+        Update: {
+          created_at?: string;
+          done?: boolean;
+          id?: string;
+          position?: number;
+          task_id?: string;
+          text?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'task_checklist_items_task_id_fkey';
+            columns: ['task_id'];
+            isOneToOne: false;
+            referencedRelation: 'tasks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      task_comments: {
+        Row: {
+          author_id: string | null;
+          body: string;
+          created_at: string;
+          id: string;
+          task_id: string;
+        };
+        Insert: {
+          author_id?: string | null;
+          body: string;
+          created_at?: string;
+          id?: string;
+          task_id: string;
+        };
+        Update: {
+          author_id?: string | null;
+          body?: string;
+          created_at?: string;
+          id?: string;
+          task_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'task_comments_task_id_fkey';
+            columns: ['task_id'];
+            isOneToOne: false;
+            referencedRelation: 'tasks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      task_participants: {
+        Row: {
+          task_id: string;
+          user_id: string;
+        };
+        Insert: {
+          task_id: string;
+          user_id: string;
+        };
+        Update: {
+          task_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'task_participants_task_id_fkey';
+            columns: ['task_id'];
+            isOneToOne: false;
+            referencedRelation: 'tasks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      tasks: {
+        Row: {
+          assignee_id: string | null;
+          company_id: string;
+          completed_at: string | null;
+          created_at: string;
+          created_by: string | null;
+          description: string | null;
+          due_at: string | null;
+          due_notified_at: string | null;
+          id: string;
+          parent_id: string | null;
+          position: number;
+          priority: string;
+          recurrence: string | null;
+          source_ref: string | null;
+          source_type: string | null;
+          status: string;
+          title: string;
+          updated_at: string;
+        };
+        Insert: {
+          assignee_id?: string | null;
+          company_id: string;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          due_at?: string | null;
+          due_notified_at?: string | null;
+          id?: string;
+          parent_id?: string | null;
+          position?: number;
+          priority?: string;
+          recurrence?: string | null;
+          source_ref?: string | null;
+          source_type?: string | null;
+          status?: string;
+          title: string;
+          updated_at?: string;
+        };
+        Update: {
+          assignee_id?: string | null;
+          company_id?: string;
+          completed_at?: string | null;
+          created_at?: string;
+          created_by?: string | null;
+          description?: string | null;
+          due_at?: string | null;
+          due_notified_at?: string | null;
+          id?: string;
+          parent_id?: string | null;
+          position?: number;
+          priority?: string;
+          recurrence?: string | null;
+          source_ref?: string | null;
+          source_type?: string | null;
+          status?: string;
+          title?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'tasks_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'tasks_parent_id_fkey';
+            columns: ['parent_id'];
+            isOneToOne: false;
+            referencedRelation: 'tasks';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       time_clock_attempts: {
         Row: {
           accuracy_m: number | null;
@@ -2051,6 +2849,42 @@ export type Database = {
           },
         ];
       };
+      user_notifications: {
+        Row: {
+          actor_id: string | null;
+          body: string | null;
+          created_at: string;
+          id: string;
+          kind: string;
+          link: string | null;
+          read_at: string | null;
+          title: string;
+          user_id: string;
+        };
+        Insert: {
+          actor_id?: string | null;
+          body?: string | null;
+          created_at?: string;
+          id?: string;
+          kind: string;
+          link?: string | null;
+          read_at?: string | null;
+          title: string;
+          user_id: string;
+        };
+        Update: {
+          actor_id?: string | null;
+          body?: string | null;
+          created_at?: string;
+          id?: string;
+          kind?: string;
+          link?: string | null;
+          read_at?: string | null;
+          title?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       user_roles: {
         Row: {
           created_at: string;
@@ -2077,7 +2911,86 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      chat_bootstrap: { Args: never; Returns: undefined };
+      chat_can_post: { Args: { _conversation_id: string }; Returns: boolean };
+      chat_create_group: {
+        Args: { _member_ids: string[]; _title: string };
+        Returns: string;
+      };
+      chat_directory: {
+        Args: never;
+        Returns: {
+          company_id: string;
+          company_name: string;
+          department: string;
+          email: string;
+          employee_id: string;
+          name: string;
+          position: string;
+          user_id: string;
+        }[];
+      };
+      chat_is_colleague: { Args: { _user_id: string }; Returns: boolean };
+      chat_is_member: { Args: { _conversation_id: string }; Returns: boolean };
+      chat_list_conversations: {
+        Args: never;
+        Returns: {
+          created_at: string;
+          id: string;
+          is_archived: boolean;
+          is_default: boolean;
+          is_muted: boolean;
+          is_pinned: boolean;
+          kind: string;
+          last_attachment_name: string;
+          last_body: string;
+          last_deleted: boolean;
+          last_kind: string;
+          last_message_at: string;
+          last_sender_id: string;
+          last_sender_name: string;
+          member_count: number;
+          my_role: string;
+          peer_department: string;
+          peer_name: string;
+          peer_position: string;
+          peer_user_id: string;
+          title: string;
+          unread: number;
+        }[];
+      };
+      chat_mark_read: { Args: { _conversation_id: string }; Returns: undefined };
+      chat_path_conversation: { Args: { _name: string }; Returns: string };
+      chat_start_direct: { Args: { _other_user_id: string }; Returns: string };
       cleanup_expired_session_transfers: { Args: never; Returns: undefined };
+      event_can_see: { Args: { _event_id: string }; Returns: boolean };
+      event_is_attendee: { Args: { _event_id: string }; Returns: boolean };
+      feed_can_see: { Args: { _post_id: string }; Returns: boolean };
+      feed_can_see_row: {
+        Args: {
+          _audience: string;
+          _author_id: string;
+          _company_id: string;
+          _department: string;
+        };
+        Returns: boolean;
+      };
+      feed_is_author: { Args: { _post_id: string }; Returns: boolean };
+      feed_list_posts: {
+        Args: { _before?: string; _limit?: number };
+        Returns: {
+          attachments: Json;
+          audience: string;
+          author_id: string;
+          body: string;
+          comment_count: number;
+          created_at: string;
+          department: string;
+          edited_at: string;
+          id: string;
+          reactions: Json;
+        }[];
+      };
       get_admin_permissions: {
         Args: { _user_id: string };
         Returns: {
@@ -2114,6 +3027,12 @@ export type Database = {
         };
         Returns: boolean;
       };
+      mail_account_delete: { Args: { p_account: string }; Returns: undefined };
+      mail_secret_get: { Args: { p_account: string }; Returns: string };
+      mail_secret_set: {
+        Args: { p_account: string; p_secret: string };
+        Returns: undefined;
+      };
       review_employee_document: {
         Args: {
           _document_id: string;
@@ -2135,6 +3054,10 @@ export type Database = {
         };
         Returns: string;
       };
+      rz_my_company: { Args: never; Returns: string };
+      task_can_see: { Args: { _task_id: string }; Returns: boolean };
+      task_is_participant: { Args: { _task_id: string }; Returns: boolean };
+      task_valid_assignee: { Args: { _user_id: string }; Returns: boolean };
       time_clock_admin_create_entry: {
         Args: {
           _employee_id: string;

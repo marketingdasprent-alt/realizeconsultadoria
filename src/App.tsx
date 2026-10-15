@@ -1,8 +1,9 @@
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
@@ -24,18 +25,28 @@ import SupportTicketsPage from './modules/admin/pages/SupportTicketsPage';
 import AccessesPage from './modules/admin/pages/AccessesPage';
 import LegalPage from './modules/admin/pages/LegalPage';
 import EmployeeLoginPage from './modules/employee/pages/EmployeeLoginPage';
-import EmployeeDashboard from './modules/employee/pages/EmployeeDashboard';
-import EmployeeTicketsPage from './modules/employee/pages/EmployeeTicketsPage';
-import EmployeeDocumentsPage from './modules/employee/pages/EmployeeDocumentsPage';
-import EmployeeTimeClockPage from './modules/timeclock/pages/EmployeeTimeClockPage';
+import SupportPage from './modules/support/pages/SupportPage';
+import MyDocumentsPage from './modules/documents/pages/MyDocumentsPage';
+import MyTimeClockPage from './modules/timeclock/pages/MyTimeClockPage';
 import TimeClockNfcPage from './modules/timeclock/pages/TimeClockNfcPage';
 import TimeClockAdminPage from './modules/timeclock/pages/TimeClockAdminPage';
 import { WorkdayProvider } from './modules/timeclock/context/WorkdayProvider';
 import DocumentsAdminPage from './modules/documents/pages/DocumentsAdminPage';
-import EmployeeLayout from './modules/employee/components/layout/EmployeeLayout';
-import EmployeeHomePage from './modules/employee/pages/EmployeeHomePage';
-import EmployeeNoticesPage from './modules/employee/pages/EmployeeNoticesPage';
-import EmployeeMorePage from './modules/employee/pages/EmployeeMorePage';
+import WorkspaceLayout from './modules/workspace/components/WorkspaceLayout';
+import { ALL_MODULES } from './modules/workspace/lib/navigation';
+import ModuleComingSoonPage from './modules/workspace/pages/ModuleComingSoonPage';
+import ProfilePage from './modules/workspace/pages/ProfilePage';
+import AccountSettingsPage from './modules/workspace/pages/SettingsPage';
+import WebmailPage from './modules/webmail/pages/WebmailPage';
+import TasksPage from './modules/tasks/pages/TasksPage';
+import MyCalendarPage from './modules/calendar/pages/CalendarPage';
+import OrgChartPage from './modules/social/pages/OrgChartPage';
+import FeedPage from './modules/social/pages/FeedPage';
+import AbsencesPage from './modules/absences/pages/AbsencesPage';
+import PeoplePage from './modules/social/pages/PeoplePage';
+import ColleagueProfilePage from './modules/social/pages/ColleagueProfilePage';
+import AppreciationsPage from './modules/social/pages/AppreciationsPage';
+import MessengerPage from './modules/messenger/pages/MessengerPage';
 import AuthCallbackPage from './pages/auth/AuthCallbackPage';
 import SetPasswordPage from './pages/auth/SetPasswordPage';
 import InstallPage from './pages/InstallPage';
@@ -43,6 +54,15 @@ import DeleteAccountPage from './pages/DeleteAccountPage';
 import NotFound from './pages/NotFound';
 
 const queryClient = new QueryClient();
+
+// Pré-visualização do Realize 2.0 com dados de exemplo: só em desenvolvimento.
+const WorkspacePreview = import.meta.env.DEV
+  ? lazy(() => import('./modules/workspace/preview/WorkspacePreview'))
+  : null;
+
+// Módulos do Realize 2.0 ainda por construir (página "Em construção").
+// (o Webmail já tem o ecrã de escolha da caixa de correio)
+const PLANNED_MODULES = ALL_MODULES.filter(module => !module.ready);
 
 const App = () => (
   <GlobalErrorBoundary>
@@ -95,22 +115,60 @@ const App = () => (
               <Route
                 element={
                   <ProtectedRoute requiredRole="employee" fallbackPath="/colaborador/login">
-                    {/* Jornada (relógio do cabeçalho) partilhada pelas páginas do colaborador;
-                        cabeçalho + navegação em tabs, as páginas renderizam no Outlet */}
+                    {/* Realize 2.0: jornada (relógio da barra superior) partilhada por toda a
+                        área; menu lateral + barra superior, as páginas renderizam no Outlet */}
                     <WorkdayProvider>
-                      <EmployeeLayout />
+                      <WorkspaceLayout />
                     </WorkdayProvider>
                   </ProtectedRoute>
                 }
               >
-                <Route path="/colaborador" element={<EmployeeHomePage />} />
-                <Route path="/colaborador/pedidos" element={<EmployeeDashboard />} />
-                <Route path="/colaborador/tickets" element={<EmployeeTicketsPage />} />
-                <Route path="/colaborador/documentos" element={<EmployeeDocumentsPage />} />
-                <Route path="/colaborador/ponto" element={<EmployeeTimeClockPage />} />
-                <Route path="/colaborador/avisos" element={<EmployeeNoticesPage />} />
-                <Route path="/colaborador/mais" element={<EmployeeMorePage />} />
+                {/* O Messenger é a página inicial (briefing §2) */}
+                <Route path="/colaborador" element={<MessengerPage />} />
+                <Route path="/colaborador/perfil" element={<ProfilePage />} />
+                {/* Páginas atuais, sem alterações, até serem redesenhadas (Fase 3) */}
+                <Route path="/colaborador/pedidos" element={<AbsencesPage />} />
+                <Route path="/colaborador/tickets" element={<SupportPage />} />
+                <Route path="/colaborador/documentos" element={<MyDocumentsPage />} />
+                <Route path="/colaborador/ponto" element={<MyTimeClockPage />} />
+                {/* Fase 2: Feed (com os avisos dos RH), colegas e apreciações */}
+                <Route path="/colaborador/feed" element={<FeedPage />} />
+                <Route
+                  path="/colaborador/avisos"
+                  element={<Navigate to="/colaborador/feed?filtro=comunicados" replace />}
+                />
+                <Route path="/colaborador/pessoas" element={<PeoplePage />} />
+                <Route path="/colaborador/pessoas/:userId" element={<ColleagueProfilePage />} />
+                <Route path="/colaborador/apreciacoes" element={<AppreciationsPage />} />
+                <Route path="/colaborador/email" element={<WebmailPage />} />
+                <Route path="/colaborador/tarefas" element={<TasksPage />} />
+                <Route path="/colaborador/calendario" element={<MyCalendarPage />} />
+                <Route path="/colaborador/organograma" element={<OrgChartPage />} />
+                <Route path="/colaborador/definicoes" element={<AccountSettingsPage />} />
+                {/* O antigo "Mais" passou para o Menu (telemóvel) e para as Definições */}
+                <Route
+                  path="/colaborador/mais"
+                  element={<Navigate to="/colaborador/definicoes" replace />}
+                />
+                {PLANNED_MODULES.map(module => (
+                  <Route
+                    key={module.key}
+                    path={`/colaborador/${module.path}`}
+                    element={<ModuleComingSoonPage moduleKey={module.key} />}
+                  />
+                ))}
               </Route>
+
+              {WorkspacePreview && (
+                <Route
+                  path="/dev/realize-2/*"
+                  element={
+                    <Suspense fallback={null}>
+                      <WorkspacePreview />
+                    </Suspense>
+                  }
+                />
+              )}
 
               {/* Registo de ponto por tag NFC: aberto pelo telemóvel ao encostar à tag.
                   Sem sessão → login do colaborador, que depois regressa aqui. */}

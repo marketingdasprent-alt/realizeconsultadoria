@@ -11,6 +11,7 @@
 //            attachments?: { filename, mime, base64 }[] }            → { id }
 //   set-read { account_id, message_id, read } · set-starred { ..., starred } · trash
 //   disconnect { account_id }
+//   discover { email } → { servers, oauth, source } (servidores IMAP/SMTP do domínio, por DNS)
 //
 // Cada ação carrega a conta com service role e `user_id = <quem chama>`; os tokens e
 // palavras-passe ficam no Vault e nunca vão para o browser. Drivers: Gmail API,
@@ -47,6 +48,8 @@ import {
   serviceClient,
 } from '../_shared/mail-server/http.ts';
 import { revokeGoogleToken } from '../_shared/mail-server/oauth-client.ts';
+import { denoResolver } from '../_shared/mail-server/dns.ts';
+import { discoverDomain, domainOfEmail } from '../_shared/mail/discover.ts';
 import { createGmailDriver } from './drivers/gmail.ts';
 import { createGraphDriver } from './drivers/graph.ts';
 import { createImapDriver, testImapLogin, type ImapAccountConfig } from './drivers/imap.ts';
@@ -161,6 +164,7 @@ const ACTIONS = [
   'set-starred',
   'trash',
   'disconnect',
+  'discover',
 ] as const;
 type Action = (typeof ACTIONS)[number];
 
@@ -168,6 +172,10 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
   const action: Action | undefined = ACTIONS.find(a => a === body.action);
   if (!action) return badRequest();
   if (action === 'connect-imap') return connectImap(db, userId, body);
+  if (action === 'discover') {
+    const email = optionalString(body.email, 320);
+    return email ? ok(await discoverDomain(domainOfEmail(email), denoResolver)) : badRequest();
+  }
 
   const account = await requireAccount(db, userId, body);
   if (action === 'disconnect') return disconnect(db, account);

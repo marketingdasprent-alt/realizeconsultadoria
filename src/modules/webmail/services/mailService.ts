@@ -1,6 +1,7 @@
 // Webmail no Supabase: contas (tabela mail_accounts, sem o segredo) e as edge functions
 // mail-oauth (ligar Google/Microsoft) e mail-api (ler, enviar, organizar).
 import { supabase } from '@/integrations/supabase/client';
+import type { Discovery } from '../lib/autodiscover';
 import type { MailProviderKey } from '../lib/providers';
 import type {
   ComposeInput,
@@ -147,6 +148,9 @@ export const mailService = {
       smtp_port: input.smtpPort,
       display_name: input.displayName,
     }),
+
+  /** Servidores do domínio, descobertos no servidor (DNS nativo; o browser pode não ter). */
+  discover: (email: string) => call<Discovery>('mail-api', { action: 'discover', email }),
 
   disconnect: (accountId: string) =>
     call('mail-api', { action: 'disconnect', account_id: accountId }),

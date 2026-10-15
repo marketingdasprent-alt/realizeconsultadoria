@@ -74,7 +74,8 @@ export const useCoordinateResolver = (apply: ApplyCoordinates): UseCoordinateRes
   const resolveCurrentPosition = useCallback(async () => {
     setBusy('gps');
     try {
-      const pos = await getBestPosition({ maxWaitMs: 10000, targetAccuracyM: 15 });
+      // Definir o local exige a melhor leitura possível: espera os 10 s inteiros.
+      const pos = await getBestPosition({ maxWaitMs: 10000, targetAccuracyM: 15, settleMs: 10000 });
       apply(pos, `Localização atual do dispositivo (precisão ±${Math.round(pos.accuracy)} m).`);
     } catch (error: unknown) {
       const description = getErrorMessage(error, 'Sem localização');

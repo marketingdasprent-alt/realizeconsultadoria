@@ -13,6 +13,11 @@ interface BestPositionOptions {
   maxWaitMs?: number;
   /** Termina logo que a precisão seja igual ou melhor do que isto (metros). */
   targetAccuracyM?: number;
+  /**
+   * Termina se a leitura não melhorar durante este tempo. Num PC (localização por Wi-Fi)
+   * a precisão nunca chega aos 25 m e esperar maxWaitMs inteiro não adiantava nada.
+   */
+  settleMs?: number;
 }
 
 const geoErrorMessage = (error: GeolocationPositionError): string => {
@@ -39,6 +44,7 @@ const toPayload = (position: GeolocationPosition): PositionPayload => ({
 export const getBestPosition = ({
   maxWaitMs = 8000,
   targetAccuracyM = 25,
+  settleMs = 2000,
 }: BestPositionOptions = {}): Promise<PositionPayload> =>
   new Promise((resolve, reject) => {
     if (typeof navigator === 'undefined' || !('geolocation' in navigator)) {
@@ -92,10 +98,16 @@ export const getBestPosition = ({
       }, hardLimitMs)
     );
 
+    let settleTimer: ReturnType<typeof setTimeout> | null = null;
     watchId = navigator.geolocation.watchPosition(
       position => {
-        if (!best || position.coords.accuracy < best.coords.accuracy) best = position;
-        if (position.coords.accuracy <= targetAccuracyM) finish();
+        if (best && position.coords.accuracy >= best.coords.accuracy) return;
+        best = position;
+        if (position.coords.accuracy <= targetAccuracyM) return finish();
+        // Leitura melhor: dá-lhe settleMs para melhorar outra vez; se não melhorar, usa esta.
+        if (settleTimer) clearTimeout(settleTimer);
+        settleTimer = setTimeout(() => finish(), settleMs);
+        timers.push(settleTimer);
       },
       error => {
         // Permissão negada falha logo; erros transitórios esperam pelo limite.

@@ -25,7 +25,7 @@ export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
       {isLoading && <Loader2 className="mx-auto h-5 w-5 animate-spin text-rz-primary" />}
       {comments.map(comment => (
         <div key={comment.id} className="group flex gap-2.5">
-          <UserAvatar name={comment.authorName} size="xs" />
+          <UserAvatar name={comment.authorName} userId={comment.authorId} size="xs" />
           <div className="min-w-0 flex-1">
             <div className="inline-block max-w-full rounded-2xl bg-rz-canvas px-3.5 py-2">
               <p className="text-[13px] font-bold">{comment.authorName}</p>
@@ -47,7 +47,7 @@ export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
         </div>
       ))}
       <div className="flex items-center gap-2.5">
-        <UserAvatar name={user.name} size="xs" />
+        <UserAvatar name={user.name} userId={user.userId} size="xs" />
         <div className="flex flex-1 items-center rounded-full bg-rz-canvas pr-1 ring-1 ring-transparent focus-within:bg-white focus-within:ring-rz-primary/40">
           <input
             value={text}

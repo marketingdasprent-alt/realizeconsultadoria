@@ -46,7 +46,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       )}
     >
       <header className="flex items-start gap-3">
-        <UserAvatar name={post.authorName} size="md" />
+        <UserAvatar name={post.authorName} userId={post.authorId} size="md" />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[15px] font-bold">{post.authorName}</p>
           <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-rz-muted">

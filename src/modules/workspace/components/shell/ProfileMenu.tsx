@@ -28,7 +28,7 @@ export const ProfileMenu: React.FC = () => {
           className="rounded-full transition-transform hover:scale-105 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70"
           aria-label="Conta e perfil"
         >
-          <UserAvatar name={user.name} size="sm" status="online" />
+          <UserAvatar name={user.name} userId={user.userId} size="sm" status="online" />
         </button>
       </PopoverTrigger>
       <PopoverContent
@@ -43,7 +43,7 @@ export const ProfileMenu: React.FC = () => {
             onClick={close}
             className="flex items-center gap-3 rounded-2xl p-1 transition-colors hover:bg-rz-canvas"
           >
-            <UserAvatar name={user.name} size="lg" status="online" />
+            <UserAvatar name={user.name} userId={user.userId} size="lg" status="online" />
             <span className="min-w-0 flex-1">
               <span className="flex items-center gap-1 text-[17px] font-bold">
                 <span className="truncate">{user.name}</span>

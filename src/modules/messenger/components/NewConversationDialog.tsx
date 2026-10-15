@@ -113,7 +113,7 @@ export const NewConversationDialog: React.FC<NewConversationDialogProps> = ({
                   )}
                   aria-pressed={isChecked}
                 >
-                  <UserAvatar name={person.name} size="md" />
+                  <UserAvatar name={person.name} userId={person.userId} size="md" />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate text-[14.5px] font-semibold">
                       {person.name}

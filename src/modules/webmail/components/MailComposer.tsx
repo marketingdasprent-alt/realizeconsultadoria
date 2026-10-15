@@ -3,6 +3,8 @@ import { Loader2, Paperclip, Send, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useDirectory } from '@/modules/social/hooks/useDirectory';
 import { parseRecipients, withSignature } from '../lib/mailFormat';
+import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
+import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import type { ComposeDraft, ComposeInput, MailAccount } from '../types';
 
 const MAX_BYTES = 10 * 1024 * 1024;
@@ -38,6 +40,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const [fields, setFields] = useState({ to: '', cc: '', bcc: '', subject: '', body: '' });
   const [showCc, setShowCc] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
+  const addFiles = (added: File[]) => setFiles(current => [...current, ...added]);
+  const { isDragging, dropProps } = useFileDrop(addFiles);
   const [busy, setBusy] = useState(false);
   const accountsRef = useRef(accounts);
   accountsRef.current = accounts;
@@ -95,8 +99,16 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     <Dialog open={!!draft} onOpenChange={open => !open && onClose()}>
       <DialogContent
         onInteractOutside={event => event.preventDefault()}
+        onPaste={event => {
+          const pasted = filesFromPaste(event);
+          if (!pasted.length) return;
+          event.preventDefault();
+          addFiles(pasted);
+        }}
+        {...dropProps}
         className="flex max-h-[94vh] flex-col gap-0 overflow-hidden rounded-[28px] p-0 sm:max-w-2xl sm:rounded-[28px]"
       >
+        <DropOverlay visible={isDragging} />
         <DialogTitle className="px-5 pb-3 pt-5 text-[18px] font-extrabold">
           {draft?.inReplyTo ? 'Responder' : 'Nova mensagem'}
         </DialogTitle>
@@ -206,7 +218,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               type="file"
               multiple
               className="hidden"
-              onChange={e => setFiles(f => [...f, ...Array.from(e.target.files ?? [])])}
+              onChange={e => addFiles(Array.from(e.target.files ?? []))}
             />
           </label>
           {size > MAX_BYTES && (

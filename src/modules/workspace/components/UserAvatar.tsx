@@ -1,5 +1,6 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { useAvatarUrl } from '../hooks/useAvatarUrl';
 
 const GRADIENTS = [
   'from-violet-500 to-fuchsia-500',
@@ -44,33 +45,62 @@ const pickGradient = (seed: string): string => {
 
 interface UserAvatarProps {
   name: string;
+  /** Pessoa (procura a fotografia no diretório da empresa). */
+  userId?: string | null;
+  /** Fotografia já conhecida (ex.: pré-visualização ao escolher uma nova). */
+  src?: string | null;
   size?: keyof typeof SIZES;
   status?: AvatarStatus;
   className?: string;
 }
 
-/** Avatar com iniciais sobre gradiente; a fotografia e os avatares chegam com o perfil. */
-export const UserAvatar: React.FC<UserAvatarProps> = ({ name, size = 'sm', status, className }) => (
-  <span className={cn('relative inline-flex shrink-0', className)}>
-    <span
-      className={cn(
-        'inline-flex items-center justify-center rounded-full bg-gradient-to-br font-bold text-white ring-2 ring-white/70',
-        SIZES[size],
-        pickGradient(name)
-      )}
-      aria-hidden
-    >
-      {getInitials(name)}
-    </span>
-    {status && (
+/** Fotografia da pessoa ou, sem ela, as iniciais sobre um gradiente. */
+export const UserAvatar: React.FC<UserAvatarProps> = ({
+  name,
+  userId,
+  src,
+  size = 'sm',
+  status,
+  className,
+}) => {
+  const fromDirectory = useAvatarUrl(src ? null : userId);
+  const photo = src ?? fromDirectory;
+  const [broken, setBroken] = useState<string | null>(null);
+  const showPhoto = !!photo && broken !== photo;
+  return (
+    <span className={cn('relative inline-flex shrink-0', className)}>
       <span
         className={cn(
-          'absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white',
-          size === 'xl' && 'bottom-2 right-2 h-5 w-5 ring-4',
-          STATUS_CLASSES[status]
+          'inline-flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-br font-bold text-white ring-2 ring-white/70',
+          SIZES[size],
+          pickGradient(name)
         )}
-        aria-label={status === 'online' ? 'Disponível' : status === 'away' ? 'Ausente' : 'Offline'}
-      />
-    )}
-  </span>
-);
+        aria-hidden
+      >
+        {showPhoto ? (
+          <img
+            src={photo}
+            alt=""
+            loading="lazy"
+            onError={() => setBroken(photo)}
+            className="h-full w-full object-cover"
+          />
+        ) : (
+          getInitials(name)
+        )}
+      </span>
+      {status && (
+        <span
+          className={cn(
+            'absolute bottom-0 right-0 h-3 w-3 rounded-full ring-2 ring-white',
+            size === 'xl' && 'bottom-2 right-2 h-5 w-5 ring-4',
+            STATUS_CLASSES[status]
+          )}
+          aria-label={
+            status === 'online' ? 'Disponível' : status === 'away' ? 'Ausente' : 'Offline'
+          }
+        />
+      )}
+    </span>
+  );
+};

@@ -9,6 +9,8 @@ import { useTasks } from '@/modules/tasks/hooks/useTasks';
 import { DeleteMessageDialog } from './DeleteMessageDialog';
 import { MessageComposer } from './MessageComposer';
 import { MessageList } from './MessageList';
+import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
+import { useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 
 interface ConversationViewProps {
   conversation: ConversationSummary;
@@ -38,6 +40,15 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
     if (search !== null) searchRef.current?.focus();
   }, [search]);
 
+  // Ficheiros largados na conversa: uma mensagem por ficheiro (a resposta vai no primeiro).
+  const sendFiles = (files: File[]) => {
+    files.forEach((file, index) =>
+      api.send({ file, replyToId: index === 0 ? replyTo?.id : undefined })
+    );
+    setReplyTo(null);
+  };
+  const { isDragging, dropProps } = useFileDrop(sendFiles, conversation.canPost && !editing);
+
   const copy = async (message: ChatMessage) => {
     try {
       await navigator.clipboard.writeText(message.text ?? '');
@@ -48,7 +59,12 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
   };
 
   return (
-    <section className="flex min-h-0 flex-1 flex-col" aria-label={conversation.title}>
+    <section
+      className="relative flex min-h-0 flex-1 flex-col"
+      aria-label={conversation.title}
+      {...dropProps}
+    >
+      <DropOverlay visible={isDragging} label={`Largue para enviar a ${conversation.title}`} />
       <ConversationHeader
         conversation={conversation}
         typing={api.typing}

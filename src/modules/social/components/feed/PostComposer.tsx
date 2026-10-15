@@ -39,7 +39,7 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPublish, isPublish
   return (
     <section className="rounded-[28px] bg-white p-4 shadow-rz-soft ring-1 ring-rz-line md:p-5">
       <div className="flex gap-3">
-        <UserAvatar name={user.name} size="md" />
+        <UserAvatar name={user.name} userId={user.userId} size="md" />
         <textarea
           value={body}
           onChange={event => setBody(event.target.value.slice(0, 5000))}

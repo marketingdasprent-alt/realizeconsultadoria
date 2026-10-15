@@ -45,7 +45,12 @@ const PersonRow: React.FC<{
       to={to}
       className="flex items-center gap-2.5 rounded-2xl px-2 py-1.5 transition-colors hover:bg-rz-canvas"
     >
-      <UserAvatar name={person.name} size="sm" status={online ? 'online' : undefined} />
+      <UserAvatar
+        name={person.name}
+        userId={person.userId}
+        size="sm"
+        status={online ? 'online' : undefined}
+      />
       <span className="min-w-0 flex-1">
         <span className="flex items-center gap-1 truncate text-[13.5px] font-bold">
           {person.name}

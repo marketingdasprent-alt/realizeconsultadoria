@@ -58,7 +58,7 @@ export const PeoplePicker: React.FC<PeoplePickerProps> = ({
           key={id}
           className="inline-flex items-center gap-1.5 rounded-full bg-rz-primary-soft py-1 pl-1 pr-2 text-[12.5px] font-semibold text-rz-primary"
         >
-          <UserAvatar name={nameOf(id)} size="xs" />
+          <UserAvatar name={nameOf(id)} userId={id} size="xs" />
           {id === user.userId ? 'Eu' : nameOf(id)}
           <button type="button" onClick={() => toggle(id)} aria-label={`Retirar ${nameOf(id)}`}>
             <X className="h-3.5 w-3.5" />
@@ -96,7 +96,7 @@ export const PeoplePicker: React.FC<PeoplePickerProps> = ({
                     value.includes(p.userId) && 'bg-rz-primary-soft'
                   )}
                 >
-                  <UserAvatar name={p.name} size="xs" />
+                  <UserAvatar name={p.name} userId={p.userId} size="xs" />
                   <span className="min-w-0 flex-1 truncate font-semibold">{p.name}</span>
                   {value.includes(p.userId) && <Check className="h-4 w-4 text-rz-primary" />}
                 </button>

@@ -62,7 +62,7 @@ export const AssigneeAvatar: React.FC<{ userId: string | null; size?: 'xs' | 'sm
   const name = nameOf(userId);
   return (
     <span title={name}>
-      <UserAvatar name={name} size={size} />
+      <UserAvatar name={name} userId={userId} size={size} />
     </span>
   );
 };

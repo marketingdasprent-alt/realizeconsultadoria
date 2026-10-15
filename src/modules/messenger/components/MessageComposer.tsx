@@ -3,6 +3,7 @@ import { Mic, Paperclip, SendHorizontal } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import { filesFromPaste } from '@/modules/workspace/hooks/useFileDrop';
 import { ACCEPT_ATTRIBUTE } from '../lib/files';
 import type { ChatMessage, SendInput } from '../types';
 import { ComposerBanner } from './composer/ComposerBanner';
@@ -121,6 +122,13 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
                 onChange={event => {
                   setText(event.target.value);
                   onTyping();
+                }}
+                onPaste={event => {
+                  // Ctrl+V de uma captura de ecrã ou de ficheiros copiados: envia-os.
+                  const files = filesFromPaste(event);
+                  if (!files.length || disabled || editing) return;
+                  event.preventDefault();
+                  files.forEach(pickFile);
                 }}
                 onKeyDown={event => {
                   if (event.key === 'Enter' && !event.shiftKey) {

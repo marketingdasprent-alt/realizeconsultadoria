@@ -168,13 +168,13 @@ export const EventDetailSheet: React.FC<EventDetailSheetProps> = ({
               <p className="mb-2 text-[13px] font-bold">Participantes</p>
               <ul className="space-y-2">
                 <li className="flex items-center gap-2.5 text-[14px]">
-                  <UserAvatar name={nameOf(event.ownerId)} size="xs" />{' '}
+                  <UserAvatar name={nameOf(event.ownerId)} userId={event.ownerId} size="xs" />{' '}
                   <span className="flex-1 font-semibold">{nameOf(event.ownerId)}</span>{' '}
                   <span className="text-xs text-rz-muted">Organizador</span>
                 </li>
                 {event.attendees.map(a => (
                   <li key={a.userId} className="flex items-center gap-2.5 text-[14px]">
-                    <UserAvatar name={nameOf(a.userId)} size="xs" />{' '}
+                    <UserAvatar name={nameOf(a.userId)} userId={a.userId} size="xs" />{' '}
                     <span className="flex-1">{nameOf(a.userId)}</span>
                     <span
                       className={cn(

@@ -5,7 +5,7 @@ import { FILTERS } from '../lib/format';
 import type { ConversationSummary } from '../types';
 
 interface ConversationAvatarProps {
-  conversation: Pick<ConversationSummary, 'kind' | 'title' | 'online'>;
+  conversation: Pick<ConversationSummary, 'kind' | 'title' | 'online' | 'peerUserId'>;
   size?: 'sm' | 'md';
 }
 
@@ -18,6 +18,7 @@ export const ConversationAvatar: React.FC<ConversationAvatarProps> = ({
     return (
       <UserAvatar
         name={conversation.title}
+        userId={conversation.peerUserId}
         size={size}
         status={conversation.online ? 'online' : undefined}
       />

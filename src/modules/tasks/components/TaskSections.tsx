@@ -193,7 +193,7 @@ export const CommentsSection: React.FC<{ detail: Detail }> = ({ detail }) => {
       <ul className="mb-3 space-y-2.5">
         {detail.comments.map(c => (
           <li key={c.id} className="flex gap-2.5">
-            <UserAvatar name={nameOf(c.authorId)} size="xs" />
+            <UserAvatar name={nameOf(c.authorId)} userId={c.authorId} size="xs" />
             <div className="min-w-0 flex-1 rounded-2xl bg-rz-canvas px-3.5 py-2">
               <p className="text-[12.5px] font-bold">
                 {nameOf(c.authorId)}{' '}

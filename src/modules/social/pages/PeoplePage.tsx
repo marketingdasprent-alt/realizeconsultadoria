@@ -84,6 +84,7 @@ const PeoplePage: React.FC = () => {
               >
                 <UserAvatar
                   name={person.name}
+                  userId={person.userId}
                   size="lg"
                   status={messenger?.isOnline(person.userId) ? 'online' : undefined}
                 />

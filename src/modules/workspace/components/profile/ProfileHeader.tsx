@@ -1,7 +1,8 @@
 import React from 'react';
-import { Award, Camera, MessageCircle, Pencil } from 'lucide-react';
+import { Award, MessageCircle, Pencil } from 'lucide-react';
 import type { WorkspaceUser } from '../../context/workspaceContext';
 import { UserAvatar } from '../UserAvatar';
+import { AvatarUploadButton } from './AvatarUploadButton';
 
 interface ProfileHeaderProps {
   user: WorkspaceUser;
@@ -38,21 +39,12 @@ export const ProfileHeader: React.FC<ProfileHeaderProps> = ({
           <div className="relative -mt-14 w-fit shrink-0">
             <UserAvatar
               name={user.name}
+              userId={user.userId}
               size="xl"
               status={isOnline === undefined ? undefined : isOnline ? 'online' : 'offline'}
               className="[&>span:first-child]:ring-4"
             />
-            {isOwn && (
-              <button
-                type="button"
-                disabled
-                title="Fotografia e avatares: em breve"
-                className="absolute bottom-1 left-1 flex h-9 w-9 items-center justify-center rounded-full bg-white text-rz-ink shadow-rz-soft ring-1 ring-rz-line disabled:cursor-not-allowed"
-                aria-label="Alterar fotografia"
-              >
-                <Camera className="h-4 w-4" />
-              </button>
-            )}
+            {isOwn && <AvatarUploadButton />}
           </div>
           <div className="min-w-0 flex-1 md:pt-4">
             <h1 className="text-2xl font-extrabold md:text-[28px]">{user.name}</h1>

@@ -396,8 +396,6 @@ const AccessesPage = () => {
     },
     onSuccess: async (_data, { accessId, employeeIds }) => {
       queryClient.invalidateQueries({ queryKey: ['employee-department-emails'] });
-      setViewEmployeesAccessId(null);
-      setSelectedEmployeeIds([]);
       if (employeeIds.length === 0) {
         // Sem colaboradores: os triggers da BD tiram a caixa do Webmail de todos.
         toast({
@@ -641,28 +639,27 @@ const AccessesPage = () => {
     saveMutation.mutate(dataToSave);
   };
 
-  const handleSaveEmployees = async () => {
-    if (viewEmployeesAccessId) {
-      await updateDepartmentEmailsMutation.mutateAsync({
-        accessId: viewEmployeesAccessId,
-        employeeIds: selectedEmployeeIds,
-      });
-    }
+  // Cada mudança grava logo (e partilha/retira a caixa no Webmail); "Fechar" só fecha.
+  const saveEmployees = (employeeIds: string[]) => {
+    if (!viewEmployeesAccessId) return;
+    setSelectedEmployeeIds(employeeIds);
+    updateDepartmentEmailsMutation.mutate({ accessId: viewEmployeesAccessId, employeeIds });
   };
 
   const handleAddEmployee = () => {
     if (employeeToAdd && !selectedEmployeeIds.includes(employeeToAdd)) {
-      setSelectedEmployeeIds(prev => [...prev, employeeToAdd]);
+      saveEmployees([...selectedEmployeeIds, employeeToAdd]);
       setEmployeeToAdd('');
     }
   };
 
   const handleRemoveEmployee = (id: string) => {
-    setSelectedEmployeeIds(prev => prev.filter(empId => empId !== id));
+    saveEmployees(selectedEmployeeIds.filter(empId => empId !== id));
   };
 
-  const handleCloseAndSave = async () => {
-    await handleSaveEmployees();
+  const handleCloseAndSave = () => {
+    setViewEmployeesAccessId(null);
+    setSelectedEmployeeIds([]);
   };
 
   const filteredAccesses = accesses.filter(access => {

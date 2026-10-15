@@ -12,6 +12,8 @@ interface MailListItemProps {
   accountDot?: string;
   onOpen: (mail: MailSummary) => void;
   onToggleStar: (mail: MailSummary) => void;
+  /** Rato em cima (null ao sair): pré-carrega o email. */
+  onHover?: (mail: MailSummary | null) => void;
 }
 
 /** Uma linha da lista: remetente, assunto, excerto, data, estrela e anexos. */
@@ -21,12 +23,15 @@ export const MailListItem: React.FC<MailListItemProps> = ({
   accountDot,
   onOpen,
   onToggleStar,
+  onHover,
 }) => (
   <li>
     <div
       role="button"
       tabIndex={0}
       onClick={() => onOpen(mail)}
+      onMouseEnter={() => onHover?.(mail)}
+      onMouseLeave={() => onHover?.(null)}
       onKeyDown={event => event.key === 'Enter' && onOpen(mail)}
       className={cn(
         'flex cursor-pointer gap-3 rounded-2xl px-3 py-3 transition-colors',

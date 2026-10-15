@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
-import { useInfiniteQuery, useQuery } from '@tanstack/react-query';
+import { useCallback, useMemo, useRef } from 'react';
+import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { matchesTerm } from '@/modules/workspace/search/searchRules';
 import { useDemoMail } from '../lib/demoStore';
@@ -91,17 +91,53 @@ export const useMailbox = (
   };
 };
 
+const messageKey = (mail: Pick<MailSummary, 'accountId' | 'id'> | null) =>
+  ['mail', 'message', mail?.accountId, mail?.id] as const;
+
+const fetchMessage = async (mail: MailSummary) => {
+  const { data, error } = await mailService.get(mail.accountId, mail.id);
+  if (error) throw error;
+  return data;
+};
+
+/**
+ * Pré-carrega um email quando o rato pára em cima dele (250 ms), para abrir sem espera.
+ * Um de cada vez, para não atrasar o email que se abrir a seguir.
+ */
+export const usePrefetchMessage = () => {
+  const { isPreview } = useWorkspace();
+  const qc = useQueryClient();
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const busy = useRef(false);
+  return useCallback(
+    (mail: MailSummary | null) => {
+      if (timer.current) clearTimeout(timer.current);
+      if (!mail || isPreview) return;
+      timer.current = setTimeout(() => {
+        if (busy.current || qc.getQueryData(messageKey(mail))) return;
+        busy.current = true;
+        void qc
+          .prefetchQuery({
+            queryKey: messageKey(mail),
+            queryFn: () => fetchMessage(mail),
+            staleTime: 5 * 60_000,
+          })
+          .finally(() => {
+            busy.current = false;
+          });
+      }, 250);
+    },
+    [isPreview, qc]
+  );
+};
+
 /** Email completo (corpo e anexos). */
 export const useMailMessage = (summary: MailSummary | null) => {
   const { isPreview } = useWorkspace();
   const demo = useDemoMail();
   const query = useQuery({
-    queryKey: ['mail', 'message', summary?.accountId, summary?.id],
-    queryFn: async () => {
-      const { data, error } = await mailService.get(summary!.accountId, summary!.id);
-      if (error) throw error;
-      return data;
-    },
+    queryKey: messageKey(summary),
+    queryFn: () => fetchMessage(summary!),
     enabled: !isPreview && !!summary,
     staleTime: 5 * 60_000,
   });

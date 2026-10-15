@@ -16,6 +16,7 @@ interface MailListProps {
   onSearch: (value: string) => void;
   onOpen: (mail: MailSummary) => void;
   onToggleStar: (mail: MailSummary) => void;
+  onHover?: (mail: MailSummary | null) => void;
   onRefresh: () => void;
   onMenu: () => void;
   isLoading: boolean;
@@ -90,6 +91,7 @@ export const MailList: React.FC<MailListProps> = props => {
             accountDot={props.showAccount ? colorOf.get(mail.accountId) : undefined}
             onOpen={props.onOpen}
             onToggleStar={props.onToggleStar}
+            onHover={props.onHover}
           />
         ))}
         {props.hasMore && (

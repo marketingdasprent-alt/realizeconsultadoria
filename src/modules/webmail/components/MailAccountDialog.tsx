@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Loader2, RefreshCw, Unplug, Users } from 'lucide-react';
+import { AlertTriangle, RefreshCw, Unplug, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/modules/workspace/components/ConfirmDialog';
@@ -37,7 +37,6 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
     color: 'violet' as MailAccountColor,
     isDefault: false,
   });
-  const [busy, setBusy] = useState(false);
   const [confirm, setConfirm] = useState(false);
 
   useEffect(() => {
@@ -71,16 +70,15 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
         </DialogContent>
       </Dialog>
     );
-  const save = async () => {
-    setBusy(true);
-    const ok = await onSave(account.id, {
+  // Fecha logo: a alteração aparece na hora e grava em fundo (avisa se falhar).
+  const save = () => {
+    void onSave(account.id, {
       displayName: form.displayName.trim() || null,
       signature: form.signature.trim() || null,
       color: form.color,
       isDefault: form.isDefault,
     });
-    setBusy(false);
-    if (ok) onClose();
+    onClose();
   };
 
   return (
@@ -180,11 +178,10 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
             </button>
             <button
               type="button"
-              disabled={busy}
               onClick={save}
               className="ml-auto inline-flex h-11 items-center gap-2 rounded-full bg-rz-primary px-6 text-[14px] font-bold text-white disabled:opacity-50"
             >
-              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Guardar
+              Guardar
             </button>
           </div>
         </DialogContent>

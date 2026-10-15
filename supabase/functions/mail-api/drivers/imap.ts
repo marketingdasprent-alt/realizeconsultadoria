@@ -13,7 +13,7 @@ import { simpleParser } from 'npm:mailparser@3.7.1';
 import nodemailer from 'npm:nodemailer@6.9.15';
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
-import { mailError, type MailError } from '../../_shared/mail/errors.ts';
+import { isMailError, mailError, type MailError } from '../../_shared/mail/errors.ts';
 import {
   decodeImapMessageId,
   encodeImapMessageId,
@@ -165,13 +165,50 @@ export const testImapLogin = async (cfg: ImapAccountConfig): Promise<void> => {
   }
 };
 
+// ---------------------------------------------------------------- reserva de ligações
+
+/**
+ * Ligações IMAP abertas, reaproveitadas enquanto o worker da função estiver vivo: abrir
+ * (TLS + login) custa 1–3 s e cada clique no Webmail é um pedido novo. Uma ligação por
+ * caixa, com as operações em fila; fecha ao fim de IDLE_MS sem uso.
+ */
+interface PooledClient {
+  client: ImapClient;
+  queue: Promise<unknown>;
+  idle: ReturnType<typeof setTimeout> | null;
+}
+const POOL = new Map<string, PooledClient>();
+const IDLE_MS = 90_000;
+
+/** Chave da ligação (a palavra-passe entra só como hash, para uma mudança abrir outra). */
+const poolKey = (cfg: ImapAccountConfig) => {
+  let hash = 0;
+  for (const char of cfg.password) hash = (hash * 31 + char.charCodeAt(0)) | 0;
+  return `${cfg.username}@${cfg.imapHost}:${cfg.imapPort}#${hash}`;
+};
+
+const isUsable = (client: ImapClient) => (client as { usable?: boolean }).usable !== false;
+
+const dropPooled = (key: string) => {
+  const entry = POOL.get(key);
+  if (!entry) return;
+  POOL.delete(key);
+  if (entry.idle) clearTimeout(entry.idle);
+  entry.client.logout().catch(() => entry.client.close());
+};
+
 // ---------------------------------------------------------------- driver
 
 export const createImapDriver = (
   cfg: ImapAccountConfig,
   onAuthFailure: () => Promise<MailError>
 ): MailDriver => {
-  const withClient = async <T>(fn: (client: ImapClient) => Promise<T>): Promise<T> => {
+  const key = poolKey(cfg);
+
+  const acquire = async (): Promise<{ entry: PooledClient; reused: boolean }> => {
+    const pooled = POOL.get(key);
+    if (pooled && isUsable(pooled.client)) return { entry: pooled, reused: true };
+    if (pooled) dropPooled(key);
     let client: ImapClient;
     try {
       client = await openClient(cfg);
@@ -180,14 +217,37 @@ export const createImapDriver = (
       console.error('mail-api imap: sem ligação', errorMessage(error));
       throw mailError('provider_error', `Não foi possível ligar a ${cfg.imapHost}.`);
     }
+    const entry: PooledClient = { client, queue: Promise.resolve(), idle: null };
+    POOL.set(key, entry);
+    return { entry, reused: false };
+  };
+
+  const run = <T>(entry: PooledClient, fn: (client: ImapClient) => Promise<T>): Promise<T> => {
+    if (entry.idle) clearTimeout(entry.idle);
+    const result = entry.queue.then(() => fn(entry.client));
+    entry.queue = result.catch(() => undefined);
+    entry.queue.then(() => {
+      if (POOL.get(key) !== entry) return;
+      if (entry.idle) clearTimeout(entry.idle);
+      entry.idle = setTimeout(() => dropPooled(key), IDLE_MS);
+    });
+    return result;
+  };
+
+  const withClient = async <T>(fn: (client: ImapClient) => Promise<T>): Promise<T> => {
+    const { entry, reused } = await acquire();
     try {
-      return await fn(client);
-    } finally {
-      try {
-        await client.logout();
-      } catch {
-        client.close();
-      }
+      return await run(entry, fn);
+    } catch (error) {
+      // Erros de negócio passam; um erro de ligação numa ligação reaproveitada (o servidor
+      // fechou-a entretanto) tenta uma vez com uma ligação nova.
+      if (isMailError(error)) throw error;
+      const dead = !isUsable(entry.client);
+      dropPooled(key);
+      // Só se a ligação morreu (o pedido não chegou a ser feito), para não repetir operações.
+      if (!reused || !dead) throw error;
+      const fresh = await acquire();
+      return run(fresh.entry, fn);
     }
   };
 

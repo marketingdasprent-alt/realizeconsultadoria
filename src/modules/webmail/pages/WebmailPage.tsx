@@ -14,7 +14,7 @@ import { MailToTaskOrEvent, type MailConversion } from '../components/MailToTask
 import { ProviderGrid } from '../components/ProviderGrid';
 import { useMailAccounts } from '../hooks/useMailAccounts';
 import { useMailActions } from '../hooks/useMailActions';
-import { useMailbox, useMailMessage } from '../hooks/useMailbox';
+import { useMailbox, useMailMessage, usePrefetchMessage } from '../hooks/useMailbox';
 import { FOLDERS, draftFrom, mailKey } from '../lib/mailFormat';
 import { providerOf, type MailProvider } from '../lib/providers';
 import type { ComposeDraft, MailAccount, MailFolder, MailSummary } from '../types';
@@ -23,6 +23,7 @@ import type { ComposeDraft, MailAccount, MailFolder, MailSummary } from '../type
 const WebmailPage: React.FC = () => {
   const mail = useMailAccounts();
   const actions = useMailActions();
+  const prefetch = usePrefetchMessage();
   const [params, setParams] = useSearchParams();
   const [scope, setScope] = useState<string | null>(null);
   const [folder, setFolder] = useState<MailFolder>('inbox');
@@ -139,6 +140,7 @@ const WebmailPage: React.FC = () => {
         onSearch={setSearch}
         onOpen={open}
         onToggleStar={actions.toggleStar}
+        onHover={prefetch}
         onRefresh={() => void box.refetch()}
         onMenu={() => setMenuOpen(true)}
         isLoading={box.isLoading}

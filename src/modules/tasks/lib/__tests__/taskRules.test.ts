@@ -46,6 +46,14 @@ describe('tarefas', () => {
     expect(filterTasks(list, 'all', 'me', 'nada').length).toBe(0);
   });
 
+  it('as minhas inclui as tarefas em que participo', () => {
+    const list = [
+      task({ id: 'a', assigneeId: 'thiago', createdBy: 'thiago', participantIds: ['joao'] }),
+      task({ id: 'b', assigneeId: 'thiago', createdBy: 'thiago' }),
+    ];
+    expect(filterTasks(list, 'mine', 'joao').map(t => t.id)).toEqual(['a']);
+  });
+
   it('ordena: por concluir, prazo mais próximo, prioridade', () => {
     const sorted = sortTasks([
       task({ id: 'done', status: 'done', dueAt: '2026-10-10T00:00:00Z' }),

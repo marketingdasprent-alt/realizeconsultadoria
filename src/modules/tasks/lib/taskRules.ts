@@ -23,7 +23,7 @@ export const RECURRENCE_LABELS: Record<string, string> = {
 };
 
 export const TASK_SCOPES: { key: TaskScope; label: string }[] = [
-  { key: 'mine', label: 'Atribuídas a mim' },
+  { key: 'mine', label: 'As minhas' },
   { key: 'created', label: 'Criadas por mim' },
   { key: 'all', label: 'Todas' },
 ];
@@ -42,7 +42,9 @@ export const filterTasks = (
   const term = query.trim().toLowerCase();
   return tasks.filter(task => {
     if (task.parentId) return false;
-    if (scope === 'mine' && task.assigneeId !== myUserId) return false;
+    // As minhas: sou o responsável ou participo.
+    if (scope === 'mine' && task.assigneeId !== myUserId && !task.participantIds.includes(myUserId))
+      return false;
     if (scope === 'created' && task.createdBy !== myUserId) return false;
     return !term || `${task.title} ${task.description ?? ''}`.toLowerCase().includes(term);
   });

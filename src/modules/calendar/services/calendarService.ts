@@ -119,6 +119,17 @@ export const calendarService = {
     return { data: data ?? [], error };
   },
 
+  /** Convites e respostas do evento (o RLS deixa ler ao organizador e aos admins). */
+  history: async (eventId: string) => {
+    const { data, error } = await supabase
+      .from('calendar_attendee_history')
+      .select('id, user_id, action, old_response, new_response, changed_at')
+      .eq('event_id', eventId)
+      .order('changed_at', { ascending: false })
+      .limit(100);
+    return { data: data ?? [], error };
+  },
+
   respond: async (eventId: string, userId: string, response: AttendeeResponse) => {
     const { error } = await supabase
       .from('calendar_event_attendees')

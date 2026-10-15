@@ -227,7 +227,12 @@ const CalendarPage: React.FC = () => {
       </div>
 
       <EventDetailSheet
-        item={open}
+        item={
+          // Sempre a versão mais recente do evento (respostas em tempo real), não a cópia de quando abriu.
+          open?.event
+            ? { ...open, event: cal.events.find(e => e.id === open.event?.id) ?? open.event }
+            : open
+        }
         onClose={() => setOpen(null)}
         onEdit={e => {
           setOpen(null);

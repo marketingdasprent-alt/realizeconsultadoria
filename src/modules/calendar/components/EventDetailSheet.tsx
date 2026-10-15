@@ -19,6 +19,7 @@ import { useDirectory } from '@/modules/social/hooks/useDirectory';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { EVENT_DOTS } from '../lib/items';
+import { EventHistory } from './EventHistory';
 import type { AttendeeResponse, CalendarEvent, CalendarItem } from '../types';
 
 const RESPONSES: { key: AttendeeResponse; label: string; tone: string }[] = [
@@ -192,6 +193,8 @@ export const EventDetailSheet: React.FC<EventDetailSheetProps> = ({
                 ))}
               </ul>
             </div>
+
+            {isOwner && <EventHistory eventId={event.id} nameOf={nameOf} />}
 
             {isOwner && (
               <div className="flex gap-2 border-t border-rz-line pt-4">

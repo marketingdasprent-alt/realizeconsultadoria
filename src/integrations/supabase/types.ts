@@ -578,6 +578,45 @@ export type Database = {
           },
         ];
       };
+      calendar_attendee_history: {
+        Row: {
+          action: string;
+          changed_at: string;
+          changed_by: string | null;
+          event_id: string;
+          event_owner_id: string | null;
+          event_title: string | null;
+          id: number;
+          new_response: string | null;
+          old_response: string | null;
+          user_id: string;
+        };
+        Insert: {
+          action: string;
+          changed_at?: string;
+          changed_by?: string | null;
+          event_id: string;
+          event_owner_id?: string | null;
+          event_title?: string | null;
+          id?: number;
+          new_response?: string | null;
+          old_response?: string | null;
+          user_id: string;
+        };
+        Update: {
+          action?: string;
+          changed_at?: string;
+          changed_by?: string | null;
+          event_id?: string;
+          event_owner_id?: string | null;
+          event_title?: string | null;
+          id?: number;
+          new_response?: string | null;
+          old_response?: string | null;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       calendar_event_attendees: {
         Row: {
           event_id: string;

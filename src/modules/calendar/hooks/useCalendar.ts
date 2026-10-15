@@ -1,6 +1,6 @@
 // Calendário: eventos do intervalo (com tempo real), ausências, feriados e prazos de tarefas,
 // mais as ações sobre eventos. Na pré-visualização, em memória.
-import { useEffect, useMemo, useSyncExternalStore } from 'react';
+import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
@@ -63,6 +63,7 @@ export const useCalendar = (from: Date, to: Date) => {
   const { isPreview, user } = useWorkspace();
   const qc = useQueryClient();
   const create = useCreateEvent();
+  const responding = useRef(false);
   const demo = useSyncExternalStore(subscribe, () => demoEvents);
   const absences = useMyAbsences();
   const { tasks } = useTasks();
@@ -154,9 +155,31 @@ export const useCalendar = (from: Date, to: Date) => {
           )
         );
       }
+      if (responding.current) return;
+      responding.current = true;
+      // Na hora no ecrã; o servidor confirma em fundo (e o tempo real atualiza os outros).
+      qc.setQueriesData<CalendarEvent[]>({ queryKey: ['calendar', 'events'] }, list =>
+        list?.map(e =>
+          e.id === event.id
+            ? {
+                ...e,
+                attendees: e.attendees.map(a =>
+                  a.userId === user.userId ? { ...a, response } : a
+                ),
+              }
+            : e
+        )
+      );
       const { error } = await calendarService.respond(event.id, user.userId, response);
-      if (error) return fail('A resposta não foi guardada.');
-      await refresh();
+      responding.current = false;
+      if (error) {
+        void refresh();
+        return fail(
+          error.message?.includes('rate_limited')
+            ? 'Mudou a resposta muitas vezes seguidas. Tente daqui a alguns minutos.'
+            : 'A resposta não foi guardada.'
+        );
+      }
     },
   };
 };

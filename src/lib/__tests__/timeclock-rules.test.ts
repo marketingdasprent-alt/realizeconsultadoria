@@ -11,6 +11,7 @@ import {
   nextEntryType,
   parseManualTime,
   sha256Hex,
+  shouldNotifyApprovers,
   type DecideContext,
   type PunchContext,
 } from '../../../supabase/functions/_shared/timeclock-rules';
@@ -401,6 +402,24 @@ describe('correção de hora (✎)', () => {
     expect(result.status).toBe('pending');
     expect(result.flags).toEqual(['gps_only', 'manual_time']);
     expect(applyManualTime(result).flags).toEqual(['gps_only', 'manual_time']);
+  });
+});
+
+describe('shouldNotifyApprovers', () => {
+  it('stays quiet when the only issue is the location', () => {
+    expect(shouldNotifyApprovers('pending', ['outside_location', 'remote', 'gps_only'])).toBe(
+      false
+    );
+    expect(shouldNotifyApprovers('pending', ['no_gps', 'remote', 'new_device'])).toBe(false);
+    expect(shouldNotifyApprovers('pending', ['weak_gps', 'remote'])).toBe(false);
+    expect(shouldNotifyApprovers('valid', ['gps_only'])).toBe(false);
+  });
+
+  it('emails HR for suspicious signals and time corrections', () => {
+    expect(shouldNotifyApprovers('flagged', ['no_gps'])).toBe(true);
+    expect(shouldNotifyApprovers('pending', ['outside_location', 'vpn_or_proxy'])).toBe(true);
+    expect(shouldNotifyApprovers('pending', ['outside_location', 'shared_device'])).toBe(true);
+    expect(shouldNotifyApprovers('pending', ['manual_time'])).toBe(true);
   });
 });
 

@@ -56,7 +56,9 @@ decide no servidor (`decidePunch`):
 O motivo fica nas flags (`outside_location`, `no_gps`, `stale_gps`, `weak_gps`,
 `approximate_location`, `no_location_configured`, `tag_required`) e o colaborador vê-o logo
 ("Está a 10,3 km de Premium Ride…", "Não foi possível obter a sua localização…") com a dica para
-a próxima vez. Os pendentes vão para **Ponto → Revisão** e para a lista de *Emails de aprovação*.
+a próxima vez. Os pendentes vão para **Ponto → Revisão**. A lista de *Emails de aprovação* só
+recebe email quando há sinais suspeitos (VPN, telemóvel partilhado, GPS suspeito…) ou uma
+correção de hora (✎); fora do local / sem GPS / GPS fraco, sem mais nada, não gera email.
 
 Verificações feitas em cada registo: tag (token estático ou NTAG 424), local da empresa, distância
 (Haversine) e precisão GPS, IP (VPN/Tor/país) via proxycheck.io, dispositivo novo/partilhado,

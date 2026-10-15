@@ -76,8 +76,8 @@ export const ApprovalEmailsCard: React.FC<ApprovalEmailsCardProps> = ({ canEdit 
           <Mail className="h-5 w-5 text-gold" /> Emails de aprovação
         </CardTitle>
         <p className="text-sm text-muted-foreground">
-          Recebem um email sempre que alguém regista ponto fora do local de trabalho (a aguardar
-          aprovação) ou com alertas.
+          Recebem um email quando um registo tem alertas (VPN, telemóvel partilhado, GPS suspeito…)
+          ou é uma correção de hora. Os registos fora do local só aparecem na Revisão, sem email.
         </p>
       </CardHeader>
       <CardContent className="space-y-3">

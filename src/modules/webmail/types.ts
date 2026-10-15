@@ -17,6 +17,8 @@ export interface MailAccount {
   lastSyncAt: string | null;
   isDefault: boolean;
   color: MailAccountColor;
+  /** Partilhada pelo admin (email departamental dos Acessos): só o admin a gere. */
+  shared: boolean;
 }
 
 export interface MailAddress {

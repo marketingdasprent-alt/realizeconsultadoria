@@ -12,6 +12,7 @@
 //   set-read { account_id, message_id, read } · set-starred { ..., starred } · trash
 //   disconnect { account_id }
 //   discover { email } → { servers, oauth, source } (servidores IMAP/SMTP do domínio, por DNS)
+//   share-access { access_id } (só admin) → caixa partilhada de um email dos Acessos (share.ts)
 //
 // Cada ação carrega a conta com service role e `user_id = <quem chama>`; os tokens e
 // palavras-passe ficam no Vault e nunca vão para o browser. Drivers: Gmail API,
@@ -54,6 +55,7 @@ import { createGmailDriver } from './drivers/gmail.ts';
 import { createGraphDriver } from './drivers/graph.ts';
 import { createImapDriver, testImapLogin, type ImapAccountConfig } from './drivers/imap.ts';
 import { OAuthSession } from './session.ts';
+import { shareAccess } from './share.ts';
 
 type Body = Record<string, unknown>;
 
@@ -144,6 +146,8 @@ const connectImap = async (db: SupabaseClient, userId: string, body: Body) => {
 };
 
 const disconnect = async (db: SupabaseClient, account: MailAccountRow) => {
+  // Caixa partilhada: só o admin a retira (nos Acessos).
+  if (account.access_id) throw mailError('shared_account');
   if (account.auth_method === 'oauth-google') {
     // Revogar o refresh token invalida também os access tokens emitidos.
     const secret = parseOAuthSecret(await readSecret(db, account.id).catch(() => null));
@@ -165,6 +169,7 @@ const ACTIONS = [
   'trash',
   'disconnect',
   'discover',
+  'share-access',
 ] as const;
 type Action = (typeof ACTIONS)[number];
 
@@ -172,6 +177,7 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
   const action: Action | undefined = ACTIONS.find(a => a === body.action);
   if (!action) return badRequest();
   if (action === 'connect-imap') return connectImap(db, userId, body);
+  if (action === 'share-access') return ok(await shareAccess(db, userId, body.access_id));
   if (action === 'discover') {
     const email = optionalString(body.email, 320);
     return email ? ok(await discoverDomain(domainOfEmail(email), denoResolver)) : badRequest();

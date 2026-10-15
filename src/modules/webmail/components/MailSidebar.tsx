@@ -12,6 +12,7 @@ import {
   Settings2,
   Star,
   Trash2,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -90,6 +91,12 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
               className={cn('h-2.5 w-2.5 shrink-0 rounded-full', ACCOUNT_DOTS[account.color])}
             />
             <span className="min-w-0 flex-1 truncate">{account.email}</span>
+            {account.shared && (
+              <Users
+                className="h-3.5 w-3.5 shrink-0 text-rz-muted"
+                aria-label="Partilhada pela empresa"
+              />
+            )}
             {account.status !== 'active' && (
               <AlertTriangle
                 className="h-4 w-4 shrink-0 text-amber-500"

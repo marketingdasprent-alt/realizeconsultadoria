@@ -16,6 +16,7 @@ export const DEMO_MAIL_ACCOUNTS: MailAccount[] = [
     lastSyncAt: minutesAgo(2),
     isDefault: true,
     color: 'violet',
+    shared: false,
   },
   {
     id: 'gmail',
@@ -29,6 +30,7 @@ export const DEMO_MAIL_ACCOUNTS: MailAccount[] = [
     lastSyncAt: minutesAgo(5),
     isDefault: false,
     color: 'rose',
+    shared: false,
   },
 ];
 

@@ -84,6 +84,7 @@ import AssignmentsTab from '@/components/admin/AssignmentsTab';
 import DomainsTab from '@/components/admin/DomainsTab';
 import ServicesTab from '@/components/admin/ServicesTab';
 import { supabase } from '@/integrations/supabase/client';
+import { mailErrorText, mailService } from '@/modules/webmail/services/mailService';
 
 interface Access {
   id: string;
@@ -393,13 +394,33 @@ const AccessesPage = () => {
         if (insertError) throw insertError;
       }
     },
-    onSuccess: () => {
+    onSuccess: async (_data, { accessId, employeeIds }) => {
       queryClient.invalidateQueries({ queryKey: ['employee-department-emails'] });
       setViewEmployeesAccessId(null);
       setSelectedEmployeeIds([]);
+      if (employeeIds.length === 0) {
+        // Sem colaboradores: os triggers da BD tiram a caixa do Webmail de todos.
+        toast({
+          title: 'Colaboradores atualizados',
+          description: 'Ninguém tem esta caixa no Webmail.',
+        });
+        return;
+      }
+      // A caixa aparece no Webmail dos colaboradores escolhidos (servidores e login testados).
+      const { data: shared, error: shareError } = await mailService.shareAccess(accessId);
+      if (shareError || !shared) {
+        toast({
+          title: 'Colaboradores guardados, mas a caixa não foi partilhada',
+          description: mailErrorText(shareError) || 'Não foi possível ligar à caixa de email.',
+          variant: 'destructive',
+        });
+        return;
+      }
       toast({
-        title: 'Colaboradores atualizados',
-        description: 'Os colaboradores com acesso foram atualizados com sucesso.',
+        title: 'Caixa partilhada no Webmail',
+        description: `${shared.email} já aparece no Webmail de ${shared.members} colaborador${
+          shared.members === 1 ? '' : 'es'
+        }.`,
       });
     },
     onError: error => {

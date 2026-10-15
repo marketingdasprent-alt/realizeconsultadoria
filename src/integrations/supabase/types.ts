@@ -1534,8 +1534,35 @@ export type Database = {
         };
         Relationships: [];
       };
+      mail_account_members: {
+        Row: {
+          account_id: string;
+          created_at: string;
+          user_id: string;
+        };
+        Insert: {
+          account_id: string;
+          created_at?: string;
+          user_id: string;
+        };
+        Update: {
+          account_id?: string;
+          created_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'mail_account_members_account_id_fkey';
+            columns: ['account_id'];
+            isOneToOne: false;
+            referencedRelation: 'mail_accounts';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       mail_accounts: {
         Row: {
+          access_id: string | null;
           auth_method: string;
           color: string;
           company_id: string | null;
@@ -1555,9 +1582,10 @@ export type Database = {
           smtp_port: number | null;
           status: string;
           updated_at: string;
-          user_id: string;
+          user_id: string | null;
         };
         Insert: {
+          access_id?: string | null;
           auth_method: string;
           color?: string;
           company_id?: string | null;
@@ -1577,9 +1605,10 @@ export type Database = {
           smtp_port?: number | null;
           status?: string;
           updated_at?: string;
-          user_id: string;
+          user_id?: string | null;
         };
         Update: {
+          access_id?: string | null;
           auth_method?: string;
           color?: string;
           company_id?: string | null;
@@ -1599,9 +1628,16 @@ export type Database = {
           smtp_port?: number | null;
           status?: string;
           updated_at?: string;
-          user_id?: string;
+          user_id?: string | null;
         };
         Relationships: [
+          {
+            foreignKeyName: 'mail_accounts_access_id_fkey';
+            columns: ['access_id'];
+            isOneToOne: true;
+            referencedRelation: 'accesses';
+            referencedColumns: ['id'];
+          },
           {
             foreignKeyName: 'mail_accounts_company_id_fkey';
             columns: ['company_id'];
@@ -3028,9 +3064,17 @@ export type Database = {
         Returns: boolean;
       };
       mail_account_delete: { Args: { p_account: string }; Returns: undefined };
+      mail_is_member: {
+        Args: { p_account: string; p_user: string };
+        Returns: boolean;
+      };
       mail_secret_get: { Args: { p_account: string }; Returns: string };
       mail_secret_set: {
         Args: { p_account: string; p_secret: string };
+        Returns: undefined;
+      };
+      mail_sync_access_members: {
+        Args: { p_access: string };
         Returns: undefined;
       };
       review_employee_document: {

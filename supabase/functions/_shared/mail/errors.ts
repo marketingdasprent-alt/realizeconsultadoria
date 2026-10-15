@@ -12,6 +12,9 @@ export type MailErrorCode =
   | 'too_large'
   | 'invalid_recipient'
   | 'not_supported'
+  | 'shared_account'
+  | 'forbidden'
+  | 'oauth_domain'
   | 'bad_request';
 
 export class MailError extends Error {
@@ -41,6 +44,10 @@ export const MAIL_ERROR_MESSAGES: Record<MailErrorCode, string> = {
   too_large: 'A mensagem ultrapassa o limite de 10 MB.',
   invalid_recipient: 'Há destinatários com endereço inválido.',
   not_supported: 'Operação não suportada nesta caixa.',
+  shared_account: 'Esta caixa é partilhada pela empresa: só o administrador a pode retirar.',
+  forbidden: 'Só um administrador pode fazer isto.',
+  oauth_domain:
+    'Este endereço é Google Workspace ou Microsoft 365, que não aceitam palavra-passe por IMAP. Partilhar estas caixas fica disponível com as apps Google/Microsoft.',
   bad_request: 'Pedido inválido.',
 };
 

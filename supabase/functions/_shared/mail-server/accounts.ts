@@ -6,7 +6,9 @@ import type { MailAuthMethod, MailProviderKey } from '../mail/types.ts';
 
 export interface MailAccountRow {
   id: string;
-  user_id: string;
+  /** null nas caixas partilhadas (ligadas a um acesso do admin). */
+  user_id: string | null;
+  access_id: string | null;
   company_id: string | null;
   provider: MailProviderKey;
   auth_method: MailAuthMethod;
@@ -21,9 +23,9 @@ export interface MailAccountRow {
 }
 
 export const ACCOUNT_COLUMNS =
-  'id, user_id, company_id, provider, auth_method, email, display_name, imap_host, imap_port, smtp_host, smtp_port, status, is_default';
+  'id, user_id, access_id, company_id, provider, auth_method, email, display_name, imap_host, imap_port, smtp_host, smtp_port, status, is_default';
 
-/** Conta do próprio utilizador (nunca de outro). */
+/** Conta do próprio utilizador ou partilhada com ele pelo admin (nunca de outro). */
 export const loadAccount = async (
   db: SupabaseClient,
   accountId: string,
@@ -33,10 +35,18 @@ export const loadAccount = async (
     .from('mail_accounts')
     .select(ACCOUNT_COLUMNS)
     .eq('id', accountId)
-    .eq('user_id', userId)
     .maybeSingle();
   if (error) throw error;
-  return (data as MailAccountRow | null) ?? null;
+  const account = (data as MailAccountRow | null) ?? null;
+  if (!account || account.user_id === userId) return account;
+  const { data: member, error: memberError } = await db
+    .from('mail_account_members')
+    .select('user_id')
+    .eq('account_id', accountId)
+    .eq('user_id', userId)
+    .maybeSingle();
+  if (memberError) throw memberError;
+  return member ? account : null;
 };
 
 /** Empresa do colaborador ativo (null para quem não é colaborador, ex. admins). */

@@ -15,7 +15,7 @@ import type {
 
 /** Colunas que o colaborador pode ler (secret_id fica de fora por GRANT). */
 const ACCOUNT_COLUMNS =
-  'id, provider, auth_method, email, display_name, signature, status, last_error, last_sync_at, is_default, color';
+  'id, provider, auth_method, email, display_name, signature, status, last_error, last_sync_at, is_default, color, access_id';
 
 export interface MailError {
   code: string;
@@ -59,6 +59,7 @@ const toAccount = (row: Row): MailAccount => ({
   lastSyncAt: (row.last_sync_at as string | null) ?? null,
   isDefault: !!row.is_default,
   color: row.color as MailAccount['color'],
+  shared: !!row.access_id,
 });
 
 const toSummary = (accountId: string, row: Row): MailSummary => ({
@@ -151,6 +152,13 @@ export const mailService = {
 
   /** Servidores do domínio, descobertos no servidor (DNS nativo; o browser pode não ter). */
   discover: (email: string) => call<Discovery>('mail-api', { action: 'discover', email }),
+
+  /** Admin: partilha o email departamental de um acesso com os colaboradores escolhidos. */
+  shareAccess: (accessId: string) =>
+    call<{ account_id: string; email: string; members: number }>('mail-api', {
+      action: 'share-access',
+      access_id: accessId,
+    }),
 
   disconnect: (accountId: string) =>
     call('mail-api', { action: 'disconnect', account_id: accountId }),

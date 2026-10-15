@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, Loader2, RefreshCw, Unplug } from 'lucide-react';
+import { AlertTriangle, Loader2, RefreshCw, Unplug, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/modules/workspace/components/ConfirmDialog';
@@ -52,6 +52,25 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
 
   if (!account) return null;
   const provider = providerOf(account.provider);
+  if (account.shared)
+    return (
+      <Dialog open onOpenChange={open => !open && onClose()}>
+        <DialogContent className="rounded-[28px] sm:max-w-md sm:rounded-[28px]">
+          <DialogTitle className="text-[17px] font-extrabold">{account.email}</DialogTitle>
+          <p className="flex gap-2 rounded-2xl bg-rz-primary-soft px-4 py-3 text-[13.5px]">
+            <Users className="mt-0.5 h-4 w-4 shrink-0 text-rz-primary" />
+            Caixa partilhada pela empresa. Quem tem acesso, a palavra-passe e os servidores são
+            geridos pelo administrador, nos Acessos.
+          </p>
+          {account.status !== 'active' && (
+            <p className="flex gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-[13px] text-amber-900 ring-1 ring-amber-200">
+              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+              {account.lastError ?? 'Houve um erro ao sincronizar. Avise o administrador.'}
+            </p>
+          )}
+        </DialogContent>
+      </Dialog>
+    );
   const save = async () => {
     setBusy(true);
     const ok = await onSave(account.id, {

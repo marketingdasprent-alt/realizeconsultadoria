@@ -11,6 +11,8 @@
 import { ImapFlow } from 'npm:imapflow@1.0.164';
 import { simpleParser } from 'npm:mailparser@3.7.1';
 import nodemailer from 'npm:nodemailer@6.9.15';
+
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
 import { mailError, type MailError } from '../../_shared/mail/errors.ts';
 import {
   decodeImapMessageId,
@@ -426,16 +428,17 @@ export const createImapDriver = (
       }
 
       // Cópia nos Enviados (melhor esforço; aqui o Bcc fica, como nos clientes de email).
+      // Corre depois da resposta: quem envia não fica à espera de mais uma ligação IMAP.
       if (!AUTO_SAVES_SENT.test(cfg.smtpHost)) {
-        try {
-          await withClient(async client => {
-            const sent = resolveImapFolder('sent', await client.list());
-            if (sent)
-              await client.append(sent, buildRawMessage({ ...base, includeBcc: true }), ['\\Seen']);
-          });
-        } catch (error) {
-          console.warn('mail-api imap: cópia nos Enviados falhou', errorMessage(error));
-        }
+        const saveCopy = withClient(async client => {
+          const sent = resolveImapFolder('sent', await client.list());
+          if (sent)
+            await client.append(sent, buildRawMessage({ ...base, includeBcc: true }), ['\\Seen']);
+        }).catch(error =>
+          console.warn('mail-api imap: cópia nos Enviados falhou', errorMessage(error))
+        );
+        if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(saveCopy);
+        else await saveCopy;
       }
       return { id: null };
     },

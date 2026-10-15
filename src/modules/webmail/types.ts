@@ -78,7 +78,10 @@ export interface ComposeDraft {
   cc?: string;
   subject?: string;
   body?: string;
+  bcc?: string;
   inReplyTo?: string;
+  /** Rascunho devolvido por um envio falhado: já tem a assinatura. */
+  restored?: boolean;
 }
 
 export interface ImapConnectInput {

@@ -51,11 +51,13 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     setFields({
       to: draft.to ?? '',
       cc: draft.cc ?? '',
-      bcc: '',
+      bcc: draft.bcc ?? '',
       subject: draft.subject ?? '',
-      body: withSignature(draft.body ?? '', account?.signature ?? null),
+      body: draft.restored
+        ? (draft.body ?? '')
+        : withSignature(draft.body ?? '', account?.signature ?? null),
     });
-    setShowCc(!!draft.cc);
+    setShowCc(!!draft.cc || !!draft.bcc);
     setFiles([]);
     setBusy(false);
   }, [draft]);
@@ -67,7 +69,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const send = async () => {
     if (!draft) return;
     setBusy(true);
-    const ok = await onSend({
+    const input: ComposeInput = {
       accountId: accountId || fallback?.id || '',
       to,
       cc: parseRecipients(fields.cc),
@@ -82,9 +84,11 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           base64: await toBase64(file),
         }))
       ),
-    });
+    };
     setBusy(false);
-    if (ok) onClose();
+    // Fecha logo; o envio continua em segundo plano (se falhar, o rascunho volta a abrir).
+    onClose();
+    void onSend(input);
   };
 
   return (

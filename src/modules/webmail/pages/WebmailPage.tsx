@@ -182,7 +182,22 @@ const WebmailPage: React.FC = () => {
         draft={draft}
         accounts={accounts}
         onClose={() => setDraft(null)}
-        onSend={actions.send}
+        onSend={async input => {
+          const ok = await actions.send(input);
+          // Falhou: o rascunho volta a abrir como estava (os anexos têm de ser escolhidos outra vez).
+          if (!ok)
+            setDraft({
+              accountId: input.accountId,
+              to: input.to.join(', '),
+              cc: input.cc.join(', '),
+              bcc: input.bcc.join(', '),
+              subject: input.subject,
+              body: input.text,
+              inReplyTo: input.inReplyTo,
+              restored: true,
+            });
+          return ok;
+        }}
         toBase64={actions.toBase64}
       />
       <MailAccountDialog

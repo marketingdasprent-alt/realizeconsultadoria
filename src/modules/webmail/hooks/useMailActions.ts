@@ -115,13 +115,17 @@ export const useMailActions = () => {
         toast({ title: 'Email enviado' });
         return true;
       }
+      // O compositor já fechou: o aviso mostra o progresso e o resultado.
+      const progress = toast({ title: 'A enviar…', description: input.subject || undefined });
       const { error } = await mailService.send(input, textToHtml(input.text));
+      progress.dismiss();
       if (error) {
-        fail(error, 'O email não foi enviado.');
+        fail(error, 'O email não foi enviado. O rascunho voltou a abrir.');
         return false;
       }
       toast({ title: 'Email enviado' });
-      await qc.invalidateQueries({ queryKey: ['mail', 'list'] });
+      // Sem esperar: as listas atualizam-se em segundo plano.
+      void qc.invalidateQueries({ queryKey: ['mail', 'list'] });
       return true;
     },
 

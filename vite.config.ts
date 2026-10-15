@@ -15,6 +15,9 @@ export default defineConfig(({ mode }) => ({
     mode === 'development' && componentTagger(),
     VitePWA({
       registerType: 'autoUpdate',
+      // O manifest vai com cookies: nas pré-visualizações protegidas da Vercel, sem eles o
+      // pedido é desviado para o login e falha por CORS.
+      useCredentials: true,
       includeAssets: ['favicon.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'Realize - Portal de Gestão',

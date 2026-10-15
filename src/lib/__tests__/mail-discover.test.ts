@@ -72,3 +72,22 @@ describe('descoberta de servidores (edge function)', () => {
     expect(await discoverDomain('não é domínio', r)).toBeNull();
   });
 });
+
+describe('descoberta com filtro de spam no MX', () => {
+  it('ignora o filtro e usa o servidor do SPF', async () => {
+    const r = resolver({
+      mx: async () => ['a1.spambusters.email', 'n1.spambusters.email'],
+      a: async () => ['1.2.3.4'],
+      ptr: async ip =>
+        ip === '194.39.124.192' ? ['hosting83.serverhs.org.'] : ['srv1.spambusters.email'],
+      txt: async () => [
+        'google-site-verification=x',
+        'v=spf1 +a +mx +ip4:194.39.124.192 include:_spf.spambusters.email ~all',
+      ],
+    });
+    expect(await discoverDomain('urbango.pt', r)).toMatchObject({
+      source: 'mx',
+      servers: { imapHost: 'hosting83.serverhs.org', smtpPort: 465 },
+    });
+  });
+});

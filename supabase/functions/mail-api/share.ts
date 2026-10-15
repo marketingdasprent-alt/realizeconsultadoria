@@ -34,10 +34,18 @@ const isAdmin = async (db: SupabaseClient, userId: string) => {
   return data === true;
 };
 
+/** Pedido de um admin (ecrã de Acessos do Realize 2.0). */
 export const shareAccess = async (db: SupabaseClient, userId: string, accessId: unknown) => {
   if (!isUuid(accessId)) throw mailError('bad_request');
   if (!(await isAdmin(db, userId))) throw mailError('forbidden');
+  return shareAccessById(db, accessId);
+};
 
+/**
+ * Cria ou atualiza a caixa partilhada de um acesso. Também chamado pela própria BD
+ * (trigger com pg_net) quando um colaborador é associado em qualquer admin.
+ */
+export const shareAccessById = async (db: SupabaseClient, accessId: string) => {
   const { data: access, error } = await db
     .from('accesses')
     .select('id, company_id, title, username, password')

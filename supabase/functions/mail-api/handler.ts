@@ -55,7 +55,7 @@ import { createGmailDriver } from './drivers/gmail.ts';
 import { createGraphDriver } from './drivers/graph.ts';
 import { createImapDriver, testImapLogin, type ImapAccountConfig } from './drivers/imap.ts';
 import { OAuthSession } from './session.ts';
-import { shareAccess } from './share.ts';
+import { shareAccess, shareAccessById } from './share.ts';
 
 type Body = Record<string, unknown>;
 
@@ -254,6 +254,22 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
   if (req.method !== 'POST') return json({ ok: false, code: 'method_not_allowed' }, 405);
 
   const db = serviceClient();
+
+  // Pedido da própria BD (trigger com pg_net quando um colaborador é associado a um email
+  // departamental, em qualquer admin): token de sistema e só esta operação.
+  const systemToken = Deno.env.get('MAIL_SYSTEM_TOKEN');
+  if (systemToken && req.headers.get('x-mail-system-token') === systemToken) {
+    const body: unknown = await req.json().catch(() => null);
+    if (!isRecord(body) || !isUuid(body.access_id)) return badRequest();
+    try {
+      return ok(await shareAccessById(db, body.access_id));
+    } catch (error) {
+      const code = isMailError(error) ? error.code : 'server_error';
+      console.error(`mail-api partilha automática ${body.access_id}:`, code, errorMessage(error));
+      return json({ ok: false, code });
+    }
+  }
+
   const userId = await authenticatedUserId(req, db);
   if (!userId) return json({ ok: false, code: 'unauthorized' }, 401);
 

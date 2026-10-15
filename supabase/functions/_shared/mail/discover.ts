@@ -23,7 +23,16 @@ export interface DiscoveryResolver {
   ptr: (ip: string) => Promise<string[]>;
   /** XML do ISPDB (autoconfig.thunderbird.net) ou null. */
   ispdb: (domain: string) => Promise<string | null>;
+  /** Registos TXT do domínio (para o SPF). */
+  txt?: (domain: string) => Promise<string[]>;
 }
+
+/**
+ * MX de filtros de spam: recebem o email antes de o entregar e não são o servidor da caixa
+ * (ex.: urbango.pt → a1.spambusters.email). Aí o servidor vem do SPF do domínio.
+ */
+const FILTER_MX =
+  /(spambusters|spamexperts|antispam|mailprotect|barracuda|mimecast|pphosted|proofpoint|mailchannels|messagelabs|sophos|trendmicro|mailcontrol|spamtitan|hornetsecurity)/i;
 
 const GOOGLE = ['gmail.com', 'googlemail.com'];
 const MICROSOFT = [
@@ -100,13 +109,17 @@ const fromIspdb = async (domain: string, r: DiscoveryResolver) => {
 };
 
 /** Nome do servidor por trás de um MX (ex.: _dc-mx.x.dominio.pt → cpanel168.dnscpanel.com). */
-const serverName = async (mxHost: string, r: DiscoveryResolver) => {
-  const [ip] = (await safe(r.a(mxHost), [])).filter(a => /^\d+\.\d+\.\d+\.\d+$/.test(a));
-  if (!ip) return null;
+/** Nome do servidor de um IP (DNS inverso), ex.: 194.39.124.192 → hosting83.serverhs.org. */
+const hostOfIp = async (ip: string, r: DiscoveryResolver) => {
   const [ptr] = await safe(r.ptr(ip), []);
   const host = ptr ? cleanHost(ptr) : '';
   // Nomes genéricos de IP (ex.: 27-116-12-185.static.isp.pt) não servem.
   return host && !/(\d+[-.]){3}\d+|static|dynamic|dsl|pool/.test(host) ? host : null;
+};
+
+const serverName = async (mxHost: string, r: DiscoveryResolver) => {
+  const [ip] = (await safe(r.a(mxHost), [])).filter(a => /^\d+\.\d+\.\d+\.\d+$/.test(a));
+  return ip ? hostOfIp(ip, r) : null;
 };
 
 export const discoverDomain = async (
@@ -126,13 +139,23 @@ export const discoverDomain = async (
     return { servers: null, oauth: 'office365', source: 'mx' };
   if (ispdb) return { servers: ispdb, oauth: null, source: 'ispdb' };
 
-  for (const host of [...new Set(mx.map(baseDomain))].filter(h => h !== domain)) {
+  const mailboxMx = mx.filter(h => !FILTER_MX.test(h));
+  for (const host of [...new Set(mailboxMx.map(baseDomain))].filter(h => h !== domain)) {
     const servers = await fromIspdb(host, r);
     if (servers) return { servers, oauth: null, source: 'mx' };
   }
-  if (mx[0]) {
-    const server = await serverName(mx[0], r);
+  if (mailboxMx[0]) {
+    const server = await serverName(mailboxMx[0], r);
     if (server) return { servers: ssl(server), oauth: null, source: 'mx' };
+  }
+  // MX de filtro de spam (ou nenhum útil): o SPF diz de que servidor sai o email.
+  if (r.txt) {
+    const spf = (await safe(r.txt(domain), [])).find(t => t.trim().startsWith('v=spf1')) ?? '';
+    const ips = [...spf.matchAll(/ip4:(\d+\.\d+\.\d+\.\d+)(?:\/32)?(?=\s|$)/g)].map(m => m[1]);
+    for (const ip of ips) {
+      const server = await hostOfIp(ip, r);
+      if (server) return { servers: ssl(server), oauth: null, source: 'mx' };
+    }
   }
   return { servers: ssl(`mail.${domain}`), oauth: null, source: 'guess' };
 };

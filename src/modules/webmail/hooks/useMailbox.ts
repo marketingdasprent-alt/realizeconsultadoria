@@ -1,8 +1,9 @@
-import { useCallback, useMemo, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { matchesTerm } from '@/modules/workspace/search/searchRules';
 import { useDemoMail } from '../lib/demoStore';
+import { readListCache, writeListCache } from '../lib/mailCache';
 import { mailService, type MailError } from '../services/mailService';
 import type { MailAccount, MailFolder, MailSummary } from '../types';
 
@@ -25,11 +26,18 @@ export const useMailbox = (
   folder: MailFolder,
   search: string
 ) => {
-  const { isPreview } = useWorkspace();
+  const { isPreview, user } = useWorkspace();
   const demo = useDemoMail();
   const ids = (scope === 'all' ? accounts : accounts.filter(a => a.id === scope))
     .filter(a => a.status !== 'reauth')
     .map(a => a.id);
+
+  // Última lista desta caixa/pasta guardada no browser: aparece já, e a nova chega a seguir.
+  const cacheKey = search.trim() ? null : [scope, folder, ids.join(',')].join('|');
+  const cached = useMemo(
+    () => (cacheKey && !isPreview ? readListCache<MailboxPage>(user.userId, cacheKey) : null),
+    [cacheKey, isPreview, user.userId]
+  );
 
   const query = useInfiniteQuery({
     queryKey: ['mail', 'list', scope, folder, search.trim(), ids.join(',')],
@@ -52,7 +60,16 @@ export const useMailbox = (
     getNextPageParam: last => (Object.keys(last.next).length ? last.next : undefined),
     enabled: !isPreview && ids.length > 0,
     staleTime: 30_000,
+    initialData: cached ? { pages: [cached.page], pageParams: [null] } : undefined,
+    initialDataUpdatedAt: cached?.savedAt,
   });
+
+  const firstPage = query.data?.pages[0];
+  useEffect(() => {
+    if (!cacheKey || isPreview || !firstPage || query.dataUpdatedAt <= (cached?.savedAt ?? 0))
+      return;
+    writeListCache(user.userId, cacheKey, firstPage);
+  }, [cacheKey, isPreview, firstPage, query.dataUpdatedAt, cached, user.userId]);
 
   const live = useMemo(() => {
     const seen = new Set<string>();

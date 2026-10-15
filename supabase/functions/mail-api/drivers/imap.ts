@@ -336,8 +336,8 @@ export const createImapDriver = (
         const before = pageToken ? Number(pageToken) : null;
         if (before !== null && (!Number.isInteger(before) || before <= 1)) return empty;
 
-        const mailboxes = await client.list();
-        let path = resolveImapFolder(folder, mailboxes);
+        // A Entrada é sempre "INBOX": poupa o LIST de todas as pastas (um pedido a menos).
+        let path = folder === 'inbox' ? 'INBOX' : resolveImapFolder(folder, await client.list());
         // Sem pasta \Flagged: marcadas = \Flagged na INBOX.
         const flaggedSearch = folder === 'starred' && !path;
         if (flaggedSearch) path = 'INBOX';

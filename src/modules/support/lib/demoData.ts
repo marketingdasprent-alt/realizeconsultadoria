@@ -1,4 +1,5 @@
 // Tickets de exemplo (só na pré-visualização /dev/realize-2/tickets).
+import type { SupportDepartment, SupportSubject } from '../services/supportService';
 import type { SupportTicket, TicketAttachment, TicketReply } from './ticketRules';
 
 const hoursAgo = (hours: number) => new Date(Date.now() - hours * 3_600_000).toISOString();
@@ -67,3 +68,17 @@ export const DEMO_REPLIES: Record<string, TicketReply[]> = {
     },
   ],
 };
+
+export const DEMO_DEPARTMENTS: SupportDepartment[] = [
+  { id: 'rh', name: 'Recursos Humanos' },
+  { id: 'fin', name: 'Financeiro' },
+  { id: 'it', name: 'Informática' },
+];
+
+export const DEMO_SUBJECTS: SupportSubject[] = [
+  { id: 's1', label: 'Declaração de rendimentos', default_priority: 'medium', department_id: 'rh' },
+  { id: 's2', label: 'Alteração de IBAN', default_priority: 'high', department_id: 'rh' },
+  { id: 's3', label: 'Férias e ausências', default_priority: 'medium', department_id: 'rh' },
+  { id: 's4', label: 'Reembolso de despesas', default_priority: 'medium', department_id: 'fin' },
+  { id: 's5', label: 'Computador ou telemóvel', default_priority: 'high', department_id: 'it' },
+];

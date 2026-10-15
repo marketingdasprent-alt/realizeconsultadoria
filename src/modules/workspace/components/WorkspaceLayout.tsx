@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import { clearMailCache } from '@/modules/webmail/lib/mailCache';
 import { ROUTES } from '@/lib/constants';
 import ChangePasswordDialog from '@/components/employee/ChangePasswordDialog';
 import type {
@@ -49,6 +50,7 @@ const WorkspaceLayout: React.FC = () => {
 
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
+    clearMailCache();
     const standalone = window.matchMedia('(display-mode: standalone)').matches;
     navigate(standalone ? ROUTES.EMPLOYEE.LOGIN : ROUTES.PUBLIC.HOME);
   }, [navigate]);

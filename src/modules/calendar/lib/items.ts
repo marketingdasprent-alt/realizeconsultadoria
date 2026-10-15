@@ -30,7 +30,7 @@ export const LAYERS: { key: CalendarLayer; label: string; dot: string }[] = [
   { key: 'invites', label: 'Convites', dot: 'bg-sky-500' },
   { key: 'company', label: 'Eventos da empresa', dot: 'bg-indigo-500' },
   { key: 'absences', label: 'As minhas férias e ausências', dot: 'bg-emerald-500' },
-  { key: 'team', label: 'Ausências da equipa', dot: 'bg-slate-400' },
+  { key: 'team', label: 'Ausências do departamento', dot: 'bg-slate-400' },
   { key: 'holidays', label: 'Feriados', dot: 'bg-rose-400' },
   { key: 'tasks', label: 'Prazos de tarefas', dot: 'bg-amber-500' },
 ];
@@ -46,11 +46,10 @@ interface BuildInput {
   myUserId: string;
   events: CalendarEvent[];
   absences: AbsenceRow[];
-  teamAbsences: { id: string; employee_id: string; start_date: string; end_date: string }[];
+  /** Colegas do mesmo departamento, só os dias aprovados (rz_team_absences). */
+  team?: { employee_id: string; name: string; start_date: string; end_date: string }[];
   holidays: Holiday[];
   tasks: Task[];
-  nameOfEmployee: (employeeId: string) => string | null;
-  myEmployeeId: string;
 }
 
 export const buildItems = (input: BuildInput): CalendarItem[] => {
@@ -77,27 +76,38 @@ export const buildItems = (input: BuildInput): CalendarItem[] => {
   }
   for (const absence of input.absences) {
     if (absence.status === 'rejected') continue;
-    items.push({
-      key: `abs-${absence.id}`,
-      layer: 'absences',
-      title: `${absenceTypeLabels[absence.absence_type] ?? 'Ausência'}${absence.status === 'pending' ? ' (pendente)' : ''}`,
-      start: dateOnly(absence.start_date),
-      end: dateOnly(absence.end_date, true),
-      allDay: true,
-      tone:
-        absence.status === 'pending'
+    // Um pedido pode ter vários períodos (ex.: abril, setembro e dezembro): desenha-se cada
+    // período, e não o intervalo do primeiro ao último dia.
+    const periods = absence.absence_periods?.length
+      ? absence.absence_periods.filter(p => p.status !== 'rejected')
+      : [
+          {
+            id: 'all',
+            start_date: absence.start_date,
+            end_date: absence.end_date,
+            status: absence.status,
+          },
+        ];
+    for (const period of periods) {
+      const pending = absence.status === 'pending' || period.status === 'pending';
+      items.push({
+        key: `abs-${absence.id}-${period.id}`,
+        layer: 'absences',
+        title: `${absenceTypeLabels[absence.absence_type] ?? 'Ausência'}${pending ? ' (pendente)' : ''}`,
+        start: dateOnly(period.start_date),
+        end: dateOnly(period.end_date, true),
+        allDay: true,
+        tone: pending
           ? 'bg-amber-50 text-amber-800 ring-1 ring-dashed ring-amber-300'
           : 'bg-emerald-100 text-emerald-800',
-    });
+      });
+    }
   }
-  for (const absence of input.teamAbsences) {
-    if (absence.employee_id === input.myEmployeeId) continue;
-    const name = input.nameOfEmployee(absence.employee_id);
-    if (!name) continue;
+  for (const absence of input.team ?? []) {
     items.push({
-      key: `team-${absence.id}`,
+      key: `team-${absence.employee_id}-${absence.start_date}`,
       layer: 'team',
-      title: `${name.split(' ')[0]} · ausente`,
+      title: `${absence.name.split(' ')[0]} · ausente`,
       start: dateOnly(absence.start_date),
       end: dateOnly(absence.end_date, true),
       allDay: true,

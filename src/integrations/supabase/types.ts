@@ -2921,6 +2921,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      user_profiles: {
+        Row: {
+          avatar_path: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          avatar_path?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          avatar_path?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       user_roles: {
         Row: {
           created_at: string;
@@ -2956,6 +2974,7 @@ export type Database = {
       chat_directory: {
         Args: never;
         Returns: {
+          avatar_path: string;
           company_id: string;
           company_name: string;
           department: string;
@@ -3099,6 +3118,16 @@ export type Database = {
         Returns: string;
       };
       rz_my_company: { Args: never; Returns: string };
+      rz_team_absences: {
+        Args: { p_from: string; p_to: string };
+        Returns: {
+          employee_id: string;
+          end_date: string;
+          name: string;
+          start_date: string;
+          user_id: string;
+        }[];
+      };
       task_can_see: { Args: { _task_id: string }; Returns: boolean };
       task_is_participant: { Args: { _task_id: string }; Returns: boolean };
       task_valid_assignee: { Args: { _user_id: string }; Returns: boolean };

@@ -1,4 +1,4 @@
-// Calendário no Supabase: eventos, convidados e ausências aprovadas da equipa.
+// Calendário no Supabase: eventos e convidados.
 import { format } from 'date-fns';
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
@@ -110,25 +110,20 @@ export const calendarService = {
     return { error };
   },
 
+  /** Ausências de colegas do mesmo departamento (só "ausente", dias aprovados). */
+  listTeamAbsences: async (from: Date, to: Date) => {
+    const { data, error } = await supabase.rpc('rz_team_absences', {
+      p_from: format(from, 'yyyy-MM-dd'),
+      p_to: format(to, 'yyyy-MM-dd'),
+    });
+    return { data: data ?? [], error };
+  },
+
   respond: async (eventId: string, userId: string, response: AttendeeResponse) => {
     const { error } = await supabase
       .from('calendar_event_attendees')
       .update({ response })
       .match({ event_id: eventId, user_id: userId });
     return { error };
-  },
-
-  /**
-   * Ausências aprovadas da empresa no intervalo (sem o tipo: só "ausente", para não expor
-   * baixas ou consultas dos colegas).
-   */
-  listTeamAbsences: async (from: Date, to: Date) => {
-    const { data, error } = await supabase
-      .from('absences')
-      .select('id, employee_id, start_date, end_date, status')
-      .in('status', ['approved', 'partially_approved'])
-      .lte('start_date', format(to, 'yyyy-MM-dd'))
-      .gte('end_date', format(from, 'yyyy-MM-dd'));
-    return { data: data ?? [], error };
   },
 };

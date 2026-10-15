@@ -5,7 +5,6 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMyAbsences } from '@/modules/absences/hooks/useMyAbsences';
-import { useDirectory } from '@/modules/social/hooks/useDirectory';
 import { useTasks } from '@/modules/tasks/hooks/useTasks';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { DEMO_EVENTS } from '../lib/demoData';
@@ -67,7 +66,6 @@ export const useCalendar = (from: Date, to: Date) => {
   const demo = useSyncExternalStore(subscribe, () => demoEvents);
   const absences = useMyAbsences();
   const { tasks } = useTasks();
-  const { colleagues } = useDirectory();
   const range = [from.toISOString(), to.toISOString()] as const;
 
   const events = useQuery({
@@ -102,10 +100,6 @@ export const useCalendar = (from: Date, to: Date) => {
     };
   }, [isPreview, user.userId, qc]);
 
-  const employeeNames = useMemo(
-    () => new Map(colleagues.map(p => [p.employeeId, p.name])),
-    [colleagues]
-  );
   const eventList = isPreview ? demo : (events.data ?? []);
   const items = useMemo(
     () =>
@@ -113,16 +107,14 @@ export const useCalendar = (from: Date, to: Date) => {
         from,
         to,
         myUserId: user.userId,
-        myEmployeeId: user.employeeId,
         events: eventList,
         absences: absences.data?.absences ?? [],
-        teamAbsences: isPreview ? [] : (team.data ?? []),
+        team: team.data ?? [],
         holidays: absences.data?.holidays ?? [],
         tasks,
-        nameOfEmployee: id => employeeNames.get(id) ?? null,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- from/to entram pela chave range
-    [range[0], range[1], eventList, absences.data, team.data, tasks, employeeNames, user, isPreview]
+    [range[0], range[1], eventList, absences.data, team.data, tasks, user]
   );
   const refresh = () => qc.invalidateQueries({ queryKey: ['calendar'] });
 

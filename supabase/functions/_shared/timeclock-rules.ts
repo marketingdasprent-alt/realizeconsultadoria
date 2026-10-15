@@ -446,6 +446,17 @@ export const applyManualTime = (decision: PunchDecision): PunchDecision => ({
     : [...decision.flags, 'manual_time'],
 });
 
+/**
+ * Email aos RH: só com sinais suspeitos (VPN, telemóvel partilhado, GPS suspeito…) ou
+ * numa correção de hora (✎). Fora do local, sem GPS ou com GPS fraco — sem mais nada —
+ * fica só em Ponto → Revisão, sem email (pedido dos RH: eram emails a mais).
+ */
+export const shouldNotifyApprovers = (status: string, flags: string[]): boolean => {
+  if (status === 'flagged') return true;
+  if (status !== 'pending') return false;
+  return flags.includes('manual_time') || hasWarnings(flags, NO_GPS_FLAGS);
+};
+
 /** Campos da morada devolvidos pelo Nominatim (OpenStreetMap) que interessam aqui. */
 export interface OsmAddress {
   road?: string;

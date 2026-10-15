@@ -30,6 +30,7 @@ import {
   isValidPosition,
   parseManualTime,
   sha256Hex,
+  shouldNotifyApprovers,
   type IpInfo,
   type LocationRules,
   type PositionReading,
@@ -529,8 +530,9 @@ serve(async (req: Request) => {
     return json({ ok: true, code: 'duplicate', state: result.state, entry: toResponse(entry) });
   }
 
-  // 6. Avisar os admins quando o registo precisa de decisão (sem atrasar a resposta).
-  if (entry.status === 'pending' || entry.status === 'flagged') {
+  // 6. Email aos admins só com sinais suspeitos ou correção de hora; fora do local fica
+  //    só na Revisão (sem atrasar a resposta).
+  if (shouldNotifyApprovers(entry.status, entry.flags)) {
     const company = employee.companies as unknown as { name: string } | null;
     const task = notifyApprovers(db, {
       employeeName: employee.name,

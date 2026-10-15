@@ -1,24 +1,42 @@
-// Registo de ponto do colaborador.
+// Registo de ponto do colaborador — jornada como no Bitrix24.
 //
-// POST { method: 'nfc' | 'gps', tag?: { t } | { e, c }, position, device_id, entry_type? }
+// POST { method: 'nfc' | 'gps', action: 'start' | 'pause' | 'resume' | 'stop',
+//        tag?: { t } | { e, c }, position?: { lat, lng, accuracy, age_ms } | null,
+//        device_id, note?: string, at?: ISO }
+// (versões antigas da app enviam entry_type: 'in' | 'out' em vez de action.)
 //
-// Toda a validação é feita aqui (service role): identidade, tag NFC,
-// distância ao local, precisão GPS, IP/VPN, dispositivo e anti-replay.
+// Toda a validação é feita aqui (service role): identidade, tag NFC, distância
+// ao local, precisão GPS, IP/VPN, dispositivo e anti-replay. O ponto regista-se
+// sempre (decidePunch): fora dos locais ou sem GPS fica 'pending' até um admin
+// aprovar, com email para a lista de aprovações. Só se recusa tag inválida ou
+// repetida, tag de outra empresa e VPN/Tor quando o local o bloqueia.
+// `at` é a hora indicada pelo colaborador para um registo esquecido (✎): exige
+// motivo e fica sempre a aguardar aprovação. Fora dos locais guarda-se a morada
+// aproximada (OpenStreetMap) para mostrar onde a pessoa estava.
+// A sequência (dia por iniciar → a trabalhar ⇄ em pausa → terminado, "Retomar
+// dia"), os duplicados e o lock são decididos em time_clock_register_punch.
 // Respostas de negócio vêm sempre com HTTP 200 e { ok: boolean, code }.
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { hexToBytes, verifySunMessage } from '../_shared/ntag424.ts';
 import {
-  DUPLICATE_WINDOW_MS,
-  evaluatePunch,
+  WORKDAY_ACTIONS,
+  applyManualTime,
+  decidePunch,
+  formatOsmAddress,
   haversineMeters,
+  ipMatchesAny,
   isValidPosition,
-  nextEntryType,
+  parseManualTime,
   sha256Hex,
   type IpInfo,
+  type LocationRules,
   type PositionReading,
 } from '../_shared/timeclock-rules.ts';
+import { notifyApprovers } from './notify.ts';
+
+declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,10 +46,15 @@ const corsHeaders = {
 
 interface PunchRequest {
   method?: 'nfc' | 'gps';
+  action?: string;
   tag?: { t?: string; e?: string; c?: string };
-  position?: { lat?: number; lng?: number; accuracy?: number; age_ms?: number };
+  position?: { lat?: number; lng?: number; accuracy?: number; age_ms?: number } | null;
   device_id?: string;
+  /** Versões antigas da app: Entrada/Saída em vez de action. */
   entry_type?: 'in' | 'out';
+  note?: string;
+  /** Hora indicada pelo colaborador (registo esquecido); exige motivo em `note`. */
+  at?: string;
 }
 
 interface LocationRow {
@@ -54,6 +77,27 @@ interface ResolvedTag {
   location: LocationRow;
 }
 
+interface EntryRow {
+  id: string;
+  entry_type: 'in' | 'out';
+  kind: 'work' | 'break';
+  punched_at: string;
+  status: string;
+  flags: string[];
+  distance_m: number | null;
+  address: string | null;
+  source: string;
+  work_mode: string;
+  created_at: string;
+}
+
+interface RegisterResult {
+  duplicate?: boolean;
+  error?: 'invalid_state' | 'invalid_time';
+  state?: 'closed' | 'working' | 'paused';
+  entry?: EntryRow | null;
+}
+
 const json = (body: unknown, status = 200) =>
   new Response(JSON.stringify(body), {
     status,
@@ -62,6 +106,18 @@ const json = (body: unknown, status = 200) =>
 
 const LOCATION_COLUMNS =
   'id, company_id, name, latitude, longitude, radius_m, max_accuracy_m, allow_manual, block_vpn, trusted_ips, is_active';
+
+const toRules = (l: LocationRow): LocationRules => ({
+  lat: l.latitude,
+  lng: l.longitude,
+  radiusM: l.radius_m,
+  maxAccuracyM: l.max_accuracy_m,
+  blockVpn: l.block_vpn,
+  trustedIps: l.trusted_ips ?? [],
+});
+
+const finiteOrNull = (value: number | undefined): number | null =>
+  typeof value === 'number' && Number.isFinite(value) ? value : null;
 
 const getClientIp = (req: Request): string | null => {
   const forwarded = req.headers.get('x-forwarded-for');
@@ -80,7 +136,10 @@ const lookupIp = async (ip: string | null): Promise<IpInfo> => {
     const res = await fetch(url, { signal: controller.signal });
     const data = await res.json();
     const info = data?.[ip];
-    if (data?.status === 'error' || !info) return { checked: false };
+    if (data?.status === 'error' || data?.status === 'denied' || !info) {
+      console.warn('clock-punch: proxycheck sem resposta útil', data?.status, data?.message);
+      return { checked: false };
+    }
     return {
       checked: true,
       country: info.isocode ?? null,
@@ -88,9 +147,36 @@ const lookupIp = async (ip: string | null): Promise<IpInfo> => {
       lat: typeof info.latitude === 'number' ? info.latitude : null,
       lng: typeof info.longitude === 'number' ? info.longitude : null,
       isProxy: info.proxy === 'yes' || info.type === 'VPN' || info.type === 'Hosting',
+      proxyType: typeof info.type === 'string' ? info.type : null,
     };
   } catch {
     return { checked: false };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
+/**
+ * Morada aproximada (rua, localidade) via Nominatim do OpenStreetMap, para mostrar
+ * onde estava quem registou fora dos locais. Timeout curto; nunca bloqueia o registo.
+ * Política do Nominatim: identificar a aplicação e não passar de 1 pedido/s.
+ */
+const reverseGeocode = async (lat: number, lng: number): Promise<string | null> => {
+  const url =
+    'https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1' +
+    `&accept-language=pt-PT&lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}`;
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), 2000);
+  try {
+    const res = await fetch(url, {
+      signal: controller.signal,
+      headers: { 'User-Agent': 'RealizeConsultadoria-Ponto/1.0 (+https://realize.dasprent.pt)' },
+    });
+    if (!res.ok) return null;
+    const data = await res.json();
+    return formatOsmAddress(data?.address);
+  } catch {
+    return null;
   } finally {
     clearTimeout(timer);
   }
@@ -161,10 +247,21 @@ serve(async (req: Request) => {
   }
   const method = body.method === 'nfc' ? 'nfc' : body.method === 'gps' ? 'gps' : null;
   if (!method) return json({ ok: false, code: 'bad_request' }, 400);
+  const action = WORKDAY_ACTIONS.find(a => a === body.action) ?? null;
+  if (body.action !== undefined && !action) return json({ ok: false, code: 'bad_request' }, 400);
+  const entryType = body.entry_type === 'in' || body.entry_type === 'out' ? body.entry_type : null;
+  const note = typeof body.note === 'string' ? body.note.trim().slice(0, 300) : null;
+  // Registo esquecido: hora indicada (até 12 h para trás), só com ação e com motivo.
+  const manualAt = parseManualTime(body.at, Date.now());
+  if (manualAt === 'invalid') return json({ ok: false, code: 'invalid_time' });
+  if (manualAt !== null && !action) return json({ ok: false, code: 'bad_request' }, 400);
+  if (manualAt !== null && (note?.length ?? 0) < 3) {
+    return json({ ok: false, code: 'note_required' });
+  }
 
   const { data: employee } = await db
     .from('employees')
-    .select('id, company_id, is_active')
+    .select('id, name, company_id, is_active, companies(name)')
     .eq('user_id', userId)
     .maybeSingle();
   if (!employee) return json({ ok: false, code: 'not_employee' }, 403);
@@ -179,6 +276,10 @@ serve(async (req: Request) => {
     accuracy: body.position?.accuracy,
     ageMs: body.position?.age_ms,
   };
+  const hasPosition = isValidPosition(position);
+  const latitude = hasPosition ? finiteOrNull(position.lat) : null;
+  const longitude = hasPosition ? finiteOrNull(position.lng) : null;
+  const accuracyM = hasPosition ? finiteOrNull(position.accuracy) : null;
 
   const logAttempt = async (
     reason: string,
@@ -198,9 +299,9 @@ serve(async (req: Request) => {
       flags: extra.flags ?? [],
       location_id: extra.location_id ?? null,
       tag_id: extra.tag_id ?? null,
-      latitude: Number.isFinite(position.lat) ? position.lat : null,
-      longitude: Number.isFinite(position.lng) ? position.lng : null,
-      accuracy_m: Number.isFinite(position.accuracy) ? position.accuracy : null,
+      latitude,
+      longitude,
+      accuracy_m: accuracyM,
       distance_m: Number.isFinite(extra.distance_m) ? extra.distance_m : null,
       ip_address: ip,
       ip_country: extra.ip_country ?? null,
@@ -210,11 +311,17 @@ serve(async (req: Request) => {
     return json({ ok: false, code: reason });
   };
 
-  if (!isValidPosition(position)) return logAttempt('missing_position');
+  // 1. Locais da empresa (Wi-Fi do escritório, local mais próximo) e tag.
+  const { data: locationRows } = await db
+    .from('time_clock_locations')
+    .select(LOCATION_COLUMNS)
+    .eq('company_id', employee.company_id)
+    .eq('is_active', true);
+  const locations = (locationRows as LocationRow[] | null) ?? [];
+  const networkLocation = locations.find(l => ipMatchesAny(ip, l.trusted_ips ?? [])) ?? null;
 
-  // 1. Descobrir o local: pela tag (NFC) ou o mais próximo que aceite registo só com GPS.
   let tag: ResolvedTag | null = null;
-  let location: LocationRow;
+  let location: LocationRow | null = null;
   if (method === 'nfc') {
     const resolved = await resolveTag(db, body.tag);
     if ('error' in resolved) return logAttempt(resolved.error);
@@ -224,79 +331,88 @@ serve(async (req: Request) => {
     if (location.company_id !== employee.company_id) {
       return logAttempt('tag_other_company', { tag_id: tag.id, location_id: location.id });
     }
-  } else {
-    const { data: locations } = await db
-      .from('time_clock_locations')
-      .select(LOCATION_COLUMNS)
-      .eq('company_id', employee.company_id)
-      .eq('is_active', true);
-    if (!locations?.length) return logAttempt('no_location');
-    const manual = (locations as LocationRow[]).filter(l => l.allow_manual);
-    if (!manual.length) return logAttempt('manual_not_allowed');
+  } else if (hasPosition) {
     const here = { lat: position.lat, lng: position.lng };
-    location = manual.reduce((best, l) =>
-      haversineMeters(here, { lat: l.latitude, lng: l.longitude }) <
-      haversineMeters(here, { lat: best.latitude, lng: best.longitude })
-        ? l
-        : best
+    location = locations.reduce<LocationRow | null>(
+      (best, l) =>
+        !best ||
+        haversineMeters(here, { lat: l.latitude, lng: l.longitude }) <
+          haversineMeters(here, { lat: best.latitude, lng: best.longitude })
+          ? l
+          : best,
+      null
     );
+  } else {
+    // Sem GPS não há "mais próximo": o local da rede do escritório ou um com
+    // bloqueio de VPN (para a regra da VPN continuar a valer).
+    location = networkLocation ?? locations.find(l => l.block_vpn) ?? null;
   }
 
-  // 2. Contexto: IP, último registo, dispositivo, coordenadas repetidas.
-  const since60d = new Date(Date.now() - 60 * 86_400_000).toISOString();
-  const [ipInfo, lastRes, deviceSeenRes, deviceOthersRes, repeatedRes] = await Promise.all([
-    lookupIp(ip),
-    db
-      .from('time_clock_entries')
-      .select('id, entry_type, punched_at, status, flags, source, distance_m, latitude, longitude')
-      .eq('employee_id', employee.id)
-      .neq('status', 'voided')
-      .order('punched_at', { ascending: false })
-      .limit(1)
-      .maybeSingle(),
-    deviceId
-      ? db
-          .from('time_clock_entries')
-          .select('id', { count: 'exact', head: true })
-          .eq('employee_id', employee.id)
-          .eq('device_id', deviceId)
-      : Promise.resolve({ count: 0 }),
-    deviceId
-      ? db
-          .from('time_clock_entries')
-          .select('id', { count: 'exact', head: true })
-          .eq('device_id', deviceId)
-          .neq('employee_id', employee.id)
-          .gte('punched_at', since60d)
-      : Promise.resolve({ count: 0 }),
-    db
-      .from('time_clock_entries')
-      .select('id', { count: 'exact', head: true })
-      .eq('employee_id', employee.id)
-      .eq('latitude', position.lat)
-      .eq('longitude', position.lng),
-  ]);
+  // Morada só quando não está claramente dentro do local mais próximo (poupa o Nominatim).
+  const insideNearest =
+    !!location &&
+    latitude !== null &&
+    longitude !== null &&
+    haversineMeters(
+      { lat: latitude, lng: longitude },
+      { lat: location.latitude, lng: location.longitude }
+    ) <= location.radius_m &&
+    (accuracyM ?? Infinity) <= location.max_accuracy_m;
 
+  // 2. Contexto: IP, último registo, dispositivo, coordenadas repetidas, morada.
+  const since60d = new Date(Date.now() - 60 * 86_400_000).toISOString();
+  const [ipInfo, lastRes, deviceSeenRes, deviceOthersRes, repeatedRes, address] = await Promise.all(
+    [
+      lookupIp(ip),
+      db
+        .from('time_clock_entries')
+        .select('punched_at, latitude, longitude')
+        .eq('employee_id', employee.id)
+        .neq('status', 'voided')
+        .order('punched_at', { ascending: false })
+        .limit(1)
+        .maybeSingle(),
+      deviceId
+        ? db
+            .from('time_clock_entries')
+            .select('id', { count: 'exact', head: true })
+            .eq('employee_id', employee.id)
+            .eq('device_id', deviceId)
+        : Promise.resolve({ count: 0 }),
+      deviceId
+        ? db
+            .from('time_clock_entries')
+            .select('id', { count: 'exact', head: true })
+            .eq('device_id', deviceId)
+            .neq('employee_id', employee.id)
+            .gte('punched_at', since60d)
+        : Promise.resolve({ count: 0 }),
+      latitude !== null && longitude !== null
+        ? db
+            .from('time_clock_entries')
+            .select('id', { count: 'exact', head: true })
+            .eq('employee_id', employee.id)
+            .eq('latitude', latitude)
+            .eq('longitude', longitude)
+        : Promise.resolve({ count: 0 }),
+      method === 'gps' && latitude !== null && longitude !== null && !insideNearest
+        ? reverseGeocode(latitude, longitude)
+        : Promise.resolve(null),
+    ]
+  );
+
+  // 3. Regras: regista sempre; fora dos locais ou sem GPS fica a aguardar aprovação.
   const now = Date.now();
   const last = lastRes.data;
-  if (last && now - new Date(last.punched_at).getTime() < DUPLICATE_WINDOW_MS) {
-    return json({ ok: true, code: 'duplicate', entry: { ...last, location_name: location.name } });
-  }
-
-  // 3. Regras.
-  const evaluation = evaluatePunch({
+  const decision = decidePunch({
     method,
+    action,
     position,
-    location: {
-      lat: location.latitude,
-      lng: location.longitude,
-      radiusM: location.radius_m,
-      maxAccuracyM: location.max_accuracy_m,
-      blockVpn: location.block_vpn,
-      trustedIps: location.trusted_ips ?? [],
-    },
+    location: location ? toRules(location) : null,
     ip,
     ipInfo,
+    trustedNetwork: !!networkLocation,
+    manualNotAllowed: method === 'gps' && !!location && !location.allow_manual,
     previous: last
       ? {
           lat: last.latitude,
@@ -309,16 +425,19 @@ serve(async (req: Request) => {
     deviceSeenBefore: !deviceId || (deviceSeenRes.count ?? 0) > 0,
     deviceUsedByOthers: (deviceOthersRes.count ?? 0) > 0,
   });
-
-  if (evaluation.rejected) {
-    return logAttempt(evaluation.rejected, {
-      location_id: location.id,
+  if (decision.rejected) {
+    return logAttempt(decision.rejected, {
+      location_id: location?.id,
       tag_id: tag?.id,
-      distance_m: evaluation.distanceM,
-      flags: evaluation.flags,
+      distance_m: decision.distanceM,
+      flags: decision.flags,
       ip_country: ipInfo.country,
     });
   }
+  const officeLocation =
+    decision.presence === 'network' ? networkLocation : decision.presence ? location : null;
+  // Registo esquecido com hora indicada: os RH confirmam sempre.
+  const { status, flags } = manualAt !== null ? applyManualTime(decision) : decision;
 
   // 4. Anti-replay NTAG 424: só avança se o contador ainda for maior (evita corridas).
   if (tag) {
@@ -331,53 +450,117 @@ serve(async (req: Request) => {
       .eq('id', tag.id);
     if (tag.counter !== null) update = update.lt('last_counter', tag.counter);
     const { data: updated } = await update.select('id');
-    if (tag.counter !== null && !updated?.length)
+    if (tag.counter !== null && !updated?.length) {
       return logAttempt('replayed_tag', { tag_id: tag.id });
+    }
   }
 
-  // 5. Gravar.
-  const entryType =
-    body.entry_type === 'in' || body.entry_type === 'out'
-      ? body.entry_type
-      : nextEntryType(
-          last
-            ? { entry_type: last.entry_type, punchedAtMs: new Date(last.punched_at).getTime() }
-            : null,
-          now
-        );
-
-  const { data: entry, error: insertError } = await db
-    .from('time_clock_entries')
-    .insert({
+  // 5. Gravar (sequência, duplicados e lock decididos na BD).
+  const distanceM = Number.isFinite(decision.distanceM)
+    ? Math.round(decision.distanceM * 10) / 10
+    : null;
+  const { data, error: rpcError } = await db.rpc('time_clock_register_punch', {
+    _payload: {
       employee_id: employee.id,
       company_id: employee.company_id,
-      location_id: location.id,
+      ...(action ? { action } : { entry_type: entryType }),
+      ...(manualAt !== null ? { punched_at: new Date(manualAt).toISOString() } : {}),
+      location_id: officeLocation?.id ?? null,
       tag_id: tag?.id ?? null,
-      entry_type: entryType,
-      punched_at: new Date(now).toISOString(),
       source: method,
-      status: evaluation.status,
-      flags: evaluation.flags,
-      latitude: position.lat,
-      longitude: position.lng,
-      accuracy_m: position.accuracy,
-      distance_m: Math.round(evaluation.distanceM * 10) / 10,
+      status,
+      flags,
+      latitude,
+      longitude,
+      accuracy_m: accuracyM,
+      distance_m: distanceM,
+      address,
       ip_address: ip,
       ip_country: ipInfo.country ?? null,
       ip_city: ipInfo.city ?? null,
       ip_is_proxy: ipInfo.checked ? !!ipInfo.isProxy : null,
       device_id: deviceId,
       user_agent: userAgent,
-      created_by: userId,
-      updated_by: userId,
-    })
-    .select('id, entry_type, punched_at, status, flags, distance_m, source')
-    .single();
+      work_mode: officeLocation ? 'office' : 'remote',
+      employee_note: note || null,
+      user_id: userId,
+    },
+  });
+  const result = data as RegisterResult | null;
 
-  if (insertError) {
-    console.error('clock-punch insert error:', insertError);
+  if (rpcError || !result) {
+    console.error('clock-punch register error:', rpcError);
     return json({ ok: false, code: 'server_error' }, 500);
   }
 
-  return json({ ok: true, code: 'registered', entry: { ...entry, location_name: location.name } });
+  const locationName = officeLocation?.name ?? 'Fora do local de trabalho';
+  const toResponse = (entry: EntryRow) => ({
+    id: entry.id,
+    entry_type: entry.entry_type,
+    kind: entry.kind ?? 'work',
+    punched_at: entry.punched_at,
+    status: entry.status,
+    flags: entry.flags,
+    distance_m: entry.distance_m,
+    address: entry.address ?? null,
+    source: entry.source,
+    work_mode: entry.work_mode,
+    created_at: entry.created_at,
+    location_name: locationName,
+  });
+
+  // O ecrã estava desatualizado (ex.: dia terminado noutro telemóvel) ou a hora
+  // indicada não é depois do último registo.
+  if (result.error) {
+    return json({
+      ok: false,
+      code: result.error,
+      state: result.state,
+      entry: result.entry ? toResponse(result.entry) : null,
+    });
+  }
+  if (!result.entry) {
+    console.error('clock-punch register: resposta sem registo', result);
+    return json({ ok: false, code: 'server_error' }, 500);
+  }
+
+  const entry = result.entry;
+  if (result.duplicate) {
+    return json({ ok: true, code: 'duplicate', state: result.state, entry: toResponse(entry) });
+  }
+
+  // 6. Avisar os admins quando o registo precisa de decisão (sem atrasar a resposta).
+  if (entry.status === 'pending' || entry.status === 'flagged') {
+    const company = employee.companies as unknown as { name: string } | null;
+    const task = notifyApprovers(db, {
+      employeeName: employee.name,
+      companyName: company?.name ?? null,
+      entryType: entry.entry_type,
+      kind: entry.kind ?? 'work',
+      punchedAt: entry.punched_at,
+      status: entry.status,
+      workMode: entry.work_mode,
+      latitude,
+      longitude,
+      accuracyM,
+      distanceM,
+      locationName: location?.name ?? null,
+      address: entry.address ?? null,
+      recordedAt: entry.created_at,
+      flags: entry.flags,
+      note: note || null,
+    });
+    if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(task);
+    else await task;
+  }
+
+  return json({
+    ok: true,
+    code: entry.status === 'pending' ? 'pending_approval' : 'registered',
+    state: result.state,
+    entry: toResponse(entry),
+    // Para explicar porque ficou a aguardar aprovação ("a 10,3 km de Premium Ride").
+    distance_m: distanceM,
+    location_name: location?.name ?? null,
+  });
 });

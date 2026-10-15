@@ -11,6 +11,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import logo from '@/assets/logo-realize.png';
+import { WorkdayClockButton } from '@/modules/timeclock/components/employee/WorkdayClockButton';
 
 interface EmployeeHeaderProps {
   name: string;
@@ -39,28 +40,32 @@ export const EmployeeHeader: React.FC<EmployeeHeaderProps> = ({
             </p>
           </div>
         </div>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button variant="ghost" className="h-11 gap-1 px-2" aria-label="Conta">
-              <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gold/20 text-gold">
-                <User className="h-4 w-4" />
-              </span>
-              <ChevronDown className="h-3 w-3 text-muted-foreground" />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-52">
-            <DropdownMenuItem onClick={onChangePassword} className="cursor-pointer">
-              <Key className="mr-2 h-4 w-4" /> Alterar palavra-passe
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onClick={onLogout}
-              className="cursor-pointer text-destructive focus:text-destructive"
-            >
-              <LogOut className="mr-2 h-4 w-4" /> Terminar sessão
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
+        <div className="flex shrink-0 items-center gap-1">
+          {/* Relógio do ponto (como no Bitrix24): abre o painel da jornada */}
+          <WorkdayClockButton />
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" className="h-11 gap-1 px-2" aria-label="Conta">
+                <span className="flex h-8 w-8 items-center justify-center rounded-full bg-gold/20 text-gold">
+                  <User className="h-4 w-4" />
+                </span>
+                <ChevronDown className="h-3 w-3 text-muted-foreground" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-52">
+              <DropdownMenuItem onClick={onChangePassword} className="cursor-pointer">
+                <Key className="mr-2 h-4 w-4" /> Alterar palavra-passe
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onClick={onLogout}
+                className="cursor-pointer text-destructive focus:text-destructive"
+              >
+                <LogOut className="mr-2 h-4 w-4" /> Terminar sessão
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
     </header>
   );

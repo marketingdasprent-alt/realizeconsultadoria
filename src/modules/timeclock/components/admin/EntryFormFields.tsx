@@ -11,6 +11,14 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import type { TimeEntryInput } from '@/lib/schemas';
+import { WORKDAY_ACTIONS, type WorkdayAction } from '@/lib/workday';
+
+const ACTION_OPTIONS: Record<WorkdayAction, string> = {
+  start: 'Início do dia',
+  pause: 'Pausa',
+  resume: 'Retoma',
+  stop: 'Fim do dia',
+};
 
 interface EntryFormFieldsProps {
   register: UseFormRegister<TimeEntryInput>;
@@ -26,15 +34,18 @@ export const EntryFormFields: React.FC<EntryFormFieldsProps> = ({ register, cont
         <Label>Tipo</Label>
         <Controller
           control={control}
-          name="entry_type"
+          name="action"
           render={({ field }) => (
             <Select value={field.value} onValueChange={field.onChange}>
               <SelectTrigger>
                 <SelectValue />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="in">Entrada</SelectItem>
-                <SelectItem value="out">Saída</SelectItem>
+                {WORKDAY_ACTIONS.map(action => (
+                  <SelectItem key={action} value={action}>
+                    {ACTION_OPTIONS[action]}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           )}

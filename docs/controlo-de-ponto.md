@@ -1,28 +1,93 @@
-# Controlo de Ponto (NFC + GPS)
+# Controlo de Ponto (jornada como no Bitrix24)
 
 ## Como funciona
 
-| Forma de registo | Onde funciona | Prova de presença |
+O colaborador regista a **jornada** com quatro botões, como no Bitrix24:
+
+| Estado | Botões | Relógio |
 |---|---|---|
-| **Encostar o telemóvel à tag** (app fechada) | Android e iPhone (XS ou mais recente) | Tag + GPS no raio |
-| **"Registar manualmente"** dentro da app | Todos | Só GPS no raio (se o local permitir) |
+| Dia não iniciado | **Iniciar dia** | cinzento |
+| A trabalhar | **Pausa** · **Terminar dia** | verde, cronómetro do tempo trabalhado |
+| Em pausa | **Retomar** · **Terminar dia** | âmbar, cronómetro da pausa |
+| Dia terminado hoje | **Retomar dia** (o fim passa a pausa) | cinzento, total do dia |
+| Dia terminado ontem (ou há 12 h) | **Iniciar dia** | cinzento |
 
-A app não lê NFC por dentro: com tag, o colaborador encosta sempre o telemóvel com a app fechada.
+- O **relógio no canto superior** (Início, Tickets, Documentos) mostra a hora e o estado; ao
+  carregar abre o painel. A página **O Meu Ponto** tem o mesmo painel e o mês.
+- Encostar o telemóvel à **tag** abre a página da tag com o mesmo painel: o primeiro registo leva a
+  leitura da tag (prova de presença).
+- Só aparecem os botões que fazem sentido, e a base valida a sequência
+  (`time_clock_register_punch`): não se pausa um dia por iniciar nem se inicia dois. Um dia aberto ou
+  em pausa há mais de 12 h conta como terminado (esquecimento) e fica "incompleto" para os RH.
+- **Retomar dia** (como o "Continuar dia de trabalho" do Bitrix24): carregou em Terminar dia por
+  engano, ou a saída para o almoço ficou como fim do dia, e voltou no mesmo dia → o Fim passa a
+  Pausa (fica no histórico) e regista-se a Retoma. As horas não mudam.
+- **Lápis ✎ — registo esquecido**: ao lado do cronómetro. O colaborador indica a hora (hoje, depois
+  do último registo, nas últimas 12 h) e o motivo, e escolhe o botão (ex.: "Retomar dia" às 14:00).
+  O registo fica com a hora indicada, a aguardar aprovação (`manual_time`), e os RH veem a hora a
+  que foi gravado.
+- **Adicionar observação** (até 300 caracteres) é opcional e vai para o registo, o email e a folha.
+- O colaborador não vê mensagens de aprovação nem alertas: a lista do dia mostra cada registo com
+  o sítio — o local de trabalho, a morada aproximada (rua e localidade, do OpenStreetMap) ou "Sem
+  localização". Só aparecem erros quando o registo não foi feito (sem internet, tag inválida, VPN).
+- As horas contam de Início/Retoma até Pausa/Fim: as pausas ficam fora e aparecem à parte.
 
-A tag contém apenas um URL, por exemplo `https://realize.dasprent.pt/ponto/nfc?t=…`.
-Ao encostar, o sistema operativo abre esse URL (no Android abre diretamente a app, por causa do
-`assetlinks.json`). A página obtém o GPS e chama a edge function `clock-punch`, que decide **no
-servidor**:
+Cada ação é um registo em `time_clock_entries` com `entry_type` + `kind`:
+Início = in/work, Pausa = out/break, Retoma = in/break, Fim = out/work. Os registos antigos são
+todos `work` (Entrada = Início, Saída = Fim) e continuam a contar igual.
 
-1. Valida a tag (token estático ou mensagem cifrada NTAG 424).
-2. Confirma que o local é da empresa do colaborador.
-3. Calcula a distância ao local (Haversine) e exige precisão GPS mínima.
-4. Verifica o IP (VPN/proxy/datacenter, país/distância) via proxycheck.io.
-5. Verifica o dispositivo (novo / partilhado entre colegas), coordenadas repetidas e viagens impossíveis.
-6. Rejeita (fica em *Tentativas rejeitadas*) ou grava; sinais fracos → registo **em revisão**.
+### Regista sempre; revê-se depois
+
+Como no Bitrix24, o ponto **nunca falha por GPS ou distância**. A edge function `clock-punch`
+decide no servidor (`decidePunch`):
+
+| Situação | Resultado |
+|---|---|
+| GPS dentro do raio de um local | válido |
+| Tag NFC (com GPS a confirmar, ou GPS fraco) | válido / em revisão |
+| Tag sem GPS | em revisão (`no_gps`) |
+| IP na rede de confiança de um local (Wi-Fi do escritório) | válido, mesmo sem GPS |
+| Fora dos locais, sem GPS, GPS fraco ou localização aproximada | **registado, a aguardar aprovação**, com o motivo |
+| **Pausa** em qualquer sítio | válida (parar o relógio não acrescenta horas) |
+| Hora indicada no ✎ (registo esquecido) | **a aguardar aprovação** (`manual_time`) |
+| VPN/Tor num local com "Bloquear VPN" | recusado |
+| Tag inválida, repetida ou de outra empresa | recusado |
+
+O motivo fica nas flags (`outside_location`, `no_gps`, `stale_gps`, `weak_gps`,
+`approximate_location`, `no_location_configured`, `tag_required`) e o colaborador vê-o logo
+("Está a 10,3 km de Premium Ride…", "Não foi possível obter a sua localização…") com a dica para
+a próxima vez. Os pendentes vão para **Ponto → Revisão** e para a lista de *Emails de aprovação*.
+
+Verificações feitas em cada registo: tag (token estático ou NTAG 424), local da empresa, distância
+(Haversine) e precisão GPS, IP (VPN/Tor/país) via proxycheck.io, dispositivo novo/partilhado,
+coordenadas repetidas e viagens impossíveis. Sinais fracos → **em revisão**.
 
 A hora gravada é sempre a do servidor. O histórico (`time_clock_entry_history`) é preenchido por
-trigger e é imutável; os admins só alteram registos através de RPCs que exigem motivo.
+trigger e é imutável; os admins só alteram registos através de RPCs que exigem motivo (o formulário
+do admin tem os quatro tipos: Início do dia, Pausa, Retoma, Fim do dia).
+
+### Locais em falta e GPS
+
+- **Locais em falta** (Ponto → Locais & Tags): sítios com várias tentativas fora dos locais
+  (2+ a menos de 150 m, GPS ≤ 100 m, últimos 30 dias), com **Criar local aqui** ou **Aumentar raio**.
+  Enquanto um local de trabalho não existir, os registos lá feitos ficam a aguardar aprovação.
+- **Wi-Fi do escritório**: pôr o IP público do escritório em "IPs de confiança" do local valida os
+  registos feitos nessa rede mesmo sem GPS (exceto em locais que exigem a tag).
+
+### Onde abre a tag (browser ou app)
+
+O registo funciona igual no browser e na app instalada; só muda onde aparece.
+
+- **iPhone:** abre sempre no **Safari**. O iOS não deixa as tags abrirem apps adicionadas ao ecrã
+  principal. O Safari e a app não partilham a sessão: na primeira vez pede login no Safari.
+- **Android:** abre no **Chrome**, porque a app instalada pelo browser (PWA) não é reconhecida como
+  dona do domínio. Cada pessoa resolve uma vez: *Definições → Aplicações → Realize → Abrir por
+  predefinição → Abrir links suportados* (Samsung: *Definir como predefinição*). O Chrome e a app
+  partilham a sessão, por isso não pede login outra vez.
+- A página da tag mostra estas instruções quando o registo é feito no browser.
+- Para abrir **sempre** a app no Android é preciso publicar a app na Play Store (Trusted Web
+  Activity). O `assetlinks.json` já declara o pacote `com.realizeconsultadoria.myapp`, mas essa app
+  nunca foi publicada.
 
 ### Tipos de tag
 
@@ -42,8 +107,11 @@ trigger e é imutável; os admins só alteram registos através de RPCs que exig
 
 ## Ativação (uma vez)
 
-1. **Base de dados** — correr `supabase/migrations/20260923120000_create_time_clock.sql` no SQL
-   Editor do projeto `jvvnsoasylusbmxfotci`.
+1. **Base de dados** — correr no SQL Editor do projeto `jvvnsoasylusbmxfotci`, por ordem, as
+   migrações `supabase/migrations/2026*_time_clock*.sql` (a jornada com pausas é
+   `20261014120000_time_clock_workday.sql`; Retomar dia, ✎ e morada são
+   `20261014190000_time_clock_continue_and_correct.sql`). Cada uma tem de estar aplicada antes
+   de publicar a `clock-punch` que a usa, e a função antes do site.
 2. **Edge functions**
    ```bash
    supabase functions deploy clock-punch --project-ref jvvnsoasylusbmxfotci
@@ -81,5 +149,9 @@ trigger e é imutável; os admins só alteram registos através de RPCs que exig
 - A localização só é recolhida no momento do registo (sem rastreamento contínuo). Informar os
   colaboradores por escrito sobre os dados recolhidos (GPS, IP, identificador do dispositivo) e a
   finalidade.
+- Morada aproximada: nos registos fora dos locais de trabalho, as coordenadas (arredondadas a
+  ~1 m) são enviadas pelo servidor ao Nominatim do OpenStreetMap para obter a rua e a localidade.
+  Não vai nenhum dado do colaborador além das coordenadas. A atribuição "© OpenStreetMap" aparece
+  junto das moradas, como pede a política do Nominatim.
 - Código do Trabalho, art. 202.º: registo de tempos de trabalho conservado **5 anos** — não
   eliminar colaboradores com registos; desativá-los.

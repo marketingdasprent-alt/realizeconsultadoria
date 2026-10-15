@@ -1,17 +1,22 @@
-import React, { useMemo } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Clock, Loader2 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { formatMinutes } from '@/lib/timeclock';
 import { useEmployeeOutlet } from '@/modules/employee/hooks/useEmployeeOutlet';
+import { useWorkday } from '../context/useWorkday';
 import { useMyTimeClock } from '../hooks/useMyTimeClock';
-import { PunchPanel } from '../components/employee/PunchPanel';
 import { TimeClockDayList } from '../components/employee/TimeClockDayList';
+import { WorkdayPanel } from '../components/employee/WorkdayPanel';
 
 const EmployeeTimeClockPage: React.FC = () => {
   const { employee } = useEmployeeOutlet();
-  const { days, today, lastEntry, nextType, isLoading, error, refetch } = useMyTimeClock(
-    employee.id
-  );
+  const { version } = useWorkday();
+  const { days, isLoading, error, refetch } = useMyTimeClock(employee.id);
+
+  // Registo novo no painel (ou no relógio do cabeçalho): atualiza o mês.
+  useEffect(() => {
+    if (version > 0) refetch();
+  }, [version, refetch]);
 
   const currentMonthKey = new Date().toISOString().slice(0, 7);
   const monthDays = useMemo(
@@ -26,18 +31,13 @@ const EmployeeTimeClockPage: React.FC = () => {
         <Clock className="h-5 w-5 text-gold" /> O Meu Ponto
       </h1>
 
-      <PunchPanel lastEntry={lastEntry} nextType={nextType} onPunched={refetch} />
-
-      <Card className="shadow-card">
-        <CardHeader className="pb-3">
-          <CardTitle className="font-display text-lg">Hoje</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <TimeClockDayList days={today ? [today] : []} emptyMessage="Sem registos hoje." />
+      <Card className="rounded-3xl shadow-card">
+        <CardContent className="p-3 sm:p-4">
+          <WorkdayPanel />
         </CardContent>
       </Card>
 
-      <Card className="shadow-card">
+      <Card className="rounded-3xl shadow-card">
         <CardHeader className="pb-3 flex flex-row items-center justify-between space-y-0">
           <CardTitle className="font-display text-lg">Este mês</CardTitle>
           <span className="text-sm font-semibold text-gold">{formatMinutes(monthMinutes)}</span>
@@ -51,10 +51,6 @@ const EmployeeTimeClockPage: React.FC = () => {
           ) : (
             <TimeClockDayList days={monthDays} emptyMessage="Ainda sem registos este mês." />
           )}
-          <p className="mt-4 text-xs text-muted-foreground">
-            Esqueceu-se de registar uma entrada ou saída? Abra um pedido de ajuda aos RH em “Mais →
-            Suporte”; a correção fica registada no histórico.
-          </p>
         </CardContent>
       </Card>
     </div>

@@ -2,8 +2,11 @@ import React from 'react';
 import { format } from 'date-fns';
 import {
   AlertTriangle,
+  Check,
   History,
+  House,
   Info,
+  MessageSquare,
   MapPin,
   Nfc,
   Pencil,
@@ -19,7 +22,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { ENTRY_TYPE_LABELS, type TimeClockEntryWithRelations } from '@/lib/timeclock';
+import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
+import { getEntryLabel } from '@/lib/workday';
 
 export type EntryDialogMode =
   | 'details'
@@ -28,6 +32,8 @@ export type EntryDialogMode =
   | 'void'
   | 'restore'
   | 'review'
+  | 'approve'
+  | 'reject'
   | 'create';
 
 interface EntryChipProps {
@@ -47,25 +53,34 @@ export const EntryChip: React.FC<EntryChipProps> = ({
 }) => {
   const SourceIcon = SOURCE_ICONS[entry.source as keyof typeof SOURCE_ICONS] ?? MapPin;
   const isVoided = entry.status === 'voided';
+  const isPending = entry.status === 'pending';
   const tone = isVoided
     ? 'border-dashed text-muted-foreground line-through'
-    : entry.status === 'flagged'
-      ? 'border-amber-400 bg-amber-50 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200'
-      : entry.entry_type === 'in'
-        ? 'border-green-300 bg-green-50 text-green-900 dark:bg-green-900/30 dark:text-green-200'
-        : 'border-slate-300 bg-slate-50 text-slate-900 dark:bg-slate-800 dark:text-slate-200';
+    : isPending
+      ? 'border-dashed border-sky-500 bg-sky-50 text-sky-900 dark:bg-sky-900/30 dark:text-sky-200'
+      : entry.status === 'flagged'
+        ? 'border-amber-400 bg-amber-50 text-amber-900 dark:bg-amber-900/30 dark:text-amber-200'
+        : entry.entry_type === 'in'
+          ? 'border-green-300 bg-green-50 text-green-900 dark:bg-green-900/30 dark:text-green-200'
+          : 'border-slate-300 bg-slate-50 text-slate-900 dark:bg-slate-800 dark:text-slate-200';
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
+          title={entry.employee_note ? `Observação: ${entry.employee_note}` : undefined}
           className={`inline-flex items-center gap-1 rounded-md border px-2 py-1 text-xs font-medium ${tone}`}
         >
-          <SourceIcon className="h-3 w-3" />
-          {ENTRY_TYPE_LABELS[entry.entry_type]}{' '}
+          {entry.work_mode === 'remote' ? (
+            <House className="h-3 w-3" />
+          ) : (
+            <SourceIcon className="h-3 w-3" />
+          )}
+          {getEntryLabel(entry)}{' '}
           {format(new Date(entry.punched_at), showDate ? 'dd/MM HH:mm' : 'HH:mm')}
           {entry.status === 'flagged' && <AlertTriangle className="h-3 w-3" />}
+          {entry.employee_note && <MessageSquare className="h-3 w-3" aria-label="Tem observação" />}
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-52">
@@ -83,6 +98,11 @@ export const EntryChip: React.FC<EntryChipProps> = ({
                 <Pencil className="h-4 w-4 mr-2" /> Editar
               </DropdownMenuItem>
             )}
+            {isPending && (
+              <DropdownMenuItem onClick={() => onAction('approve', entry)}>
+                <Check className="h-4 w-4 mr-2" /> Aprovar
+              </DropdownMenuItem>
+            )}
             {entry.status === 'flagged' && (
               <DropdownMenuItem onClick={() => onAction('review', entry)}>
                 <ShieldCheck className="h-4 w-4 mr-2" /> Marcar como revisto
@@ -95,9 +115,9 @@ export const EntryChip: React.FC<EntryChipProps> = ({
             ) : (
               <DropdownMenuItem
                 className="text-destructive"
-                onClick={() => onAction('void', entry)}
+                onClick={() => onAction(isPending ? 'reject' : 'void', entry)}
               >
-                <Ban className="h-4 w-4 mr-2" /> Anular
+                <Ban className="h-4 w-4 mr-2" /> {isPending ? 'Rejeitar' : 'Anular'}
               </DropdownMenuItem>
             )}
           </>

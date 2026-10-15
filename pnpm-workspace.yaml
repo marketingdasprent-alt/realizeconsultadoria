@@ -1,3 +1,5 @@
 allowBuilds:
   '@swc/core': true
   esbuild: true
+  # Só mostra uma mensagem de donativos no postinstall (vem do jspdf).
+  core-js: false

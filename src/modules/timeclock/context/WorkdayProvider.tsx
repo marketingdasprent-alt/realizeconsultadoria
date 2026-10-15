@@ -1,0 +1,109 @@
+// Estado partilhado da jornada (relógio no cabeçalho, painel do ponto e página da
+// tag): registos recentes do colaborador e a ação em curso.
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { addDays, startOfDay } from 'date-fns';
+import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
+import { deriveWorkday, type WorkdayAction } from '@/lib/workday';
+import { useCurrentEmployee } from '../hooks/useCurrentEmployee';
+import { useNow } from '../hooks/useNow';
+import { usePunch } from '../hooks/usePunch';
+import { timeClockService } from '../services/timeClockService';
+import { WorkdayContext, type RunOptions, type WorkdayContextValue } from './workdayContext';
+
+/** Um erro de registo fica visível este tempo (ou até ao registo seguinte). */
+const OUTCOME_VISIBLE_MS = 60 * 1000;
+
+export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { employee, isLoading: employeeLoading } = useCurrentEmployee();
+  const [entries, setEntries] = useState<TimeClockEntryWithRelations[]>([]);
+  const [entriesLoaded, setEntriesLoaded] = useState(false);
+  const [version, setVersion] = useState(0);
+  const { phase, outcome, isBusy, punch, warmUp, clear } = usePunch();
+  const now = useNow(30_000);
+  const employeeId = employee?.id ?? null;
+
+  const refetch = useCallback(async () => {
+    if (!employeeId) return;
+    const today = startOfDay(new Date());
+    const { data, error } = await timeClockService.getMyEntries(
+      employeeId,
+      addDays(today, -1).toISOString(),
+      addDays(today, 2).toISOString()
+    );
+    if (!error) setEntries(data);
+    setEntriesLoaded(true);
+  }, [employeeId]);
+
+  useEffect(() => {
+    refetch();
+  }, [refetch]);
+
+  // Ao voltar à app (ex.: depois de registar na tag, que pode abrir no browser).
+  useEffect(() => {
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') refetch();
+    };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => document.removeEventListener('visibilitychange', onVisible);
+  }, [refetch]);
+
+  useEffect(() => {
+    if (!outcome) return;
+    const timer = setTimeout(clear, OUTCOME_VISIBLE_MS);
+    return () => clearTimeout(timer);
+  }, [outcome, clear]);
+
+  const run = useCallback(
+    async (action: WorkdayAction, options: RunOptions = {}) => {
+      const result = await punch({
+        action,
+        method: options.method ?? 'gps',
+        note: options.note,
+        tag: options.tag,
+        at: options.at,
+      });
+      // Registado, ou o ecrã estava desatualizado: recarrega para mostrar o estado real.
+      if (result && (result.entry || result.code === 'invalid_state')) {
+        await refetch();
+        setVersion(v => v + 1);
+      }
+      return result;
+    },
+    [punch, refetch]
+  );
+
+  const workday = useMemo(() => deriveWorkday(entries, now), [entries, now]);
+
+  const value = useMemo<WorkdayContextValue>(
+    () => ({
+      employee,
+      isLoading: employeeLoading || (!!employeeId && !entriesLoaded),
+      entries,
+      workday,
+      phase,
+      outcome,
+      isBusy,
+      run,
+      warmUp,
+      refetch,
+      version,
+    }),
+    [
+      employee,
+      employeeLoading,
+      employeeId,
+      entriesLoaded,
+      entries,
+      workday,
+      phase,
+      outcome,
+      isBusy,
+      run,
+      warmUp,
+      refetch,
+      version,
+    ]
+  );
+
+  return <WorkdayContext.Provider value={value}>{children}</WorkdayContext.Provider>;
+};

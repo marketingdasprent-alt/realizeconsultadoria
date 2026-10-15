@@ -23,6 +23,7 @@ import {
 import { useToast } from '@/hooks/use-toast';
 import { timeEntrySchema, type TimeEntryInput } from '@/lib/schemas';
 import { getErrorMessage, type TimeClockEntryWithRelations } from '@/lib/timeclock';
+import { ACTION_ENTRY, getEntryAction } from '@/lib/workday';
 import { timeClockService } from '../../services/timeClockService';
 import { EntryFormFields } from './EntryFormFields';
 
@@ -54,7 +55,7 @@ export const EntryFormDialog: React.FC<EntryFormDialogProps> = ({
     resolver: zodResolver(timeEntrySchema),
     defaultValues: {
       employee_id: entry?.employee_id ?? defaultEmployeeId ?? '',
-      entry_type: (entry?.entry_type as 'in' | 'out') ?? 'in',
+      action: entry ? getEntryAction(entry) : 'start',
       date: format(base, 'yyyy-MM-dd'),
       time: format(base, 'HH:mm'),
       notes: entry?.notes ?? '',
@@ -65,7 +66,7 @@ export const EntryFormDialog: React.FC<EntryFormDialogProps> = ({
   const onSubmit = async (values: TimeEntryInput) => {
     const punchedAtIso = new Date(`${values.date}T${values.time}:00`).toISOString();
     const common = {
-      entryType: values.entry_type,
+      ...ACTION_ENTRY[values.action],
       punchedAtIso,
       reason: values.reason,
       notes: values.notes || null,

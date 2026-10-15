@@ -30,6 +30,7 @@ import EmployeeDocumentsPage from './modules/employee/pages/EmployeeDocumentsPag
 import EmployeeTimeClockPage from './modules/timeclock/pages/EmployeeTimeClockPage';
 import TimeClockNfcPage from './modules/timeclock/pages/TimeClockNfcPage';
 import TimeClockAdminPage from './modules/timeclock/pages/TimeClockAdminPage';
+import { WorkdayProvider } from './modules/timeclock/context/WorkdayProvider';
 import DocumentsAdminPage from './modules/documents/pages/DocumentsAdminPage';
 import EmployeeLayout from './modules/employee/components/layout/EmployeeLayout';
 import EmployeeHomePage from './modules/employee/pages/EmployeeHomePage';
@@ -94,8 +95,11 @@ const App = () => (
               <Route
                 element={
                   <ProtectedRoute requiredRole="employee" fallbackPath="/colaborador/login">
-                    {/* Cabeçalho + navegação em tabs; as páginas renderizam no Outlet */}
-                    <EmployeeLayout />
+                    {/* Jornada (relógio do cabeçalho) partilhada pelas páginas do colaborador;
+                        cabeçalho + navegação em tabs, as páginas renderizam no Outlet */}
+                    <WorkdayProvider>
+                      <EmployeeLayout />
+                    </WorkdayProvider>
                   </ProtectedRoute>
                 }
               >
@@ -113,8 +117,10 @@ const App = () => (
               <Route
                 path="/ponto/nfc"
                 element={
-                  <ProtectedRoute requiredRole="employee" fallbackPath="/colaborador/login">
-                    <TimeClockNfcPage />
+                  <ProtectedRoute fallbackPath="/colaborador/login">
+                    <WorkdayProvider>
+                      <TimeClockNfcPage />
+                    </WorkdayProvider>
                   </ProtectedRoute>
                 }
               />

@@ -1,16 +1,13 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Headset, Loader2, Plus } from 'lucide-react';
-import NewTicketDialog from '@/components/employee/NewTicketDialog';
-import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ModuleIcon } from '@/modules/workspace/components/ModuleIcon';
-import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { getModule } from '@/modules/workspace/lib/navigation';
-import { useQueryClient } from '@tanstack/react-query';
 import { TicketListItem } from '../components/TicketListItem';
+import { NewTicketDialog } from '../components/NewTicketDialog';
 import { TicketThread } from '../components/TicketThread';
-import { TICKETS_KEY, useMyTickets } from '../hooks/useMyTickets';
+import { useMyTickets } from '../hooks/useMyTickets';
 import { countTickets, filterTickets, TICKET_FILTERS, type TicketFilter } from '../lib/ticketRules';
 
 /**
@@ -18,8 +15,6 @@ import { countTickets, filterTickets, TICKET_FILTERS, type TicketFilter } from '
  * vez). O ticket aberto fica no endereço (?t=id).
  */
 const SupportPage: React.FC = () => {
-  const { user, isPreview } = useWorkspace();
-  const qc = useQueryClient();
   const { tickets, attachments, isLoading } = useMyTickets();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<TicketFilter>('all');
@@ -37,10 +32,7 @@ const SupportPage: React.FC = () => {
     }
   }, [params, setParams]);
 
-  const newTicket = () =>
-    isPreview
-      ? toast({ title: 'Pré-visualização', description: 'Criar um ticket usa dados reais.' })
-      : setIsNewOpen(true);
+  const newTicket = () => setIsNewOpen(true);
 
   return (
     <div className="flex h-full">
@@ -123,18 +115,11 @@ const SupportPage: React.FC = () => {
         )}
       </div>
 
-      {!isPreview && (
-        <NewTicketDialog
-          open={isNewOpen}
-          onOpenChange={setIsNewOpen}
-          employeeId={user.employeeId}
-          companyId={user.companyId}
-          employeeName={user.name}
-          employeeEmail={user.email}
-          companyName={user.companyName ?? ''}
-          onSuccess={() => qc.invalidateQueries({ queryKey: TICKETS_KEY })}
-        />
-      )}
+      <NewTicketDialog
+        open={isNewOpen}
+        onOpenChange={setIsNewOpen}
+        onCreated={id => setParams({ t: id })}
+      />
     </div>
   );
 };

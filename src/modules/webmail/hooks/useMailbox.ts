@@ -166,3 +166,37 @@ export const useMailMessage = (summary: MailSummary | null) => {
     };
   return { message: query.data ?? null, isLoading: query.isLoading, isError: query.isError };
 };
+
+/**
+ * Pré-carrega, em segundo plano e um de cada vez, os primeiros emails da lista: são os que
+ * quase sempre se abrem, e assim abrem sem espera (também no telemóvel, onde não há rato).
+ */
+export const usePrefetchTop = (messages: MailSummary[], count = 4) => {
+  const { isPreview } = useWorkspace();
+  const qc = useQueryClient();
+  const top = messages.slice(0, count);
+  const signature = top.map(m => `${m.accountId}:${m.id}`).join('|');
+
+  useEffect(() => {
+    if (isPreview || !top.length) return;
+    let cancelled = false;
+    const timer = setTimeout(async () => {
+      for (const mail of top) {
+        if (cancelled) return;
+        if (qc.getQueryData(messageKey(mail))) continue;
+        await qc
+          .prefetchQuery({
+            queryKey: messageKey(mail),
+            queryFn: () => fetchMessage(mail),
+            staleTime: 5 * 60_000,
+          })
+          .catch(() => undefined);
+      }
+    }, 800);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura resume a lista
+  }, [signature, isPreview, qc]);
+};

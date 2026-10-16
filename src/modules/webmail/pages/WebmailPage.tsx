@@ -14,7 +14,12 @@ import { MailToTaskOrEvent, type MailConversion } from '../components/MailToTask
 import { ProviderGrid } from '../components/ProviderGrid';
 import { useMailAccounts } from '../hooks/useMailAccounts';
 import { useMailActions } from '../hooks/useMailActions';
-import { useMailbox, useMailMessage, usePrefetchMessage } from '../hooks/useMailbox';
+import {
+  useMailbox,
+  useMailMessage,
+  usePrefetchMessage,
+  usePrefetchTop,
+} from '../hooks/useMailbox';
 import { FOLDERS, draftFrom, mailKey } from '../lib/mailFormat';
 import { providerOf, type MailProvider } from '../lib/providers';
 import type { ComposeDraft, MailAccount, MailFolder, MailSummary } from '../types';
@@ -39,6 +44,7 @@ const WebmailPage: React.FC = () => {
   const accounts = mail.accounts;
   const current = scope ?? (accounts.length > 1 ? 'all' : (accounts[0]?.id ?? 'all'));
   const box = useMailbox(accounts, current, folder, query);
+  usePrefetchTop(box.messages);
   const selected = active
     ? (box.messages.find(m => mailKey(m) === mailKey(active)) ?? active)
     : null;

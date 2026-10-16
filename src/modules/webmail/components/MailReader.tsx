@@ -21,14 +21,7 @@ import { formatAddressList, nameOf, readerDocument } from '../lib/mailFormat';
 import type { MailMessage, MailSummary } from '../types';
 
 export type ReaderAction =
-  | 'reply'
-  | 'replyAll'
-  | 'forward'
-  | 'star'
-  | 'trash'
-  | 'unread'
-  | 'task'
-  | 'event';
+  'reply' | 'replyAll' | 'forward' | 'star' | 'trash' | 'unread' | 'task' | 'event';
 
 const TOOLBAR: { action: ReaderAction; label: string; icon: LucideIcon }[] = [
   { action: 'reply', label: 'Responder', icon: Reply },
@@ -131,7 +124,17 @@ export const MailReader: React.FC<MailReaderProps> = ({
         </div>
 
         {isLoading || !message ? (
-          <Loader2 className="mx-auto mt-12 h-6 w-6 animate-spin text-rz-primary" />
+          // Enquanto o corpo chega, o início do email (já conhecido da lista) e um indicador.
+          <div className="mt-5 space-y-3">
+            {summary.snippet && (
+              <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-rz-ink/80">
+                {summary.snippet}
+              </p>
+            )}
+            <p className="flex items-center gap-2 text-[12.5px] text-rz-muted">
+              <Loader2 className="h-4 w-4 animate-spin text-rz-primary" /> A abrir o email…
+            </p>
+          </div>
         ) : (
           <>
             <iframe

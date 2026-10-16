@@ -89,7 +89,11 @@ const imapConfig = (
     : null;
 
 /** Driver do fornecedor da conta, com o segredo do Vault. */
-const createDriver = async (db: SupabaseClient, account: MailAccountRow): Promise<MailDriver> => {
+const createDriver = async (
+  db: SupabaseClient,
+  account: MailAccountRow,
+  pendingSecret?: Promise<string | null>
+): Promise<MailDriver> => {
   if (account.auth_method === 'app-microsoft') {
     // Caixa da empresa lida com a permissão da própria app: sem segredo no Vault.
     const domain = domainOfEmail(account.email);
@@ -105,7 +109,7 @@ const createDriver = async (db: SupabaseClient, account: MailAccountRow): Promis
     );
     return createGraphDriver(session, `${GRAPH_BASE}/users/${encodeURIComponent(account.email)}`);
   }
-  const raw = await readSecret(db, account.id);
+  const raw = await (pendingSecret ?? readSecret(db, account.id));
   if (account.auth_method === 'imap') {
     const secret = parseImapSecret(raw);
     const config = secret ? imapConfig(account, secret) : null;
@@ -199,6 +203,13 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
     return email ? ok(await discoverDomain(domainOfEmail(email), denoResolver)) : badRequest();
   }
 
+  // O segredo lê-se ao mesmo tempo que a conta (menos uma ida à base de dados); só é
+  // usado se a conta for mesmo desta pessoa.
+  const pendingSecret = isUuid(body.account_id)
+    ? readSecret(db, body.account_id)
+    : Promise.resolve(null);
+  // Sem isto, um erro ao ler o segredo de uma conta que não chega a ser usada ficava por tratar.
+  pendingSecret.catch(() => undefined);
   const account = await requireAccount(db, userId, body);
   if (action === 'disconnect') return disconnect(db, account);
 
@@ -210,7 +221,7 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
     case 'list': {
       const folder = body.folder;
       if (!isMailFolder(folder)) return badRequest();
-      const driver = await createDriver(db, account);
+      const driver = await createDriver(db, account, pendingSecret);
       try {
         const result = await driver.list({
           folder,
@@ -232,11 +243,13 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       }
     }
     case 'get':
-      return ok(await (await createDriver(db, account)).get(messageId));
+      return ok(await (await createDriver(db, account, pendingSecret)).get(messageId));
     case 'attachment': {
       const attachmentId = optionalString(body.attachment_id, 2000);
       if (!attachmentId) return badRequest();
-      return ok(await (await createDriver(db, account)).attachment(messageId, attachmentId));
+      return ok(
+        await (await createDriver(db, account, pendingSecret)).attachment(messageId, attachmentId)
+      );
     }
     case 'send': {
       const parsed = parseSendRequest(body);
@@ -245,19 +258,19 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
           ? badRequest()
           : json({ ok: false, code: parsed.code, message: MAIL_ERROR_MESSAGES[parsed.code] });
       }
-      const driver = await createDriver(db, account);
+      const driver = await createDriver(db, account, pendingSecret);
       return ok(await driver.send(parsed.value));
     }
     case 'set-read':
       if (typeof body.read !== 'boolean') return badRequest();
-      await (await createDriver(db, account)).setRead(messageId, body.read);
+      await (await createDriver(db, account, pendingSecret)).setRead(messageId, body.read);
       return ok();
     case 'set-starred':
       if (typeof body.starred !== 'boolean') return badRequest();
-      await (await createDriver(db, account)).setStarred(messageId, body.starred);
+      await (await createDriver(db, account, pendingSecret)).setStarred(messageId, body.starred);
       return ok();
     case 'trash':
-      await (await createDriver(db, account)).trash(messageId);
+      await (await createDriver(db, account, pendingSecret)).trash(messageId);
       return ok();
     default:
       return badRequest();

@@ -14,11 +14,12 @@ html.rz-theme {
   --rz-line: 248 26% 91%;
   --rz-canvas: 248 45% 97.5%;
   --rz-gold: 39 62% 56%;
-  --rz-aurora:
-    radial-gradient(1100px 560px at 88% -12%, hsla(39, 85%, 62%, 0.3), transparent 62%),
-    radial-gradient(900px 700px at -12% 112%, hsla(192, 90%, 56%, 0.32), transparent 60%),
-    radial-gradient(700px 500px at 40% 40%, hsla(282, 80%, 60%, 0.18), transparent 70%),
-    linear-gradient(140deg, hsl(250 64% 15%) 0%, hsl(258 56% 29%) 48%, hsl(232 68% 38%) 100%);
+  /* Fundo preto (em teste). O roxo anterior era:
+     radial-gradient(1100px 560px at 88% -12%, hsla(39, 85%, 62%, 0.3), transparent 62%),
+     radial-gradient(900px 700px at -12% 112%, hsla(192, 90%, 56%, 0.32), transparent 60%),
+     radial-gradient(700px 500px at 40% 40%, hsla(282, 80%, 60%, 0.18), transparent 70%),
+     linear-gradient(140deg, hsl(250 64% 15%) 0%, hsl(258 56% 29%) 48%, hsl(232 68% 38%) 100%); */
+  --rz-aurora: linear-gradient(140deg, hsl(0 0% 4%) 0%, hsl(0 0% 7%) 100%);
 
   /* Tokens do shadcn dentro da área: violeta como cor principal, cantos maiores. */
   --primary: 252 78% 60%;

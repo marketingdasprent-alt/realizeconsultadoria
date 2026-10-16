@@ -58,7 +58,7 @@ export const ROUTES = {
     DASHBOARD: '/colaborador',
     REQUESTS: '/colaborador/pedidos',
     TICKETS: '/colaborador/tickets',
-    DOCUMENTS: '/colaborador/documentos',
+    DOCUMENTS: '/colaborador/definicoes/documentos',
     NOTICES: '/colaborador/avisos',
     MORE: '/colaborador/mais',
     TIMECLOCK: '/colaborador/ponto',

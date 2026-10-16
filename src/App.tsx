@@ -32,6 +32,7 @@ const LegalPage = lazy(() => import('./modules/admin/pages/LegalPage'));
 const EmployeeLoginPage = lazy(() => import('./modules/employee/pages/EmployeeLoginPage'));
 const SupportPage = lazy(() => import('./modules/support/pages/SupportPage'));
 const MyDocumentsPage = lazy(() => import('./modules/documents/pages/MyDocumentsPage'));
+const PersonalDocumentsPage = lazy(() => import('./modules/documents/pages/PersonalDocumentsPage'));
 const MyTimeClockPage = lazy(() => import('./modules/timeclock/pages/MyTimeClockPage'));
 const TimeClockNfcPage = lazy(() => import('./modules/timeclock/pages/TimeClockNfcPage'));
 const TimeClockAdminPage = lazy(() => import('./modules/timeclock/pages/TimeClockAdminPage'));
@@ -139,6 +140,10 @@ const App = () => (
                   <Route path="/colaborador/pedidos" element={<AbsencesPage />} />
                   <Route path="/colaborador/tickets" element={<SupportPage />} />
                   <Route path="/colaborador/documentos" element={<MyDocumentsPage />} />
+                  <Route
+                    path="/colaborador/definicoes/documentos"
+                    element={<PersonalDocumentsPage />}
+                  />
                   <Route path="/colaborador/ponto" element={<MyTimeClockPage />} />
                   {/* Fase 2: Feed (com os avisos dos RH), colegas e apreciações */}
                   <Route path="/colaborador/feed" element={<FeedPage />} />

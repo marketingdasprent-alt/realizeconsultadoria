@@ -139,7 +139,7 @@ export const useGlobalSearch = (term: string, enabled: boolean) => {
           group: 'documents',
           title: d.fileName,
           subtitle: `${getDocumentCategoryLabel(d.category)} · ${when(d.createdAt, false)}`,
-          to: `${basePath}/documentos`,
+          to: `${basePath}/definicoes/documentos`,
         });
       for (const tk of server.tickets)
         hits.push({

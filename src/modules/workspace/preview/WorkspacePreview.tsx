@@ -20,6 +20,7 @@ import AbsencesPage from '@/modules/absences/pages/AbsencesPage';
 import MyTimeClockPage from '@/modules/timeclock/pages/MyTimeClockPage';
 import SupportPage from '@/modules/support/pages/SupportPage';
 import MyDocumentsPage from '@/modules/documents/pages/MyDocumentsPage';
+import PersonalDocumentsPage from '@/modules/documents/pages/PersonalDocumentsPage';
 import PeoplePage from '@/modules/social/pages/PeoplePage';
 import ModuleComingSoonPage from '../pages/ModuleComingSoonPage';
 import ProfilePage from '../pages/ProfilePage';
@@ -101,6 +102,7 @@ const WorkspacePreview: React.FC = () => (
           <Route path="ponto" element={<MyTimeClockPage />} />
           <Route path="tickets" element={<SupportPage />} />
           <Route path="documentos" element={<MyDocumentsPage />} />
+          <Route path="definicoes/documentos" element={<PersonalDocumentsPage />} />
           <Route path="definicoes" element={<SettingsPage />} />
           <Route path="email" element={<WebmailPage />} />
           <Route path="tarefas" element={<TasksPage />} />

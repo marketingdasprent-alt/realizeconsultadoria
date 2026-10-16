@@ -139,7 +139,8 @@ export const WORKSPACE_GROUPS: WorkspaceGroup[] = [
         icon: FolderOpen,
         tint: 'from-amber-400 to-orange-500',
         ready: true,
-        description: 'Contratos, recibos e documentos enviados pela empresa.',
+        description:
+          'Em breve: o editor de documentos da empresa. Os documentos pessoais e recibos estão nas Definições.',
       },
       {
         key: 'tickets',

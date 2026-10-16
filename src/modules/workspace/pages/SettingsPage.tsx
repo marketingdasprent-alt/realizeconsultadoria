@@ -5,7 +5,9 @@ import {
   ChevronRight,
   Download,
   FileText,
+  FolderLock,
   KeyRound,
+  Receipt,
   LogOut,
   ShieldCheck,
   Stethoscope,
@@ -115,6 +117,22 @@ const SettingsPage: React.FC = () => {
             )}
           </section>
         )}
+
+        <section className={cn(CARD, 'space-y-1 p-3 md:p-3')}>
+          <p className="px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-[0.14em] text-rz-muted">
+            Os meus documentos
+          </p>
+          <LinkRow
+            to={`${basePath}/definicoes/documentos`}
+            icon={FolderLock}
+            label="Documentos pessoais"
+          />
+          <LinkRow
+            to={`${basePath}/definicoes/documentos?tab=recibos`}
+            icon={Receipt}
+            label="Recibos de vencimento"
+          />
+        </section>
 
         <WorkScheduleCard />
         <PushCard />

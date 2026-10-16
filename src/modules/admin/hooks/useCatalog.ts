@@ -20,7 +20,8 @@ export const useCatalog = (kind: CatalogKind) => {
   const items = useQuery({
     queryKey: key,
     queryFn: () => unwrap(catalogService.list(kind)),
-    staleTime: 5 * 60_000,
+    // Sempre atual ao abrir (são listas pequenas): mudanças noutro sítio aparecem logo.
+    staleTime: 0,
   });
 
   const refresh = () => {
@@ -54,5 +55,5 @@ export const useCatalogUsage = (kind: CatalogKind) =>
   useQuery({
     queryKey: ['admin', 'catalog-usage', kind],
     queryFn: () => unwrap(catalogService.usage(kind)),
-    staleTime: 60_000,
+    staleTime: 0,
   });

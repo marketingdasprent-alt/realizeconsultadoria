@@ -79,6 +79,23 @@ export const useCalendar = (from: Date, to: Date) => {
     enabled: !isPreview,
     placeholderData: keepPreviousData,
   });
+  // Consulta de higiene e segurança (da ficha do próprio).
+  const health = useQuery({
+    queryKey: ['calendar', 'health', user.employeeId],
+    queryFn: async () => {
+      const { data } = await supabase
+        .from('employees')
+        .select('safety_checkup_date, safety_checkup_renewal_months')
+        .eq('id', user.employeeId)
+        .maybeSingle();
+      return {
+        date: data?.safety_checkup_date ?? null,
+        renewalMonths: data?.safety_checkup_renewal_months ?? null,
+      };
+    },
+    enabled: !isPreview && !!user.employeeId,
+    staleTime: 10 * 60_000,
+  });
   const team = useQuery({
     queryKey: ['calendar', 'team', ...range],
     queryFn: async () => (await calendarService.listTeamAbsences(from, to)).data,
@@ -114,10 +131,11 @@ export const useCalendar = (from: Date, to: Date) => {
         absences: absences.data?.absences ?? [],
         team: team.data ?? [],
         holidays: absences.data?.holidays ?? [],
+        health: health.data,
         tasks,
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- from/to entram pela chave range
-    [range[0], range[1], eventList, absences.data, team.data, tasks, user]
+    [range[0], range[1], eventList, absences.data, team.data, health.data, tasks, user]
   );
   const refresh = () => qc.invalidateQueries({ queryKey: ['calendar'] });
 

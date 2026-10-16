@@ -3,6 +3,7 @@ import { endOfDay, startOfDay } from 'date-fns';
 import { countBusinessDays, type Holiday } from '@/lib/vacation-utils';
 import { absenceTypeLabels } from '@/lib/absence-types';
 import type { AbsenceRow } from '@/modules/absences/lib/absenceRules';
+import { safetyCheckupView } from '@/lib/employee-home';
 import type { Task } from '@/modules/tasks/types';
 import type { CalendarEvent, CalendarItem, CalendarLayer, EventColor } from '../types';
 import { expandOccurrences } from './recurrence';
@@ -32,6 +33,7 @@ export const LAYERS: { key: CalendarLayer; label: string; dot: string }[] = [
   { key: 'absences', label: 'As minhas férias e ausências', dot: 'bg-emerald-500' },
   { key: 'team', label: 'Ausências do departamento', dot: 'bg-slate-400' },
   { key: 'holidays', label: 'Feriados', dot: 'bg-rose-400' },
+  { key: 'health', label: 'Higiene e segurança', dot: 'bg-sky-500' },
   { key: 'tasks', label: 'Prazos de tarefas', dot: 'bg-amber-500' },
 ];
 
@@ -50,6 +52,8 @@ interface BuildInput {
   team?: { employee_id: string; name: string; start_date: string; end_date: string }[];
   holidays: Holiday[];
   tasks: Task[];
+  /** Consulta de higiene e segurança da ficha (data e periodicidade em meses). */
+  health?: { date: string | null; renewalMonths: number | null };
 }
 
 export const buildItems = (input: BuildInput): CalendarItem[] => {
@@ -140,6 +144,29 @@ export const buildItems = (input: BuildInput): CalendarItem[] => {
       allDay: true,
       tone: 'bg-slate-100 text-slate-600',
       info: { kind: 'team', name: absence.name },
+    });
+  }
+  const checkup = safetyCheckupView(
+    input.health?.date ?? null,
+    input.health?.renewalMonths ?? null
+  );
+  if (checkup) {
+    items.push({
+      key: `health-${checkup.kind}`,
+      layer: 'health',
+      title: checkup.kind === 'scheduled' ? 'Consulta de HST' : 'Consulta de HST (prevista)',
+      start: startOfDay(checkup.date),
+      end: endOfDay(checkup.date),
+      allDay: true,
+      tone:
+        checkup.kind === 'scheduled'
+          ? 'bg-sky-100 text-sky-800'
+          : 'bg-sky-50 text-sky-700 ring-1 ring-dashed ring-sky-300',
+      info: {
+        kind: 'health',
+        scheduled: checkup.kind === 'scheduled',
+        renewalMonths: input.health?.renewalMonths ?? null,
+      },
     });
   }
   for (const holiday of input.holidays) {

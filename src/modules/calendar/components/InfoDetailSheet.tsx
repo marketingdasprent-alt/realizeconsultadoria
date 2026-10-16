@@ -133,7 +133,23 @@ export const InfoDetailSheet: React.FC<InfoDetailSheetProps> = ({
                 )}
               >
                 {info.kind === 'holiday' && 'Feriado'}
+                {info.kind === 'health' && (info.scheduled ? 'Marcada' : 'Prevista')}
                 {info.kind === 'absence' && (info.pending ? 'À espera dos RH' : 'Aprovado')}
+                {info.kind === 'health' && (
+                  <div className="space-y-2.5">
+                    <Line icon={CalendarDays}>
+                      <span className="first-letter:uppercase">{range(item.start, item.end)}</span>
+                      <span className="block text-[13px] text-rz-muted">
+                        {countdown(item.start, item.end)}
+                      </span>
+                    </Line>
+                    <Line icon={Info}>
+                      {info.scheduled
+                        ? 'Consulta marcada pelos RH. Recebe um aviso na véspera.'
+                        : `Data prevista para a próxima consulta${info.renewalMonths ? ` (de ${info.renewalMonths} em ${info.renewalMonths} meses)` : ''}. Os RH marcam o dia e a hora.`}
+                    </Line>
+                  </div>
+                )}
                 {info.kind === 'team' && (
                   <>
                     <Users className="h-3.5 w-3.5" /> Colega do departamento
@@ -145,7 +161,9 @@ export const InfoDetailSheet: React.FC<InfoDetailSheetProps> = ({
                   ? info.typeLabel
                   : info.kind === 'team'
                     ? `${info.name} está ausente`
-                    : info.name}
+                    : info.kind === 'health'
+                      ? 'Consulta de higiene e segurança no trabalho'
+                      : info.name}
               </SheetTitle>
               {info.kind === 'absence' && (
                 <p className="mt-1 text-[14px] text-rz-muted">

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { buildHomeAlerts, getSafetyCheckupStatus, type HomeData } from '../employee-home';
+import {
+  buildHomeAlerts,
+  getSafetyCheckupStatus,
+  safetyCheckupView,
+  type HomeData,
+} from '../employee-home';
 
 const routes = {
   requests: '/colaborador/pedidos',
@@ -86,5 +91,23 @@ describe('buildHomeAlerts', () => {
       today,
     });
     expect(far).toEqual([]);
+  });
+});
+
+describe('consulta de higiene e segurança vista pelo colaborador', () => {
+  const today = new Date(2026, 9, 16);
+  it('data futura = consulta marcada', () => {
+    expect(safetyCheckupView('2026-10-20', 12, today)).toMatchObject({
+      kind: 'scheduled',
+      daysLeft: 4,
+    });
+  });
+  it('data passada = próxima prevista pela renovação', () => {
+    const view = safetyCheckupView('2026-01-10', 12, today);
+    expect(view?.kind).toBe('due');
+    expect(view?.date.getFullYear()).toBe(2027);
+  });
+  it('sem data não mostra nada', () => {
+    expect(safetyCheckupView(null, 12, today)).toBeNull();
   });
 });

@@ -24,13 +24,7 @@ export interface CalendarEvent {
 }
 
 export type CalendarLayer =
-  | 'mine'
-  | 'invites'
-  | 'company'
-  | 'absences'
-  | 'team'
-  | 'holidays'
-  | 'tasks';
+  'mine' | 'invites' | 'company' | 'absences' | 'team' | 'holidays' | 'health' | 'tasks';
 
 /** Detalhe de blocos que não são eventos (abre na lateral, como um evento). */
 export type CalendarInfo =
@@ -46,7 +40,8 @@ export type CalendarInfo =
       siblings: { key: string; start: Date; end: Date; pending: boolean }[];
     }
   | { kind: 'holiday'; name: string; national: boolean }
-  | { kind: 'team'; name: string };
+  | { kind: 'team'; name: string }
+  | { kind: 'health'; scheduled: boolean; renewalMonths: number | null };
 
 /** Um bloco no calendário (ocorrência de evento, ausência, feriado ou prazo de tarefa). */
 export interface CalendarItem {

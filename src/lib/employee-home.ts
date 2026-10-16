@@ -169,3 +169,29 @@ export const buildHomeAlerts = ({
 /** "seg, 5 out" para listas compactas. */
 export const formatShortDate = (iso: string): string =>
   format(parseISO(iso), 'EEE, d MMM', { locale: pt });
+
+export interface SafetyCheckupView {
+  /** Consulta já marcada (data no futuro) ou a próxima prevista pela renovação. */
+  kind: 'scheduled' | 'due';
+  date: Date;
+  daysLeft: number;
+}
+
+/**
+ * Consulta de higiene e segurança a mostrar ao colaborador: a data guardada na ficha é a da
+ * consulta (o admin avisa nesse dia e na véspera). Se ainda não passou, está marcada; se já
+ * passou, a próxima é essa data mais a periodicidade.
+ */
+export const safetyCheckupView = (
+  checkupDate: string | null,
+  renewalMonths: number | null,
+  today: Date = new Date()
+): SafetyCheckupView | null => {
+  if (!checkupDate) return null;
+  const date = parseISO(checkupDate);
+  const days = differenceInCalendarDays(date, today);
+  if (days >= 0) return { kind: 'scheduled', date, daysLeft: days };
+  if (!renewalMonths) return null;
+  const due = addMonths(date, renewalMonths);
+  return { kind: 'due', date: due, daysLeft: differenceInCalendarDays(due, today) };
+};

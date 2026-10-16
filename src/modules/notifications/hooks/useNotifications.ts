@@ -27,6 +27,8 @@ export const useNotifications = () => {
       return data;
     },
     enabled: !isPreview,
+    // Lidas noutro separador ou no telemóvel: ao voltar a esta janela o contador acerta.
+    refetchOnWindowFocus: true,
   });
 
   // Notificação nova: atualiza a lista e mostra um aviso discreto.
@@ -46,6 +48,17 @@ export const useNotifications = () => {
           qc.invalidateQueries({ queryKey: KEY });
           toast({ title: (payload.new as NotificationRow).title });
         }
+      )
+      // Marcadas como lidas noutro sítio: atualiza o contador (sem aviso).
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table: 'user_notifications',
+          filter: `user_id=eq.${user.userId}`,
+        },
+        () => qc.invalidateQueries({ queryKey: KEY })
       )
       .subscribe();
     return () => {

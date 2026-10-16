@@ -1,0 +1,79 @@
+/*
+ * Painel de administração no Realize 2.0: retoques por cima dos componentes shadcn das
+ * páginas antigas (cartões, tabelas, separadores e títulos), só enquanto o admin está
+ * aberto — a classe rz-admin fica no <html> ao lado da rz-theme (tokens em workspace.css).
+ */
+html.rz-admin {
+  /* O dourado das páginas antigas (ícones, realces, dia de hoje) passa a violeta do 2.0. */
+  --gold: var(--rz-primary);
+  --gold-light: 252 90% 76%;
+  --gold-dark: 252 70% 54%;
+  --shadow-gold: 0 8px 24px -12px hsl(var(--rz-primary) / 0.7);
+  --shadow-card: 0 1px 2px hsla(250, 40%, 20%, 0.04), 0 14px 34px -20px hsla(250, 50%, 20%, 0.22);
+}
+
+/* Títulos: a Cormorant do site dá lugar à Plus Jakarta do 2.0. */
+html.rz-admin .font-display {
+  font-family: 'Plus Jakarta Sans', 'Inter', system-ui, sans-serif;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* Cartões mais arredondados, linha suave e sombra difusa. */
+html.rz-admin [data-ui='card'] {
+  border-radius: 1.5rem;
+  border-color: hsl(var(--rz-line));
+}
+html.rz-admin [data-ui='card']:not(.shadow-none) {
+  box-shadow: var(--shadow-card);
+}
+
+/* Tabelas: cabeçalho discreto e linha realçada ao passar o rato. */
+html.rz-admin [data-ui='table'] thead tr {
+  border-color: hsl(var(--rz-line));
+}
+html.rz-admin [data-ui='table'] thead th {
+  height: 2.75rem;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  color: hsl(var(--rz-ink-muted));
+}
+html.rz-admin [data-ui='table'] tbody tr {
+  border-color: hsl(var(--rz-line));
+}
+html.rz-admin [data-ui='table'] tbody tr:hover {
+  background: hsl(var(--rz-primary-soft));
+}
+
+/* Separadores como os filtros da área do colaborador (cantos que aguentam quebrar a linha). */
+html.rz-admin [data-ui='tabs-list'] {
+  border-radius: 1.25rem;
+  background: hsl(0 0% 100%);
+  box-shadow: inset 0 0 0 1px hsl(var(--rz-line));
+}
+html.rz-admin [data-ui='tabs-list'] > [role='tab'] {
+  border-radius: 0.95rem;
+  font-weight: 600;
+}
+html.rz-admin [data-ui='tabs-list'] > [role='tab'][data-state='active'] {
+  background: hsl(var(--rz-ink));
+  color: hsl(0 0% 100%);
+}
+
+/* Botões: letra do 2.0 e a ação principal (dourada no admin antigo) em violeta, como na
+   área do colaborador. */
+html.rz-admin :is(button, a)[data-variant] {
+  font-family: inherit;
+  font-weight: 600;
+}
+html.rz-admin :is(button, a)[data-variant='gold'],
+html.rz-admin :is(button, a)[data-variant='default'] {
+  background: hsl(var(--rz-primary));
+  color: hsl(0 0% 100%);
+  box-shadow: 0 8px 20px -12px hsl(var(--rz-primary) / 0.9);
+}
+html.rz-admin :is(button, a)[data-variant='gold']:hover,
+html.rz-admin :is(button, a)[data-variant='default']:hover {
+  background: hsl(252 70% 54%);
+}

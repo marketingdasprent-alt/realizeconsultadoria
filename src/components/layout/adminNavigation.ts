@@ -131,6 +131,20 @@ export const ADMIN_SETTINGS_ITEM: AdminNavItem = {
   tint: 'from-slate-400 to-slate-600',
 };
 
+/** Módulo da página aberta (o de caminho mais comprido que a contém), para o cabeçalho. */
+export const findAdminNavItem = (pathname: string): AdminNavItem | null => {
+  const items = [...ADMIN_NAV_GROUPS.flatMap(group => group.items), ADMIN_SETTINGS_ITEM];
+  return (
+    items
+      .filter(item =>
+        item.href === ROUTES.ADMIN.DASHBOARD
+          ? pathname === item.href
+          : pathname === item.href || pathname.startsWith(`${item.href}/`)
+      )
+      .sort((a, b) => b.href.length - a.href.length)[0] ?? null
+  );
+};
+
 /** Só os grupos (e módulos) que o admin pode ver; grupos vazios desaparecem. */
 export const visibleAdminGroups = (canView: (moduleKey: string) => boolean): AdminNavGroup[] =>
   ADMIN_NAV_GROUPS.map(group => ({

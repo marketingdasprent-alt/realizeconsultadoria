@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Edit, Scale, Loader2, CheckCircle2, AlertCircle, Clock } from 'lucide-react';
+import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -357,9 +358,7 @@ const LegalPage = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-          <div className="flex items-center gap-2">
-            <h1 className="font-display text-2xl sm:text-3xl font-semibold">Jurídico</h1>
-          </div>
+          <AdminPageTitle title="Jurídico" description="Clientes e processos jurídicos" />
           <Button onClick={() => handleOpenModal()} variant="gold" className="w-full sm:w-auto">
             <Plus className="h-4 w-4 mr-2" />
             Adicionar Cliente

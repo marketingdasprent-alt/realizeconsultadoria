@@ -119,7 +119,7 @@ const EmployeeFormPage = () => {
             <ArrowLeft className="h-5 w-5" />
           </Button>
           <div>
-            <h1 className="font-display text-2xl sm:text-3xl font-semibold">
+            <h1 className="text-[24px] font-extrabold leading-tight tracking-tight sm:text-[28px]">
               {isEditMode ? employee?.name || 'Editar Colaborador' : 'Novo Colaborador'}
             </h1>
             {isEditMode && employee?.companies?.name && (

@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
@@ -1072,12 +1073,10 @@ const AbsenceRequestsPage = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="font-display text-3xl font-semibold">Pedidos de Ausência</h1>
-            <p className="text-muted-foreground mt-1">
-              Gerir pedidos de férias e ausências dos colaboradores
-            </p>
-          </div>
+          <AdminPageTitle
+            title="Pedidos de Ausência"
+            description="Gerir pedidos de férias e ausências dos colaboradores"
+          />
           <div className="flex flex-wrap items-center gap-2">
             <Button variant="gold" onClick={() => setAddDialogOpen(true)}>
               <Plus className="h-4 w-4 mr-2" />

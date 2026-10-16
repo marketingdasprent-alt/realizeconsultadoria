@@ -18,6 +18,7 @@ import {
   Building2,
   Wrench,
 } from 'lucide-react';
+import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import SupportSubjectsManager from '@/components/admin/SupportSubjectsManager';
 import SupportDepartmentsManager from '@/components/admin/SupportDepartmentsManager';
 import ChangeAdminPasswordDialog from '@/components/admin/ChangeAdminPasswordDialog';
@@ -552,10 +553,10 @@ const SettingsPage = () => {
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="font-display text-3xl font-semibold">Configurações</h1>
-          <p className="text-muted-foreground mt-1">Gerir preferências da conta e do sistema</p>
-        </div>
+        <AdminPageTitle
+          title="Configurações"
+          description="Gerir preferências da conta e do sistema"
+        />
 
         <Tabs defaultValue="profile" className="space-y-6">
           <TabsList className="flex-wrap">

@@ -12,6 +12,7 @@ import {
 } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Filter, Printer } from 'lucide-react';
+import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import logoRealize from '@/assets/logo-realize.png';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -357,10 +358,7 @@ const CalendarPage = () => {
         <div className="space-y-6">
           {/* Header - hidden on print */}
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 print:hidden">
-            <div>
-              <h1 className="font-display text-3xl font-semibold">Calendário</h1>
-              <p className="text-muted-foreground mt-1">Visualizar férias e ausências</p>
-            </div>
+            <AdminPageTitle title="Calendário" description="Visualizar férias e ausências" />
 
             <div className="flex items-center gap-4">
               <Select value={selectedCompany} onValueChange={setSelectedCompany}>

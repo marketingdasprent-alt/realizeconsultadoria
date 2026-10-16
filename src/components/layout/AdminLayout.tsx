@@ -1,4 +1,4 @@
-import { Suspense, useMemo, useState } from 'react';
+import { Suspense, useEffect, useMemo, useState } from 'react';
 import { useNavigate, Outlet } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
@@ -12,6 +12,7 @@ import { AdminSidebar } from './AdminSidebar';
 import { AdminMobileHeader } from './AdminMobileHeader';
 import { AdminMobileSidebar } from './AdminMobileSidebar';
 import { ADMIN_SETTINGS_ITEM, visibleAdminGroups } from './adminNavigation';
+import './admin-theme.css';
 
 interface AdminLayoutProps {
   children?: React.ReactNode;
@@ -31,6 +32,12 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const { canView, isLoading: isLoadingPermissions, isSuperAdmin } = useAdminPermissions();
 
   useRzTheme();
+
+  // Retoques do admin (admin-theme.css) também nos diálogos e popovers, que abrem em portais.
+  useEffect(() => {
+    document.documentElement.classList.add('rz-admin');
+    return () => document.documentElement.classList.remove('rz-admin');
+  }, []);
 
   const groups = useMemo(
     () => (isLoadingPermissions ? [] : visibleAdminGroups(canView)),

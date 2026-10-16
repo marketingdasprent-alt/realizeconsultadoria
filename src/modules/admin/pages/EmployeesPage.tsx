@@ -19,6 +19,7 @@ import {
   UserCheck,
   UserX,
 } from 'lucide-react';
+import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -589,10 +590,7 @@ const EmployeesPage = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="font-display text-3xl font-semibold">Colaboradores</h1>
-            <p className="text-muted-foreground mt-1">Gerir colaboradores das empresas</p>
-          </div>
+          <AdminPageTitle title="Colaboradores" description="Gerir colaboradores das empresas" />
 
           <div className="flex flex-wrap gap-2">
             <Button

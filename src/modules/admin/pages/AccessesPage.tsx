@@ -29,6 +29,7 @@ import {
   Info,
   Globe,
 } from 'lucide-react';
+import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -904,10 +905,7 @@ const AccessesPage = () => {
     <>
       <div className="space-y-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Acessos</h1>
-            <p className="text-muted-foreground">Gestão de credenciais e acessos</p>
-          </div>
+          <AdminPageTitle title="Acessos" description="Gestão de credenciais e acessos" />
         </div>
 
         <Tabs defaultValue="accesses" className="w-full">

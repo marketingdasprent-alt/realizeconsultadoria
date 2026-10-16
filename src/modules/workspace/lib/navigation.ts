@@ -220,7 +220,7 @@ export const WORKSPACE_GROUPS: WorkspaceGroup[] = [
         path: 'ai',
         icon: Sparkles,
         tint: 'from-violet-500 via-fuchsia-500 to-amber-400',
-        ready: false,
+        ready: true,
         phase: 5,
         description: 'O seu assistente, sempre dentro das suas permissões.',
         planned: [

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { matchesText } from '@/lib/text';
 import { Check, Plus, Search, X } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
@@ -36,10 +37,8 @@ export const PeoplePicker: React.FC<PeoplePickerProps> = ({
         : []),
       ...colleagues.map(p => ({ userId: p.userId, name: p.name, department: p.department })),
     ];
-    const term = query.trim().toLowerCase();
-    return people.filter(
-      p => !term || `${p.name} ${p.department ?? ''}`.toLowerCase().includes(term)
-    );
+    const term = query;
+    return people.filter(p => matchesText(term, p.name, p.department));
   }, [colleagues, includeMe, query, user]);
 
   const toggle = (id: string) => {

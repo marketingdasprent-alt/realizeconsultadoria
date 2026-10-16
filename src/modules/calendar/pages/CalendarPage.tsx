@@ -21,6 +21,7 @@ import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { AgendaView, MonthView, TimeGridView } from '../components/CalendarViews';
 import { CalendarSidebar } from '../components/CalendarSidebar';
 import { EventDetailSheet } from '../components/EventDetailSheet';
+import { InfoDetailSheet } from '../components/InfoDetailSheet';
 import { EventDialog } from '../components/EventDialog';
 import { useCalendar } from '../hooks/useCalendar';
 import type { CalendarEvent, CalendarItem, CalendarLayer, CalendarView } from '../types';
@@ -60,11 +61,10 @@ const CalendarPage: React.FC = () => {
   const [anchor, setAnchor] = useState(new Date());
   const [hidden, setHidden] = useState<Set<CalendarLayer>>(new Set());
   const [open, setOpen] = useState<CalendarItem | null>(null);
+  const [openInfo, setOpenInfo] = useState<CalendarItem | null>(null);
   const [editing, setEditing] = useState<CalendarEvent | 'new' | null>(null);
   const [newDay, setNewDay] = useState<Date | null>(null);
   const [toDelete, setToDelete] = useState<CalendarEvent | null>(null);
-  const [selecting, setSelecting] = useState(false);
-  const [selected, setSelected] = useState<Set<string>>(new Set());
   const [from, to] = useMemo(() => rangeOf(view, anchor), [view, anchor]);
   const cal = useCalendar(from, to);
   const items = cal.items.filter(item => !hidden.has(item.layer));
@@ -91,21 +91,18 @@ const CalendarPage: React.FC = () => {
   const openItem = (item: CalendarItem) => {
     if (item.event) setOpen(item);
     else if (item.taskId) navigate(`${basePath}/tarefas?tarefa=${item.taskId}`);
-    else if (item.layer === 'absences') navigate(`${basePath}/pedidos`);
+    else if (item.info) setOpenInfo(item);
   };
+  const openDay = (day: Date) => {
+    setAnchor(day);
+    setView('day');
+  };
+  // Espaço vazio do dia: criar evento nesse dia. No telemóvel as células são pequenas,
+  // por isso tocar abre o dia.
   const dayClick = (day: Date) => {
-    if (selecting) {
-      const key = format(day, 'yyyy-MM-dd');
-      setSelected(s => {
-        const next = new Set(s);
-        if (next.has(key)) next.delete(key);
-        else next.add(key);
-        return next;
-      });
-    } else {
-      setAnchor(day);
-      setView('day');
-    }
+    if (!window.matchMedia('(min-width: 640px)').matches) return openDay(day);
+    setNewDay(day);
+    setEditing('new');
   };
 
   const title =
@@ -188,7 +185,7 @@ const CalendarPage: React.FC = () => {
               items={items}
               onOpen={openItem}
               onDayClick={dayClick}
-              isSelected={d => selected.has(format(d, 'yyyy-MM-dd'))}
+              onDayNumberClick={openDay}
             />
           ) : view === 'agenda' ? (
             <AgendaView start={from} days={30} items={items} onOpen={openItem} />
@@ -211,23 +208,14 @@ const CalendarPage: React.FC = () => {
               return next;
             })
           }
-          balance={cal.balance}
-          selecting={selecting}
-          selectedCount={selected.size}
-          onStartSelecting={() => {
-            setSelecting(true);
-            setView('month');
-          }}
-          onCancelSelecting={() => {
-            setSelecting(false);
-            setSelected(new Set());
-          }}
-          onRequestVacation={() =>
-            navigate(`${basePath}/pedidos?novo=1&dias=${[...selected].sort().join(',')}`)
-          }
         />
       </div>
 
+      <InfoDetailSheet
+        item={openInfo}
+        onClose={() => setOpenInfo(null)}
+        onOpenAbsences={() => navigate(`${basePath}/pedidos`)}
+      />
       <EventDetailSheet
         item={
           // Sempre a versão mais recente do evento (respostas em tempo real), não a cópia de quando abriu.

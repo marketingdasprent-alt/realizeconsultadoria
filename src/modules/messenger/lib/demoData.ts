@@ -155,6 +155,18 @@ const message = (
   ...extra,
 });
 
+/** Imagens de exemplo (SVG) para a pré-visualização da galeria: "demo:<nome>". */
+const demoImage = (title: string, from: string, to: string) =>
+  `data:image/svg+xml;utf8,${encodeURIComponent(
+    `<svg xmlns="http://www.w3.org/2000/svg" width="900" height="600"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="${from}"/><stop offset="1" stop-color="${to}"/></linearGradient></defs><rect width="900" height="600" fill="url(#g)"/><text x="450" y="320" font-size="64" font-family="sans-serif" font-weight="700" fill="white" text-anchor="middle">${title}</text></svg>`
+  )}`;
+
+export const DEMO_IMAGES: Record<string, string> = {
+  'demo:praia': demoImage('Praia', '#38bdf8', '#6366f1'),
+  'demo:montanha': demoImage('Montanha', '#34d399', '#0f766e'),
+  'demo:cidade': demoImage('Cidade', '#f59e0b', '#e11d48'),
+};
+
 export const DEMO_MESSAGES: Record<string, ChatMessage[]> = {
   ana: [
     message('a1', 'ana', 'ana', 60 * 25, { text: 'Olá! Vi o teu pedido de férias para agosto.' }),
@@ -170,6 +182,25 @@ export const DEMO_MESSAGES: Record<string, ChatMessage[]> = {
         size: 290_816,
         mime: 'application/pdf',
       },
+    }),
+    message('a3a', 'ana', 'ana', 13, {
+      kind: 'image',
+      attachment: { path: 'demo:praia', name: 'praia.svg', size: 20_480, mime: 'image/svg+xml' },
+    }),
+    message('a3b', 'ana', 'me', 12, {
+      kind: 'image',
+      text: 'Esta também!',
+      attachment: {
+        path: 'demo:montanha',
+        name: 'montanha.svg',
+        size: 20_480,
+        mime: 'image/svg+xml',
+      },
+      read: true,
+    }),
+    message('a3c', 'ana', 'ana', 11, {
+      kind: 'image',
+      attachment: { path: 'demo:cidade', name: 'cidade.svg', size: 20_480, mime: 'image/svg+xml' },
     }),
     message('a4', 'ana', 'ana', 9, {
       text: 'Perfeito, já aprovei o pedido 🙂',

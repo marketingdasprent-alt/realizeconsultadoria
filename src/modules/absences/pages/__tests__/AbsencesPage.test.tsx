@@ -30,10 +30,13 @@ const DATA: AbsencesData = {
       id: 'absence-1',
       absence_type: 'vacation',
       status: 'approved',
-      start_date: '2026-10-05',
+      start_date: '2026-03-02',
       end_date: '2026-10-09',
       notes: null,
-      absence_periods: [period('p1', '2026-10-05', '2026-10-09', 'approved')],
+      absence_periods: [
+        period('p0', '2026-03-02', '2026-03-03', 'approved'),
+        period('p1', '2026-10-05', '2026-10-09', 'approved'),
+      ],
     },
     {
       id: 'absence-2',
@@ -50,8 +53,6 @@ const DATA: AbsencesData = {
 vi.mock('../../services/absenceRequestService', () => ({
   absenceRequestService: { load: vi.fn(async () => ({ data: DATA, error: null })) },
 }));
-vi.mock('@/components/employee/EmployeeCalendar', () => ({ default: () => null }));
-vi.mock('@/components/admin/AbsenceEditDialog', () => ({ default: () => null }));
 vi.mock('@/components/admin/AbsenceDocumentsDialog', () => ({ default: () => null }));
 vi.mock('@/components/employee/AddDocumentsDialog', () => ({ default: () => null }));
 
@@ -101,19 +102,17 @@ describe('AbsencesPage', () => {
     expect(screen.getByText(/^17/)).toBeInTheDocument();
   });
 
-  it('mostra a ação de remarcar num pedido de férias aprovado', async () => {
+  it('lista períodos, não pedidos: remarca o período futuro de um pedido que já tem um passado', async () => {
     renderPage();
-    expect(
-      await screen.findByRole('button', { name: 'Remarcar férias de 05/10/2026' })
-    ).toBeInTheDocument();
+    // O pedido começou em março (passado), mas o período de outubro ainda se remarca.
+    expect(await screen.findByRole('button', { name: 'Remarcar 5 – 9 out' })).toBeInTheDocument();
+    // O de março fica no histórico (recolhido), sem ações.
+    expect(screen.queryByRole('button', { name: /Remarcar 2 – 3 mar/ })).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /Histórico/ })).toBeInTheDocument();
   });
 
-  it('deixa corrigir um pedido de férias ainda pendente, e cancelá-lo', async () => {
+  it('um período pendente edita-se', async () => {
     renderPage();
-    expect(
-      await screen.findByRole('button', { name: 'Editar pedido de férias de 16/11/2026' })
-    ).toBeInTheDocument();
-    // Só o pedido pendente se pode cancelar (o aprovado não).
-    expect(screen.getAllByRole('button', { name: /Cancelar/ })).toHaveLength(1);
+    expect(await screen.findByRole('button', { name: 'Editar 16 – 20 nov' })).toBeInTheDocument();
   });
 });

@@ -51,7 +51,7 @@ interface MonthViewProps {
   items: CalendarItem[];
   onOpen: (item: CalendarItem) => void;
   onDayClick: (day: Date) => void;
-  isSelected?: (day: Date) => boolean;
+  onDayNumberClick: (day: Date) => void;
 }
 
 /** Mês: até 3 blocos por dia e "+N" para os restantes. */
@@ -60,17 +60,17 @@ export const MonthView: React.FC<MonthViewProps> = ({
   items,
   onOpen,
   onDayClick,
-  isSelected,
+  onDayNumberClick,
 }) => (
   <MonthGrid
     month={month}
     onDayClick={onDayClick}
-    isSelected={isSelected}
+    onDayNumberClick={onDayNumberClick}
     renderDay={day => {
       const list = onDay(items, day);
       return (
         <>
-          {/* Telemóvel: só pontos de cor; tocar no dia abre a vista do dia. */}
+          {/* Telemóvel: só pontos de cor; tocar no dia abre a vista do dia (ver CalendarPage). */}
           <div className="flex flex-wrap gap-1 px-1 sm:hidden">
             {list.slice(0, 4).map(item => (
               <span key={item.key} className={cn('h-1.5 w-1.5 rounded-full', dotOf(item))} />

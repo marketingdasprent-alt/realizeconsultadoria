@@ -46,6 +46,7 @@ const OrgChartPage = lazy(() => import('./modules/social/pages/OrgChartPage'));
 const FeedPage = lazy(() => import('./modules/social/pages/FeedPage'));
 const AbsencesPage = lazy(() => import('./modules/absences/pages/AbsencesPage'));
 const PeoplePage = lazy(() => import('./modules/social/pages/PeoplePage'));
+const AiPage = lazy(() => import('./modules/ai/pages/AiPage'));
 const ColleagueProfilePage = lazy(() => import('./modules/social/pages/ColleagueProfilePage'));
 const AppreciationsPage = lazy(() => import('./modules/social/pages/AppreciationsPage'));
 const AuthCallbackPage = lazy(() => import('./pages/auth/AuthCallbackPage'));
@@ -152,6 +153,7 @@ const App = () => (
                   <Route path="/colaborador/tarefas" element={<TasksPage />} />
                   <Route path="/colaborador/calendario" element={<MyCalendarPage />} />
                   <Route path="/colaborador/organograma" element={<OrgChartPage />} />
+                  <Route path="/colaborador/ai" element={<AiPage />} />
                   <Route path="/colaborador/definicoes" element={<AccountSettingsPage />} />
                   {/* O antigo "Mais" passou para o Menu (telemóvel) e para as Definições */}
                   <Route

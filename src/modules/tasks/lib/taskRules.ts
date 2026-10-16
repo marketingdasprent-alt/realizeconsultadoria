@@ -1,4 +1,5 @@
 // Regras e etiquetas das Tarefas.
+import { matchesText } from '@/lib/text';
 import type { Task, TaskPriority, TaskScope, TaskStatus } from '../types';
 
 export const TASK_STATUSES: { key: TaskStatus; label: string; dot: string; column: string }[] = [
@@ -39,14 +40,13 @@ export const filterTasks = (
   myUserId: string,
   query = ''
 ): Task[] => {
-  const term = query.trim().toLowerCase();
   return tasks.filter(task => {
     if (task.parentId) return false;
     // As minhas: sou o responsável ou participo.
     if (scope === 'mine' && task.assigneeId !== myUserId && !task.participantIds.includes(myUserId))
       return false;
     if (scope === 'created' && task.createdBy !== myUserId) return false;
-    return !term || `${task.title} ${task.description ?? ''}`.toLowerCase().includes(term);
+    return matchesText(query, task.title, task.description);
   });
 };
 

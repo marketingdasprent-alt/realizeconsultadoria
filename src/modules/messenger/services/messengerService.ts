@@ -90,6 +90,13 @@ export const messengerService = {
     return { data: error ? null : path, error };
   },
 
+  /** Copia um anexo para a pasta de outra conversa (encaminhar sem voltar a enviar). */
+  copyFile: async (fromPath: string, toConversationId: string, name: string) => {
+    const path = `${toConversationId}/${crypto.randomUUID()}-${safeFileName(name)}`;
+    const { error } = await supabase.storage.from(BUCKET).copy(fromPath, path);
+    return { data: error ? null : path, error };
+  },
+
   insertMessage: async (message: Tables['chat_messages']['Insert']) => {
     const { data, error } = await supabase.from('chat_messages').insert(message).select().single();
     return { data, error };

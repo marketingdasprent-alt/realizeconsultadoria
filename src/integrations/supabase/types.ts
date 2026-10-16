@@ -413,6 +413,172 @@ export type Database = {
         };
         Relationships: [];
       };
+      ai_conversations: {
+        Row: {
+          archived_at: string | null;
+          company_id: string | null;
+          created_at: string;
+          id: string;
+          last_message_at: string | null;
+          model: string;
+          summary: string | null;
+          summary_updated_at: string | null;
+          system_prompt: string | null;
+          title: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          archived_at?: string | null;
+          company_id?: string | null;
+          created_at?: string;
+          id?: string;
+          last_message_at?: string | null;
+          model?: string;
+          summary?: string | null;
+          summary_updated_at?: string | null;
+          system_prompt?: string | null;
+          title?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Update: {
+          archived_at?: string | null;
+          company_id?: string | null;
+          created_at?: string;
+          id?: string;
+          last_message_at?: string | null;
+          model?: string;
+          summary?: string | null;
+          summary_updated_at?: string | null;
+          system_prompt?: string | null;
+          title?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'ai_conversations_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      ai_messages: {
+        Row: {
+          completion_tokens: number | null;
+          content: string;
+          conversation_id: string;
+          created_at: string;
+          id: string;
+          latency_ms: number | null;
+          metadata: Json;
+          model: string | null;
+          prompt_tokens: number | null;
+          role: string;
+        };
+        Insert: {
+          completion_tokens?: number | null;
+          content: string;
+          conversation_id: string;
+          created_at?: string;
+          id?: string;
+          latency_ms?: number | null;
+          metadata?: Json;
+          model?: string | null;
+          prompt_tokens?: number | null;
+          role: string;
+        };
+        Update: {
+          completion_tokens?: number | null;
+          content?: string;
+          conversation_id?: string;
+          created_at?: string;
+          id?: string;
+          latency_ms?: number | null;
+          metadata?: Json;
+          model?: string | null;
+          prompt_tokens?: number | null;
+          role?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'ai_messages_conversation_id_fkey';
+            columns: ['conversation_id'];
+            isOneToOne: false;
+            referencedRelation: 'ai_conversations';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      ai_preferences: {
+        Row: {
+          daily_digest: boolean;
+          last_digest_on: string | null;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          daily_digest?: boolean;
+          last_digest_on?: string | null;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          daily_digest?: boolean;
+          last_digest_on?: string | null;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      ai_reminders: {
+        Row: {
+          created_at: string;
+          id: string;
+          notified_at: string | null;
+          remind_at: string;
+          text: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          notified_at?: string | null;
+          remind_at: string;
+          text: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          notified_at?: string | null;
+          remind_at?: string;
+          text?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
+      ai_requests: {
+        Row: {
+          created_at: string;
+          id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       appreciations: {
         Row: {
           company_id: string;
@@ -3004,6 +3170,16 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      ai_get_context: {
+        Args: { _conversation_id: string; _limit?: number };
+        Returns: Json;
+      };
+      ai_owns_conversation: {
+        Args: { _conversation_id: string };
+        Returns: boolean;
+      };
+      ai_suggestions: { Args: never; Returns: Json };
+      cancel_absence_period: { Args: { p_period_id: string }; Returns: Json };
       chat_bootstrap: { Args: never; Returns: undefined };
       chat_can_post: { Args: { _conversation_id: string }; Returns: boolean };
       chat_create_group: {
@@ -3134,6 +3310,17 @@ export type Database = {
       mail_sync_access_members: {
         Args: { p_access: string };
         Returns: undefined;
+      };
+      reschedule_vacation_period: {
+        Args: {
+          p_end_date: string;
+          p_end_time?: string;
+          p_period_id: string;
+          p_period_type?: string;
+          p_start_date: string;
+          p_start_time?: string;
+        };
+        Returns: Json;
       };
       review_employee_document: {
         Args: {

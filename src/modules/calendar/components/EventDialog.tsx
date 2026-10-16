@@ -161,7 +161,11 @@ export const EventDialog: React.FC<EventDialogProps> = ({
             <span className={LABEL}>Convidados</span>
             <PeoplePicker
               value={form.attendeeIds}
-              onChange={ids => set('attendeeIds', ids)}
+              onChange={ids => {
+                set('attendeeIds', ids);
+                // Convidados só veem o evento se ele não for privado.
+                if (ids.length && form.visibility === 'private') set('visibility', 'participants');
+              }}
               placeholder="Convidar"
             />
           </div>
@@ -241,7 +245,9 @@ export const EventDialog: React.FC<EventDialogProps> = ({
               >
                 <option value="participants">Eu e os convidados</option>
                 <option value="company">Toda a empresa</option>
-                <option value="private">Só eu</option>
+                <option value="private" disabled={form.attendeeIds.length > 0}>
+                  Só eu
+                </option>
               </select>
             </label>
             <div>

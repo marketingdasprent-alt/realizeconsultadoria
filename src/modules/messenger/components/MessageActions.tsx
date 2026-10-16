@@ -1,5 +1,14 @@
 import React from 'react';
-import { Copy, ListChecks, MoreHorizontal, Pencil, Reply, SmilePlus, Trash2 } from 'lucide-react';
+import {
+  Copy,
+  Forward,
+  ListChecks,
+  MoreHorizontal,
+  Pencil,
+  Reply,
+  SmilePlus,
+  Trash2,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,6 +28,7 @@ export interface MessageActionHandlers {
   onDelete: (message: ChatMessage) => void;
   onCopy: (message: ChatMessage) => void;
   onCreateTask: (message: ChatMessage) => void;
+  onForward: (message: ChatMessage) => void;
 }
 
 const BUTTON =
@@ -33,6 +43,7 @@ export const MessageActions: React.FC<{ message: ChatMessage } & MessageActionHa
   onDelete,
   onCopy,
   onCreateTask,
+  onForward,
 }) => (
   <div
     className={cn(
@@ -82,6 +93,9 @@ export const MessageActions: React.FC<{ message: ChatMessage } & MessageActionHa
             <Copy className="mr-2 h-4 w-4" /> Copiar texto
           </DropdownMenuItem>
         )}
+        <DropdownMenuItem className="rounded-xl" onClick={() => onForward(message)}>
+          <Forward className="mr-2 h-4 w-4" /> Encaminhar
+        </DropdownMenuItem>
         <DropdownMenuItem className="rounded-xl" onClick={() => onCreateTask(message)}>
           <ListChecks className="mr-2 h-4 w-4" /> Criar tarefa
         </DropdownMenuItem>

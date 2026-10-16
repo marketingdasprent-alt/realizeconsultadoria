@@ -113,4 +113,6 @@ export interface MessengerApi {
   createGroup: (title: string, userIds: string[]) => Promise<string | null>;
   /** URL temporário de um anexo privado. */
   getFileUrl: (path: string) => Promise<string | null>;
+  /** Reenvia uma mensagem (texto, imagem, ficheiro ou voz) para outras conversas. */
+  forwardMessage: (message: ChatMessage, conversationIds: string[]) => Promise<void>;
 }

@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { matchesText } from '@/lib/text';
 import { Check, Loader2, Search, Users } from 'lucide-react';
 import {
   Dialog,
@@ -33,10 +34,8 @@ export const NewConversationDialog: React.FC<NewConversationDialogProps> = ({
   const [isBusy, setIsBusy] = useState(false);
 
   const people = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    return api.directory.filter(
-      p => !term || [p.name, p.position, p.department].some(v => v?.toLowerCase().includes(term))
-    );
+    const term = query;
+    return api.directory.filter(p => matchesText(term, p.name, p.position, p.department));
   }, [api.directory, query]);
 
   const reset = () => {

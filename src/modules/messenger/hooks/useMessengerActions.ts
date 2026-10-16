@@ -29,6 +29,7 @@ type Actions = Pick<
   | 'startDirect'
   | 'createGroup'
   | 'getFileUrl'
+  | 'forwardMessage'
 >;
 
 const fail = (description: string): void => {
@@ -210,6 +211,61 @@ export const useMessengerActions = ({
     [openNew]
   );
 
+  const forwardMessage = useCallback<Actions['forwardMessage']>(
+    async (message, conversationIds) => {
+      let failed = 0;
+      for (const conversationId of conversationIds) {
+        try {
+          const attachment = message.attachment;
+          let path: string | null = null;
+          if (attachment?.path) {
+            const copy = await messengerService.copyFile(
+              attachment.path,
+              conversationId,
+              attachment.name
+            );
+            if (copy.error || !copy.data) throw copy.error ?? new Error('copy');
+            path = copy.data;
+          }
+          const { data, error } = await messengerService.insertMessage({
+            conversation_id: conversationId,
+            sender_id: user.userId,
+            kind: message.kind,
+            body: message.text?.trim() || null,
+            attachment_path: path,
+            attachment_name: path ? attachment?.name : null,
+            attachment_size: path ? attachment?.size : null,
+            attachment_mime: path ? attachment?.mime : null,
+            duration_sec: message.durationSec ?? null,
+            reply_to_id: null,
+          });
+          if (error || !data) throw error ?? new Error('insert');
+          qc.setQueryData(CHAT_KEYS.thread(conversationId), (cache: InfiniteData<MessageRow[]>) =>
+            cache ? upsertThreadRow(cache, data) : cache
+          );
+        } catch {
+          failed += 1;
+        }
+      }
+      refreshList();
+      if (failed)
+        fail(
+          failed === conversationIds.length
+            ? 'Não foi encaminhada.'
+            : 'Algumas conversas não receberam a mensagem.'
+        );
+      else
+        toast({
+          title: conversationIds.length > 1 ? 'Mensagem encaminhada' : 'Mensagem encaminhada',
+          description:
+            conversationIds.length > 1
+              ? `Enviada a ${conversationIds.length} conversas.`
+              : undefined,
+        });
+    },
+    [user.userId, qc, refreshList]
+  );
+
   const getFileUrl = useCallback(
     async (path: string) => (await messengerService.getFileUrl(path)).data,
     []
@@ -224,5 +280,6 @@ export const useMessengerActions = ({
     startDirect,
     createGroup,
     getFileUrl,
+    forwardMessage,
   };
 };

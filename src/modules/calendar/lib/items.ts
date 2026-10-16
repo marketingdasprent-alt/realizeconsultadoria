@@ -1,6 +1,6 @@
 // Conversão das várias fontes (eventos, ausências, feriados, tarefas) em blocos do calendário.
 import { endOfDay, startOfDay } from 'date-fns';
-import type { Holiday } from '@/lib/vacation-utils';
+import { countBusinessDays, type Holiday } from '@/lib/vacation-utils';
 import { absenceTypeLabels } from '@/lib/absence-types';
 import type { AbsenceRow } from '@/modules/absences/lib/absenceRules';
 import type { Task } from '@/modules/tasks/types';
@@ -88,8 +88,23 @@ export const buildItems = (input: BuildInput): CalendarItem[] => {
             status: absence.status,
           },
         ];
+    const spans = periods.map(period => ({
+      key: period.id,
+      start: dateOnly(period.start_date),
+      end: dateOnly(period.end_date, true),
+      pending: absence.status === 'pending' || period.status === 'pending',
+    }));
     for (const period of periods) {
       const pending = absence.status === 'pending' || period.status === 'pending';
+      const partial = 'period_type' in period && period.period_type === 'partial';
+      const days =
+        'business_days' in period && typeof period.business_days === 'number'
+          ? period.business_days
+          : countBusinessDays(
+              dateOnly(period.start_date),
+              dateOnly(period.end_date),
+              input.holidays
+            );
       items.push({
         key: `abs-${absence.id}-${period.id}`,
         layer: 'absences',
@@ -100,6 +115,18 @@ export const buildItems = (input: BuildInput): CalendarItem[] => {
         tone: pending
           ? 'bg-amber-50 text-amber-800 ring-1 ring-dashed ring-amber-300'
           : 'bg-emerald-100 text-emerald-800',
+        info: {
+          kind: 'absence',
+          typeLabel: absenceTypeLabels[absence.absence_type] ?? 'Ausência',
+          pending,
+          days,
+          hours:
+            partial && 'start_time' in period && period.start_time && period.end_time
+              ? `${period.start_time.slice(0, 5)} – ${period.end_time.slice(0, 5)}`
+              : undefined,
+          notes: absence.notes,
+          siblings: spans.filter(span => span.key !== period.id),
+        },
       });
     }
   }
@@ -112,6 +139,7 @@ export const buildItems = (input: BuildInput): CalendarItem[] => {
       end: dateOnly(absence.end_date, true),
       allDay: true,
       tone: 'bg-slate-100 text-slate-600',
+      info: { kind: 'team', name: absence.name },
     });
   }
   for (const holiday of input.holidays) {
@@ -123,6 +151,7 @@ export const buildItems = (input: BuildInput): CalendarItem[] => {
       end: dateOnly(holiday.date, true),
       allDay: true,
       tone: 'bg-rose-50 text-rose-700',
+      info: { kind: 'holiday', name: holiday.name, national: holiday.is_national },
     });
   }
   for (const task of input.tasks) {

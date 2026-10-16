@@ -32,6 +32,22 @@ export type CalendarLayer =
   | 'holidays'
   | 'tasks';
 
+/** Detalhe de blocos que não são eventos (abre na lateral, como um evento). */
+export type CalendarInfo =
+  | {
+      kind: 'absence';
+      typeLabel: string;
+      pending: boolean;
+      days: number;
+      /** Só algumas horas (ex.: "09:00 – 13:00"). */
+      hours?: string;
+      notes: string | null;
+      /** Os outros períodos do mesmo pedido. */
+      siblings: { key: string; start: Date; end: Date; pending: boolean }[];
+    }
+  | { kind: 'holiday'; name: string; national: boolean }
+  | { kind: 'team'; name: string };
+
 /** Um bloco no calendário (ocorrência de evento, ausência, feriado ou prazo de tarefa). */
 export interface CalendarItem {
   key: string;
@@ -44,6 +60,7 @@ export interface CalendarItem {
   tone: string;
   event?: CalendarEvent;
   taskId?: string;
+  info?: CalendarInfo;
 }
 
 export type CalendarView = 'month' | 'week' | 'day' | 'agenda';

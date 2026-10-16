@@ -7,6 +7,7 @@ import { ConversationHeader } from './ConversationHeader';
 import { TaskFormDialog } from '@/modules/tasks/components/TaskFormDialog';
 import { useTasks } from '@/modules/tasks/hooks/useTasks';
 import { DeleteMessageDialog } from './DeleteMessageDialog';
+import { ForwardDialog } from './ForwardDialog';
 import { MessageComposer } from './MessageComposer';
 import { MessageList } from './MessageList';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
@@ -23,6 +24,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [toDelete, setToDelete] = useState<ChatMessage | null>(null);
+  const [toForward, setToForward] = useState<ChatMessage | null>(null);
   const [search, setSearch] = useState<string | null>(null);
   // Mensagem a transformar em tarefa (briefing §28: Chat → Tarefas).
   const [taskFrom, setTaskFrom] = useState<ChatMessage | null>(null);
@@ -111,6 +113,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
             onDelete: setToDelete,
             onCopy: copy,
             onCreateTask: setTaskFrom,
+            onForward: setToForward,
           }}
         />
       )}
@@ -155,6 +158,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
         }
         onSave={tasks.create}
       />
+      <ForwardDialog message={toForward} onClose={() => setToForward(null)} />
       <DeleteMessageDialog
         message={toDelete}
         onClose={() => setToDelete(null)}

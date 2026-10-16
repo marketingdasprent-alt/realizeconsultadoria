@@ -1,8 +1,10 @@
 // Messenger da pré-visualização: a mesma interface que o servidor real, mas em memória.
+import { toast } from '@/hooks/use-toast';
 import { useCallback, useMemo, useState } from 'react';
 import {
   DEMO_CONVERSATIONS,
   DEMO_DIRECTORY,
+  DEMO_IMAGES,
   DEMO_ME,
   DEMO_MESSAGES,
   DEMO_ONLINE,
@@ -187,6 +189,12 @@ export const useDemoMessenger = (): MessengerApi => {
     startDirect,
     createGroup,
     // Na pré-visualização o "caminho" de um ficheiro enviado já é um URL local.
-    getFileUrl: async path => (path.startsWith('blob:') ? path : null),
+    getFileUrl: async path => (path.startsWith('blob:') ? path : (DEMO_IMAGES[path] ?? null)),
+    forwardMessage: async (_message, conversationIds) => {
+      toast({
+        title: 'Mensagem encaminhada',
+        description: `Pré-visualização: ${conversationIds.length} conversa(s).`,
+      });
+    },
   };
 };

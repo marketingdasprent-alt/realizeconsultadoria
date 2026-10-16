@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { matchesText } from '@/lib/text';
 import { MessageSquarePlus, Search, SquarePen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FILTERS } from '../lib/format';
@@ -33,12 +34,12 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   const archivedCount = conversations.filter(c => c.archived).length;
 
   const visible = useMemo(() => {
-    const term = query.trim().toLowerCase();
+    const term = query;
     return conversations
       .filter(c => (showArchived ? c.archived : !c.archived))
       .filter(c => filter === 'all' || c.kind === filter)
       .filter(c => !onlyUnread || c.unread > 0)
-      .filter(c => !term || `${c.title} ${c.lastMessage}`.toLowerCase().includes(term))
+      .filter(c => matchesText(term, c.title, c.lastMessage))
       .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.lastAt.localeCompare(a.lastAt));
   }, [conversations, filter, onlyUnread, query, showArchived]);
 

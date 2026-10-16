@@ -17,6 +17,8 @@ interface MonthGridProps {
   month: Date;
   renderDay: (day: Date) => React.ReactNode;
   onDayClick?: (day: Date) => void;
+  /** Clicar no número do dia (em vez do espaço vazio). */
+  onDayNumberClick?: (day: Date) => void;
   /** Dias destacados (ex.: seleção para pedir férias). */
   isSelected?: (day: Date) => boolean;
   dayClassName?: (day: Date) => string | undefined;
@@ -27,6 +29,7 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
   month,
   renderDay,
   onDayClick,
+  onDayNumberClick,
   isSelected,
   dayClassName,
 }) => {
@@ -64,14 +67,31 @@ export const MonthGrid: React.FC<MonthGridProps> = ({
                 dayClassName?.(day)
               )}
             >
-              <span
-                className={cn(
-                  'mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-bold',
-                  isToday(day) && 'bg-rz-primary text-white'
-                )}
-              >
-                {format(day, 'd')}
-              </span>
+              {onDayNumberClick ? (
+                <button
+                  type="button"
+                  onClick={event => {
+                    event.stopPropagation();
+                    onDayNumberClick(day);
+                  }}
+                  title="Ver o dia"
+                  className={cn(
+                    'mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-bold hover:bg-rz-primary-soft hover:text-rz-primary',
+                    isToday(day) && 'bg-rz-primary text-white hover:bg-rz-primary hover:text-white'
+                  )}
+                >
+                  {format(day, 'd')}
+                </button>
+              ) : (
+                <span
+                  className={cn(
+                    'mb-1 inline-flex h-6 min-w-6 items-center justify-center rounded-full px-1 text-[12px] font-bold',
+                    isToday(day) && 'bg-rz-primary text-white'
+                  )}
+                >
+                  {format(day, 'd')}
+                </span>
+              )}
               <div className="space-y-0.5">{renderDay(day)}</div>
             </div>
           );

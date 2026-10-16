@@ -40,6 +40,7 @@ export interface AbsenceRow {
   status: string;
   notes: string | null;
   rejection_reason?: string | null;
+  created_at?: string;
   training_mode?: string | null;
   absence_periods?: AbsencePeriodRow[];
   document_count?: number;

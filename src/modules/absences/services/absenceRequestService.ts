@@ -157,6 +157,37 @@ export const absenceRequestService = {
       .catch(error => console.error('Falhou o email aos RH:', error));
   },
 
+  /**
+   * Muda as datas de um período de férias (aprovado ou pendente, que ainda não começou).
+   * As regras estão na base de dados (reschedule_vacation_period).
+   */
+  reschedulePeriod: async (
+    periodId: string,
+    input: {
+      startDate: string;
+      endDate: string;
+      periodType: 'full_day' | 'partial';
+      startTime: string | null;
+      endTime: string | null;
+    }
+  ) => {
+    const { data, error } = await supabase.rpc('reschedule_vacation_period', {
+      p_period_id: periodId,
+      p_start_date: input.startDate,
+      p_end_date: input.endDate,
+      p_period_type: input.periodType,
+      p_start_time: input.startTime ?? undefined,
+      p_end_time: input.endTime ?? undefined,
+    });
+    return { data, error };
+  },
+
+  /** Cancela um período de um pedido pendente ou rejeitado (o único = o pedido todo). */
+  cancelPeriod: async (periodId: string) => {
+    const { error } = await supabase.rpc('cancel_absence_period', { p_period_id: periodId });
+    return { error };
+  },
+
   /** Cancela (apaga) um pedido pendente ou rejeitado, com os períodos e os anexos. */
   cancel: async (absenceId: string) => {
     await supabase.from('absence_documents').delete().eq('absence_id', absenceId);

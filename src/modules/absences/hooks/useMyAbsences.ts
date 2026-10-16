@@ -8,6 +8,7 @@ import { describeConflicts, findApprovedConflicts } from '@/lib/absence-overlap'
 import type { DatePeriod } from '@/lib/vacation-utils';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { periodsRange, toPeriodRows, violatesVacationNotice } from '../lib/absenceRules';
+import type { PeriodItem } from '../lib/periodItems';
 import { DEMO_ABSENCES } from '../lib/demoData';
 import { absenceRequestService, type AbsencesData } from '../services/absenceRequestService';
 
@@ -25,6 +26,15 @@ const fail = (title: string, description: string): false => {
   toast({ title, description, variant: 'destructive' });
   return false;
 };
+
+export interface PeriodEdit {
+  from: Date;
+  to: Date;
+  periodType: 'full_day' | 'partial';
+  startTime: string | null;
+  endTime: string | null;
+  businessDays: number;
+}
 
 export const useMyAbsences = () => {
   const { isPreview, user } = useWorkspace();
@@ -159,6 +169,89 @@ export const useMyAbsences = () => {
     await refresh();
   };
 
+  /** Muda as datas de um período (as regras de sempre, aplicadas na base de dados). */
+  const editPeriod = async (item: PeriodItem, edit: PeriodEdit): Promise<boolean> => {
+    const startDate = format(edit.from, 'yyyy-MM-dd');
+    const endDate = format(edit.to, 'yyyy-MM-dd');
+    if (isPreview) {
+      setDemo(current => ({
+        ...current,
+        absences: current.absences.map(a =>
+          a.id !== item.absenceId
+            ? a
+            : {
+                ...a,
+                status: 'pending',
+                absence_periods: a.absence_periods?.map(p =>
+                  p.id === item.id
+                    ? {
+                        ...p,
+                        start_date: startDate,
+                        end_date: endDate,
+                        business_days: edit.businessDays,
+                        period_type: edit.periodType,
+                        start_time: edit.startTime,
+                        end_time: edit.endTime,
+                        status: 'pending',
+                      }
+                    : p
+                ),
+              }
+        ),
+      }));
+      toast({ title: 'Novas datas enviadas aos RH' });
+      return true;
+    }
+    const { error } = await absenceRequestService.reschedulePeriod(item.id, {
+      startDate,
+      endDate,
+      periodType: edit.periodType,
+      startTime: edit.startTime,
+      endTime: edit.endTime,
+    });
+    if (error) {
+      fail(
+        'Não foi possível alterar as datas',
+        (error as { message?: string }).message ?? 'Tente novamente.'
+      );
+      return false;
+    }
+    absenceRequestService.notifyHR({
+      employeeName: user.name,
+      employeeEmail: user.email,
+      companyName: user.companyName ?? '',
+      absenceType: item.absenceType,
+      periods: [{ startDate, endDate, businessDays: edit.businessDays }],
+      notes: 'Remarcação de um período de férias.',
+    });
+    toast({
+      title: 'Novas datas enviadas aos RH',
+      description: 'O período fica à espera de aprovação; os outros mantêm-se.',
+    });
+    await refresh();
+    return true;
+  };
+
+  const cancelPeriod = async (item: PeriodItem) => {
+    if (isPreview) {
+      setDemo(current => ({
+        ...current,
+        absences: current.absences
+          .map(a =>
+            a.id !== item.absenceId
+              ? a
+              : { ...a, absence_periods: a.absence_periods?.filter(p => p.id !== item.id) }
+          )
+          .filter(a => a.id !== item.absenceId || (a.absence_periods?.length ?? 0) > 0),
+      }));
+      return;
+    }
+    const { error } = await absenceRequestService.cancelPeriod(item.id);
+    if (error) return void fail('Erro', 'Não foi possível cancelar este período.');
+    toast({ title: 'Período cancelado' });
+    await refresh();
+  };
+
   return {
     data,
     isLoading: !isPreview && live.isLoading,
@@ -166,6 +259,8 @@ export const useMyAbsences = () => {
     isSubmitting,
     submit,
     cancel,
+    editPeriod,
+    cancelPeriod,
     refresh,
   };
 };

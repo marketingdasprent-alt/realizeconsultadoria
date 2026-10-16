@@ -1,0 +1,271 @@
+// Edge function ai-chat: o "Realize AI". Conversa com o modelo da empresa e, quando pedem,
+// prepara eventos, tarefas e lembretes (que a pessoa confirma no ecrã antes de gravar).
+//
+// POST com Authorization: Bearer <JWT do utilizador>. Respostas de negócio em HTTP 200:
+//   { action: 'chat', messages: [{ role: 'user' | 'assistant', content }] }
+//        → { ok: true, reply, proposals: [{ id, tool, title, lines, args }] }
+//   { action: 'execute', tool: 'event' | 'task' | 'reminder', args }
+//        → { ok, message, link? }          (grava uma proposta confirmada)
+//   erros: { ok: false, code, message }
+//
+// O modelo é qualquer servidor compatível com a API da OpenAI (Ollama, OpenAI, DeepSeek, ...).
+// Segredos da função (nunca vão para o browser):
+//   AI_BASE_URL   ex.: https://ia.dasprent.pt/v1
+//   AI_MODEL      ex.: qwen2.5:7b
+//   AI_API_KEY    a chave do servidor (ou OLLAMA_API_KEY; opcional se o servidor não a exigir)
+//   AI_TOOLS_MODEL (opcional) modelo para este assistente, se for outro que o de AI_MODEL
+// verify_jwt = false: o JWT é validado aqui (auth.getUser).
+
+import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { describeInstant, fold } from '../_shared/ai/time.ts';
+import type { Person } from '../_shared/ai/time.ts';
+import {
+  authenticatedUserId,
+  corsHeaders,
+  fetchWithTimeout,
+  json,
+  serviceClient,
+} from '../_shared/mail-server/http.ts';
+import { executeProposal, runTool, TOOL_DEFS, type Proposal, type ToolContext } from './tools.ts';
+
+const MAX_MESSAGES = 30;
+const MAX_CONTENT = 8000;
+const PER_MINUTE = 12;
+const PER_DAY = 300;
+const MAX_ROUNDS = 4;
+
+// Só pedidos que parecem ações (agenda, tarefas, lembretes, férias...) usam o modelo das
+// ferramentas, que é mais capaz mas mais lento; o resto vai para o modelo rápido, sem ferramentas.
+const ACTION_HINT =
+  /agenda|calendario|reuniao|evento|marc[ae]|desmarc|lembr|tarefa|prazo|ferias|saldo|convid|compromisso|hoje|amanha|semana|segunda|terca|quarta|quinta|sexta|colega/;
+
+type Role = 'user' | 'assistant';
+interface ChatMessage {
+  role: Role;
+  content: string;
+}
+type ModelMessage = Record<string, unknown>;
+
+const fail = (code: string, message: string) => json({ ok: false, code, message });
+const UNAVAILABLE = 'O assistente não está disponível neste momento.';
+
+const parseMessages = (value: unknown): ChatMessage[] | null => {
+  if (!Array.isArray(value) || value.length === 0 || value.length > MAX_MESSAGES) return null;
+  const messages: ChatMessage[] = [];
+  for (const item of value) {
+    if (typeof item !== 'object' || item === null) return null;
+    const { role, content } = item as Record<string, unknown>;
+    if ((role !== 'user' && role !== 'assistant') || typeof content !== 'string') return null;
+    const text = content.trim();
+    if (text.length > MAX_CONTENT) return null;
+    // Respostas vazias de tentativas falhadas ficam de fora do histórico.
+    if (text) messages.push({ role, content: text });
+  }
+  return messages.length && messages[messages.length - 1].role === 'user' ? messages : null;
+};
+
+const systemPrompt = (firstName: string, now: Date, withTools: boolean) =>
+  `És o Realize AI, o assistente dos colaboradores da Realize Consultadoria. ` +
+  `Estás a falar com ${firstName}. Agora é ${describeInstant(now)} (hora de Lisboa). ` +
+  `Responde sempre em português de Portugal, de forma clara e muito concisa: no máximo três ou quatro frases, ou uma lista curta, a não ser que peçam mais detalhe. ` +
+  (withTools
+    ? `Tens ferramentas: lê a agenda, as tarefas e o saldo de férias da pessoa, procura colegas, e prepara eventos, tarefas e lembretes. ` +
+      `Para marcar, criar ou lembrar algo usa SEMPRE propose_event, propose_task ou propose_reminder: elas só preparam uma proposta e a pessoa confirma num cartão. ` +
+      `Depois de preparar, diz numa frase o que preparaste e que basta confirmar no cartão; nunca digas que já ficou criado. ` +
+      `Calcula datas relativas (amanhã, sexta, daqui a duas semanas) a partir de agora. Se faltar a data ou a hora, pergunta antes. ` +
+      `Se uma ferramenta pedir esclarecimento (nome repetido, data passada), pergunta à pessoa. `
+    : `Não consegues ver nem alterar a agenda, as tarefas ou as férias nesta resposta; se pedirem isso, diz que podem pedir de outra forma, por exemplo "marca uma reunião amanhã às 10h". `) +
+  `Não inventes factos nem dados da empresa; se não souberes, di-lo.`;
+
+/** Uma chamada ao modelo (sem fluxo: as ferramentas precisam da resposta inteira). */
+const callModel = async (
+  baseUrl: string,
+  model: string,
+  apiKey: string | undefined,
+  messages: ModelMessage[],
+  withTools: boolean
+): Promise<{ message?: ModelMessage; status: number }> => {
+  const response = await fetchWithTimeout(
+    `${baseUrl}/chat/completions`,
+    {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        ...(apiKey ? { Authorization: `Bearer ${apiKey}` } : {}),
+      },
+      body: JSON.stringify({
+        model,
+        stream: false,
+        max_tokens: 700,
+        temperature: 0.3,
+        messages,
+        ...(withTools
+          ? { tools: TOOL_DEFS.map(def => ({ type: 'function', function: def })) }
+          : {}),
+      }),
+    },
+    90_000
+  );
+  if (!response.ok) {
+    console.error(
+      'ai-chat: o modelo respondeu',
+      response.status,
+      (await response.text()).slice(0, 200)
+    );
+    return { status: response.status };
+  }
+  const body = (await response.json()) as { choices?: { message?: ModelMessage }[] };
+  return { message: body.choices?.[0]?.message, status: 200 };
+};
+
+const parseArgs = (raw: unknown): Record<string, unknown> => {
+  if (raw && typeof raw === 'object') return raw as Record<string, unknown>;
+  try {
+    const parsed: unknown = JSON.parse(typeof raw === 'string' ? raw : '{}');
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+};
+
+serve(async (req: Request) => {
+  if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
+  if (req.method !== 'POST') return json({ ok: false, code: 'bad_request' }, 405);
+
+  const baseUrl = Deno.env.get('AI_BASE_URL')?.replace(/\/+$/, '');
+  const chatModel = Deno.env.get('AI_MODEL');
+  const toolsModel = Deno.env.get('AI_TOOLS_MODEL') || chatModel;
+  if (!baseUrl || !chatModel || !toolsModel)
+    return fail('not_configured', 'A IA ainda não está configurada.');
+
+  const admin = serviceClient();
+  const userId = await authenticatedUserId(req, admin);
+  if (!userId) return json({ ok: false, code: 'unauthorized' }, 401);
+
+  const { data: employee } = await admin
+    .from('employees')
+    .select('name, company_id')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+  if (!employee) return json({ ok: false, code: 'forbidden' }, 403);
+
+  let body: Record<string, unknown>;
+  try {
+    body = (await req.json()) as Record<string, unknown>;
+  } catch {
+    return json({ ok: false, code: 'bad_request' }, 400);
+  }
+
+  // Cliente com o JWT da pessoa: as regras de acesso da base de dados aplicam-se.
+  const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    global: { headers: { Authorization: req.headers.get('Authorization')! } },
+    auth: { autoRefreshToken: false, persistSession: false },
+  });
+  let people: Person[] | null = null;
+  const ctx: ToolContext = {
+    db,
+    userId,
+    companyId: employee.company_id,
+    now: new Date(),
+    directory: async () => {
+      if (!people) {
+        const { data } = await db.rpc('chat_directory');
+        people = (data ?? []) as Person[];
+      }
+      return people;
+    },
+  };
+
+  if (body.action === 'execute') {
+    const args =
+      body.args && typeof body.args === 'object' ? (body.args as Record<string, unknown>) : {};
+    const result = await executeProposal(ctx, String(body.tool ?? ''), args);
+    return json(result);
+  }
+
+  const history = parseMessages(body.messages);
+  if (!history) return json({ ok: false, code: 'bad_request' }, 400);
+
+  // Limite de pedidos por pessoa (o modelo é nosso e partilhado).
+  const minuteAgo = new Date(Date.now() - 60_000).toISOString();
+  const dayAgo = new Date(Date.now() - 24 * 3_600_000).toISOString();
+  const [perMinute, perDay] = await Promise.all([
+    admin
+      .from('ai_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', minuteAgo),
+    admin
+      .from('ai_requests')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId)
+      .gte('created_at', dayAgo),
+  ]);
+  if ((perMinute.count ?? 0) >= PER_MINUTE)
+    return fail('rate_limited', 'Muitos pedidos seguidos. Espere um minuto e tente outra vez.');
+  if ((perDay.count ?? 0) >= PER_DAY)
+    return fail('rate_limited', 'Chegou ao limite de pedidos de hoje. Volte amanhã.');
+  await admin.from('ai_requests').insert({ user_id: userId });
+
+  // Sem espaços nem quebras de linha à volta (vêm da área de transferência).
+  const apiKey = (Deno.env.get('AI_API_KEY') ?? Deno.env.get('OLLAMA_API_KEY'))?.trim();
+  const lastUser = history[history.length - 1].content;
+  const withTools = ACTION_HINT.test(fold(lastUser));
+  const model = withTools ? toolsModel : chatModel;
+  const messages: ModelMessage[] = [
+    { role: 'system', content: systemPrompt(employee.name.split(' ')[0], ctx.now, withTools) },
+    ...history,
+  ];
+  const proposals: Proposal[] = [];
+  const deadline = Date.now() + 100_000;
+  let reply = '';
+
+  try {
+    for (let round = 0; round < MAX_ROUNDS; round += 1) {
+      const { message, status } = await callModel(baseUrl, model, apiKey, messages, withTools);
+      if (status === 401 || status === 403)
+        return fail('not_configured', 'A chave da IA não é válida. Fale com a administração.');
+      if (status === 404)
+        return fail('unavailable', 'O modelo da IA não foi encontrado no servidor.');
+      if (!message) return fail('unavailable', UNAVAILABLE);
+
+      const calls = Array.isArray(message.tool_calls)
+        ? (message.tool_calls as {
+            id?: string;
+            function?: { name?: string; arguments?: unknown };
+          }[])
+        : [];
+      if (!calls.length) {
+        reply = typeof message.content === 'string' ? message.content.trim() : '';
+        break;
+      }
+      messages.push({ role: 'assistant', content: message.content ?? '', tool_calls: calls });
+      for (const call of calls.slice(0, 4)) {
+        const result = await runTool(
+          ctx,
+          call.function?.name ?? '',
+          parseArgs(call.function?.arguments)
+        );
+        if (result.proposal) proposals.push(result.proposal);
+        messages.push({
+          role: 'tool',
+          tool_call_id: call.id ?? call.function?.name,
+          content: result.content,
+        });
+      }
+      if (Date.now() > deadline) break;
+    }
+  } catch (error) {
+    console.error('ai-chat: sem ligação ao modelo', error instanceof Error ? error.message : error);
+    return fail('unavailable', UNAVAILABLE);
+  }
+
+  if (!reply)
+    reply = proposals.length
+      ? 'Preparei isto para si. Confirme abaixo.'
+      : 'Não consegui responder a isso. Pode reformular o pedido?';
+  return json({ ok: true, reply, proposals });
+});

@@ -1,4 +1,5 @@
 // Linha do tempo do Feed: publicações, comunicados dos RH e reconhecimentos públicos.
+import { matchesText } from '@/lib/text';
 import type { Appreciation, FeedPost, Notice } from '../types';
 import { extractHashtags } from './feed';
 
@@ -34,9 +35,7 @@ export const buildTimeline = ({
   query,
   hashtag,
 }: BuildInput) => {
-  const term = query.trim().toLowerCase();
-  const matches = (...texts: (string | null | undefined)[]) =>
-    !term || texts.some(text => text?.toLowerCase().includes(term));
+  const matches = (...texts: (string | null | undefined)[]) => matchesText(query, ...texts);
 
   const items: TimelineItem[] = [];
   if (filter === 'all' || filter === 'posts') {

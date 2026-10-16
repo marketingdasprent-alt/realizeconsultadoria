@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Loader2, MessageCircle, Search } from 'lucide-react';
+import { canonicalLabels, compareText, matchesText, sameText } from '@/lib/text';
 import { useOptionalMessenger } from '@/modules/messenger/context/useMessengerApi';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { WorkspacePage } from '@/modules/workspace/components/WorkspacePage';
@@ -17,18 +18,18 @@ const PeoplePage: React.FC = () => {
   const [query, setQuery] = useState('');
   const [department, setDepartment] = useState<string | null>(null);
 
-  const departments = useMemo(
-    () => [...new Set(colleagues.map(p => p.department).filter(Boolean) as string[])].sort(),
-    [colleagues]
+  // "contabilidade" e "Contabilidade" são o mesmo departamento.
+  const labels = useMemo(() => canonicalLabels(colleagues.map(p => p.department)), [colleagues]);
+  const departments = useMemo(() => [...labels.values()].sort(compareText), [labels]);
+  const visible = useMemo(
+    () =>
+      colleagues.filter(
+        p =>
+          (!department || sameText(p.department, department)) &&
+          matchesText(query, p.name, p.position, p.department)
+      ),
+    [colleagues, department, query]
   );
-  const visible = useMemo(() => {
-    const term = query.trim().toLowerCase();
-    return colleagues.filter(
-      p =>
-        (!department || p.department === department) &&
-        (!term || [p.name, p.position, p.department].some(v => v?.toLowerCase().includes(term)))
-    );
-  }, [colleagues, department, query]);
 
   return (
     <WorkspacePage>

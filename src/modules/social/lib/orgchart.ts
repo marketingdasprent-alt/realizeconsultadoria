@@ -1,5 +1,6 @@
 // Organograma a partir do diretório: empresa → direção → departamentos → pessoas.
 // A BD não guarda chefias; usamos o departamento e o cargo de cada colaborador.
+import { canonicalLabels, compareText, fold, matchesText } from '@/lib/text';
 import type { DirectoryPerson } from '@/modules/messenger/types';
 
 export const NO_DEPARTMENT = 'Outros';
@@ -26,38 +27,36 @@ export const isLead = (person: Pick<DirectoryPerson, 'position'>) =>
   !!person.position && LEAD_PATTERN.test(person.position);
 
 const matches = (person: DirectoryPerson, term: string) =>
-  [person.name, person.position, person.department].some(v => v?.toLowerCase().includes(term));
+  matchesText(term, person.name, person.position, person.department);
 
 /**
  * Agrupa por departamento (chefias primeiro, depois por nome). Com pesquisa, ficam só as
  * pessoas que correspondem — ou o departamento inteiro, se o nome dele corresponder.
  */
 export const buildOrgChart = (people: DirectoryPerson[], search = ''): OrgChart => {
-  const term = search.trim().toLowerCase();
+  const term = search.trim();
+  // "contabilidade" e "Contabilidade" são o mesmo departamento.
+  const labels = canonicalLabels(people.map(p => p.department));
   const groups = new Map<string, DirectoryPerson[]>();
   for (const person of people) {
-    const name = person.department?.trim() || NO_DEPARTMENT;
+    const name = labels.get(fold(person.department)) ?? NO_DEPARTMENT;
     groups.set(name, [...(groups.get(name) ?? []), person]);
   }
 
   const departments: OrgDepartment[] = [];
   for (const [name, members] of groups) {
     const visible =
-      !term || name.toLowerCase().includes(term) ? members : members.filter(p => matches(p, term));
+      !term || matchesText(term, name) ? members : members.filter(p => matches(p, term));
     if (!visible.length) continue;
     departments.push({
       name,
       people: [...visible].sort(
-        (a, b) => Number(isLead(b)) - Number(isLead(a)) || a.name.localeCompare(b.name, 'pt')
+        (a, b) => Number(isLead(b)) - Number(isLead(a)) || compareText(a.name, b.name)
       ),
     });
   }
   departments.sort((a, b) =>
-    a.name === NO_DEPARTMENT
-      ? 1
-      : b.name === NO_DEPARTMENT
-        ? -1
-        : a.name.localeCompare(b.name, 'pt')
+    a.name === NO_DEPARTMENT ? 1 : b.name === NO_DEPARTMENT ? -1 : compareText(a.name, b.name)
   );
 
   const boardIndex = departments.findIndex(d => BOARD_PATTERN.test(d.name));

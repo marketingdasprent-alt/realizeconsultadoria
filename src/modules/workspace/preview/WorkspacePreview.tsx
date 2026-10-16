@@ -28,6 +28,7 @@ import WebmailPage from '@/modules/webmail/pages/WebmailPage';
 import TasksPage from '@/modules/tasks/pages/TasksPage';
 import CalendarPage from '@/modules/calendar/pages/CalendarPage';
 import OrgChartPage from '@/modules/social/pages/OrgChartPage';
+import AiPage from '@/modules/ai/pages/AiPage';
 import { PreviewWorkdayProvider } from './PreviewWorkdayProvider';
 
 const BASE_PATH = '/dev/realize-2';
@@ -105,6 +106,7 @@ const WorkspacePreview: React.FC = () => (
           <Route path="tarefas" element={<TasksPage />} />
           <Route path="calendario" element={<CalendarPage />} />
           <Route path="organograma" element={<OrgChartPage />} />
+          <Route path="ai" element={<AiPage />} />
           <Route path="pessoas" element={<PeoplePage />} />
           <Route path="pessoas/:userId" element={<ColleagueProfilePage />} />
           <Route path="apreciacoes" element={<AppreciationsPage />} />

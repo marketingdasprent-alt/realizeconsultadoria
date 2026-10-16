@@ -103,14 +103,16 @@ export const sharedDocuments = (docs: EmployeeDocument[]): EmployeeDocument[] =>
     )
     .sort(newestFirst);
 
-/** Recibos de vencimento por mês (AAAA-MM → recibo atual). */
-export const payslipsByMonth = (docs: EmployeeDocument[]): Map<string, EmployeeDocument> => {
-  const months = new Map<string, EmployeeDocument>();
-  for (const doc of docs
-    .filter(d => d.category === PAYSLIP_CATEGORY && d.period_month)
-    .sort(newestFirst)) {
+/** Recibos de vencimento em vigor por mês (AAAA-MM → recibos, um mês pode ter vários). */
+export const payslipsByMonth = (docs: EmployeeDocument[]): Map<string, EmployeeDocument[]> => {
+  const months = new Map<string, EmployeeDocument[]>();
+  const current = docs.filter(
+    d =>
+      d.category === PAYSLIP_CATEGORY && d.period_month && d.is_current && d.status === 'approved'
+  );
+  for (const doc of current.sort((a, b) => a.created_at.localeCompare(b.created_at))) {
     const month = doc.period_month!.slice(0, 7);
-    if (!months.has(month)) months.set(month, doc);
+    months.set(month, [...(months.get(month) ?? []), doc]);
   }
   return months;
 };

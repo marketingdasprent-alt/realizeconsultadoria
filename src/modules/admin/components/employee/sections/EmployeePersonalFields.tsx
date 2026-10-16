@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CalendarIcon } from 'lucide-react';
@@ -15,6 +16,8 @@ interface EmployeePersonalFieldsProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   control: Control<any>;
   errors: FieldErrors;
+  /** Documento de identificação (ver / anexar), ao lado do número. */
+  idDocument?: ReactNode;
 }
 
 const message = (errors: FieldErrors, name: string) => errors[name]?.message as string | undefined;
@@ -24,6 +27,7 @@ export const EmployeePersonalFields = ({
   register,
   control,
   errors,
+  idDocument,
 }: EmployeePersonalFieldsProps) => (
   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
     <Field label="Nome completo *" error={message(errors, 'name')} className="md:col-span-2">
@@ -89,5 +93,6 @@ export const EmployeePersonalFields = ({
     <Field label="Nº documento de identificação">
       <Input {...register('document_number')} />
     </Field>
+    {idDocument && <div className="self-end">{idDocument}</div>}
   </div>
 );

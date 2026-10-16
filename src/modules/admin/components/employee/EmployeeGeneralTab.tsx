@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -12,6 +12,12 @@ import { createEmployeeSchema, updateEmployeeSchema } from '@/lib/schemas';
 import { formatIban } from '@/lib/utils';
 import { employeeService } from '@/modules/admin/services/employeeService';
 import { equipmentService } from '@/modules/admin/services/equipmentService';
+import { DOCUMENT_CATEGORIES } from '@/lib/documents';
+import { AdminUploadDocumentDialog } from '@/modules/documents/components/admin/AdminUploadDocumentDialog';
+import { useDocumentDownload } from '@/modules/documents/hooks/useDocumentDownload';
+import { useEmployeeDocuments } from '@/modules/documents/hooks/useEmployeeDocuments';
+import { slotStates, type RegistrationSlot } from '../../lib/registrationSlots';
+import { InlineDocumentSlot } from './files/InlineDocumentSlot';
 import { FormSection } from './FormSection';
 import { EmployeeAccessFields } from './sections/EmployeeAccessFields';
 import { EmployeeEquipmentSection } from './sections/EmployeeEquipmentSection';
@@ -94,6 +100,21 @@ const EmployeeGeneralTab = ({
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [attachFor, setAttachFor] = useState<RegistrationSlot | null>(null);
+
+  // Documentos de registo ao lado dos campos (identificação, IBAN): ver, anexar, substituir.
+  const documents = useEmployeeDocuments(isEditMode ? (employee?.id ?? null) : null);
+  const download = useDocumentDownload();
+  const slots = useMemo(() => slotStates(documents.all), [documents.all]);
+  const docSlot = (key: string) =>
+    isEditMode ? (
+      <InlineDocumentSlot
+        state={slots.find(state => state.slot.key === key)}
+        onAttach={() => setAttachFor(slots.find(state => state.slot.key === key)?.slot ?? null)}
+        onOpen={download.open}
+        openingId={download.openingId}
+      />
+    ) : null;
 
   const methods = useForm<FormValues>({
     resolver: zodResolver(isEditMode ? updateEmployeeSchema : createEmployeeSchema),
@@ -201,7 +222,12 @@ const EmployeeGeneralTab = ({
         <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_340px]">
           <div className="space-y-4">
             <FormSection title="Dados pessoais" icon={UserRound}>
-              <EmployeePersonalFields register={register} control={control} errors={errors} />
+              <EmployeePersonalFields
+                register={register}
+                control={control}
+                errors={errors}
+                idDocument={docSlot('id')}
+              />
             </FormSection>
             <FormSection title="Trabalho" icon={Briefcase}>
               <EmployeeWorkFields
@@ -228,7 +254,11 @@ const EmployeeGeneralTab = ({
               </FormSection>
             )}
             <FormSection title="Dados financeiros" icon={Wallet}>
-              <EmployeeFinancialSection register={register} errors={errors} />
+              <EmployeeFinancialSection
+                register={register}
+                errors={errors}
+                ibanDocument={docSlot('iban')}
+              />
             </FormSection>
           </div>
 
@@ -266,6 +296,17 @@ const EmployeeGeneralTab = ({
           </Button>
         </div>
       </form>
+
+      {employee && (
+        <AdminUploadDocumentDialog
+          open={!!attachFor}
+          onOpenChange={value => !value && setAttachFor(null)}
+          employeeId={employee.id}
+          onUploaded={documents.refetch}
+          categories={DOCUMENT_CATEGORIES.filter(c => attachFor?.categories.includes(c.value))}
+          initialCategory={attachFor?.categories.length === 1 ? attachFor.categories[0] : undefined}
+        />
+      )}
     </FormProvider>
   );
 };

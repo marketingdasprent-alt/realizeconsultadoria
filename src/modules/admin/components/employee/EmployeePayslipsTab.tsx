@@ -1,17 +1,17 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { ChevronLeft, ChevronRight, ExternalLink, Loader2, Plus, Trash2 } from 'lucide-react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import { toPeriodMonth } from '@/lib/documents';
 import { getErrorMessage } from '@/lib/timeclock';
-import { cn } from '@/lib/utils';
 import { useDocumentDownload } from '@/modules/documents/hooks/useDocumentDownload';
 import { useEmployeeDocuments } from '@/modules/documents/hooks/useEmployeeDocuments';
 import { documentService } from '@/modules/documents/services/documentService';
 import { useDocumentRemoval } from '../../hooks/useDocumentRemoval';
 import { payslipsByMonth } from '../../lib/registrationSlots';
+import { PayslipMonthCard } from './files/PayslipMonthCard';
 
 interface EmployeePayslipsTabProps {
   employeeId: string;
@@ -20,8 +20,9 @@ interface EmployeePayslipsTabProps {
 const pad = (month: number) => String(month).padStart(2, '0');
 
 /**
- * Recibos de vencimento do colaborador, mês a mês: carregar (substitui o do mesmo mês), abrir
- * e apagar. Aparecem ao colaborador em Definições → Os meus documentos → Recibos.
+ * Recibos de vencimento do colaborador, mês a mês: um mês pode ter vários (vencimento,
+ * subsídios…). Carregar ou arrastar os ficheiros para cima do mês; o mesmo nome de ficheiro
+ * substitui o anterior. Aparecem ao colaborador em Os meus documentos → Recibos.
  */
 const EmployeePayslipsTab = ({ employeeId }: EmployeePayslipsTabProps) => {
   const { toast } = useToast();
@@ -31,38 +32,36 @@ const EmployeePayslipsTab = ({ employeeId }: EmployeePayslipsTabProps) => {
   const today = new Date();
   const [year, setYear] = useState(today.getFullYear());
   const [uploadingMonth, setUploadingMonth] = useState<string | null>(null);
-  const fileInput = useRef<HTMLInputElement>(null);
-  const pickFor = useRef<string | null>(null);
 
   const byMonth = useMemo(() => payslipsByMonth(all), [all]);
   const months = Array.from({ length: 12 }, (_, index) => `${year}-${pad(index + 1)}`);
   const currentMonth = `${today.getFullYear()}-${pad(today.getMonth() + 1)}`;
 
-  const choose = (month: string) => {
-    pickFor.current = month;
-    fileInput.current?.click();
-  };
-
-  const upload = async (file: File | undefined) => {
-    const month = pickFor.current;
-    if (fileInput.current) fileInput.current.value = '';
-    if (!file || !month) return;
+  const upload = async (month: string, files: File[]) => {
     setUploadingMonth(month);
-    const { error } = await documentService.uploadPayslip({
-      employeeId,
-      periodMonth: toPeriodMonth(month),
-      file,
-    });
-    setUploadingMonth(null);
-    if (error) {
-      toast({
-        title: 'Erro ao carregar',
-        description: getErrorMessage(error, ''),
-        variant: 'destructive',
+    let failed = 0;
+    for (const file of files) {
+      const { error } = await documentService.uploadPayslip({
+        employeeId,
+        periodMonth: toPeriodMonth(month),
+        file,
       });
-      return;
+      if (error) {
+        failed += 1;
+        toast({
+          title: `Erro ao carregar ${file.name}`,
+          description: getErrorMessage(error, ''),
+          variant: 'destructive',
+        });
+      }
     }
-    toast({ title: 'Recibo carregado', description: 'O colaborador já o vê na app.' });
+    setUploadingMonth(null);
+    const done = files.length - failed;
+    if (done > 0)
+      toast({
+        title: done === 1 ? 'Recibo carregado' : `${done} recibos carregados`,
+        description: 'O colaborador já os vê na app.',
+      });
     refetch();
   };
 
@@ -72,7 +71,8 @@ const EmployeePayslipsTab = ({ employeeId }: EmployeePayslipsTabProps) => {
         <div className="min-w-0 flex-1">
           <h3 className="text-[15.5px] font-extrabold">Recibos de vencimento</h3>
           <p className="text-[12.5px] text-rz-muted">
-            Um por mês. O colaborador vê-os na app, em Os meus documentos → Recibos.
+            Arraste os ficheiros para cima do mês (pode ter vários). O colaborador vê-os na app, em
+            Os meus documentos → Recibos.
           </p>
         </div>
         <div className="flex items-center gap-1 rounded-full bg-rz-canvas p-1">
@@ -97,88 +97,27 @@ const EmployeePayslipsTab = ({ employeeId }: EmployeePayslipsTabProps) => {
         </div>
       </header>
 
-      <input
-        ref={fileInput}
-        type="file"
-        accept="application/pdf,image/*"
-        className="hidden"
-        onChange={event => upload(event.target.files?.[0])}
-      />
-
       {isLoading ? (
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
           {months.map(month => (
-            <div key={month} className="h-[88px] animate-pulse rounded-2xl bg-rz-canvas" />
+            <div key={month} className="h-[104px] animate-pulse rounded-2xl bg-rz-canvas" />
           ))}
         </div>
       ) : (
         <ul className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-          {months.map(month => {
-            const payslip = byMonth.get(month);
-            const future = month > currentMonth;
-            const label = format(new Date(`${month}-01T12:00:00`), 'MMMM', { locale: pt });
-            return (
-              <li
-                key={month}
-                className={cn(
-                  'flex flex-col rounded-2xl p-3 ring-1',
-                  payslip ? 'bg-emerald-50 ring-emerald-200' : 'bg-rz-canvas ring-transparent',
-                  future && 'opacity-40'
-                )}
-              >
-                <span className="text-[13.5px] font-bold capitalize">{label}</span>
-                <span className="truncate text-[12px] text-rz-muted">
-                  {payslip ? payslip.file_name : future ? '—' : 'Sem recibo'}
-                </span>
-                <div className="mt-2 flex items-center gap-1">
-                  {uploadingMonth === month ? (
-                    <Loader2 className="h-4 w-4 animate-spin text-rz-primary" />
-                  ) : payslip ? (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => open(payslip)}
-                        disabled={openingId === payslip.id}
-                        className="flex h-8 items-center gap-1 rounded-full bg-white px-2.5 text-[12.5px] font-semibold ring-1 ring-rz-line hover:text-rz-primary"
-                      >
-                        {openingId === payslip.id ? (
-                          <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                        ) : (
-                          <ExternalLink className="h-3.5 w-3.5" />
-                        )}
-                        Ver
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => choose(month)}
-                        className="h-8 rounded-full px-2.5 text-[12.5px] font-semibold text-rz-muted hover:text-rz-ink"
-                      >
-                        Trocar
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => removal.ask(payslip)}
-                        className="ml-auto flex h-8 w-8 items-center justify-center rounded-full text-rz-muted hover:bg-red-50 hover:text-red-600"
-                        aria-label={`Apagar recibo de ${label}`}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    </>
-                  ) : (
-                    !future && (
-                      <button
-                        type="button"
-                        onClick={() => choose(month)}
-                        className="flex h-8 items-center gap-1 rounded-full bg-white px-2.5 text-[12.5px] font-semibold text-rz-primary ring-1 ring-rz-line"
-                      >
-                        <Plus className="h-3.5 w-3.5" /> Carregar
-                      </button>
-                    )
-                  )}
-                </div>
-              </li>
-            );
-          })}
+          {months.map(month => (
+            <PayslipMonthCard
+              key={month}
+              label={format(new Date(`${month}-01T12:00:00`), 'MMMM', { locale: pt })}
+              payslips={byMonth.get(month) ?? []}
+              future={month > currentMonth}
+              uploading={uploadingMonth === month}
+              onFiles={files => upload(month, files)}
+              onOpen={open}
+              openingId={openingId}
+              onDelete={removal.ask}
+            />
+          ))}
         </ul>
       )}
 

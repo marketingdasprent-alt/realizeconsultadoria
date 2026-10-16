@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { formatIban } from '@/lib/utils';
@@ -7,10 +8,16 @@ interface EmployeeFinancialSectionProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   register: UseFormRegister<any>;
   errors: FieldErrors;
+  /** Comprovativo de IBAN (ver / anexar), por baixo do IBAN. */
+  ibanDocument?: ReactNode;
 }
 
 /** IBAN (formatado ao escrever) e cartões. */
-export const EmployeeFinancialSection = ({ register, errors }: EmployeeFinancialSectionProps) => {
+export const EmployeeFinancialSection = ({
+  register,
+  errors,
+  ibanDocument,
+}: EmployeeFinancialSectionProps) => {
   const ibanField = register('iban');
 
   return (
@@ -37,6 +44,7 @@ export const EmployeeFinancialSection = ({ register, errors }: EmployeeFinancial
           className="font-mono tracking-wide"
         />
       </Field>
+      {ibanDocument && <div className="md:col-span-2">{ibanDocument}</div>}
       <Field label="Nº Cartão Dá">
         <Input {...register('cartao_da')} />
       </Field>

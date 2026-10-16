@@ -39,6 +39,25 @@ describe('documentos de registo na ficha', () => {
     expect(id.current?.id).toBe('pp');
   });
 
+  it('um mês pode ter vários recibos (só os em vigor)', () => {
+    const months = payslipsByMonth([
+      doc({ id: 'a', category: 'recibo_vencimento', period_month: '2026-09-01' }),
+      doc({
+        id: 'b',
+        category: 'recibo_vencimento',
+        period_month: '2026-09-01',
+        created_at: '2026-09-30T10:00:00Z',
+      }),
+      doc({
+        id: 'old',
+        category: 'recibo_vencimento',
+        period_month: '2026-09-01',
+        is_current: false,
+      }),
+    ]);
+    expect(months.get('2026-09')?.map(d => d.id)).toEqual(['a', 'b']);
+  });
+
   it('separa histórico, partilhados e recibos', () => {
     const docs = [
       doc({ id: 'old', category: 'cartao_cidadao', is_current: false }),
@@ -52,6 +71,10 @@ describe('documentos de registo na ficha', () => {
         .sort()
     ).toEqual(['old', 'rej']);
     expect(sharedDocuments(docs).map(d => d.id)).toEqual(['com']);
-    expect(payslipsByMonth(docs).get('2026-09')?.id).toBe('r1');
+    expect(
+      payslipsByMonth(docs)
+        .get('2026-09')
+        ?.map(d => d.id)
+    ).toEqual(['r1']);
   });
 });

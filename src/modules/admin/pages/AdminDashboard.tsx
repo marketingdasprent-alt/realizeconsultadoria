@@ -1,5 +1,4 @@
 import { useAuth } from '@/contexts/AuthContext';
-import PWAInstallBanner from '@/components/PWAInstallBanner';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { DashboardStats } from '../components/DashboardStats';
 import { DashboardShortcuts } from '../components/DashboardShortcuts';
@@ -26,8 +25,6 @@ const AdminDashboard = () => {
 
   return (
     <div className="space-y-6">
-      <PWAInstallBanner />
-
       <AdminPageHeader
         title={`${greeting(new Date().getHours())}${name ? `, ${name}` : ''}`}
         description={<span className="first-letter:uppercase">{today}</span>}

@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Holiday } from '@/lib/vacation-utils';
 import type { CalendarAbsence, CalendarEmployee } from '../lib/teamCalendar';
+import type { ReportAbsence, ReportBalance } from '../lib/vacationReport';
 
 export interface CalendarCompany {
   id: string;
@@ -62,6 +63,41 @@ export const calendarService = {
           })),
           companies: companies.data ?? [],
           holidays: holidays.data ?? [],
+        },
+        error: null,
+      };
+    } catch (error) {
+      return { data: null, error };
+    }
+  },
+
+  /** Saldos de férias do ano e pedidos de férias (pendentes e aprovados) para o relatório. */
+  getVacationReportData: async (
+    year: number
+  ): Promise<{
+    data: { balances: ReportBalance[]; absences: ReportAbsence[] } | null;
+    error: unknown;
+  }> => {
+    try {
+      const [balances, absences] = await Promise.all([
+        supabase
+          .from('employee_vacation_balances')
+          .select('employee_id, total_days, used_days, self_schedulable_days')
+          .eq('year', year),
+        supabase
+          .from('absences')
+          .select(
+            'employee_id, status, created_by_role, absence_periods(business_days, start_date)'
+          )
+          .eq('absence_type', 'vacation')
+          .in('status', ['pending', 'approved']),
+      ]);
+      if (balances.error) throw balances.error;
+      if (absences.error) throw absences.error;
+      return {
+        data: {
+          balances: balances.data ?? [],
+          absences: (absences.data ?? []) as unknown as ReportAbsence[],
         },
         error: null,
       };

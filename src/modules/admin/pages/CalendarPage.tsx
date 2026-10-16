@@ -1,11 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { CalendarX2, ClipboardList, Printer } from 'lucide-react';
+import { CalendarX2, ClipboardList, FileSpreadsheet, Loader2, Printer } from 'lucide-react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
 import CalendarPrintDialog from '@/components/admin/CalendarPrintDialog';
 import { ROUTES } from '@/lib/constants';
 import { useAdminCalendar } from '../hooks/useAdminCalendar';
+import { useVacationReport } from '../hooks/useVacationReport';
 import { buildTeamRows, isoDay } from '../lib/teamCalendar';
 import { CalendarToolbar, type CalendarView } from '../components/calendar/CalendarToolbar';
 import { TeamTimeline } from '../components/calendar/TeamTimeline';
@@ -37,6 +38,7 @@ const CalendarPage = () => {
   const [printOpen, setPrintOpen] = useState(false);
 
   const calendar = useAdminCalendar(month, companyId);
+  const report = useVacationReport();
   const { days, entriesByDay, holidays } = calendar;
   const rows = useMemo(
     () => buildTeamRows(calendar.employees, entriesByDay, calendar.approvedDays, onlyAbsent),
@@ -60,8 +62,8 @@ const CalendarPage = () => {
     <>
       <div className="space-y-4 print:hidden">
         <AdminPageHeader
-          title="Calendário"
-          description="Férias e ausências da equipa"
+          title="Férias e Ausências"
+          description="Quem está fora, mapa de férias e saldos da equipa"
           actions={
             <>
               {calendar.pendingCount > 0 && (
@@ -73,6 +75,19 @@ const CalendarPage = () => {
                   {calendar.pendingCount} por aprovar
                 </Link>
               )}
+              <Button
+                variant="outline"
+                className="rounded-full"
+                disabled={report.isGenerating || calendar.isLoading}
+                onClick={() => report.generate(month.getFullYear(), calendar.employees)}
+              >
+                {report.isGenerating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileSpreadsheet className="h-4 w-4" />
+                )}
+                Relatório de Férias
+              </Button>
               <Button variant="outline" className="rounded-full" onClick={() => setPrintOpen(true)}>
                 <Printer className="h-4 w-4" />
                 Mapa de Férias

@@ -30,7 +30,7 @@ export const AbsentTodayCard: React.FC<AbsentTodayCardProps> = ({ absent }) => (
         to={ROUTES.ADMIN.CALENDAR}
         className="text-[13px] font-semibold text-rz-primary hover:underline"
       >
-        Ver calendário
+        Ver mapa
       </Link>
     </div>
 

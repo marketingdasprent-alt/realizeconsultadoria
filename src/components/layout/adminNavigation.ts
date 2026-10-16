@@ -2,13 +2,13 @@
 // com o mosaico colorido do colaborador. `moduleKey` é a permissão que o mostra.
 import {
   Building2,
-  CalendarDays,
   ClipboardList,
   Clock,
   FileCheck,
   Headset,
   KeyRound,
   LayoutDashboard,
+  Palmtree,
   Scale,
   Settings,
   Users,
@@ -41,13 +41,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         moduleKey: 'dashboard',
         tint: 'from-violet-500 to-indigo-500',
       },
-      {
-        href: ROUTES.ADMIN.CALENDAR,
-        icon: CalendarDays,
-        label: 'Calendário',
-        moduleKey: 'calendar',
-        tint: 'from-rose-400 to-red-500',
-      },
     ],
   },
   {
@@ -66,6 +59,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: 'Documentos',
         moduleKey: 'employees',
         tint: 'from-amber-400 to-orange-500',
+      },
+      {
+        href: ROUTES.ADMIN.CALENDAR,
+        icon: Palmtree,
+        label: 'Férias e Ausências',
+        moduleKey: 'calendar',
+        tint: 'from-rose-400 to-red-500',
       },
       {
         href: ROUTES.ADMIN.REQUESTS,

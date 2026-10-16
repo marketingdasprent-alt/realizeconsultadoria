@@ -1,7 +1,9 @@
 import React, { useMemo, useState } from 'react';
 import { matchesText } from '@/lib/text';
-import { MessageSquarePlus, Search, SquarePen } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { MessageSquarePlus, Search, Sparkles, SquarePen } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { FILTERS } from '../lib/format';
 import type { ConversationFilter, ConversationSummary } from '../types';
 import { ConversationRow } from './ConversationRow';
@@ -28,6 +30,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   onNewConversation,
   className,
 }) => {
+  const { basePath } = useWorkspace();
   const [query, setQuery] = useState('');
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -119,6 +122,23 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       </div>
 
       <div className="rz-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-28 md:pb-3">
+        {/* O Realize AI fica sempre à mão no topo (abre o assistente, numa página própria). */}
+        {!showArchived && !conversations.some(c => c.kind === 'ai') && (
+          <Link
+            to={`${basePath}/ai`}
+            className="mb-1 flex items-center gap-3 rounded-2xl p-2.5 transition-colors hover:bg-rz-canvas"
+          >
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-400 text-white">
+              <Sparkles className="h-5 w-5" />
+            </span>
+            <span className="min-w-0 flex-1">
+              <span className="block text-[14.5px] font-bold">Realize AI</span>
+              <span className="block truncate text-[13px] text-rz-muted">
+                Pergunte ou peça para marcar, criar e lembrar
+              </span>
+            </span>
+          </Link>
+        )}
         {visible.length > 0 ? (
           <ul className="space-y-0.5">
             {visible.map(conversation => (

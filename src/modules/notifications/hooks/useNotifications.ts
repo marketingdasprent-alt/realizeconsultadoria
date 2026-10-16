@@ -62,8 +62,13 @@ export const useNotifications = () => {
         const at = new Date().toISOString();
         return setDemo(list => list.map(n => (ids.includes(n.id) ? { ...n, read_at: at } : n)));
       }
-      await notificationService.markRead(ids);
-      await qc.invalidateQueries({ queryKey: KEY });
+      // Lidas na hora; o servidor confirma em fundo.
+      const at = new Date().toISOString();
+      qc.setQueryData<typeof live.data>(KEY, list =>
+        list?.map(n => (ids.includes(n.id) ? { ...n, read_at: n.read_at ?? at } : n))
+      );
+      const { error } = await notificationService.markRead(ids);
+      if (error) void qc.invalidateQueries({ queryKey: KEY });
     },
     [isPreview, qc]
   );

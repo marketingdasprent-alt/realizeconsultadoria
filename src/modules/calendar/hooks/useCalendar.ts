@@ -1,7 +1,7 @@
 // Calendário: eventos do intervalo (com tempo real), ausências, feriados e prazos de tarefas,
 // mais as ações sobre eventos. Na pré-visualização, em memória.
 import { useEffect, useMemo, useRef, useSyncExternalStore } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { keepPreviousData, useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useMyAbsences } from '@/modules/absences/hooks/useMyAbsences';
@@ -77,11 +77,13 @@ export const useCalendar = (from: Date, to: Date) => {
       return data;
     },
     enabled: !isPreview,
+    placeholderData: keepPreviousData,
   });
   const team = useQuery({
     queryKey: ['calendar', 'team', ...range],
     queryFn: async () => (await calendarService.listTeamAbsences(from, to)).data,
     enabled: !isPreview,
+    placeholderData: keepPreviousData,
   });
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from 'react';
+import { Suspense, useEffect, useState, useMemo } from 'react';
 import { useNavigate, useLocation, Outlet } from 'react-router-dom';
 import {
   LayoutDashboard,
@@ -131,7 +131,17 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
       />
 
       <main className="flex-1 lg:ml-64 pt-14 lg:pt-0 print:ml-0 print:pt-0 overflow-x-hidden">
-        <div className="p-4 lg:p-8 print:p-0 max-w-full">{children || <Outlet />}</div>
+        <div className="p-4 lg:p-8 print:p-0 max-w-full">
+          {children || (
+            <Suspense
+              fallback={
+                <div className="py-16 text-center text-sm text-muted-foreground">A carregar…</div>
+              }
+            >
+              <Outlet />
+            </Suspense>
+          )}
+        </div>
       </main>
     </div>
   );

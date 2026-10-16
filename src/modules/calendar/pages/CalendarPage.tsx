@@ -177,10 +177,12 @@ const CalendarPage: React.FC = () => {
       </div>
 
       <div className="mt-4 grid gap-5 xl:grid-cols-[minmax(0,1fr)_280px]">
-        <div className="min-w-0">
-          {cal.isLoading ? (
-            <Loader2 className="mx-auto mt-16 h-7 w-7 animate-spin text-rz-primary" />
-          ) : view === 'month' ? (
+        <div className="relative min-w-0">
+          {cal.isLoading && (
+            <Loader2 className="absolute right-4 top-3 z-10 h-4 w-4 animate-spin text-rz-primary" />
+          )}
+          {/* A grelha aparece logo; os eventos entram quando chegam. */}
+          {view === 'month' ? (
             <MonthView
               month={anchor}
               items={items}

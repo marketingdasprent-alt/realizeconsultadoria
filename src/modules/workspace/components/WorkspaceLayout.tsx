@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,6 +14,13 @@ import { LiveMessengerProvider } from '@/modules/messenger/context/MessengerProv
 import type { WorkspaceContextValue } from '../context/workspaceContext';
 import { useRzTheme } from '../hooks/useRzTheme';
 import { WorkspaceShell } from './shell/WorkspaceShell';
+
+/** Enquanto o código de uma página chega (só da primeira vez). */
+const PageLoading: React.FC = () => (
+  <div className="flex h-full items-center justify-center">
+    <Loader2 className="h-7 w-7 animate-spin text-rz-primary" />
+  </div>
+);
 
 const FullScreen: React.FC<{ children: React.ReactNode }> = ({ children }) => (
   <div className="fixed inset-0 flex items-center justify-center bg-rz-aurora p-4 font-jakarta">
@@ -118,7 +125,9 @@ const WorkspaceLayout: React.FC = () => {
       }}
     >
       <WorkspaceShell value={workspace}>
-        <Outlet context={context} />
+        <Suspense fallback={<PageLoading />}>
+          <Outlet context={context} />
+        </Suspense>
         <ChangePasswordDialog
           open={isChangePasswordOpen}
           onOpenChange={setIsChangePasswordOpen}

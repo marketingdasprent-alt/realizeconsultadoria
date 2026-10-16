@@ -80,7 +80,7 @@ export const useAppreciations = (scope: { userId: string } | 'public') => {
       toast({ title: 'A apreciação não foi enviada', variant: 'destructive' });
       return false;
     }
-    await qc.invalidateQueries({ queryKey: FEED_KEYS.appreciations });
+    void qc.invalidateQueries({ queryKey: FEED_KEYS.appreciations });
     return true;
   };
 

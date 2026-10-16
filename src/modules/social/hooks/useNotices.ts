@@ -41,8 +41,12 @@ export const useNotices = () => {
     if (isPreview) {
       return setDemo(list => list.map(n => (ids.includes(n.id) ? { ...n, read: true } : n)));
     }
+    // Confirmado na hora; o servidor grava em fundo.
+    qc.setQueryData<typeof live.data>(FEED_KEYS.notices, list =>
+      list?.map(n => (ids.includes(n.id) ? { ...n, read: true } : n))
+    );
     await employeeHomeService.markNoticesRead(user.employeeId, ids);
-    await qc.invalidateQueries({ queryKey: FEED_KEYS.notices });
+    void qc.invalidateQueries({ queryKey: FEED_KEYS.notices });
   };
 
   return {

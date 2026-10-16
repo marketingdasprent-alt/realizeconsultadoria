@@ -148,6 +148,17 @@ export const useMessengerActions = ({
       const mine = reactions.some(
         r => r.message_id === messageId && r.user_id === user.userId && r.emoji === emoji
       );
+      // Na hora no ecrã; o servidor confirma em fundo (se falhar, volta ao estado real).
+      const key = CHAT_KEYS.reactions(activeId);
+      qc.setQueryData<ReactionRow[]>(key, rows => {
+        const list = rows ?? [];
+        return mine
+          ? list.filter(
+              r => !(r.message_id === messageId && r.user_id === user.userId && r.emoji === emoji)
+            )
+          : [...list, { message_id: messageId, user_id: user.userId, emoji }];
+      });
+      notifyReactions(messageId);
       const { error } = mine
         ? await messengerService.removeReaction(messageId, user.userId, emoji)
         : await messengerService.addReaction({
@@ -156,8 +167,10 @@ export const useMessengerActions = ({
             user_id: user.userId,
             emoji,
           });
-      if (error) return fail('A reação não foi guardada.');
-      await qc.invalidateQueries({ queryKey: CHAT_KEYS.reactions(activeId) });
+      if (error) {
+        void qc.invalidateQueries({ queryKey: key });
+        return fail('A reação não foi guardada.');
+      }
       notifyReactions(messageId);
     },
     [activeId, reactions, user.userId, qc, notifyReactions]
@@ -167,7 +180,7 @@ export const useMessengerActions = ({
     async (conversationId, flag, value) => {
       const { error } = await messengerService.setFlag(conversationId, user.userId, flag, value);
       if (error) return fail('A alteração não foi guardada.');
-      await qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
+      void qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
     },
     [qc, user.userId]
   );

@@ -4,7 +4,7 @@ import { Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { DirectoryPerson } from '@/modules/messenger/types';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
-import { isLead, type OrgDepartment } from '../lib/orgchart';
+import type { OrgDepartment } from '../lib/orgchart';
 
 const TINTS = [
   'from-violet-500 to-indigo-500',
@@ -39,7 +39,8 @@ const PersonRow: React.FC<{
   to: string;
   online: boolean;
   isMe: boolean;
-}> = ({ person, to, online, isMe }) => (
+  lead: boolean;
+}> = ({ person, to, online, isMe, lead }) => (
   <li>
     <Link
       to={to}
@@ -57,7 +58,7 @@ const PersonRow: React.FC<{
           {isMe && <span className="font-semibold text-rz-muted">(eu)</span>}
         </span>
         <span className="flex items-center gap-1 truncate text-[12px] text-rz-muted">
-          {isLead(person) && <Crown className="h-3 w-3 shrink-0 text-amber-500" />}
+          {lead && <Crown className="h-3 w-3 shrink-0 text-amber-500" />}
           {person.position || 'Colaborador'}
         </span>
       </span>
@@ -65,7 +66,7 @@ const PersonRow: React.FC<{
   </li>
 );
 
-/** Um departamento do organograma: cabeçalho colorido e as pessoas (chefias primeiro). */
+/** Um departamento do organograma: as pessoas por nível; a coroa é de quem o lidera. */
 export const OrgDepartmentCard: React.FC<OrgDepartmentCardProps> = ({
   department,
   profilePath,
@@ -100,6 +101,7 @@ export const OrgDepartmentCard: React.FC<OrgDepartmentCardProps> = ({
             to={profilePath(person.userId)}
             online={isOnline(person.userId)}
             isMe={person.userId === myUserId}
+            lead={department.leads.includes(person.userId)}
           />
         ))}
       </ul>

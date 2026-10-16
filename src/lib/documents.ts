@@ -14,7 +14,7 @@ export interface DocumentCategory {
   unique: boolean;
   hasNumber: boolean;
   hasExpiry: boolean;
-  /** O colaborador pode submeter este tipo pela app. */
+  /** O colaborador pode submeter este tipo pela app (só os documentos de registo). */
   employeeCanSubmit: boolean;
 }
 
@@ -91,7 +91,7 @@ export const DOCUMENT_CATEGORIES: DocumentCategory[] = [
     unique: true,
     hasNumber: false,
     hasExpiry: false,
-    employeeCanSubmit: true,
+    employeeCanSubmit: false,
   },
   {
     value: 'ficha_medica',
@@ -99,7 +99,7 @@ export const DOCUMENT_CATEGORIES: DocumentCategory[] = [
     unique: true,
     hasNumber: false,
     hasExpiry: true,
-    employeeCanSubmit: true,
+    employeeCanSubmit: false,
   },
   {
     value: 'documento_identificacao',
@@ -139,7 +139,7 @@ export const DOCUMENT_CATEGORIES: DocumentCategory[] = [
     unique: false,
     hasNumber: false,
     hasExpiry: true,
-    employeeCanSubmit: true,
+    employeeCanSubmit: false,
   },
   {
     value: 'comunicado',
@@ -155,7 +155,7 @@ export const DOCUMENT_CATEGORIES: DocumentCategory[] = [
     unique: false,
     hasNumber: false,
     hasExpiry: false,
-    employeeCanSubmit: true,
+    employeeCanSubmit: false,
   },
 ];
 

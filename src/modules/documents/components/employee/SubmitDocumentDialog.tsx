@@ -26,6 +26,8 @@ interface SubmitDocumentDialogProps {
   employeeName: string;
   /** Tipo pré-selecionado (ex.: "Atualizar Cartão de Cidadão"). */
   presetCategory?: string | null;
+  /** Só estes tipos se podem escolher (ex.: identificação = CC, Passaporte ou TR). */
+  categories?: string[] | null;
   onSubmitted: () => void;
 }
 
@@ -38,6 +40,7 @@ export const SubmitDocumentDialog: React.FC<SubmitDocumentDialogProps> = ({
   employeeId,
   employeeName,
   presetCategory,
+  categories,
   onSubmitted,
 }) => {
   const { toast } = useToast();
@@ -101,7 +104,11 @@ export const SubmitDocumentDialog: React.FC<SubmitDocumentDialogProps> = ({
         </DialogHeader>
         <div className="space-y-4">
           <DocumentMetadataFields
-            categories={EMPLOYEE_SUBMITTABLE_CATEGORIES}
+            categories={
+              categories
+                ? EMPLOYEE_SUBMITTABLE_CATEGORIES.filter(c => categories.includes(c.value))
+                : EMPLOYEE_SUBMITTABLE_CATEGORIES
+            }
             value={metadata}
             onChange={update}
             tall

@@ -10,7 +10,7 @@ import { PayslipsList } from '../components/employee/PayslipsList';
 import { RegistrationDocuments } from '../components/employee/RegistrationDocuments';
 import { SubmitDocumentDialog } from '../components/employee/SubmitDocumentDialog';
 import { useEmployeeDocuments } from '../hooks/useEmployeeDocuments';
-import { buildRegistration } from '../lib/registration';
+import { buildRegistration, REGISTRATION_SLOTS, type RegistrationSlot } from '../lib/registration';
 
 type Tab = 'personal' | 'payslips';
 
@@ -24,21 +24,23 @@ const PersonalDocumentsPage: React.FC = () => {
   const [params, setParams] = useSearchParams();
   const [tab, setTab] = useState<Tab>(params.get('tab') === 'recibos' ? 'payslips' : 'personal');
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [presetCategory, setPresetCategory] = useState<string | null>(null);
+  const [slot, setSlot] = useState<RegistrationSlot | null>(null);
 
   // Atalho "Enviar documento" (?enviar=1&tipo=…)
   useEffect(() => {
     if (params.get('enviar')) {
-      setPresetCategory(params.get('tipo'));
+      const tipo = params.get('tipo') ?? '';
+      setSlot(REGISTRATION_SLOTS.find(s => s.categories.includes(tipo)) ?? null);
       setDialogOpen(true);
       setParams({}, { replace: true });
     }
   }, [params, setParams]);
 
-  const openSubmit = (category: string | null = null) => {
+  // Enviar / substituir um documento de registo: o envio só deixa escolher os tipos desse lugar.
+  const openSubmit = (next: RegistrationSlot) => {
     if (isPreview)
       return toast({ title: 'Pré-visualização', description: 'Enviar usa dados reais.' });
-    setPresetCategory(category);
+    setSlot(next);
     setDialogOpen(true);
   };
 
@@ -127,7 +129,8 @@ const PersonalDocumentsPage: React.FC = () => {
           onOpenChange={setDialogOpen}
           employeeId={user.employeeId}
           employeeName={user.name}
-          presetCategory={presetCategory}
+          presetCategory={slot?.categories.length === 1 ? slot.categories[0] : null}
+          categories={slot?.categories ?? null}
           onSubmitted={docs.refetch}
         />
       )}

@@ -48,7 +48,8 @@ import {
   json,
   serviceClient,
 } from '../_shared/mail-server/http.ts';
-import { revokeGoogleToken } from '../_shared/mail-server/oauth-client.ts';
+import { microsoftAppToken, revokeGoogleToken } from '../_shared/mail-server/oauth-client.ts';
+import { GRAPH_BASE } from '../_shared/mail/folders.ts';
 import { denoResolver } from '../_shared/mail-server/dns.ts';
 import { discoverDomain, domainOfEmail } from '../_shared/mail/discover.ts';
 import { createGmailDriver } from './drivers/gmail.ts';
@@ -89,6 +90,21 @@ const imapConfig = (
 
 /** Driver do fornecedor da conta, com o segredo do Vault. */
 const createDriver = async (db: SupabaseClient, account: MailAccountRow): Promise<MailDriver> => {
+  if (account.auth_method === 'app-microsoft') {
+    // Caixa da empresa lida com a permissão da própria app: sem segredo no Vault.
+    const domain = domainOfEmail(account.email);
+    const session = new OAuthSession(
+      db,
+      account.id,
+      'microsoft',
+      { access_token: '', refresh_token: null, expires_at: 0, scope: null },
+      () =>
+        microsoftAppToken(domain).catch(() => {
+          throw mailError('provider_error', 'A app Realize não tem permissão para ler esta caixa.');
+        })
+    );
+    return createGraphDriver(session, `${GRAPH_BASE}/users/${encodeURIComponent(account.email)}`);
+  }
   const raw = await readSecret(db, account.id);
   if (account.auth_method === 'imap') {
     const secret = parseImapSecret(raw);

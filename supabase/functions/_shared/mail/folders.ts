@@ -84,12 +84,14 @@ const graphSearchTerm = (query: string): string =>
  */
 export const buildGraphListUrl = (
   folder: MailFolder,
-  options: { query: string | null; limit: number }
+  options: { query: string | null; limit: number; root?: string }
 ): { url: string; postFilterFlagged: boolean } => {
+  // A própria caixa (/me) ou, com a permissão da app, a de outra pessoa (/users/<email>).
+  const root = options.root ?? `${GRAPH_BASE}/me`;
   const base =
     folder === 'starred'
-      ? `${GRAPH_BASE}/me/messages`
-      : `${GRAPH_BASE}/me/mailFolders/${GRAPH_WELL_KNOWN_FOLDER[folder]}/messages`;
+      ? `${root}/messages`
+      : `${root}/mailFolders/${GRAPH_WELL_KNOWN_FOLDER[folder]}/messages`;
   const params = [`$top=${options.limit}`, `$select=${GRAPH_SUMMARY_FIELDS.join(',')}`];
   const query = options.query?.trim();
 

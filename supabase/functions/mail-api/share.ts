@@ -6,8 +6,11 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { discoverDomain, domainOfEmail } from '../_shared/mail/discover.ts';
 import { mailError } from '../_shared/mail/errors.ts';
 import { isUuid } from '../_shared/mail/request.ts';
+import { GRAPH_BASE } from '../_shared/mail/folders.ts';
 import { storeSecret } from '../_shared/mail-server/accounts.ts';
 import { denoResolver } from '../_shared/mail-server/dns.ts';
+import { fetchWithTimeout } from '../_shared/mail-server/http.ts';
+import { MailAppError, microsoftAppToken } from '../_shared/mail-server/oauth-client.ts';
 import { testImapLogin } from './drivers/imap.ts';
 
 const SMTP_SSL_PORT = 465;
@@ -22,6 +25,7 @@ interface AccessRow {
 
 interface SharedAccountRow {
   id: string;
+  auth_method: string;
   imap_host: string | null;
   imap_port: number | null;
   smtp_host: string | null;
@@ -32,6 +36,94 @@ const isAdmin = async (db: SupabaseClient, userId: string) => {
   const { data, error } = await db.rpc('has_role', { _user_id: userId, _role: 'admin' });
   if (error) throw error;
   return data === true;
+};
+
+/** Cria a conta partilhada e junta os colaboradores do acesso. */
+const saveShared = async (
+  db: SupabaseClient,
+  row: AccessRow,
+  accountId: string | null,
+  fields: Record<string, unknown>
+): Promise<string> => {
+  if (accountId) {
+    const { error } = await db.from('mail_accounts').update(fields).eq('id', accountId);
+    if (error) throw error;
+    return accountId;
+  }
+  const { data, error } = await db
+    .from('mail_accounts')
+    .insert({ ...fields, access_id: row.id, user_id: null, is_default: false })
+    .select('id')
+    .single();
+  if (error) throw error;
+  return (data as { id: string }).id;
+};
+
+const syncMembers = async (db: SupabaseClient, accessId: string, accountId: string) => {
+  const { error } = await db.rpc('mail_sync_access_members', { p_access: accessId });
+  if (error) throw error;
+  const { count } = await db
+    .from('mail_account_members')
+    .select('user_id', { count: 'exact', head: true })
+    .eq('account_id', accountId);
+  return count ?? 0;
+};
+
+/**
+ * Caixa do Microsoft 365: lida e enviada com a permissão da própria app "Realize Webmail"
+ * (Mail.ReadWrite e Mail.Send de aplicação, com consentimento do administrador). A
+ * palavra-passe do acesso não é usada; confirma-se só que a app consegue abrir a caixa.
+ */
+const shareMicrosoftApp = async (
+  db: SupabaseClient,
+  row: AccessRow,
+  email: string,
+  accountId: string | null
+) => {
+  let token: string;
+  try {
+    token = (await microsoftAppToken(domainOfEmail(email))).access_token;
+  } catch (error) {
+    const code = error instanceof MailAppError ? error.code : 'erro';
+    throw mailError(
+      'provider_error',
+      code === 'not_configured'
+        ? 'A ligação à Microsoft não está configurada.'
+        : 'A app Realize não tem acesso a esta organização Microsoft. Confirme as permissões de aplicação e o consentimento do administrador.'
+    );
+  }
+  const res = await fetchWithTimeout(
+    `${GRAPH_BASE}/users/${encodeURIComponent(email)}/mailFolders/inbox?$select=id`,
+    { headers: { Authorization: `Bearer ${token}` } }
+  ).catch(() => null);
+  if (!res || !res.ok) {
+    const status = res?.status ?? 0;
+    await res?.body?.cancel();
+    throw mailError(
+      'provider_error',
+      status === 404
+        ? 'Esta caixa não existe no Microsoft 365.'
+        : status === 401 || status === 403
+          ? 'A app Realize ainda não tem permissão para ler caixas (Mail.ReadWrite de aplicação com consentimento do administrador).'
+          : 'Não foi possível abrir a caixa no Microsoft 365.'
+    );
+  }
+  await res.body?.cancel();
+
+  const id = await saveShared(db, row, accountId, {
+    provider: 'office365',
+    auth_method: 'app-microsoft',
+    email,
+    display_name: row.title.trim().slice(0, 120) || null,
+    company_id: row.company_id,
+    imap_host: null,
+    imap_port: null,
+    smtp_host: null,
+    smtp_port: null,
+    status: 'active',
+    last_error: null,
+  });
+  return { account_id: id, email, members: await syncMembers(db, row.id, id), servers: null };
 };
 
 /** Pedido de um admin (ecrã de Acessos do Realize 2.0). */
@@ -60,11 +152,13 @@ export const shareAccessById = async (db: SupabaseClient, accessId: string) => {
 
   const { data: existing, error: existingError } = await db
     .from('mail_accounts')
-    .select('id, imap_host, imap_port, smtp_host, smtp_port')
+    .select('id, auth_method, imap_host, imap_port, smtp_host, smtp_port')
     .eq('access_id', row.id)
     .maybeSingle();
   if (existingError) throw existingError;
   const current = existing as SharedAccountRow | null;
+  if (current?.auth_method === 'app-microsoft')
+    return shareMicrosoftApp(db, row, email, current.id);
 
   // Servidores: os que a caixa já tem ou, da primeira vez, descobertos pelo domínio.
   let servers =
@@ -78,6 +172,9 @@ export const shareAccessById = async (db: SupabaseClient, accessId: string) => {
       : null;
   if (!servers) {
     const discovery = await discoverDomain(domainOfEmail(email), denoResolver);
+    // Microsoft 365 já não aceita palavra-passe por IMAP: usa-se a permissão da app.
+    if (discovery?.oauth === 'office365')
+      return shareMicrosoftApp(db, row, email, current?.id ?? null);
     if (discovery?.oauth) throw mailError('oauth_domain');
     servers = discovery?.servers ?? null;
   }

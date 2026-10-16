@@ -13,7 +13,7 @@ export type MailProviderKey =
   | 'aol'
   | 'imap';
 
-export type MailAuthMethod = 'oauth-google' | 'oauth-microsoft' | 'imap';
+export type MailAuthMethod = 'oauth-google' | 'oauth-microsoft' | 'imap' | 'app-microsoft';
 
 export type OAuthProvider = 'google' | 'microsoft';
 

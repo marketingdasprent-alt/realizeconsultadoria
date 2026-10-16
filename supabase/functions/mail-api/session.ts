@@ -19,11 +19,16 @@ export class OAuthSession {
   private refreshed = false;
   private refreshing: Promise<void> | null = null;
 
+  /**
+   * `appToken`: caixas da empresa lidas com a permissão da própria app (sem utilizador nem
+   * refresh token): o token novo vem daqui e não se guarda no Vault.
+   */
   constructor(
     private readonly db: SupabaseClient,
     private readonly accountId: string,
     readonly provider: OAuthProvider,
-    private secret: OAuthSecret
+    private secret: OAuthSecret,
+    private readonly appToken?: () => Promise<OAuthSecret>
   ) {}
 
   /** Marca a conta para voltar a ligar e devolve o erro a lançar. */
@@ -36,6 +41,11 @@ export class OAuthSession {
   }
 
   private async doRefresh(): Promise<void> {
+    if (this.appToken) {
+      this.secret = await this.appToken();
+      this.refreshed = true;
+      return;
+    }
     if (!this.secret.refresh_token) throw await this.reauth();
     const credentials = oauthCredentials(this.provider);
     if (!credentials) throw mailError('provider_error', 'A ligação OAuth não está configurada.');

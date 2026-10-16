@@ -1,4 +1,5 @@
-// Microsoft Graph (Outlook.com, Microsoft 365, Exchange Online): /v1.0/me/...
+// Microsoft Graph (Outlook.com, Microsoft 365, Exchange Online): /v1.0/me/... ou, nas caixas
+// da empresa lidas com a permissão da app, /v1.0/users/<email>/...
 
 import { mailError } from '../../_shared/mail/errors.ts';
 import {
@@ -35,15 +36,13 @@ import {
 } from '../../_shared/mail-server/http.ts';
 import type { OAuthSession } from '../session.ts';
 
-const ME = `${GRAPH_BASE}/me`;
 const INLINE_IMAGE_MAX = 512 * 1024;
 const INLINE_IMAGE_COUNT = 10;
 const JSON_HEADERS = { 'Content-Type': 'application/json' };
 
 const enc = encodeURIComponent;
-const messageUrl = (id: string) => `${ME}/messages/${enc(id)}`;
-
-export const createGraphDriver = (session: OAuthSession): MailDriver => {
+export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`): MailDriver => {
+  const messageUrl = (id: string) => `${ME}/messages/${enc(id)}`;
   const patchMessage = async (id: string, body: Record<string, unknown>) => {
     await session.json(messageUrl(id), {
       method: 'PATCH',
@@ -153,7 +152,7 @@ export const createGraphDriver = (session: OAuthSession): MailDriver => {
         url = pageToken;
         postFilterFlagged = folder === 'starred' && !!query;
       } else {
-        ({ url, postFilterFlagged } = buildGraphListUrl(folder, { query, limit }));
+        ({ url, postFilterFlagged } = buildGraphListUrl(folder, { query, limit, root: ME }));
       }
 
       const res = await session.fetch(url);

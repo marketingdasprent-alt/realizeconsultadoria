@@ -141,3 +141,56 @@ export const revokeGoogleToken = async (token: string): Promise<void> => {
     console.warn('mail oauth google: revogação falhou', errorMessage(error));
   }
 };
+
+// Tokens da própria app por organização (domínio do email), reaproveitados até expirarem.
+const appTokens = new Map<string, OAuthSecret>();
+
+/**
+ * Token da app "Realize Webmail" para ler/enviar em qualquer caixa da organização do
+ * `domain` (permissões de aplicação Mail.ReadWrite e Mail.Send, com consentimento do admin).
+ * Lança MailAppError com o código da Microsoft quando não há permissão.
+ */
+export const microsoftAppToken = async (domain: string): Promise<OAuthSecret> => {
+  const cached = appTokens.get(domain);
+  if (cached && cached.expires_at - 120_000 > Date.now()) return cached;
+  const credentials = oauthCredentials('microsoft');
+  if (!credentials) throw new MailAppError('not_configured');
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(
+      `https://login.microsoftonline.com/${encodeURIComponent(domain)}/oauth2/v2.0/token`,
+      {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/x-www-form-urlencoded',
+          Accept: 'application/json',
+        },
+        body: new URLSearchParams({
+          client_id: credentials.clientId,
+          client_secret: credentials.clientSecret,
+          scope: 'https://graph.microsoft.com/.default',
+          grant_type: 'client_credentials',
+        }).toString(),
+      }
+    );
+  } catch (error) {
+    console.error('mail oauth microsoft: token da app sem resposta', errorMessage(error));
+    throw new MailAppError('network');
+  }
+  const body: unknown = await res.json().catch(() => null);
+  if (!res.ok) {
+    const code = oauthErrorCode(body) ?? `http_${res.status}`;
+    console.error(`mail oauth microsoft: token da app recusado (${res.status})`, code);
+    throw new MailAppError(code);
+  }
+  const secret = tokenResponseToSecret(body, Date.now(), null);
+  if (!secret) throw new MailAppError('invalid_response');
+  appTokens.set(domain, secret);
+  return secret;
+};
+
+export class MailAppError extends Error {
+  constructor(readonly code: string) {
+    super(`microsoft app token: ${code}`);
+  }
+}

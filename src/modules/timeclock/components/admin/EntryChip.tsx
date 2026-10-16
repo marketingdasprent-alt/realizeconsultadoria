@@ -26,15 +26,7 @@ import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
 import { getEntryLabel } from '@/lib/workday';
 
 export type EntryDialogMode =
-  | 'details'
-  | 'history'
-  | 'edit'
-  | 'void'
-  | 'restore'
-  | 'review'
-  | 'approve'
-  | 'reject'
-  | 'create';
+  'details' | 'history' | 'edit' | 'void' | 'restore' | 'review' | 'approve' | 'reject' | 'create';
 
 interface EntryChipProps {
   entry: TimeClockEntryWithRelations;

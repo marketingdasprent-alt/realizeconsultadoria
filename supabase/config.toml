@@ -76,3 +76,6 @@ verify_jwt = false
 
 [functions.ai-chat]
 verify_jwt = false
+
+[functions.push-send]
+verify_jwt = false

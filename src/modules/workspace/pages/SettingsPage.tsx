@@ -17,6 +17,8 @@ import { ROUTES } from '@/lib/constants';
 import { getSafetyCheckupStatus } from '@/lib/employee-home';
 import type { EmployeeOutletContext } from '@/modules/employee/hooks/useEmployeeOutlet';
 import { maskTail } from '@/modules/employee/lib/home-summaries';
+import { WorkScheduleCard } from '@/modules/timeclock/components/employee/WorkScheduleCard';
+import { PushCard } from '../components/PushCard';
 import { WorkspacePage } from '../components/WorkspacePage';
 import { useWorkspace } from '../context/workspaceContext';
 
@@ -113,6 +115,9 @@ const SettingsPage: React.FC = () => {
             )}
           </section>
         )}
+
+        <WorkScheduleCard />
+        <PushCard />
 
         <section className={cn(CARD, 'space-y-1 p-3 md:p-3')}>
           <p className="px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-[0.14em] text-rz-muted">

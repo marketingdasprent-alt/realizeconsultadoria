@@ -29,8 +29,8 @@ export const AdminLoginForm = ({
 
   return (
     <>
-      <h1 className="text-3xl font-bold mb-2">Área de Administração</h1>
-      <p className="text-muted-foreground mb-8">
+      <h1 className="mb-2 text-[28px] font-extrabold">Área de Administração</h1>
+      <p className="mb-8 text-[14.5px] text-rz-muted">
         Insira as suas credenciais para aceder ao painel.
       </p>
 
@@ -44,6 +44,7 @@ export const AdminLoginForm = ({
             onChange={e => setEmail(e.target.value)}
             placeholder="admin@empresa.pt"
             required
+            className="h-11 rounded-xl"
             disabled={isLoading}
           />
         </div>
@@ -67,6 +68,7 @@ export const AdminLoginForm = ({
               onChange={e => setPassword(e.target.value)}
               placeholder="••••••••"
               required
+              className="h-11 rounded-xl"
               disabled={isLoading}
             />
             <button
@@ -79,7 +81,11 @@ export const AdminLoginForm = ({
           </div>
         </div>
 
-        <Button type="submit" className="w-full" disabled={isLoading}>
+        <Button
+          type="submit"
+          className="h-11 w-full rounded-xl text-[15px] font-semibold"
+          disabled={isLoading}
+        >
           {isLoading ? (
             <>
               <Loader2 className="h-4 w-4 mr-2 animate-spin" />A entrar...

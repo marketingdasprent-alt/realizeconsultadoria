@@ -1,95 +1,58 @@
-import { Suspense, useEffect, useState, useMemo } from 'react';
-import { useNavigate, useLocation, Outlet } from 'react-router-dom';
-import {
-  LayoutDashboard,
-  Building2,
-  Users,
-  Calendar,
-  Settings,
-  ClipboardList,
-  Loader2,
-  Headset,
-  Lock,
-  Scale,
-  Clock,
-  FileCheck,
-} from 'lucide-react';
+import { Suspense, useMemo, useState } from 'react';
+import { useNavigate, Outlet } from 'react-router-dom';
+import { Loader2 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useAuth } from '@/contexts/AuthContext';
 import { ROUTES } from '@/lib/constants';
+import { cn } from '@/lib/utils';
+import { useRzTheme } from '@/modules/workspace/hooks/useRzTheme';
+import { useSidebarCollapsed } from '@/modules/workspace/hooks/useSidebarCollapsed';
 import { AdminSidebar } from './AdminSidebar';
 import { AdminMobileHeader } from './AdminMobileHeader';
 import { AdminMobileSidebar } from './AdminMobileSidebar';
+import { ADMIN_SETTINGS_ITEM, visibleAdminGroups } from './adminNavigation';
 
 interface AdminLayoutProps {
   children?: React.ReactNode;
 }
 
-interface NavItem {
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  moduleKey: string;
-}
-
-const allNavItems: NavItem[] = [
-  {
-    href: ROUTES.ADMIN.DASHBOARD,
-    icon: LayoutDashboard,
-    label: 'Dashboard',
-    moduleKey: 'dashboard',
-  },
-  { href: ROUTES.ADMIN.LEGAL, icon: Scale, label: 'Jurídico', moduleKey: 'legal' },
-  { href: ROUTES.ADMIN.COMPANIES, icon: Building2, label: 'Empresas', moduleKey: 'companies' },
-  { href: ROUTES.ADMIN.EMPLOYEES, icon: Users, label: 'Colaboradores', moduleKey: 'employees' },
-  { href: ROUTES.ADMIN.DOCUMENTS, icon: FileCheck, label: 'Documentos', moduleKey: 'employees' },
-  { href: ROUTES.ADMIN.ACCESSES, icon: Lock, label: 'Acessos', moduleKey: 'accesses' },
-  { href: ROUTES.ADMIN.REQUESTS, icon: ClipboardList, label: 'Pedidos', moduleKey: 'requests' },
-  { href: ROUTES.ADMIN.TIMECLOCK, icon: Clock, label: 'Ponto', moduleKey: 'timeclock' },
-  { href: ROUTES.ADMIN.SUPPORT, icon: Headset, label: 'Suporte', moduleKey: 'support' },
-  { href: ROUTES.ADMIN.CALENDAR, icon: Calendar, label: 'Calendário', moduleKey: 'calendar' },
-  { href: ROUTES.ADMIN.SETTINGS, icon: Settings, label: 'Configurações', moduleKey: 'settings' },
-];
-
+/**
+ * Painel de administração no visual do Realize 2.0: menu lateral sobre a aurora e as páginas
+ * num painel claro e arredondado. A página continua a deslizar na janela (impressões e
+ * cabeçalhos das páginas antigas funcionam como antes).
+ */
 const AdminLayout = ({ children }: AdminLayoutProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const { logout, user } = useAuth();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
-  const [userName, setUserName] = useState('');
+  const [collapsed, toggleCollapsed] = useSidebarCollapsed('rz.admin.sidebar.collapsed');
   const { canView, isLoading: isLoadingPermissions, isSuperAdmin } = useAdminPermissions();
 
-  const navItems = useMemo(() => {
-    if (isLoadingPermissions) return [];
-    return allNavItems.filter(item => {
-      if (item.moduleKey === 'settings') {
-        return isSuperAdmin || canView('settings') || canView('marketing');
-      }
-      return canView(item.moduleKey);
-    });
-  }, [canView, isLoadingPermissions, isSuperAdmin]);
+  useRzTheme();
 
-  useEffect(() => {
-    if (user) {
-      setUserName(user.email?.split('@')[0] || 'Admin');
-    }
-  }, [user]);
+  const groups = useMemo(
+    () => (isLoadingPermissions ? [] : visibleAdminGroups(canView)),
+    [canView, isLoadingPermissions]
+  );
+  const settings =
+    !isLoadingPermissions && (isSuperAdmin || canView('settings') || canView('marketing'))
+      ? ADMIN_SETTINGS_ITEM
+      : null;
 
+  const userName = user?.email?.split('@')[0] || 'Admin';
   const userInitial = userName.charAt(0).toUpperCase();
 
   const handleLogout = async () => {
     try {
       await logout();
-      toast({
-        title: 'Sessão terminada',
-        description: 'Até breve!',
-      });
+      toast({ title: 'Sessão terminada', description: 'Até breve!' });
       navigate(ROUTES.ADMIN.LOGIN);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro',
-        description: error.message || 'Erro ao fazer logout',
+        description: error instanceof Error ? error.message : 'Erro ao fazer logout',
         variant: 'destructive',
       });
     }
@@ -97,52 +60,59 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
   if (isLoadingPermissions) {
     return (
-      <div className="min-h-screen bg-secondary flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="text-muted-foreground">A carregar permissões...</p>
+      <div className="flex min-h-screen items-center justify-center bg-rz-aurora font-jakarta">
+        <div className="flex flex-col items-center gap-4 text-white/70">
+          <Loader2 className="h-8 w-8 animate-spin" />
+          <p className="text-sm">A carregar permissões…</p>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-secondary flex overflow-x-hidden">
+    <div className="min-h-screen bg-rz-aurora bg-fixed font-jakarta text-rz-ink print:bg-white">
       <AdminSidebar
-        navItems={navItems}
+        groups={groups}
+        settings={settings}
         userName={userName}
         userInitial={userInitial}
+        collapsed={collapsed}
+        onToggle={toggleCollapsed}
         onLogout={handleLogout}
       />
 
-      <AdminMobileHeader
-        isSidebarOpen={isSidebarOpen}
-        setIsSidebarOpen={setIsSidebarOpen}
-        userInitial={userInitial}
-      />
+      <AdminMobileHeader isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 
       <AdminMobileSidebar
         isOpen={isSidebarOpen}
         onClose={() => setIsSidebarOpen(false)}
-        navItems={navItems}
+        groups={groups}
+        settings={settings}
         userName={userName}
         userInitial={userInitial}
         onLogout={handleLogout}
       />
 
-      <main className="flex-1 lg:ml-64 pt-14 lg:pt-0 print:ml-0 print:pt-0 overflow-x-hidden">
-        <div className="p-4 lg:p-8 print:p-0 max-w-full">
-          {children || (
-            <Suspense
-              fallback={
-                <div className="py-16 text-center text-sm text-muted-foreground">A carregar…</div>
-              }
-            >
-              <Outlet />
-            </Suspense>
-          )}
-        </div>
-      </main>
+      <div
+        className={cn(
+          'min-h-screen pt-14 transition-[padding] duration-300 ease-out lg:py-3 lg:pr-3 print:p-0',
+          collapsed ? 'lg:pl-[76px]' : 'lg:pl-[260px]'
+        )}
+      >
+        <main className="min-h-[calc(100vh-3.5rem)] overflow-x-hidden rounded-t-[28px] bg-rz-canvas shadow-rz-panel lg:min-h-[calc(100vh-1.5rem)] lg:rounded-[28px] print:min-h-0 print:rounded-none print:bg-white print:shadow-none">
+          <div className="mx-auto max-w-[1600px] p-4 lg:p-8 print:max-w-none print:p-0">
+            {children || (
+              <Suspense
+                fallback={
+                  <div className="py-16 text-center text-sm text-rz-muted">A carregar…</div>
+                }
+              >
+                <Outlet />
+              </Suspense>
+            )}
+          </div>
+        </main>
+      </div>
     </div>
   );
 };

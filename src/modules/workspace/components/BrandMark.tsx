@@ -7,11 +7,17 @@ const BARS = [14, 13, 12, 11, 10, 9, 22, 21, 20, 19, 18, 17];
 interface BrandMarkProps {
   /** Mostra o nome ao lado do símbolo. */
   withName?: boolean;
+  /** Linha por baixo do nome (Workplace no colaborador, Admin no painel). */
+  subtitle?: string;
   className?: string;
 }
 
 /** Símbolo dourado da Realize (barras) + nome, legível sobre a aurora. */
-export const BrandMark: React.FC<BrandMarkProps> = ({ withName = true, className }) => {
+export const BrandMark: React.FC<BrandMarkProps> = ({
+  withName = true,
+  subtitle = 'Workplace',
+  className,
+}) => {
   // Id único: o menu lateral (escondido no telemóvel) e a barra superior têm cada um o seu
   // símbolo, e um gradiente dentro de um elemento escondido deixa de pintar os outros.
   const gradientId = `rz-brand-gold-${useId().replace(/:/g, '')}`;
@@ -42,7 +48,7 @@ export const BrandMark: React.FC<BrandMarkProps> = ({ withName = true, className
             Realize
           </span>
           <span className="mt-1 block text-[10px] font-semibold uppercase tracking-[0.22em] text-white/55">
-            Workplace
+            {subtitle}
           </span>
         </span>
       )}

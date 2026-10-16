@@ -1,72 +1,79 @@
-import { Link, useLocation } from 'react-router-dom';
-import { LogOut } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import logo from '@/assets/logo-realize.png';
-
-interface NavItem {
-  href: string;
-  icon: React.ComponentType<{ className?: string }>;
-  label: string;
-  moduleKey: string;
-}
+import React from 'react';
+import { Link } from 'react-router-dom';
+import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { ROUTES } from '@/lib/constants';
+import { BrandMark } from '@/modules/workspace/components/BrandMark';
+import { AdminNavGroups } from './AdminNavGroups';
+import { AdminNavLink } from './AdminNavLink';
+import { AdminUserCard } from './AdminUserCard';
+import type { AdminNavGroup, AdminNavItem } from './adminNavigation';
 
 interface AdminSidebarProps {
-  navItems: NavItem[];
+  groups: AdminNavGroup[];
+  settings: AdminNavItem | null;
   userName: string;
   userInitial: string;
+  collapsed: boolean;
+  onToggle: () => void;
   onLogout: () => void;
 }
 
-export const AdminSidebar = ({ navItems, userName, userInitial, onLogout }: AdminSidebarProps) => {
-  const location = useLocation();
+/** Menu lateral do admin sobre a aurora (como o do colaborador), fixo à esquerda. */
+export const AdminSidebar: React.FC<AdminSidebarProps> = ({
+  groups,
+  settings,
+  userName,
+  userInitial,
+  collapsed,
+  onToggle,
+  onLogout,
+}) => (
+  <aside
+    className={cn(
+      'fixed inset-y-0 left-0 z-40 hidden flex-col transition-[width] duration-300 ease-out lg:flex print:hidden',
+      collapsed ? 'w-[76px]' : 'w-[260px]'
+    )}
+    aria-label="Menu do admin"
+  >
+    <Link
+      to={ROUTES.ADMIN.DASHBOARD}
+      className={cn('flex h-16 shrink-0 items-center', collapsed ? 'justify-center' : 'px-5')}
+      aria-label="Realize — Dashboard"
+    >
+      <BrandMark withName={!collapsed} subtitle="Admin" />
+    </Link>
 
-  return (
-    <aside className="hidden lg:flex lg:flex-col w-64 bg-sidebar fixed inset-y-0 left-0 z-50 print:hidden">
-      <div className="p-4 flex justify-center">
-        <img src={logo} alt="Realize Consultadoria" className="h-16 w-auto brightness-0 invert" />
-      </div>
+    <nav className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-3 pb-3 pt-2">
+      <AdminNavGroups groups={groups} collapsed={collapsed} />
+    </nav>
 
-      <div className="flex-1 flex flex-col min-h-0">
-        <nav className="px-3 py-4 flex flex-col gap-[5px]">
-          {navItems.map(item => {
-            const isActive = location.pathname === item.href;
-            return (
-              <Link
-                key={item.href}
-                to={item.href}
-                className={`flex items-center gap-3 px-3 py-2.5 rounded-lg transition-colors ${
-                  isActive
-                    ? 'bg-sidebar-accent text-sidebar-primary'
-                    : 'text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground'
-                }`}
-              >
-                <item.icon className="h-5 w-5" />
-                <span className="font-medium">{item.label}</span>
-              </Link>
-            );
-          })}
-        </nav>
-      </div>
-
-      <div className="p-4 border-t border-sidebar-border mt-auto mb-2">
-        <div className="flex items-center gap-3 px-4 py-2 mb-2">
-          <div className="w-8 h-8 bg-sidebar-primary rounded-full flex items-center justify-center text-sm font-semibold text-sidebar-primary-foreground">
-            {userInitial}
-          </div>
-          <div className="flex-1 min-w-0">
-            <p className="text-sm font-medium text-sidebar-foreground truncate">{userName}</p>
-            <p className="text-xs text-sidebar-foreground/60">Administrador</p>
-          </div>
-        </div>
-        <Button
-          variant="ghost"
-          className="w-full justify-start text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
-          onClick={onLogout}
-        >
-          <LogOut className="h-5 w-5 mr-3" />
-          Terminar Sessão
-        </Button>
-      </div>
-    </aside>
-  );
-};
+    <div className="space-y-2 px-3 pb-4 pt-2">
+      {settings && <AdminNavLink item={settings} collapsed={collapsed} />}
+      <button
+        type="button"
+        onClick={onToggle}
+        className={cn(
+          'flex w-full items-center gap-3 rounded-2xl px-2.5 py-2 text-[13px] font-medium text-white/60 transition-colors hover:bg-white/[0.08] hover:text-white',
+          collapsed && 'justify-center px-0'
+        )}
+        aria-label={collapsed ? 'Expandir menu' : 'Recolher menu'}
+      >
+        {collapsed ? (
+          <PanelLeftOpen className="h-5 w-5" />
+        ) : (
+          <>
+            <PanelLeftClose className="ml-1.5 h-5 w-5" />
+            <span>Recolher menu</span>
+          </>
+        )}
+      </button>
+      <AdminUserCard
+        userName={userName}
+        userInitial={userInitial}
+        collapsed={collapsed}
+        onLogout={onLogout}
+      />
+    </div>
+  </aside>
+);

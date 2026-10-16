@@ -1,14 +1,20 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { Button } from '@/components/ui/button';
 import { useToast } from '@/hooks/use-toast';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Building2, ClipboardList, Users } from 'lucide-react';
 import { motion } from 'framer-motion';
-import logo from '@/assets/logo-realize.png';
 import { ROUTES, ERROR_MESSAGES } from '@/lib/constants';
+import { BrandMark } from '@/modules/workspace/components/BrandMark';
+import { useRzTheme } from '@/modules/workspace/hooks/useRzTheme';
 import { AdminLoginForm } from '../components/AdminLoginForm';
 import { AdminForgotPasswordForm } from '../components/AdminForgotPasswordForm';
+
+const HIGHLIGHTS = [
+  { icon: Users, text: 'Colaboradores, documentos e equipamentos' },
+  { icon: ClipboardList, text: 'Pedidos de férias, ausências e ponto' },
+  { icon: Building2, text: 'Empresas, acessos e jurídico' },
+];
 
 const AdminLoginPage = () => {
   const navigate = useNavigate();
@@ -16,6 +22,8 @@ const AdminLoginPage = () => {
   const { login, isLoading, isAuthenticated, role } = useAuth();
   const [email, setEmail] = useState('');
   const [showForgotPassword, setShowForgotPassword] = useState(false);
+
+  useRzTheme();
 
   // Se já está logado como admin, redirecionar
   useEffect(() => {
@@ -43,66 +51,83 @@ const AdminLoginPage = () => {
         description: 'Bem-vindo ao painel de administração.',
       });
       navigate(ROUTES.ADMIN.DASHBOARD);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro no login',
-        description: error.message || ERROR_MESSAGES.AUTH.UNEXPECTED,
+        description: error instanceof Error ? error.message : ERROR_MESSAGES.AUTH.UNEXPECTED,
         variant: 'destructive',
       });
     }
   };
 
   return (
-    <div className="min-h-screen bg-background flex">
-      {/* Left side - Form */}
-      <div className="flex-1 flex flex-col justify-center px-8 sm:px-16 lg:px-24">
+    <div className="flex min-h-screen bg-rz-aurora font-jakarta text-rz-ink">
+      {/* Lado esquerdo: marca e o que se gere aqui, sobre a aurora */}
+      <div className="hidden flex-1 flex-col justify-between p-12 lg:flex">
+        <BrandMark subtitle="Admin" />
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="max-w-md"
+        >
+          <h2 className="text-[40px] font-extrabold leading-tight text-white">
+            Painel de Administração
+          </h2>
+          <p className="mt-3 text-[16px] text-white/65">
+            Tudo o que os RH precisam, num único lugar.
+          </p>
+          <ul className="mt-8 space-y-3">
+            {HIGHLIGHTS.map(({ icon: Icon, text }) => (
+              <li key={text} className="flex items-center gap-3 text-[14.5px] text-white/80">
+                <span className="rz-glass flex h-9 w-9 items-center justify-center rounded-xl">
+                  <Icon className="h-[18px] w-[18px] text-[#F3D9A4]" />
+                </span>
+                {text}
+              </li>
+            ))}
+          </ul>
+        </motion.div>
+        <p className="text-[12px] text-white/35">Realize Consultadoria</p>
+      </div>
+
+      {/* Lado direito: o formulário num painel claro e arredondado */}
+      <div className="flex flex-1 items-center justify-center p-4 sm:p-8 lg:p-3">
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ duration: 0.5 }}
-          className="max-w-md w-full mx-auto"
+          className="flex w-full max-w-md flex-col rounded-[28px] bg-white p-7 shadow-rz-panel sm:p-10 lg:h-full lg:max-w-none lg:items-center lg:justify-center"
         >
-          <Button
-            variant="ghost"
-            onClick={() => (showForgotPassword ? setShowForgotPassword(false) : navigate('/'))}
-            className="mb-8 -ml-2"
-          >
-            <ArrowLeft className="h-4 w-4 mr-2" />
-            {showForgotPassword ? 'Voltar ao login' : 'Voltar'}
-          </Button>
+          <div className="w-full max-w-sm">
+            <div className="mb-8 flex items-center justify-between">
+              <button
+                type="button"
+                onClick={() => (showForgotPassword ? setShowForgotPassword(false) : navigate('/'))}
+                className="-ml-2 inline-flex items-center gap-2 rounded-xl px-2 py-1.5 text-[13.5px] font-medium text-rz-muted transition-colors hover:bg-rz-canvas hover:text-rz-ink"
+              >
+                <ArrowLeft className="h-4 w-4" />
+                {showForgotPassword ? 'Voltar ao login' : 'Voltar'}
+              </button>
+              <span className="lg:hidden">
+                <span className="inline-flex rounded-2xl bg-rz-ink px-3 py-2">
+                  <BrandMark withName={false} />
+                </span>
+              </span>
+            </div>
 
-          <div className="flex items-center gap-4 mb-8">
-            <img src={logo} alt="Realize Logo" className="h-12 w-auto" />
+            {showForgotPassword ? (
+              <AdminForgotPasswordForm initialEmail={email} />
+            ) : (
+              <AdminLoginForm
+                email={email}
+                setEmail={setEmail}
+                isLoading={isLoading}
+                onSubmit={handleLoginSubmit}
+                onForgotPasswordClick={() => setShowForgotPassword(true)}
+              />
+            )}
           </div>
-
-          {showForgotPassword ? (
-            <AdminForgotPasswordForm initialEmail={email} />
-          ) : (
-            <AdminLoginForm
-              email={email}
-              setEmail={setEmail}
-              isLoading={isLoading}
-              onSubmit={handleLoginSubmit}
-              onForgotPasswordClick={() => setShowForgotPassword(true)}
-            />
-          )}
-        </motion.div>
-      </div>
-
-      {/* Right side - Decorative */}
-      <div className="hidden lg:flex flex-1 bg-primary items-center justify-center p-16">
-        <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.6 }}
-          className="text-center"
-        >
-          <h2 className="text-4xl font-bold text-primary-foreground mb-4">
-            Painel de Administração
-          </h2>
-          <p className="text-primary-foreground/80 text-lg max-w-md">
-            Gerencie empresas, colaboradores e ausências num único lugar.
-          </p>
         </motion.div>
       </div>
     </div>

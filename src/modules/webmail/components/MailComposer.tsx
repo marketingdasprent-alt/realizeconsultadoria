@@ -2,7 +2,8 @@ import React, { useEffect, useId, useRef, useState } from 'react';
 import { Loader2, Paperclip, Send, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useDirectory } from '@/modules/social/hooks/useDirectory';
-import { parseRecipients, withSignature } from '../lib/mailFormat';
+import { parseRecipients } from '../lib/mailFormat';
+import { signatureToHtml } from '../lib/signature';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import type { ComposeDraft, ComposeInput, MailAccount } from '../types';
@@ -43,6 +44,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const addFiles = (added: File[]) => setFiles(current => [...current, ...added]);
   const { isDragging, dropProps } = useFileDrop(addFiles);
   const [busy, setBusy] = useState(false);
+  const [withSig, setWithSig] = useState(true);
   const accountsRef = useRef(accounts);
   accountsRef.current = accounts;
 
@@ -57,11 +59,10 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       cc: draft.cc ?? '',
       bcc: draft.bcc ?? '',
       subject: draft.subject ?? '',
-      body: draft.restored
-        ? (draft.body ?? '')
-        : withSignature(draft.body ?? '', account?.signature ?? null),
+      body: draft.body ?? '',
     });
     setShowCc(!!draft.cc || !!draft.bcc);
+    setWithSig(true);
     setFiles([]);
     setBusy(false);
   }, [draft]);
@@ -69,6 +70,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const set = (key: keyof typeof fields, value: string) => setFields(f => ({ ...f, [key]: value }));
   const size = files.reduce((total, file) => total + file.size, 0);
   const to = parseRecipients(fields.to);
+  const sender = accounts.find(a => a.id === (accountId || fallback?.id));
+  const signatureHtml = signatureToHtml(sender?.signature ?? null);
 
   const send = async () => {
     if (!draft) return;
@@ -80,6 +83,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       bcc: parseRecipients(fields.bcc),
       subject: fields.subject.trim(),
       text: fields.body,
+      signatureHtml: withSig ? signatureHtml || null : null,
       inReplyTo: draft.inReplyTo,
       attachments: await Promise.all(
         files.map(async file => ({
@@ -179,6 +183,26 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           className="min-h-[240px] flex-1 resize-none px-5 py-4 text-[14px] leading-relaxed outline-none"
           placeholder="Escreva a sua mensagem…"
         />
+        {signatureHtml && (
+          <div className="border-t border-rz-line px-5 py-3">
+            <label className="mb-2 flex w-fit cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-rz-muted">
+              <input
+                type="checkbox"
+                checked={withSig}
+                onChange={e => setWithSig(e.target.checked)}
+                className="h-4 w-4 accent-violet-600"
+              />
+              Incluir assinatura
+            </label>
+            {withSig && (
+              // Já limpa (sem scripts nem eventos): é a assinatura da própria pessoa.
+              <div
+                className="max-h-40 overflow-auto rounded-xl bg-rz-canvas/60 px-3 py-2 text-[13px] [&_img]:inline-block"
+                dangerouslySetInnerHTML={{ __html: signatureHtml }}
+              />
+            )}
+          </div>
+        )}
         {files.length > 0 && (
           <ul className="flex flex-wrap gap-2 px-5 pb-2">
             {files.map((file, index) => (

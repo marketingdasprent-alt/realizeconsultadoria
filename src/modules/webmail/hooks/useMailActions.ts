@@ -3,7 +3,7 @@ import { toast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { DEMO_MAIL_ACCOUNTS } from '../lib/demoData';
 import { patchDemoMail, setDemoMail } from '../lib/demoStore';
-import { textToHtml } from '../lib/mailFormat';
+import { composeWithSignature } from '../lib/signature';
 import { mailErrorText, mailService, type MailError } from '../services/mailService';
 import type { ComposeInput, MailSummary } from '../types';
 
@@ -117,7 +117,8 @@ export const useMailActions = () => {
       }
       // O compositor já fechou: o aviso mostra o progresso e o resultado.
       const progress = toast({ title: 'A enviar…', description: input.subject || undefined });
-      const { error } = await mailService.send(input, textToHtml(input.text));
+      const composed = composeWithSignature(input.text, input.signatureHtml ?? null);
+      const { error } = await mailService.send({ ...input, text: composed.text }, composed.html);
       progress.dismiss();
       if (error) {
         fail(error, 'O email não foi enviado. O rascunho voltou a abrir.');

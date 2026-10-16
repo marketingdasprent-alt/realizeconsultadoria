@@ -67,8 +67,10 @@ export interface ComposeInput {
   cc: string[];
   bcc: string[];
   subject: string;
-  /** Texto escrito pelo utilizador (a assinatura e a citação já incluídas). */
+  /** Texto escrito pelo utilizador (com a citação, se for resposta). */
   text: string;
+  /** Assinatura em HTML a juntar ao enviar (antes da citação). */
+  signatureHtml?: string | null;
   inReplyTo?: string;
   attachments: OutgoingAttachment[];
 }

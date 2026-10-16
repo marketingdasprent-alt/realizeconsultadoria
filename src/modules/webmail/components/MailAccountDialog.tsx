@@ -4,8 +4,10 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/modules/workspace/components/ConfirmDialog';
 import { ACCOUNT_DOTS } from '../lib/mailFormat';
+import { sanitizeSignatureHtml } from '../lib/signature';
 import { providerOf } from '../lib/providers';
 import type { MailAccount, MailAccountColor } from '../types';
+import { SignatureEditor } from './SignatureEditor';
 
 const FIELD =
   'w-full rounded-2xl bg-rz-canvas px-4 text-sm outline-none ring-1 ring-transparent focus:bg-white focus:ring-rz-primary/40';
@@ -55,7 +57,7 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
   const save = () => {
     void onSave(account.id, {
       displayName: account.shared ? account.displayName : form.displayName.trim() || null,
-      signature: form.signature.trim() || null,
+      signature: sanitizeSignatureHtml(form.signature) || null,
       color: form.color,
       isDefault: account.shared ? account.isDefault : form.isDefault,
     });
@@ -67,7 +69,7 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
       <Dialog open onOpenChange={open => !open && onClose()}>
         <DialogContent
           onInteractOutside={event => event.preventDefault()}
-          className="max-h-[92vh] overflow-y-auto rounded-[28px] sm:max-w-md sm:rounded-[28px]"
+          className="max-h-[92vh] overflow-y-auto rounded-[28px] sm:max-w-xl sm:rounded-[28px]"
         >
           <div className="flex items-center gap-3">
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rz-canvas">
@@ -120,16 +122,14 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
                 />
               </label>
             )}
-            <label className="block">
+            <div>
               <span className={LABEL}>Assinatura</span>
-              <textarea
-                value={form.signature}
-                onChange={e => setForm(f => ({ ...f, signature: e.target.value }))}
-                rows={4}
-                className={cn(FIELD, 'py-3')}
-                placeholder="Nome · Cargo · Empresa"
+              <SignatureEditor
+                key={account.id}
+                initial={account.signature}
+                onChange={signature => setForm(f => ({ ...f, signature }))}
               />
-            </label>
+            </div>
             <div>
               <span className={LABEL}>Cor</span>
               <div className="flex gap-2">

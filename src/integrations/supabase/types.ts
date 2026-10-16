@@ -1164,6 +1164,24 @@ export type Database = {
         };
         Relationships: [];
       };
+      departments: {
+        Row: {
+          created_at: string;
+          id: string;
+          name: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          name: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          name?: string;
+        };
+        Relationships: [];
+      };
       employee_attachments: {
         Row: {
           created_at: string;
@@ -1736,6 +1754,24 @@ export type Database = {
           is_national?: boolean;
           name?: string;
           year?: number;
+        };
+        Relationships: [];
+      };
+      job_positions: {
+        Row: {
+          created_at: string;
+          id: string;
+          name: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          name: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          name?: string;
         };
         Relationships: [];
       };

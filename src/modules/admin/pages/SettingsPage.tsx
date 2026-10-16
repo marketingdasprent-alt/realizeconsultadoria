@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import {
   Save,
   User,
@@ -14,11 +15,14 @@ import {
   X,
   Key,
   Headset,
+  Briefcase,
+  Network,
   FolderKey,
   Building2,
   Wrench,
 } from 'lucide-react';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
+import { CatalogManager } from '../components/settings/CatalogManager';
 import SupportSubjectsManager from '@/components/admin/SupportSubjectsManager';
 import SupportDepartmentsManager from '@/components/admin/SupportDepartmentsManager';
 import ChangeAdminPasswordDialog from '@/components/admin/ChangeAdminPasswordDialog';
@@ -126,6 +130,9 @@ const SettingsPage = () => {
   const [repairAdmin, setRepairAdmin] = useState<AdminUser | null>(null);
 
   const { canViewTopic, isSuperAdmin, isLoading: isLoadingPermissions } = useAdminPermissions();
+  // Separador aberto por ligação (ex.: ?tab=equipa a partir da ficha do colaborador).
+  const [searchParams] = useSearchParams();
+  const tabParam = searchParams.get('tab');
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -558,7 +565,7 @@ const SettingsPage = () => {
           description="Gerir preferências da conta e do sistema"
         />
 
-        <Tabs defaultValue="profile" className="space-y-6">
+        <Tabs defaultValue={tabParam ?? 'profile'} className="space-y-6">
           <TabsList className="flex-wrap">
             <TabsTrigger value="profile" className="gap-2">
               <User className="h-4 w-4" />
@@ -591,6 +598,10 @@ const SettingsPage = () => {
             <TabsTrigger value="suporte" className="gap-2">
               <Headset className="h-4 w-4" />
               Suporte
+            </TabsTrigger>
+            <TabsTrigger value="equipa" className="gap-2">
+              <Briefcase className="h-4 w-4" />
+              Equipa
             </TabsTrigger>
           </TabsList>
 
@@ -1076,6 +1087,24 @@ const SettingsPage = () => {
             <div className="space-y-6">
               <SupportDepartmentsManager />
               <SupportSubjectsManager />
+            </div>
+          </TabsContent>
+
+          {/* Listas das fichas dos colaboradores: funções e departamentos */}
+          <TabsContent value="equipa">
+            <div className="grid gap-4 lg:grid-cols-2">
+              <CatalogManager
+                kind="job_positions"
+                title="Funções"
+                icon={Briefcase}
+                addPlaceholder="Nova função (ex.: Assist. Contabilidade)"
+              />
+              <CatalogManager
+                kind="departments"
+                title="Departamentos"
+                icon={Network}
+                addPlaceholder="Novo departamento (ex.: Oficina)"
+              />
             </div>
           </TabsContent>
         </Tabs>

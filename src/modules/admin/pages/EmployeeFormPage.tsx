@@ -10,6 +10,7 @@ import EmployeeGeneralTab, { type EmployeeRecord } from '../components/employee/
 import EmployeeVacationTab from '../components/employee/EmployeeVacationTab';
 import EmployeeDocumentsTab from '../components/employee/EmployeeDocumentsTab';
 import EmployeeAttachmentsTab from '../components/employee/EmployeeAttachmentsTab';
+import EmployeePayslipsTab from '../components/employee/EmployeePayslipsTab';
 import { EmployeeProfileHeader } from '../components/employee/EmployeeProfileHeader';
 import { useEmployeeAvatars } from '../hooks/useEmployeeAvatars';
 
@@ -20,7 +21,7 @@ interface Company {
 
 /**
  * Ficha do colaborador: cabeçalho com a fotografia, contactos e ações; separadores Perfil,
- * Férias, Documentos e Anexos. Sem id é a criação de um colaborador novo.
+ * Férias, Documentos (identificação e registo), Recibos e Anexos. Sem id é a criação de um colaborador novo.
  */
 const EmployeeFormPage = () => {
   const { id } = useParams<{ id: string }>();
@@ -115,6 +116,7 @@ const EmployeeFormPage = () => {
             <TabsTrigger value="perfil">Perfil</TabsTrigger>
             {canVacation && <TabsTrigger value="ferias">Férias</TabsTrigger>}
             {canEdit && <TabsTrigger value="documentos">Documentos</TabsTrigger>}
+            {canEdit && <TabsTrigger value="recibos">Recibos</TabsTrigger>}
             {canEdit && <TabsTrigger value="anexos">Anexos</TabsTrigger>}
           </TabsList>
         )}
@@ -138,6 +140,9 @@ const EmployeeFormPage = () => {
           <>
             <TabsContent value="documentos" className="mt-0">
               <EmployeeDocumentsTab employeeId={employee.id} />
+            </TabsContent>
+            <TabsContent value="recibos" className="mt-0">
+              <EmployeePayslipsTab employeeId={employee.id} />
             </TabsContent>
             <TabsContent value="anexos" className="mt-0">
               <EmployeeAttachmentsTab employeeId={employee.id} />

@@ -1,632 +1,207 @@
-import { useCallback, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  Plus,
-  Search,
-  Edit,
-  Trash2,
-  MoreHorizontal,
-  AlertTriangle,
-  Key,
-  ArrowUp,
-  ArrowDown,
-  ArrowUpDown,
-  Cake,
-  Upload,
-  RefreshCw,
-  Loader2,
-  UserCheck,
-  UserX,
-} from 'lucide-react';
-import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
+import { Plus, Upload } from 'lucide-react';
+import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Badge } from '@/components/ui/badge';
-import { useToast } from '@/hooks/use-toast';
 import EmployeeAvisoDialog from '@/components/admin/EmployeeAvisoDialog';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import ChangeEmployeePasswordDialog from '@/components/admin/ChangeEmployeePasswordDialog';
-import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import BulkDocumentUploadDialog from '@/components/admin/BulkDocumentUploadDialog';
 import ResendInviteSuccessDialog from '@/components/admin/ResendInviteSuccessDialog';
-import { useEmployees } from '@/hooks/useEmployees';
-import EmployeeFinancialTab from '@/modules/admin/components/employee/EmployeeFinancialTab';
-import type { Employee } from '@/modules/admin/services/employeeService';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { ROUTES } from '@/lib/constants';
 import { matchesSearch } from '@/lib/utils';
+import EmployeeFinancialTab from '@/modules/admin/components/employee/EmployeeFinancialTab';
+import { EmployeesStats } from '../components/employees/EmployeesStats';
+import {
+  EmployeesToolbar,
+  type EmployeesView,
+  type StatusFilter,
+} from '../components/employees/EmployeesToolbar';
+import { EmployeesTable, type SortField } from '../components/employees/EmployeesTable';
+import { useEmployeeAvatars } from '../hooks/useEmployeeAvatars';
+import { useEmployeeListActions } from '../hooks/useEmployeeListActions';
+import { companiesOf, companyName, hasBirthdayIn } from '../lib/employeeView';
+import type { Employee } from '../services/employeeService';
 
+const thisMonth = new Date().getMonth();
+
+const SORTERS: Record<SortField, (a: Employee, b: Employee) => number> = {
+  name: (a, b) => a.name.localeCompare(b.name, 'pt'),
+  company: (a, b) => companyName(a).localeCompare(companyName(b), 'pt'),
+  position: (a, b) => (a.position || '').localeCompare(b.position || '', 'pt'),
+  status: (a, b) => Number(b.is_active) - Number(a.is_active),
+};
+
+/** Colaboradores: números da equipa, filtros (no endereço) e a lista pessoal ou financeira. */
 const EmployeesPage = () => {
   const navigate = useNavigate();
-  const { toast } = useToast();
   const { canExecuteTopic } = useAdminPermissions();
-  const { employees, isLoading, deleteEmployee, toggleStatus, resendInvite } = useEmployees();
-
-  const [searchParams, setSearchParams] = useSearchParams();
-  const activeTab: 'personal' | 'financial' =
-    searchParams.get('tab') === 'financial' ? 'financial' : 'personal';
-  const searchTerm = searchParams.get('q') || '';
-  const statusFilter: 'active' | 'inactive' | 'all' =
-    searchParams.get('status') === 'inactive'
-      ? 'inactive'
-      : searchParams.get('status') === 'all'
-        ? 'all'
-        : 'active';
-
-  const setActiveTab = useCallback(
-    (tab: 'personal' | 'financial') => {
-      setSearchParams(
-        prev => {
-          const next = new URLSearchParams(prev);
-          if (tab === 'personal') next.delete('tab');
-          else next.set('tab', tab);
-          return next;
-        },
-        { replace: true }
-      );
-    },
-    [setSearchParams]
-  );
-
-  const setSearchTerm = useCallback(
-    (term: string) => {
-      setSearchParams(
-        prev => {
-          const next = new URLSearchParams(prev);
-          if (term) next.set('q', term);
-          else next.delete('q');
-          return next;
-        },
-        { replace: true }
-      );
-    },
-    [setSearchParams]
-  );
-
-  const setStatusFilter = useCallback(
-    (status: 'active' | 'inactive' | 'all') => {
-      setSearchParams(
-        prev => {
-          const next = new URLSearchParams(prev);
-          if (status === 'active') next.delete('status');
-          else next.set('status', status);
-          return next;
-        },
-        { replace: true }
-      );
-    },
-    [setSearchParams]
-  );
-
-  const [avisoDialogEmployee, setAvisoDialogEmployee] = useState<any>(null);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [employeeToDelete, setEmployeeToDelete] = useState<Employee | null>(null);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const [passwordDialogEmployee, setPasswordDialogEmployee] = useState<any>(null);
-  const [bulkDocDialogOpen, setBulkDocDialogOpen] = useState(false);
-  const [isResending, setIsResending] = useState<string | null>(null);
-  const [resendSuccessData, setResendSuccessData] = useState<{
-    name: string;
-    password: string;
-  } | null>(null);
-
-  // Sorting state
-  type SortField = 'name' | 'email' | 'company' | 'position' | 'status' | 'iban';
+  const actions = useEmployeeListActions();
+  const avatarOf = useEmployeeAvatars();
+  const [params, setParams] = useSearchParams();
+  const [bulkOpen, setBulkOpen] = useState(false);
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
-  const handleSort = (field: SortField) => {
-    if (sortField === field) {
-      setSortDirection(prev => (prev === 'asc' ? 'desc' : 'asc'));
-    } else {
-      setSortField(field);
-      setSortDirection('asc');
-    }
-  };
+  const search = params.get('q') || '';
+  const view: EmployeesView = params.get('tab') === 'financial' ? 'financial' : 'personal';
+  const status = (
+    ['inactive', 'all'].includes(params.get('status') || '') ? params.get('status') : 'active'
+  ) as StatusFilter;
+  const companyId = params.get('empresa') || 'all';
+  const onlyBirthdays = params.get('aniversarios') === '1';
 
-  const SortIcon = ({ field }: { field: SortField }) => {
-    if (sortField !== field) return <ArrowUpDown className="h-3 w-3 opacity-50" />;
-    return sortDirection === 'asc' ? (
-      <ArrowUp className="h-3 w-3" />
-    ) : (
-      <ArrowDown className="h-3 w-3" />
+  /** Muda um filtro no endereço (o valor por omissão sai do endereço). */
+  const setParam = (key: string, value: string, fallback: string) =>
+    setParams(
+      previous => {
+        const next = new URLSearchParams(previous);
+        if (value === fallback) next.delete(key);
+        else next.set(key, value);
+        return next;
+      },
+      { replace: true }
     );
+
+  const permissions = {
+    canEdit: canExecuteTopic('employees', 'edit'),
+    canDelete: canExecuteTopic('employees', 'delete'),
+    canNotifications: canExecuteTopic('employees', 'notifications'),
+    canResetPassword: canExecuteTopic('employees', 'reset_password'),
   };
 
-  // Permission checks
-  const canCreate = canExecuteTopic('employees', 'create');
-  const canEdit = canExecuteTopic('employees', 'edit');
-  const canDelete = canExecuteTopic('employees', 'delete');
-  const canNotifications = canExecuteTopic('employees', 'notifications');
-  const canResetPassword = canExecuteTopic('employees', 'reset_password');
+  const { employees } = actions;
+  const companies = useMemo(() => companiesOf(employees), [employees]);
 
-  const openDeleteDialog = (employee: Employee) => {
-    setEmployeeToDelete(employee);
-    setDeleteDialogOpen(true);
+  // Os números refletem a pesquisa e a empresa, mas não o estado (servem para o escolher).
+  const searched = useMemo(() => {
+    const iban = search.replace(/\s/g, '').toLowerCase();
+    return employees.filter(
+      employee =>
+        (companyId === 'all' || employee.company_id === companyId) &&
+        (matchesSearch(employee.name, search) ||
+          matchesSearch(employee.email, search) ||
+          matchesSearch(companyName(employee), search) ||
+          (!!iban && (employee.iban || '').replace(/\s/g, '').toLowerCase().includes(iban)))
+    );
+  }, [employees, search, companyId]);
+
+  const visible = useMemo(() => {
+    const direction = sortDirection === 'asc' ? 1 : -1;
+    return searched
+      .filter(e => status === 'all' || e.is_active === (status === 'active'))
+      .filter(e => !onlyBirthdays || hasBirthdayIn(e, thisMonth))
+      .sort((a, b) => SORTERS[sortField](a, b) * direction);
+  }, [searched, status, onlyBirthdays, sortField, sortDirection]);
+
+  const sort = (field: SortField) => {
+    setSortDirection(field === sortField && sortDirection === 'asc' ? 'desc' : 'asc');
+    setSortField(field);
   };
-
-  const handleDelete = async () => {
-    if (!employeeToDelete) return;
-
-    setIsDeleting(true);
-    try {
-      const { error } = await deleteEmployee(employeeToDelete.id);
-      if (error) throw error;
-      toast({ title: 'Colaborador eliminado com sucesso!' });
-      setDeleteDialogOpen(false);
-      setEmployeeToDelete(null);
-    } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Ocorreu um erro ao eliminar.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsDeleting(false);
-    }
-  };
-
-  const handleResendInvite = async (employee: Employee) => {
-    setIsResending(employee.id);
-    const result = await resendInvite(employee.id, employee.name);
-
-    if (result.success) {
-      setResendSuccessData({
-        name: employee.name,
-        password: result.newPassword!,
-      });
-
-      if (result.emailSuccess) {
-        toast({ title: 'Convite re-enviado com sucesso!' });
-      } else {
-        toast({
-          title: 'Convite Enviado (SEM EMAIL)',
-          description:
-            'A senha foi alterada, mas o email falhou. Partilhe a senha com o utilizador.',
-          variant: 'destructive',
-        });
-      }
-    } else {
-      toast({
-        title: 'Erro ao re-enviar',
-        description: result.error || 'Ocorreu um erro desconhecido.',
-        variant: 'destructive',
-      });
-    }
-    setIsResending(null);
-  };
-
-  const handleToggleStatus = async (employee: Employee) => {
-    try {
-      const { error } = await toggleStatus(employee.id, !employee.is_active);
-      if (error) throw error;
-
-      toast({
-        title: 'Estado atualizado',
-        description: `O colaborador ${employee.name} está agora ${!employee.is_active ? 'Ativo' : 'Desativado'}.`,
-      });
-    } catch (error: any) {
-      toast({
-        title: 'Erro ao atualizar estado',
-        description: error.message || 'Erro desconhecido.',
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const filteredEmployees = employees.filter(employee => {
-    if (matchesSearch(employee.name, searchTerm)) return true;
-    if (matchesSearch(employee.email, searchTerm)) return true;
-    // @ts-expect-error - Supabase relational data typing
-    if (matchesSearch(employee.companies?.name || '', searchTerm)) return true;
-    // IBAN: comparar sem espaços para tolerar formatação
-    const ibanNoSpaces = (employee.iban || '').replace(/\s/g, '').toLowerCase();
-    const termNoSpaces = searchTerm.replace(/\s/g, '').toLowerCase();
-    if (termNoSpaces && ibanNoSpaces.includes(termNoSpaces)) return true;
-    return false;
-  });
-
-  // KPI stats: refletem a pesquisa mas não o filtro de status
-  // (o filtro de status existe precisamente para escolher Ativos/Inativos).
-  const currentMonthIdx = new Date().getMonth();
-  const stats = {
-    active: filteredEmployees.filter(e => e.is_active).length,
-    inactive: filteredEmployees.filter(e => !e.is_active).length,
-    birthdays: filteredEmployees.filter(e => {
-      // @ts-expect-error - Supabase relational data typing
-      if (!e.birth_date) return false;
-      // @ts-expect-error - Supabase relational data typing
-      return new Date(e.birth_date).getMonth() === currentMonthIdx;
-    }).length,
-  };
-
-  const statusFilteredEmployees = filteredEmployees.filter(employee => {
-    if (statusFilter === 'all') return true;
-    if (statusFilter === 'active') return employee.is_active;
-    return !employee.is_active;
-  });
-
-  const sortedEmployees = [...statusFilteredEmployees].sort((a, b) => {
-    let comparison = 0;
-
-    switch (sortField) {
-      case 'name':
-        comparison = a.name.toLowerCase().localeCompare(b.name.toLowerCase());
-        break;
-      case 'email':
-        comparison = a.email.toLowerCase().localeCompare(b.email.toLowerCase());
-        break;
-      case 'company':
-        // @ts-expect-error - Supabase relational data typing
-        comparison = (a.companies?.name || '')
-          .toLowerCase()
-          // @ts-expect-error - Supabase relational data typing
-          .localeCompare((b.companies?.name || '').toLowerCase());
-        break;
-      case 'position':
-        comparison = (a.position || '')
-          .toLowerCase()
-          .localeCompare((b.position || '').toLowerCase());
-        break;
-      case 'status':
-        comparison = a.is_active === b.is_active ? 0 : a.is_active ? -1 : 1;
-        break;
-      case 'iban':
-        comparison = (a.iban || '').toLowerCase().localeCompare((b.iban || '').toLowerCase());
-        break;
-    }
-
-    return sortDirection === 'asc' ? comparison : -comparison;
-  });
-
-  const renderRowActions = (employee: Employee) => (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon">
-          <MoreHorizontal className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
-        {canEdit && (
-          <DropdownMenuItem onClick={() => navigate(`/admin/colaboradores/${employee.id}`)}>
-            <Edit className="h-4 w-4 mr-2" />
-            Editar
-          </DropdownMenuItem>
-        )}
-        {canNotifications && (
-          <DropdownMenuItem onClick={() => setAvisoDialogEmployee(employee)}>
-            <AlertTriangle className="h-4 w-4 mr-2" />
-            Avisos
-          </DropdownMenuItem>
-        )}
-        {canResetPassword && (
-          <>
-            <DropdownMenuItem onClick={() => setPasswordDialogEmployee(employee)}>
-              <Key className="h-4 w-4 mr-2" />
-              Definir Nova Senha
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handleResendInvite(employee)} disabled={!!isResending}>
-              {isResending === employee.id ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-              ) : (
-                <RefreshCw className="h-4 w-4 mr-2" />
-              )}
-              Re-enviar Convite
-            </DropdownMenuItem>
-          </>
-        )}
-        {canDelete && (
-          <DropdownMenuItem onClick={() => openDeleteDialog(employee)} className="text-destructive">
-            <Trash2 className="h-4 w-4 mr-2" />
-            Eliminar
-          </DropdownMenuItem>
-        )}
-      </DropdownMenuContent>
-    </DropdownMenu>
-  );
+  const open = (employee: Employee) => navigate(`${ROUTES.ADMIN.EMPLOYEES}/${employee.id}`);
 
   return (
-    <>
-      <div className="space-y-6">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <AdminPageTitle title="Colaboradores" description="Gerir colaboradores das empresas" />
-
-          <div className="flex flex-wrap gap-2">
-            {canEdit && (
-              <Button variant="outline" onClick={() => setBulkDocDialogOpen(true)}>
-                <Upload className="h-4 w-4 mr-2" />
-                <span className="hidden sm:inline">Enviar Documento</span>
-                <span className="sm:hidden">Doc. Empresa</span>
+    <div className="space-y-5">
+      <AdminPageHeader
+        title="Colaboradores"
+        description="Fichas, acessos e dados financeiros da equipa"
+        actions={
+          <>
+            {permissions.canEdit && (
+              <Button variant="outline" className="rounded-full" onClick={() => setBulkOpen(true)}>
+                <Upload className="h-4 w-4" /> Enviar documento
               </Button>
             )}
-            {canCreate && (
-              <Button variant="gold" onClick={() => navigate('/admin/colaboradores/novo')}>
-                <Plus className="h-4 w-4 mr-2" />
-                Novo Colaborador
+            {canExecuteTopic('employees', 'create') && (
+              <Button className="rounded-full" onClick={() => navigate(ROUTES.ADMIN.EMPLOYEE_NEW)}>
+                <Plus className="h-4 w-4" /> Novo colaborador
               </Button>
             )}
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        {/* KPI Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-          <Card className="shadow-card">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
-                <UserCheck className="h-3.5 w-3.5 text-emerald-600" />
-                <span>Ativos</span>
-              </div>
-              <div className="text-2xl font-bold tabular-nums leading-tight">{stats.active}</div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-card">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
-                <UserX className="h-3.5 w-3.5 text-destructive" />
-                <span>Inativos</span>
-              </div>
-              <div className="text-2xl font-bold tabular-nums leading-tight text-muted-foreground">
-                {stats.inactive}
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="shadow-card">
-            <CardContent className="p-4">
-              <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
-                <Cake className="h-3.5 w-3.5 text-gold" />
-                <span>Aniversariantes do Mês</span>
-              </div>
-              <div className="text-2xl font-bold tabular-nums leading-tight">{stats.birthdays}</div>
-            </CardContent>
-          </Card>
-        </div>
+      <EmployeesStats
+        active={searched.filter(e => e.is_active).length}
+        inactive={searched.filter(e => !e.is_active).length}
+        birthdays={searched.filter(e => e.is_active && hasBirthdayIn(e, thisMonth)).length}
+        status={status}
+        onlyBirthdays={onlyBirthdays}
+        onStatusChange={value => setParam('status', value, 'active')}
+        onBirthdaysChange={value => setParam('aniversarios', value ? '1' : '0', '0')}
+      />
 
-        {/* Search + Status filter */}
-        <Card className="shadow-card">
-          <CardContent className="pt-6">
-            <div className="flex flex-col sm:flex-row gap-2">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  type="search"
-                  autoComplete="off"
-                  autoCorrect="off"
-                  autoCapitalize="off"
-                  spellCheck={false}
-                  inputMode="search"
-                  name="search-employees"
-                  placeholder={
-                    activeTab === 'financial'
-                      ? 'Pesquisar por nome, IBAN ou empresa...'
-                      : 'Pesquisar por nome, email ou empresa...'
-                  }
-                  value={searchTerm}
-                  onChange={e => setSearchTerm(e.target.value)}
-                  className="pl-10"
-                />
-              </div>
-              <Select
-                value={statusFilter}
-                onValueChange={value => setStatusFilter(value as 'active' | 'inactive' | 'all')}
-              >
-                <SelectTrigger className="w-full sm:w-[160px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="active">Ativos</SelectItem>
-                  <SelectItem value="inactive">Inativos</SelectItem>
-                  <SelectItem value="all">Todos</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-          </CardContent>
-        </Card>
-
-        {/* Tabs: Pessoais / Financeiras */}
-        <Tabs
-          value={activeTab}
-          onValueChange={value => setActiveTab(value as 'personal' | 'financial')}
-        >
-          <TabsList className="grid w-full grid-cols-2 sm:w-auto sm:inline-flex">
-            <TabsTrigger value="personal">Informações Pessoais</TabsTrigger>
-            <TabsTrigger value="financial">Informações Financeiras</TabsTrigger>
-          </TabsList>
-
-          {/* Informações Pessoais */}
-          <TabsContent value="personal" className="mt-4">
-            <Card className="shadow-card">
-              <CardContent className="p-0">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead
-                        className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => handleSort('name')}
-                      >
-                        <div className="flex items-center gap-1">
-                          Nome
-                          <SortIcon field="name" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="hidden md:table-cell h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => handleSort('email')}
-                      >
-                        <div className="flex items-center gap-1">
-                          Email
-                          <SortIcon field="email" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => handleSort('company')}
-                      >
-                        <div className="flex items-center gap-1">
-                          Empresa
-                          <SortIcon field="company" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="hidden md:table-cell h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => handleSort('position')}
-                      >
-                        <div className="flex items-center gap-1">
-                          Cargo
-                          <SortIcon field="position" />
-                        </div>
-                      </TableHead>
-                      <TableHead
-                        className="h-8 py-1 px-2 cursor-pointer hover:bg-muted/50 transition-colors"
-                        onClick={() => handleSort('status')}
-                      >
-                        <div className="flex items-center gap-1">
-                          Estado
-                          <SortIcon field="status" />
-                        </div>
-                      </TableHead>
-                      <TableHead className="w-[40px] h-8 py-1 px-2"></TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {isLoading ? (
-                      <TableRow>
-                        <TableCell colSpan={6} className="text-center py-4 text-sm">
-                          <div className="flex justify-center items-center">
-                            <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ) : sortedEmployees.length === 0 ? (
-                      <TableRow>
-                        <TableCell
-                          colSpan={6}
-                          className="text-center py-4 text-sm text-muted-foreground"
-                        >
-                          Nenhum colaborador encontrado
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      sortedEmployees.map(employee => (
-                        <TableRow
-                          key={employee.id}
-                          className={`h-8 ${canEdit ? 'cursor-pointer hover:bg-muted/50' : ''}`}
-                          onClick={() => canEdit && navigate(`/admin/colaboradores/${employee.id}`)}
-                        >
-                          <TableCell className="py-1 px-2">
-                            <span className="font-medium">{employee.name}</span>
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell py-1 px-2 text-sm">
-                            {employee.email}
-                          </TableCell>
-                          <TableCell className="py-1 px-2 text-sm">
-                            {/* @ts-expect-error - Supabase relational data typing */}
-                            {employee.companies?.name}
-                          </TableCell>
-                          <TableCell className="hidden md:table-cell py-1 px-2 text-sm">
-                            {employee.position || '-'}
-                          </TableCell>
-                          <TableCell
-                            className="py-1 px-2"
-                            onClick={e => {
-                              if (canEdit) {
-                                e.stopPropagation();
-                                handleToggleStatus(employee);
-                              }
-                            }}
-                          >
-                            <Badge
-                              variant={employee.is_active ? 'default' : 'secondary'}
-                              className={`text-xs py-0 ${canEdit ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                            >
-                              {employee.is_active ? 'Ativo' : 'Desativado'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell className="py-1 px-2" onClick={e => e.stopPropagation()}>
-                            {renderRowActions(employee)}
-                          </TableCell>
-                        </TableRow>
-                      ))
-                    )}
-                  </TableBody>
-                </Table>
-              </CardContent>
-            </Card>
-          </TabsContent>
-
-          {/* Informações Financeiras */}
-          <TabsContent value="financial" className="mt-4">
+      <section className="overflow-hidden rounded-[28px] bg-white shadow-rz-soft ring-1 ring-rz-line">
+        <EmployeesToolbar
+          search={search}
+          onSearchChange={value => setParam('q', value, '')}
+          status={status}
+          onStatusChange={value => setParam('status', value, 'active')}
+          companies={companies}
+          companyId={companyId}
+          onCompanyChange={value => setParam('empresa', value, 'all')}
+          view={view}
+          onViewChange={value => setParam('tab', value, 'personal')}
+          count={visible.length}
+        />
+        {view === 'personal' ? (
+          <EmployeesTable
+            employees={visible}
+            isLoading={actions.isLoading}
+            avatarOf={avatarOf}
+            sortField={sortField}
+            sortDirection={sortDirection}
+            onSort={sort}
+            permissions={permissions}
+            resendingId={actions.resendingId}
+            onOpen={open}
+            onNotices={actions.setNoticesFor}
+            onPassword={actions.setPasswordFor}
+            onResendInvite={actions.resend}
+            onToggleStatus={actions.toggle}
+            onDelete={actions.setDeleteFor}
+          />
+        ) : (
+          <div className="p-3 sm:p-4">
             <EmployeeFinancialTab
-              employees={sortedEmployees}
-              isLoading={isLoading}
-              searchTerm={searchTerm}
+              employees={visible}
+              isLoading={actions.isLoading}
+              searchTerm={search}
             />
-          </TabsContent>
-        </Tabs>
+          </div>
+        )}
+      </section>
 
-        {/* Employee Aviso Dialog */}
-        <EmployeeAvisoDialog
-          open={!!avisoDialogEmployee}
-          onOpenChange={open => !open && setAvisoDialogEmployee(null)}
-          employeeId={avisoDialogEmployee?.id || ''}
-          employeeName={avisoDialogEmployee?.name || ''}
-        />
-
-        {/* Delete Confirmation Dialog */}
-        <DeleteConfirmDialog
-          open={deleteDialogOpen}
-          onOpenChange={open => {
-            setDeleteDialogOpen(open);
-            if (!open) setEmployeeToDelete(null);
-          }}
-          title="Eliminar Colaborador"
-          description="Tem a certeza que deseja eliminar este colaborador?"
-          itemName={employeeToDelete?.name}
-          onConfirm={handleDelete}
-          isLoading={isDeleting}
-        />
-
-        {/* Change Employee Password Dialog */}
-        <ChangeEmployeePasswordDialog
-          open={!!passwordDialogEmployee}
-          onOpenChange={open => !open && setPasswordDialogEmployee(null)}
-          employeeId={passwordDialogEmployee?.id || ''}
-          employeeName={passwordDialogEmployee?.name || ''}
-        />
-
-        {/* Bulk Document Upload Dialog */}
-        <BulkDocumentUploadDialog open={bulkDocDialogOpen} onOpenChange={setBulkDocDialogOpen} />
-
-        {/* Resend Success Dialog */}
-        <ResendInviteSuccessDialog
-          open={!!resendSuccessData}
-          onOpenChange={open => !open && setResendSuccessData(null)}
-          employeeName={resendSuccessData?.name || ''}
-          newPassword={resendSuccessData?.password || ''}
-        />
-      </div>
-    </>
+      <EmployeeAvisoDialog
+        open={!!actions.noticesFor}
+        onOpenChange={value => !value && actions.setNoticesFor(null)}
+        employeeId={actions.noticesFor?.id || ''}
+        employeeName={actions.noticesFor?.name || ''}
+      />
+      <DeleteConfirmDialog
+        open={!!actions.deleteFor}
+        onOpenChange={value => !value && actions.setDeleteFor(null)}
+        title="Eliminar colaborador"
+        description="Tem a certeza que deseja eliminar este colaborador?"
+        itemName={actions.deleteFor?.name}
+        onConfirm={actions.confirmDelete}
+        isLoading={actions.isDeleting}
+      />
+      <ChangeEmployeePasswordDialog
+        open={!!actions.passwordFor}
+        onOpenChange={value => !value && actions.setPasswordFor(null)}
+        employeeId={actions.passwordFor?.id || ''}
+        employeeName={actions.passwordFor?.name || ''}
+      />
+      <BulkDocumentUploadDialog open={bulkOpen} onOpenChange={setBulkOpen} />
+      <ResendInviteSuccessDialog
+        open={!!actions.invite}
+        onOpenChange={value => !value && actions.setInvite(null)}
+        employeeName={actions.invite?.name || ''}
+        newPassword={actions.invite?.password || ''}
+      />
+    </div>
   );
 };
 

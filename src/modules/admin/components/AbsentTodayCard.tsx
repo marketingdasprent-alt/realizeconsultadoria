@@ -35,7 +35,7 @@ export const AbsentTodayCard: React.FC<AbsentTodayCardProps> = ({ absent }) => (
     </div>
 
     {!absent ? (
-      <div className="mt-4 space-y-2">
+      <div className="mt-4 grid gap-2 sm:grid-cols-2 xl:grid-cols-3">
         {[0, 1, 2].map(key => (
           <div key={key} className="h-12 animate-pulse rounded-2xl bg-rz-canvas" />
         ))}
@@ -49,7 +49,7 @@ export const AbsentTodayCard: React.FC<AbsentTodayCardProps> = ({ absent }) => (
         <p className="text-[13px] text-rz-muted">Ninguém está ausente hoje.</p>
       </div>
     ) : (
-      <ul className="rz-scroll mt-3 max-h-[280px] space-y-1 overflow-y-auto">
+      <ul className="rz-scroll mt-3 grid max-h-[280px] gap-1 overflow-y-auto sm:grid-cols-2 xl:grid-cols-3">
         {absent.map(person => (
           <li key={person.employeeId} className="flex items-center gap-3 rounded-2xl p-2">
             <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-rz-primary-soft text-[12px] font-bold text-rz-primary">

@@ -1,7 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { DashboardStats } from '../components/DashboardStats';
-import { DashboardShortcuts } from '../components/DashboardShortcuts';
 import { AbsentTodayCard } from '../components/AbsentTodayCard';
 import { useDashboardOverview } from '../hooks/useDashboardOverview';
 
@@ -32,10 +31,7 @@ const AdminDashboard = () => {
 
       <DashboardStats data={data} />
 
-      <div className="grid gap-4 lg:grid-cols-2">
-        <DashboardShortcuts />
-        <AbsentTodayCard absent={data?.absentToday} />
-      </div>
+      <AbsentTodayCard absent={data?.absentToday} />
     </div>
   );
 };

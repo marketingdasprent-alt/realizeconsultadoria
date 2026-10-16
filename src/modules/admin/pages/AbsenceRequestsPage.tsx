@@ -18,6 +18,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { openPrintPreview } from '@/lib/print-preview';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Badge } from '@/components/ui/badge';
 import { format } from 'date-fns';
@@ -297,15 +298,7 @@ const AbsenceRequestsPage = () => {
       </html>
     `;
 
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(printContent);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => {
-        printWindow.print();
-      }, 250);
-    }
+    openPrintPreview(printContent, 'Comprovativo de ausência');
   };
 
   const handleUnapprove = async () => {
@@ -342,16 +335,6 @@ const AbsenceRequestsPage = () => {
       toast({
         title: 'Sem pedidos para imprimir',
         description: 'Não existem pedidos com os filtros actuais.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast({
-        title: 'Erro ao abrir janela de impressão',
-        description: 'Verifique se pop-ups estão bloqueados.',
         variant: 'destructive',
       });
       return;
@@ -541,7 +524,6 @@ const AbsenceRequestsPage = () => {
     const currentYear = new Date().getFullYear();
 
     if (mode === 'saldo' && vacationEmpIds.length === 0) {
-      printWindow.close();
       toast({
         title: 'Sem pedidos de férias',
         description:
@@ -1058,8 +1040,10 @@ const AbsenceRequestsPage = () => {
         </div>
       </body></html>`;
 
-    printWindow.document.write(html);
-    printWindow.document.close();
+    openPrintPreview(
+      html,
+      mode === 'saldo' ? 'Saldo de férias' : 'Relatório de pedidos de ausência'
+    );
   };
 
   const pendingCount = filteredRequests.filter(r => r.status === 'pending').length;

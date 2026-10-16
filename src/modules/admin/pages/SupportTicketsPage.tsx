@@ -17,6 +17,7 @@ import {
   Image,
   Printer,
 } from 'lucide-react';
+import { openPrintPreview } from '@/lib/print-preview';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -226,13 +227,7 @@ const SupportTicketsPage = () => {
       </body></html>
     `;
 
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => printWindow.print(), 300);
-    }
+    openPrintPreview(html, 'Tickets de suporte');
   };
 
   const handlePrintSelected = () => {

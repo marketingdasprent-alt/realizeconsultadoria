@@ -19,6 +19,7 @@ import {
   UserCheck,
   UserX,
 } from 'lucide-react';
+import { openPrintPreview } from '@/lib/print-preview';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -517,17 +518,7 @@ const EmployeesPage = () => {
           </script>
         </body></html>`;
 
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast({
-          title: 'Erro ao abrir janela de impressão',
-          description: 'Verifique se pop-ups estão bloqueados.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      printWindow.document.write(html);
-      printWindow.document.close();
+      openPrintPreview(html, 'Relatório de Férias');
     } catch (error: any) {
       toast({
         title: 'Erro ao gerar relatório',

@@ -11,6 +11,7 @@ import { useSidebarCollapsed } from '@/modules/workspace/hooks/useSidebarCollaps
 import { AdminSidebar } from './AdminSidebar';
 import { AdminMobileHeader } from './AdminMobileHeader';
 import { AdminMobileSidebar } from './AdminMobileSidebar';
+import { PrintPreviewHost } from '@/components/admin/PrintPreviewHost';
 import { ADMIN_SETTINGS_ITEM, visibleAdminGroups } from './adminNavigation';
 import './admin-theme.css';
 
@@ -120,6 +121,9 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
           </div>
         </main>
       </div>
+
+      {/* Impressões (mapa de férias, relatórios…) abertas por cima da página */}
+      <PrintPreviewHost />
     </div>
   );
 };

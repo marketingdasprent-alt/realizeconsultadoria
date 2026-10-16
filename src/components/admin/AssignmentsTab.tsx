@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { openPrintPreview } from '@/lib/print-preview';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -533,16 +534,6 @@ const AssignmentsTab = () => {
   // Print functions
   const handlePrint = async (assignment: any, isReturn = false) => {
     try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast({
-          title: 'Erro ao imprimir',
-          description: 'Verifique se pop-ups estão bloqueados.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
       const logoBase64 = await getLogoBase64();
       const employee = assignment.employees;
       const company = assignment.companies;
@@ -685,8 +676,7 @@ const AssignmentsTab = () => {
           </script>
         </body></html>`;
 
-      printWindow.document.write(html);
-      printWindow.document.close();
+      openPrintPreview(html, isReturn ? 'Devolução de equipamentos' : 'Entrega de equipamentos');
     } catch (error) {
       console.error('Erro ao gerar impressão:', error);
       toast({ title: 'Erro ao imprimir', variant: 'destructive' });

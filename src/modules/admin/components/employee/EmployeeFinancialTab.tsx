@@ -13,6 +13,7 @@ import {
   UtensilsCrossed,
   Wallet,
 } from 'lucide-react';
+import { openPrintPreview } from '@/lib/print-preview';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import {
   Bar,
@@ -650,16 +651,6 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
       return;
     }
 
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) {
-      toast({
-        title: 'Erro ao abrir janela de impressão',
-        description: 'Verifique se pop-ups estão bloqueados.',
-        variant: 'destructive',
-      });
-      return;
-    }
-
     const logoBase64 = await getLogoBase64();
     const monthLabel = MONTH_LABELS[month - 1];
 
@@ -809,8 +800,7 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
         </script>
       </body></html>`;
 
-    printWindow.document.write(html);
-    printWindow.document.close();
+    openPrintPreview(html, 'Relatório financeiro');
   };
 
   const handleExportExcel = async () => {

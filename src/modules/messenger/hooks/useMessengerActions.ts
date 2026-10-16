@@ -4,7 +4,12 @@ import React, { useCallback } from 'react';
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { baseMime, extensionFor, validateFile } from '../lib/files';
-import { messengerService, type MessageRow, type ReactionRow } from '../services/messengerService';
+import {
+  messengerService,
+  type ConversationRow,
+  type MessageRow,
+  type ReactionRow,
+} from '../services/messengerService';
 import type { ChatMessage, MessengerApi, SendInput } from '../types';
 import { CHAT_KEYS, upsertThreadRow } from '../lib/cache';
 import type { LiveMessengerUser } from './useLiveMessenger';
@@ -28,6 +33,7 @@ type Actions = Pick<
   | 'setFlag'
   | 'startDirect'
   | 'createGroup'
+  | 'renameGroup'
   | 'getFileUrl'
   | 'forwardMessage'
 >;
@@ -179,9 +185,17 @@ export const useMessengerActions = ({
 
   const setFlag = useCallback<Actions['setFlag']>(
     async (conversationId, flag, value) => {
+      // Na hora no ecrã (fixar, silenciar, arquivar); o servidor confirma em fundo.
+      const column =
+        flag === 'pinned' ? 'is_pinned' : flag === 'muted' ? 'is_muted' : 'is_archived';
+      qc.setQueryData(CHAT_KEYS.conversations, (rows: ConversationRow[] | undefined) =>
+        rows?.map(row => (row.id === conversationId ? { ...row, [column]: value } : row))
+      );
       const { error } = await messengerService.setFlag(conversationId, user.userId, flag, value);
-      if (error) return fail('A alteração não foi guardada.');
-      void qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
+      if (error) {
+        void qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
+        return fail('A alteração não foi guardada.');
+      }
     },
     [qc, user.userId]
   );
@@ -266,6 +280,23 @@ export const useMessengerActions = ({
     [user.userId, qc, refreshList]
   );
 
+  const renameGroup = useCallback<Actions['renameGroup']>(
+    async (conversationId, title) => {
+      // Na hora na lista e no cabeçalho; volta atrás se o servidor recusar.
+      qc.setQueryData(
+        CHAT_KEYS.conversations,
+        (rows: { id: string; title: string | null }[] | undefined) =>
+          rows?.map(row => (row.id === conversationId ? { ...row, title } : row))
+      );
+      const { error } = await messengerService.renameGroup(conversationId, title);
+      if (error) {
+        fail('O nome do grupo não foi alterado.');
+        void qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
+      }
+    },
+    [qc]
+  );
+
   const getFileUrl = useCallback(
     async (path: string) => (await messengerService.getFileUrl(path)).data,
     []
@@ -279,6 +310,7 @@ export const useMessengerActions = ({
     setFlag,
     startDirect,
     createGroup,
+    renameGroup,
     getFileUrl,
     forwardMessage,
   };

@@ -157,6 +157,14 @@ export const messengerService = {
     return { data: data ?? null, error };
   },
 
+  renameGroup: async (conversationId: string, title: string) => {
+    const { error } = await supabase.rpc('chat_rename_group', {
+      _conversation_id: conversationId,
+      _title: title,
+    });
+    return { error };
+  },
+
   /** URL temporário (1 h) de um anexo; reaproveitado enquanto for válido. */
   getFileUrl: async (path: string) => {
     const cached = signedUrls.get(path);

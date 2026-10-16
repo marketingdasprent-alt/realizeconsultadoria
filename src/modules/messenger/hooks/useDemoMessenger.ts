@@ -188,6 +188,7 @@ export const useDemoMessenger = (): MessengerApi => {
     setFlag: async (id, flag, value) => patchConversation(id, { [flag]: value }),
     startDirect,
     createGroup,
+    renameGroup: async (id, title) => patchConversation(id, { title }),
     // Na pré-visualização o "caminho" de um ficheiro enviado já é um URL local.
     getFileUrl: async path => (path.startsWith('blob:') ? path : (DEMO_IMAGES[path] ?? null)),
     forwardMessage: async (_message, conversationIds) => {

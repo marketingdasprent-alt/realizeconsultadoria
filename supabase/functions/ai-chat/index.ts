@@ -27,7 +27,14 @@ import {
   json,
   serviceClient,
 } from '../_shared/mail-server/http.ts';
-import { executeProposal, runTool, TOOL_DEFS, type Proposal, type ToolContext } from './tools.ts';
+import {
+  executeProposal,
+  personalContext,
+  runTool,
+  TOOL_DEFS,
+  type Proposal,
+  type ToolContext,
+} from './tools.ts';
 
 const MAX_MESSAGES = 30;
 const MAX_CONTENT = 8000;
@@ -35,10 +42,11 @@ const PER_MINUTE = 12;
 const PER_DAY = 300;
 const MAX_ROUNDS = 4;
 
-// Só pedidos que parecem ações (agenda, tarefas, lembretes, férias...) usam o modelo das
-// ferramentas, que é mais capaz mas mais lento; o resto vai para o modelo rápido, sem ferramentas.
+// Só pedidos para FAZER algo (marcar, criar, lembrar, convidar) usam o modelo das ferramentas,
+// mais capaz mas lento no CPU. Perguntas ("quantos dias de férias tenho?", "o que tenho
+// amanhã?") vão para o modelo rápido, com os dados da pessoa já incluídos.
 const ACTION_HINT =
-  /agenda|calendario|reuniao|evento|marc[ae]|desmarc|lembr|tarefa|prazo|ferias|saldo|convid|compromisso|hoje|amanha|semana|segunda|terca|quarta|quinta|sexta|colega/;
+  /\b(marca|marcar|marque|agenda[r]?|agende|desmarca|lembra|lembrar|lembre|lembrete|convida|convidar|convide|cria|criar|crie|adiciona|adicionar|nova reuniao|nova tarefa)\b/;
 
 type Role = 'user' | 'assistant';
 interface ChatMessage {
@@ -65,9 +73,10 @@ const parseMessages = (value: unknown): ChatMessage[] | null => {
   return messages.length && messages[messages.length - 1].role === 'user' ? messages : null;
 };
 
-const systemPrompt = (firstName: string, now: Date, withTools: boolean) =>
+const systemPrompt = (firstName: string, now: Date, withTools: boolean, context: string) =>
   `És o Realize AI, o assistente dos colaboradores da Realize Consultadoria. ` +
   `Estás a falar com ${firstName}. Agora é ${describeInstant(now)} (hora de Lisboa). ` +
+  `Dados atuais desta pessoa (usa-os para responder; não precisas de os ir buscar):\n${context}\n` +
   `Responde sempre em português de Portugal, de forma clara e muito concisa: no máximo três ou quatro frases, ou uma lista curta, a não ser que peçam mais detalhe. ` +
   (withTools
     ? `Tens ferramentas: lê a agenda, as tarefas e o saldo de férias da pessoa, procura colegas, e prepara eventos, tarefas e lembretes. ` +
@@ -75,7 +84,7 @@ const systemPrompt = (firstName: string, now: Date, withTools: boolean) =>
       `Depois de preparar, diz numa frase o que preparaste e que basta confirmar no cartão; nunca digas que já ficou criado. ` +
       `Calcula datas relativas (amanhã, sexta, daqui a duas semanas) a partir de agora. Se faltar a data ou a hora, pergunta antes. ` +
       `Se uma ferramenta pedir esclarecimento (nome repetido, data passada), pergunta à pessoa. `
-    : `Não consegues ver nem alterar a agenda, as tarefas ou as férias nesta resposta; se pedirem isso, diz que podem pedir de outra forma, por exemplo "marca uma reunião amanhã às 10h". `) +
+    : `Se a pessoa quiser marcar, criar ou lembrar algo, diz-lhe para pedir diretamente (por exemplo "marca uma reunião amanhã às 10h"). `) +
   `Não inventes factos nem dados da empresa; se não souberes, di-lo.`;
 
 /** Uma chamada ao modelo (sem fluxo: as ferramentas precisam da resposta inteira). */
@@ -216,7 +225,15 @@ serve(async (req: Request) => {
   const withTools = ACTION_HINT.test(fold(lastUser));
   const model = withTools ? toolsModel : chatModel;
   const messages: ModelMessage[] = [
-    { role: 'system', content: systemPrompt(employee.name.split(' ')[0], ctx.now, withTools) },
+    {
+      role: 'system',
+      content: systemPrompt(
+        employee.name.split(' ')[0],
+        ctx.now,
+        withTools,
+        await personalContext(ctx)
+      ),
+    },
     ...history,
   ];
   const proposals: Proposal[] = [];

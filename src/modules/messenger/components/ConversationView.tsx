@@ -8,6 +8,7 @@ import { TaskFormDialog } from '@/modules/tasks/components/TaskFormDialog';
 import { useTasks } from '@/modules/tasks/hooks/useTasks';
 import { DeleteMessageDialog } from './DeleteMessageDialog';
 import { ForwardDialog } from './ForwardDialog';
+import { RenameGroupDialog } from './RenameGroupDialog';
 import { MessageComposer } from './MessageComposer';
 import { MessageList } from './MessageList';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
@@ -25,6 +26,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [toDelete, setToDelete] = useState<ChatMessage | null>(null);
   const [toForward, setToForward] = useState<ChatMessage | null>(null);
+  const [renaming, setRenaming] = useState(false);
   const [search, setSearch] = useState<string | null>(null);
   // Mensagem a transformar em tarefa (briefing §28: Chat → Tarefas).
   const [taskFrom, setTaskFrom] = useState<ChatMessage | null>(null);
@@ -74,6 +76,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
         onBack={onBack}
         onToggleSearch={() => setSearch(current => (current === null ? '' : null))}
         onFlag={(flag, value) => api.setFlag(conversation.id, flag, value)}
+        onRename={conversation.kind === 'group' ? () => setRenaming(true) : undefined}
       />
       {search !== null && (
         <div className="border-b border-rz-line bg-white/80 px-4 py-2 md:px-6">
@@ -159,6 +162,11 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
         onSave={tasks.create}
       />
       <ForwardDialog message={toForward} onClose={() => setToForward(null)} />
+      <RenameGroupDialog
+        current={renaming ? conversation.title : null}
+        onClose={() => setRenaming(false)}
+        onSave={title => api.renameGroup(conversation.id, title)}
+      />
       <DeleteMessageDialog
         message={toDelete}
         onClose={() => setToDelete(null)}

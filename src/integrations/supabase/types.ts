@@ -3237,6 +3237,10 @@ export type Database = {
       };
       chat_mark_read: { Args: { _conversation_id: string }; Returns: undefined };
       chat_path_conversation: { Args: { _name: string }; Returns: string };
+      chat_rename_group: {
+        Args: { _conversation_id: string; _title: string };
+        Returns: undefined;
+      };
       chat_start_direct: { Args: { _other_user_id: string }; Returns: string };
       cleanup_expired_session_transfers: { Args: never; Returns: undefined };
       event_can_see: { Args: { _event_id: string }; Returns: boolean };

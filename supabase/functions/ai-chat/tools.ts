@@ -473,3 +473,23 @@ export const executeProposal = async (
   }
   return { ok: false, message: 'Ação desconhecida.' };
 };
+
+/**
+ * Os dados da pessoa que respondem à maioria das perguntas (férias, agenda da semana,
+ * tarefas abertas), lidos de uma vez e dados ao modelo no início: assim uma pergunta
+ * precisa de uma só chamada ao modelo rápido, sem ferramentas.
+ */
+export const personalContext = async (ctx: ToolContext): Promise<string> => {
+  const today = utcToLisbon(ctx.now).slice(0, 10);
+  const inSixDays = utcToLisbon(new Date(ctx.now.getTime() + 6 * 24 * 3_600_000)).slice(0, 10);
+  const [vacation, agenda, tasks] = await Promise.all([
+    runTool(ctx, 'get_vacation_balance', {}),
+    runTool(ctx, 'get_agenda', { from: today, to: inSixDays }),
+    runTool(ctx, 'list_tasks', {}),
+  ]);
+  return (
+    `Férias: ${vacation.content}\n` +
+    `Agenda de hoje (${today}) a ${inSixDays}:\n${agenda.content}\n` +
+    `Tarefas abertas:\n${tasks.content}`
+  );
+};

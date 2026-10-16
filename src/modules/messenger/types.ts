@@ -111,6 +111,8 @@ export interface MessengerApi {
   setFlag: (conversationId: string, flag: MemberFlag, value: boolean) => Promise<void>;
   startDirect: (userId: string) => Promise<string | null>;
   createGroup: (title: string, userIds: string[]) => Promise<string | null>;
+  /** Mudar o nome de um grupo (qualquer membro). */
+  renameGroup: (conversationId: string, title: string) => Promise<void>;
   /** URL temporário de um anexo privado. */
   getFileUrl: (path: string) => Promise<string | null>;
   /** Reenvia uma mensagem (texto, imagem, ficheiro ou voz) para outras conversas. */

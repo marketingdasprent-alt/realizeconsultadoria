@@ -12,6 +12,8 @@ import EmployeeDocumentsTab from '../components/employee/EmployeeDocumentsTab';
 import EmployeeAttachmentsTab from '../components/employee/EmployeeAttachmentsTab';
 import EmployeePayslipsTab from '../components/employee/EmployeePayslipsTab';
 import { EmployeeProfileHeader } from '../components/employee/EmployeeProfileHeader';
+import { EmployeeDocumentAlerts } from '../components/employee/EmployeeDocumentAlerts';
+import { useEmployeeDocuments } from '@/modules/documents/hooks/useEmployeeDocuments';
 import { useEmployeeAvatars } from '../hooks/useEmployeeAvatars';
 
 interface Company {
@@ -35,6 +37,8 @@ const EmployeeFormPage = () => {
   const [employee, setEmployee] = useState<EmployeeRecord | null>(null);
   const [companies, setCompanies] = useState<Company[]>([]);
   const [activeTab, setActiveTab] = useState('perfil');
+  // Validades e documentos por aprovar (aviso no topo); volta a ler ao mudar de separador.
+  const documents = useEmployeeDocuments(id ?? null);
 
   const canEdit = canExecuteTopic('employees', 'edit');
   const canVacation = canExecuteTopic('employees', 'vacation');
@@ -84,11 +88,19 @@ const EmployeeFormPage = () => {
   return (
     <div className="space-y-4">
       {isEditMode && employee ? (
-        <EmployeeProfileHeader
-          employee={employee}
-          avatarUrl={avatarOf(employee.user_id)}
-          onChanged={fetchData}
-        />
+        <>
+          <EmployeeProfileHeader
+            employee={employee}
+            avatarUrl={avatarOf(employee.user_id)}
+            onChanged={fetchData}
+          />
+          {canEdit && (
+            <EmployeeDocumentAlerts
+              documents={documents.all}
+              onShowDocuments={() => setActiveTab('documentos')}
+            />
+          )}
+        </>
       ) : (
         <div className="flex items-center gap-3">
           <button
@@ -110,7 +122,14 @@ const EmployeeFormPage = () => {
         </div>
       )}
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
+      <Tabs
+        value={activeTab}
+        onValueChange={tab => {
+          setActiveTab(tab);
+          documents.refetch();
+        }}
+        className="w-full"
+      >
         {isEditMode && (
           <TabsList className="mb-4 h-auto flex-wrap justify-start">
             <TabsTrigger value="perfil">Perfil</TabsTrigger>

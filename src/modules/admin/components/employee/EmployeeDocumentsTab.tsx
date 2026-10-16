@@ -50,7 +50,15 @@ const EmployeeDocumentsTab = ({ employeeId }: EmployeeDocumentsTabProps) => {
 
   const states = useMemo(() => slotStates(all), [all]);
   const history = useMemo(() => registrationHistory(all), [all]);
-  const pending = states.flatMap(state => state.pending);
+  // Tudo o que o colaborador enviou e espera decisão, de qualquer tipo (ao aprovar pode
+  // corrigir-se o tipo, se ele escolheu mal na app).
+  const pending = useMemo(
+    () =>
+      all
+        .filter(doc => doc.status === 'pending')
+        .sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    [all]
+  );
 
   if (isLoading) {
     return (
@@ -66,8 +74,8 @@ const EmployeeDocumentsTab = ({ employeeId }: EmployeeDocumentsTabProps) => {
     <div className="space-y-4">
       {pending.length > 0 && (
         <FileSection
-          title="Enviados pelo colaborador"
-          description="Confirme o tipo, o número e a validade ao aprovar."
+          title="Por aprovar"
+          description="Enviados pelo colaborador na app. Abra o ficheiro (↗) antes de aprovar; ao aprovar confirma o tipo, o número e a validade."
           count={pending.length}
         >
           <ul>

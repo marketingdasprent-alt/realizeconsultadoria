@@ -1,12 +1,11 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Upload } from 'lucide-react';
+import { FileUp, Plus } from 'lucide-react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
 import EmployeeAvisoDialog from '@/components/admin/EmployeeAvisoDialog';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import ChangeEmployeePasswordDialog from '@/components/admin/ChangeEmployeePasswordDialog';
-import BulkDocumentUploadDialog from '@/components/admin/BulkDocumentUploadDialog';
 import ResendInviteSuccessDialog from '@/components/admin/ResendInviteSuccessDialog';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { ROUTES } from '@/lib/constants';
@@ -19,6 +18,9 @@ import {
   type StatusFilter,
 } from '../components/employees/EmployeesToolbar';
 import { EmployeesTable, type SortField } from '../components/employees/EmployeesTable';
+import { ImportPayslipsDialog } from '../components/employees/ImportPayslipsDialog';
+import { PendingDocumentsDialog } from '../components/employees/PendingDocumentsDialog';
+import { useDocumentAlerts } from '../hooks/useDocumentAlerts';
 import { useEmployeeAvatars } from '../hooks/useEmployeeAvatars';
 import { useEmployeeListActions } from '../hooks/useEmployeeListActions';
 import { companiesOf, companyName, hasBirthdayIn } from '../lib/employeeView';
@@ -40,7 +42,9 @@ const EmployeesPage = () => {
   const actions = useEmployeeListActions();
   const avatarOf = useEmployeeAvatars();
   const [params, setParams] = useSearchParams();
-  const [bulkOpen, setBulkOpen] = useState(false);
+  const [importOpen, setImportOpen] = useState(false);
+  const [pendingOpen, setPendingOpen] = useState(false);
+  const documentAlerts = useDocumentAlerts();
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
@@ -109,8 +113,12 @@ const EmployeesPage = () => {
         actions={
           <>
             {permissions.canEdit && (
-              <Button variant="outline" className="rounded-full" onClick={() => setBulkOpen(true)}>
-                <Upload className="h-4 w-4" /> Enviar documento
+              <Button
+                variant="outline"
+                className="rounded-full"
+                onClick={() => setImportOpen(true)}
+              >
+                <FileUp className="h-4 w-4" /> Importar recibos
               </Button>
             )}
             {canExecuteTopic('employees', 'create') && (
@@ -130,6 +138,8 @@ const EmployeesPage = () => {
         onlyBirthdays={onlyBirthdays}
         onStatusChange={value => setParam('status', value, 'active')}
         onBirthdaysChange={value => setParam('aniversarios', value ? '1' : '0', '0')}
+        pendingDocuments={documentAlerts.pending.length}
+        onPendingDocuments={() => setPendingOpen(true)}
       />
 
       <section className="overflow-hidden rounded-[28px] bg-white shadow-rz-soft ring-1 ring-rz-line">
@@ -155,6 +165,10 @@ const EmployeesPage = () => {
             onSort={sort}
             permissions={permissions}
             resendingId={actions.resendingId}
+            alertsOf={employeeId => ({
+              expiring: documentAlerts.expiringOf(employeeId).length,
+              pending: documentAlerts.pendingOf(employeeId).length,
+            })}
             onOpen={open}
             onNotices={actions.setNoticesFor}
             onPassword={actions.setPasswordFor}
@@ -194,7 +208,18 @@ const EmployeesPage = () => {
         employeeId={actions.passwordFor?.id || ''}
         employeeName={actions.passwordFor?.name || ''}
       />
-      <BulkDocumentUploadDialog open={bulkOpen} onOpenChange={setBulkOpen} />
+      <PendingDocumentsDialog
+        open={pendingOpen}
+        onOpenChange={setPendingOpen}
+        pending={documentAlerts.pending}
+        canReview={permissions.canEdit}
+        onChanged={() => documentAlerts.refetch()}
+      />
+      <ImportPayslipsDialog
+        open={importOpen}
+        onOpenChange={setImportOpen}
+        employees={employees.filter(e => e.is_active)}
+      />
       <ResendInviteSuccessDialog
         open={!!actions.invite}
         onOpenChange={value => !value && actions.setInvite(null)}

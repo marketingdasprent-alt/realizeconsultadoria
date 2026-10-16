@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cake, UserCheck, UserX, type LucideIcon } from 'lucide-react';
+import { Cake, FileClock, UserCheck, UserX, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { StatusFilter } from './EmployeesToolbar';
 
@@ -11,6 +11,9 @@ interface EmployeesStatsProps {
   onlyBirthdays: boolean;
   onStatusChange: (status: StatusFilter) => void;
   onBirthdaysChange: (value: boolean) => void;
+  /** Documentos enviados pelos colaboradores à espera de aprovação. */
+  pendingDocuments: number;
+  onPendingDocuments: () => void;
 }
 
 interface TileProps {
@@ -27,21 +30,26 @@ const Tile: React.FC<TileProps> = ({ icon: Icon, tone, label, value, selected, o
     type="button"
     onClick={onClick}
     className={cn(
-      'flex items-center gap-3 rounded-[22px] bg-white p-4 text-left shadow-rz-soft ring-1 transition-all hover:-translate-y-0.5',
+      'flex min-w-0 items-center gap-2.5 rounded-[22px] bg-white p-3 text-left shadow-rz-soft ring-1 transition-all hover:-translate-y-0.5 sm:p-3.5',
       selected ? 'ring-2 ring-rz-primary' : 'ring-rz-line'
     )}
   >
-    <span className={cn('flex h-11 w-11 items-center justify-center rounded-2xl', tone)}>
+    <span className={cn('flex h-10 w-10 shrink-0 items-center justify-center rounded-2xl', tone)}>
       <Icon className="h-5 w-5" />
     </span>
-    <span>
-      <span className="block text-[26px] font-extrabold leading-none tabular-nums">{value}</span>
-      <span className="mt-1 block text-[13px] font-semibold text-rz-muted">{label}</span>
+    <span className="min-w-0">
+      <span className="block text-[24px] font-extrabold leading-none tabular-nums">{value}</span>
+      <span className="mt-1 block text-[12px] font-semibold leading-tight text-rz-muted">
+        {label}
+      </span>
     </span>
   </button>
 );
 
-/** Números da equipa; cada mosaico filtra a lista (ativos, inativos, aniversários do mês). */
+/**
+ * Números da equipa: ativos, inativos e aniversários do mês filtram a lista; os documentos
+ * por aprovar abrem a fila de aprovação.
+ */
 export const EmployeesStats: React.FC<EmployeesStatsProps> = ({
   active,
   inactive,
@@ -50,8 +58,10 @@ export const EmployeesStats: React.FC<EmployeesStatsProps> = ({
   onlyBirthdays,
   onStatusChange,
   onBirthdaysChange,
+  pendingDocuments,
+  onPendingDocuments,
 }) => (
-  <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+  <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
     <Tile
       icon={UserCheck}
       tone="bg-emerald-100 text-emerald-700"
@@ -81,6 +91,14 @@ export const EmployeesStats: React.FC<EmployeesStatsProps> = ({
       value={birthdays}
       selected={onlyBirthdays}
       onClick={() => onBirthdaysChange(!onlyBirthdays)}
+    />
+    <Tile
+      icon={FileClock}
+      tone={pendingDocuments > 0 ? 'bg-amber-100 text-amber-700' : 'bg-slate-100 text-slate-500'}
+      label="Documentos por aprovar"
+      value={pendingDocuments}
+      selected={false}
+      onClick={onPendingDocuments}
     />
   </div>
 );

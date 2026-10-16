@@ -40,7 +40,6 @@ export const FileRow: React.FC<FileRowProps> = ({
       {badges && <div className="mt-1 flex flex-wrap gap-1">{badges}</div>}
     </div>
     <div className="flex shrink-0 items-center gap-1">
-      {actions}
       {onOpen && (
         <button
           type="button"
@@ -56,6 +55,7 @@ export const FileRow: React.FC<FileRowProps> = ({
           )}
         </button>
       )}
+      {actions}
       {onDelete && (
         <button
           type="button"

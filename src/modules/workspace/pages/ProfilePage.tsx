@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { NotebookPen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAppreciations } from '@/modules/social/hooks/useAppreciations';
+import { useDirectory } from '@/modules/social/hooks/useDirectory';
 import { AppreciationsCard } from '../components/profile/AppreciationsCard';
 import { ProfileHeader } from '../components/profile/ProfileHeader';
 import { ProfileInfoCard } from '../components/profile/ProfileInfoCard';
@@ -17,6 +18,10 @@ const TAB_MODULES: ModuleKey[] = ['tasks', 'calendar', 'documents', 'feed', 'tim
 const ProfilePage: React.FC = () => {
   const { user, basePath } = useWorkspace();
   const { received } = useAppreciations({ userId: user.userId });
+  // No perfil (que os colegas também veem) só aparecem os contactos da empresa.
+  const { byId } = useDirectory();
+  const me = byId.get(user.userId);
+  const professional = { ...user, email: me?.email ?? '', phone: me?.phone ?? null };
 
   return (
     <WorkspacePage>
@@ -43,7 +48,7 @@ const ProfilePage: React.FC = () => {
 
       <div className="mt-4 grid gap-4 lg:grid-cols-[1fr_380px]">
         <div className="space-y-4">
-          <ProfileInfoCard user={user} isOwn />
+          <ProfileInfoCard user={professional} isOwn />
           <section className="rounded-[28px] bg-white p-5 shadow-rz-soft ring-1 ring-rz-line md:p-6">
             <h2 className="text-[17px] font-bold">Sobre mim</h2>
             <div className="mt-4 flex items-center gap-4 rounded-2xl border border-dashed border-rz-line p-4">

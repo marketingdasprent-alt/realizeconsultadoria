@@ -37,7 +37,7 @@ const ColleagueProfilePage: React.FC = () => {
     );
   }
 
-  // Só dados profissionais (o diretório não traz telefone, morada nem dados de RH).
+  // Só contactos da empresa (o diretório não traz email/telefone pessoais nem dados de RH).
   const profile: WorkspaceUser = {
     userId: person.userId,
     employeeId: person.employeeId,
@@ -47,7 +47,7 @@ const ColleagueProfilePage: React.FC = () => {
     position: person.position,
     department: person.department,
     companyName: user.companyName,
-    phone: null,
+    phone: person.phone ?? null,
     hireDate: null,
   };
 

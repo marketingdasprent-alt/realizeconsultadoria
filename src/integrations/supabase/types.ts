@@ -3268,6 +3268,7 @@ export type Database = {
           email: string;
           employee_id: string;
           name: string;
+          phone: string;
           position: string;
           user_id: string;
         }[];

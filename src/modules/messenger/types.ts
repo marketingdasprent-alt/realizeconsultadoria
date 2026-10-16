@@ -11,7 +11,10 @@ export interface DirectoryPerson {
   name: string;
   position: string | null;
   department: string | null;
+  /** Email da empresa (acesso "Email Pessoal" da pessoa), nunca o pessoal da ficha. */
   email: string | null;
+  /** Telemóvel da empresa atribuído (lista de telefones). */
+  phone?: string | null;
 }
 
 export interface ConversationSummary {

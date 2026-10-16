@@ -52,6 +52,7 @@ export const ROUTES = {
     SETTINGS: '/admin/configuracoes',
     TIMECLOCK: '/admin/ponto',
     DOCUMENTS: '/admin/documentos',
+    FINANCE: '/admin/financeiro',
   },
   EMPLOYEE: {
     LOGIN: '/colaborador/login',

@@ -11,6 +11,7 @@ import {
   Scale,
   Settings,
   Users,
+  Wallet,
   type LucideIcon,
 } from 'lucide-react';
 import { ROUTES } from '@/lib/constants';
@@ -65,6 +66,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: 'Pedidos',
         moduleKey: 'requests',
         tint: 'from-lime-400 to-green-600',
+      },
+      {
+        href: ROUTES.ADMIN.FINANCE,
+        icon: Wallet,
+        label: 'Financeiro',
+        moduleKey: 'employees',
+        tint: 'from-emerald-400 to-teal-600',
       },
       {
         href: ROUTES.ADMIN.TIMECLOCK,

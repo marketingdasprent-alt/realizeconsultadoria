@@ -11,6 +11,7 @@ import EmployeeVacationTab from '../components/employee/EmployeeVacationTab';
 import EmployeeDocumentsTab from '../components/employee/EmployeeDocumentsTab';
 import EmployeeAttachmentsTab from '../components/employee/EmployeeAttachmentsTab';
 import EmployeePayslipsTab from '../components/employee/EmployeePayslipsTab';
+import EmployeeFinanceHistoryTab from '../components/employee/EmployeeFinanceHistoryTab';
 import { EmployeeProfileHeader } from '../components/employee/EmployeeProfileHeader';
 import { EmployeeDocumentAlerts } from '../components/employee/EmployeeDocumentAlerts';
 import { useEmployeeDocuments } from '@/modules/documents/hooks/useEmployeeDocuments';
@@ -136,6 +137,7 @@ const EmployeeFormPage = () => {
             {canVacation && <TabsTrigger value="ferias">Férias</TabsTrigger>}
             {canEdit && <TabsTrigger value="documentos">Documentos</TabsTrigger>}
             {canEdit && <TabsTrigger value="recibos">Recibos</TabsTrigger>}
+            {canEdit && <TabsTrigger value="financeiro">Financeiro</TabsTrigger>}
             {canEdit && <TabsTrigger value="anexos">Anexos</TabsTrigger>}
           </TabsList>
         )}
@@ -162,6 +164,9 @@ const EmployeeFormPage = () => {
             </TabsContent>
             <TabsContent value="recibos" className="mt-0">
               <EmployeePayslipsTab employeeId={employee.id} />
+            </TabsContent>
+            <TabsContent value="financeiro" className="mt-0">
+              <EmployeeFinanceHistoryTab employeeId={employee.id} />
             </TabsContent>
             <TabsContent value="anexos" className="mt-0">
               <EmployeeAttachmentsTab employeeId={employee.id} />

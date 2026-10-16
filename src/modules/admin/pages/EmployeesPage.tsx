@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { FileUp, Plus } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
 import EmployeeAvisoDialog from '@/components/admin/EmployeeAvisoDialog';
@@ -10,15 +10,9 @@ import ResendInviteSuccessDialog from '@/components/admin/ResendInviteSuccessDia
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { ROUTES } from '@/lib/constants';
 import { matchesSearch } from '@/lib/utils';
-import EmployeeFinancialTab from '@/modules/admin/components/employee/EmployeeFinancialTab';
 import { EmployeesStats } from '../components/employees/EmployeesStats';
-import {
-  EmployeesToolbar,
-  type EmployeesView,
-  type StatusFilter,
-} from '../components/employees/EmployeesToolbar';
+import { EmployeesToolbar, type StatusFilter } from '../components/employees/EmployeesToolbar';
 import { EmployeesTable, type SortField } from '../components/employees/EmployeesTable';
-import { ImportPayslipsDialog } from '../components/employees/ImportPayslipsDialog';
 import { PendingDocumentsDialog } from '../components/employees/PendingDocumentsDialog';
 import { useDocumentAlerts } from '../hooks/useDocumentAlerts';
 import { useEmployeeAvatars } from '../hooks/useEmployeeAvatars';
@@ -42,14 +36,12 @@ const EmployeesPage = () => {
   const actions = useEmployeeListActions();
   const avatarOf = useEmployeeAvatars();
   const [params, setParams] = useSearchParams();
-  const [importOpen, setImportOpen] = useState(false);
   const [pendingOpen, setPendingOpen] = useState(false);
   const documentAlerts = useDocumentAlerts();
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
 
   const search = params.get('q') || '';
-  const view: EmployeesView = params.get('tab') === 'financial' ? 'financial' : 'personal';
   const status = (
     ['inactive', 'all'].includes(params.get('status') || '') ? params.get('status') : 'active'
   ) as StatusFilter;
@@ -109,18 +101,9 @@ const EmployeesPage = () => {
     <div className="space-y-5">
       <AdminPageHeader
         title="Colaboradores"
-        description="Fichas, acessos e dados financeiros da equipa"
+        description="Fichas, documentos e acessos da equipa"
         actions={
           <>
-            {permissions.canEdit && (
-              <Button
-                variant="outline"
-                className="rounded-full"
-                onClick={() => setImportOpen(true)}
-              >
-                <FileUp className="h-4 w-4" /> Importar recibos
-              </Button>
-            )}
             {canExecuteTopic('employees', 'create') && (
               <Button className="rounded-full" onClick={() => navigate(ROUTES.ADMIN.EMPLOYEE_NEW)}>
                 <Plus className="h-4 w-4" /> Novo colaborador
@@ -151,40 +134,28 @@ const EmployeesPage = () => {
           companies={companies}
           companyId={companyId}
           onCompanyChange={value => setParam('empresa', value, 'all')}
-          view={view}
-          onViewChange={value => setParam('tab', value, 'personal')}
           count={visible.length}
         />
-        {view === 'personal' ? (
-          <EmployeesTable
-            employees={visible}
-            isLoading={actions.isLoading}
-            avatarOf={avatarOf}
-            sortField={sortField}
-            sortDirection={sortDirection}
-            onSort={sort}
-            permissions={permissions}
-            resendingId={actions.resendingId}
-            alertsOf={employeeId => ({
-              expiring: documentAlerts.expiringOf(employeeId).length,
-              pending: documentAlerts.pendingOf(employeeId).length,
-            })}
-            onOpen={open}
-            onNotices={actions.setNoticesFor}
-            onPassword={actions.setPasswordFor}
-            onResendInvite={actions.resend}
-            onToggleStatus={actions.toggle}
-            onDelete={actions.setDeleteFor}
-          />
-        ) : (
-          <div className="p-3 sm:p-4">
-            <EmployeeFinancialTab
-              employees={visible}
-              isLoading={actions.isLoading}
-              searchTerm={search}
-            />
-          </div>
-        )}
+        <EmployeesTable
+          employees={visible}
+          isLoading={actions.isLoading}
+          avatarOf={avatarOf}
+          sortField={sortField}
+          sortDirection={sortDirection}
+          onSort={sort}
+          permissions={permissions}
+          resendingId={actions.resendingId}
+          alertsOf={employeeId => ({
+            expiring: documentAlerts.expiringOf(employeeId).length,
+            pending: documentAlerts.pendingOf(employeeId).length,
+          })}
+          onOpen={open}
+          onNotices={actions.setNoticesFor}
+          onPassword={actions.setPasswordFor}
+          onResendInvite={actions.resend}
+          onToggleStatus={actions.toggle}
+          onDelete={actions.setDeleteFor}
+        />
       </section>
 
       <EmployeeAvisoDialog
@@ -214,11 +185,6 @@ const EmployeesPage = () => {
         pending={documentAlerts.pending}
         canReview={permissions.canEdit}
         onChanged={() => documentAlerts.refetch()}
-      />
-      <ImportPayslipsDialog
-        open={importOpen}
-        onOpenChange={setImportOpen}
-        employees={employees.filter(e => e.is_active)}
       />
       <ResendInviteSuccessDialog
         open={!!actions.invite}

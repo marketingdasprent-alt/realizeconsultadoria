@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useCallback, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import {
@@ -42,13 +43,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
   Table,
   TableBody,
   TableCell,
@@ -70,6 +64,7 @@ import {
 } from '@/modules/admin/services/employeeFinanceService';
 import type { Employee } from '@/modules/admin/services/employeeService';
 import DiscountItemsPopover from './DiscountItemsPopover';
+import { MonthSwitcher } from '../finance/MonthSwitcher';
 
 const MONTH_LABELS = [
   'Janeiro',
@@ -397,11 +392,11 @@ const KpiCard = ({ icon: Icon, label, value, subtitle, accentColor, variant }: K
     <CardContent className="p-4">
       <div className="flex items-center gap-1.5 text-xs font-medium text-muted-foreground mb-2">
         <Icon className="h-3.5 w-3.5" style={accentColor ? { color: accentColor } : undefined} />
-        <span className="truncate">{label}</span>
+        <span className="leading-tight">{label}</span>
       </div>
       <div
         className={cn(
-          'text-xl font-bold tabular-nums leading-tight',
+          'text-lg font-extrabold tabular-nums leading-tight',
           variant === 'muted' && 'text-muted-foreground'
         )}
       >
@@ -416,9 +411,16 @@ interface EmployeeFinancialTabProps {
   employees: Employee[];
   isLoading: boolean;
   searchTerm: string;
+  /** Botões extra na barra (ex.: Importar recibos). */
+  actions?: ReactNode;
 }
 
-const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFinancialTabProps) => {
+const EmployeeFinancialTab = ({
+  employees,
+  isLoading,
+  searchTerm,
+  actions,
+}: EmployeeFinancialTabProps) => {
   const { toast } = useToast();
   const { isRhMember } = useIsRhMember();
   const { isSuperAdmin } = useAdminPermissions();
@@ -437,26 +439,13 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
       ? monthParam
       : now.getMonth() + 1;
 
-  const setYear = useCallback(
-    (value: number) => {
+  const setPeriod = useCallback(
+    (nextYear: number, nextMonth: number) => {
       setSearchParams(
         prev => {
           const next = new URLSearchParams(prev);
-          next.set('year', String(value));
-          return next;
-        },
-        { replace: true }
-      );
-    },
-    [setSearchParams]
-  );
-
-  const setMonth = useCallback(
-    (value: number) => {
-      setSearchParams(
-        prev => {
-          const next = new URLSearchParams(prev);
-          next.set('month', String(value));
+          next.set('year', String(nextYear));
+          next.set('month', String(nextMonth));
           return next;
         },
         { replace: true }
@@ -563,11 +552,6 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
   );
 
   const hasChartData = totals.total > 0;
-
-  const yearOptions = useMemo(() => {
-    const current = new Date().getFullYear();
-    return Array.from({ length: 7 }, (_, i) => current - 3 + i);
-  }, []);
 
   const copyFromPreviousMonth = async () => {
     setCopyDialogOpen(false);
@@ -956,79 +940,54 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
 
   return (
     <div className="space-y-4">
-      {/* Controls: month/year + export */}
-      <Card className="shadow-card print:hidden">
-        <CardContent className="pt-6 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="flex flex-col sm:flex-row gap-3">
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Mês</label>
-              <Select value={String(month)} onValueChange={value => setMonth(Number(value))}>
-                <SelectTrigger className="w-[160px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {MONTH_LABELS.map((label, idx) => (
-                    <SelectItem key={label} value={String(idx + 1)}>
-                      {label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className="flex flex-col gap-1">
-              <label className="text-xs font-medium text-muted-foreground">Ano</label>
-              <Select value={String(year)} onValueChange={value => setYear(Number(value))}>
-                <SelectTrigger className="w-[120px]">
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  {yearOptions.map(y => (
-                    <SelectItem key={y} value={String(y)}>
-                      {y}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          <div className="flex flex-col sm:flex-row gap-2">
-            {canEditFinancial && (
-              <Button
-                variant="outline"
-                onClick={() => setCopyDialogOpen(true)}
-                disabled={isCopying || isLoadingFinances || filtered.length === 0}
-              >
-                {isCopying ? (
-                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                ) : (
-                  <Copy className="h-4 w-4 mr-2" />
-                )}
-                Copiar do mês anterior
-              </Button>
-            )}
+      {/* Mês + ações (passam para a linha seguinte em ecrãs estreitos) */}
+      <div className="flex flex-wrap items-center gap-2 print:hidden">
+        <MonthSwitcher
+          year={year}
+          month={month}
+          onChange={(nextYear, nextMonth) => {
+            setPeriod(nextYear, nextMonth);
+          }}
+        />
+        <div className="ml-auto flex flex-wrap items-center gap-2">
+          {actions}
+          {canEditFinancial && (
             <Button
               variant="outline"
-              onClick={handleExportExcel}
-              disabled={isExporting || isLoadingFinances || filtered.length === 0}
+              className="rounded-full"
+              onClick={() => setCopyDialogOpen(true)}
+              disabled={isCopying || isLoadingFinances || filtered.length === 0}
             >
-              {isExporting ? (
-                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              {isCopying ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <FileSpreadsheet className="h-4 w-4 mr-2" />
+                <Copy className="h-4 w-4" />
               )}
-              Exportar Excel
+              Copiar do mês anterior
             </Button>
-            <Button variant="outline" onClick={handlePrint}>
-              <Printer className="h-4 w-4 mr-2" />
-              Imprimir
-            </Button>
-          </div>
-        </CardContent>
-      </Card>
+          )}
+          <Button
+            variant="outline"
+            className="rounded-full"
+            onClick={handleExportExcel}
+            disabled={isExporting || isLoadingFinances || filtered.length === 0}
+          >
+            {isExporting ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <FileSpreadsheet className="h-4 w-4" />
+            )}
+            Excel
+          </Button>
+          <Button variant="outline" className="rounded-full" onClick={handlePrint}>
+            <Printer className="h-4 w-4" />
+            Imprimir
+          </Button>
+        </div>
+      </div>
 
       {/* KPI cards */}
-      <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 2xl:grid-cols-6">
         <KpiCard
           icon={Wallet}
           label="Total a Pagar"
@@ -1078,8 +1037,8 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead className="h-8 py-1 px-2">Nome</TableHead>
-                  <TableHead className="h-8 py-1 px-2">IBAN</TableHead>
+                  <TableHead className="sticky left-0 z-10 h-8 bg-white px-3 py-1">Nome</TableHead>
+                  <TableHead className="h-8 whitespace-nowrap px-2 py-1">IBAN</TableHead>
                   <TableHead className="h-8 py-1 px-2 text-right">Valor Recibo</TableHead>
                   <TableHead className="h-8 py-1 px-2 text-right">Sub. Alimentação</TableHead>
                   <TableHead className="h-8 py-1 px-2 text-right">Cartão DÁ</TableHead>
@@ -1183,10 +1142,10 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
                       const nextRowVrId = nextEmployee ? `fin-${nextEmployee.id}-vr` : null;
                       return (
                         <TableRow key={employee.id} className="h-8">
-                          <TableCell className="py-1 px-2">
-                            <span className="font-medium">{employee.name}</span>
+                          <TableCell className="sticky left-0 z-10 min-w-[180px] bg-white px-3 py-1">
+                            <span className="font-semibold">{employee.name}</span>
                           </TableCell>
-                          <TableCell className="py-1 px-2 text-sm font-mono">
+                          <TableCell className="whitespace-nowrap px-2 py-1 font-mono text-[12px] text-rz-muted">
                             {employee.iban ? formatIban(employee.iban) : '-'}
                           </TableCell>
                           <TableCell className="py-1 px-2 text-right">
@@ -1258,7 +1217,7 @@ const EmployeeFinancialTab = ({ employees, isLoading, searchTerm }: EmployeeFina
                       );
                     })}
                     <TableRow className="bg-muted/60 font-semibold border-t-2 hover:bg-muted/60">
-                      <TableCell className="py-2 px-2 font-bold uppercase text-xs tracking-wide">
+                      <TableCell className="sticky left-0 z-10 bg-rz-canvas px-3 py-2 text-xs font-bold uppercase tracking-wide">
                         Total
                       </TableCell>
                       <TableCell className="py-2 px-2" />

@@ -10,7 +10,6 @@ import {
 } from '@/components/ui/select';
 
 export type StatusFilter = 'active' | 'inactive' | 'all';
-export type EmployeesView = 'personal' | 'financial';
 
 interface EmployeesToolbarProps {
   search: string;
@@ -20,8 +19,6 @@ interface EmployeesToolbarProps {
   companies: { id: string; name: string }[];
   companyId: string;
   onCompanyChange: (companyId: string) => void;
-  view: EmployeesView;
-  onViewChange: (view: EmployeesView) => void;
   count: number;
 }
 
@@ -51,7 +48,7 @@ const Segmented = <T extends string>({
   </div>
 );
 
-/** Pesquisa, estado, empresa e vista (dados pessoais / financeiros) da lista. */
+/** Pesquisa, empresa e estado da lista de colaboradores. */
 export const EmployeesToolbar: React.FC<EmployeesToolbarProps> = props => (
   <div className="space-y-3 border-b border-rz-line p-3 sm:p-4">
     <div className="flex flex-wrap items-center gap-2">
@@ -64,11 +61,7 @@ export const EmployeesToolbar: React.FC<EmployeesToolbarProps> = props => (
           spellCheck={false}
           value={props.search}
           onChange={event => props.onSearchChange(event.target.value)}
-          placeholder={
-            props.view === 'financial'
-              ? 'Procurar por nome, IBAN ou empresa'
-              : 'Procurar por nome, email ou empresa'
-          }
+          placeholder="Procurar por nome, email ou empresa"
           className="w-full bg-transparent text-[14px] text-rz-ink outline-none placeholder:text-rz-muted"
         />
       </label>
@@ -99,16 +92,6 @@ export const EmployeesToolbar: React.FC<EmployeesToolbarProps> = props => (
       <span className="px-1 text-[13px] font-semibold text-rz-muted">
         {props.count} {props.count === 1 ? 'colaborador' : 'colaboradores'}
       </span>
-      <div className="ml-auto">
-        <Segmented
-          value={props.view}
-          onChange={props.onViewChange}
-          options={[
-            { key: 'personal', label: 'Dados pessoais' },
-            { key: 'financial', label: 'Financeiro' },
-          ]}
-        />
-      </div>
     </div>
   </div>
 );

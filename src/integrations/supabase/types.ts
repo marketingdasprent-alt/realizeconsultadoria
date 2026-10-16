@@ -3387,6 +3387,7 @@ export type Database = {
         Args: { p_access: string };
         Returns: undefined;
       };
+      my_equipment: { Args: never; Returns: Json };
       reschedule_vacation_period: {
         Args: {
           p_end_date: string;

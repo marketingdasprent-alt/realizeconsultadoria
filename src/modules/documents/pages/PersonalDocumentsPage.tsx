@@ -1,22 +1,22 @@
 import React, { useEffect, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { AlertTriangle, FileCheck2, Loader2, Receipt, Send, Upload } from 'lucide-react';
+import { AlertTriangle, FileCheck2, Loader2, Receipt } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { getDocumentCategoryLabel, getExpiryInfo } from '@/lib/documents';
 import { cn } from '@/lib/utils';
 import { WorkspacePage } from '@/modules/workspace/components/WorkspacePage';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
-import { CurrentDocumentsList } from '../components/employee/CurrentDocumentsList';
 import { PayslipsList } from '../components/employee/PayslipsList';
-import { SubmissionsList } from '../components/employee/SubmissionsList';
+import { RegistrationDocuments } from '../components/employee/RegistrationDocuments';
 import { SubmitDocumentDialog } from '../components/employee/SubmitDocumentDialog';
 import { useEmployeeDocuments } from '../hooks/useEmployeeDocuments';
+import { buildRegistration } from '../lib/registration';
 
 type Tab = 'personal' | 'payslips';
 
 /**
- * Os meus documentos (nas Definições): documentos pessoais (em vigor e enviados para
- * aprovação) e recibos de vencimento. A página Documentos do menu fica para o editor.
+ * Os meus documentos (nas Definições): documentos de registo (abrir e substituir; a
+ * substituição fica à espera de aprovação no admin) e recibos de vencimento.
  */
 const PersonalDocumentsPage: React.FC = () => {
   const { user, isPreview } = useWorkspace();
@@ -42,11 +42,14 @@ const PersonalDocumentsPage: React.FC = () => {
     setDialogOpen(true);
   };
 
-  const pending = docs.submissions.filter(s => s.status === 'pending').length;
-  const expiring = docs.current.filter(d => {
-    const state = getExpiryInfo(d.expiry_date).state;
-    return state === 'expiring' || state === 'expired';
-  });
+  const registration = buildRegistration(docs.all);
+  const pending = registration.rows.filter(r => r.pendingReplacement).length;
+  const expiring = registration.rows
+    .map(r => r.doc)
+    .filter(d => {
+      const state = getExpiryInfo(d.expiry_date).state;
+      return state === 'expiring' || state === 'expired';
+    });
   const tiles: {
     key: Tab;
     label: string;
@@ -58,7 +61,7 @@ const PersonalDocumentsPage: React.FC = () => {
     {
       key: 'personal',
       label: 'Documentos pessoais',
-      count: docs.current.length,
+      count: registration.rows.length,
       icon: FileCheck2,
       tint: 'from-amber-400 to-orange-500',
       hint: pending ? `${pending} a aguardar aprovação` : undefined,
@@ -75,16 +78,7 @@ const PersonalDocumentsPage: React.FC = () => {
 
   return (
     <WorkspacePage>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-[26px] font-extrabold">Os meus documentos</h1>
-        <button
-          type="button"
-          onClick={() => openSubmit()}
-          className="inline-flex h-11 items-center gap-2 rounded-full bg-rz-primary px-5 text-sm font-semibold text-white shadow-[0_12px_24px_-12px_hsl(var(--rz-primary))]"
-        >
-          <Upload className="h-4 w-4" /> Enviar documento
-        </button>
-      </div>
+      <h1 className="mb-4 text-[26px] font-extrabold">Os meus documentos</h1>
 
       <div className="grid grid-cols-2 gap-3">
         {tiles.map(tile => (
@@ -111,8 +105,8 @@ const PersonalDocumentsPage: React.FC = () => {
         <p className="mt-4 flex items-start gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-[13.5px] text-amber-900 ring-1 ring-amber-200">
           <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
           {expiring.map(d => getDocumentCategoryLabel(d.category)).join(', ')}{' '}
-          {expiring.length === 1 ? 'está' : 'estão'} a expirar ou expirado. Envie a versão
-          atualizada.
+          {expiring.length === 1 ? 'está' : 'estão'} a expirar ou expirado. Use "Substituir" para
+          enviar a versão atualizada.
         </p>
       )}
 
@@ -121,21 +115,7 @@ const PersonalDocumentsPage: React.FC = () => {
         {isLoading ? (
           <Loader2 className="mx-auto my-8 h-6 w-6 animate-spin text-rz-primary" />
         ) : tab === 'personal' ? (
-          <div className="space-y-6">
-            <CurrentDocumentsList
-              documents={docs.current}
-              archived={docs.archived}
-              onUpdate={openSubmit}
-            />
-            {docs.submissions.length > 0 && (
-              <div>
-                <h2 className="mb-2 flex items-center gap-2 text-[12px] font-bold uppercase tracking-[0.1em] text-rz-muted">
-                  <Send className="h-3.5 w-3.5" /> Enviados para aprovação
-                </h2>
-                <SubmissionsList submissions={docs.submissions} onChanged={docs.refetch} />
-              </div>
-            )}
-          </div>
+          <RegistrationDocuments documents={docs.all} onSubmit={openSubmit} />
         ) : (
           <PayslipsList payslips={docs.payslips} />
         )}

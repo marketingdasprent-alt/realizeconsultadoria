@@ -20,6 +20,7 @@ import { getSafetyCheckupStatus } from '@/lib/employee-home';
 import type { EmployeeOutletContext } from '@/modules/employee/hooks/useEmployeeOutlet';
 import { maskTail } from '@/modules/employee/lib/home-summaries';
 import { WorkScheduleCard } from '@/modules/timeclock/components/employee/WorkScheduleCard';
+import { MyEquipmentCard } from '../components/MyEquipmentCard';
 import { PushCard } from '../components/PushCard';
 import { WorkspacePage } from '../components/WorkspacePage';
 import { useWorkspace } from '../context/workspaceContext';
@@ -94,16 +95,21 @@ const SettingsPage: React.FC = () => {
           )}
         </section>
 
-        {safety && (
+        {/* Sempre visível: sem data, diz que ainda não há consulta registada. */}
+        {(employee || isPreview) && (
           <section className={cn(CARD, 'flex items-center gap-4')}>
             <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-gradient-to-br from-sky-400 to-blue-600 text-white">
               <Stethoscope className="h-6 w-6" />
             </span>
             <div className="flex-1">
-              <p className="text-[13px] text-rz-muted">Medicina do trabalho · próximo exame</p>
-              <p className="text-[16px] font-bold">{format(safety.nextDate, 'dd/MM/yyyy')}</p>
+              <p className="text-[13px] text-rz-muted">
+                Higiene e segurança no trabalho · próxima consulta
+              </p>
+              <p className="text-[16px] font-bold">
+                {safety ? format(safety.nextDate, 'dd/MM/yyyy') : 'Ainda sem consulta registada'}
+              </p>
             </div>
-            {safety.state !== 'ok' && (
+            {safety && safety.state !== 'ok' && (
               <span
                 className={cn(
                   'rounded-full px-3 py-1 text-xs font-bold',
@@ -134,6 +140,7 @@ const SettingsPage: React.FC = () => {
           />
         </section>
 
+        <MyEquipmentCard />
         <WorkScheduleCard />
         <PushCard />
 

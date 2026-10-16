@@ -5,16 +5,23 @@ import type { DirectoryPerson } from '@/modules/messenger/types';
 
 export const NO_DEPARTMENT = 'Outros';
 
-/** Cargos de chefia aparecem primeiro dentro do departamento. */
-const LEAD_PATTERN =
-  /\b(ceo|cfo|coo|cto|administrador|administradora|diretor|diretora|director|directora|gerente|gestor|gestora|respons[aá]vel|coordenador|coordenadora|chefe|head|manager|supervisor|supervisora)\b/i;
+/** Direção: CEO, administradores e diretores (o topo de um departamento). */
+const DIRECTOR_PATTERN =
+  /\b(ceo|cfo|coo|cto|administrador|administradora|diretor|diretora|director|directora|head)\b/i;
+
+/** Chefias intermédias: respondem à direção do departamento, quando existe. */
+const MANAGER_PATTERN =
+  /\b(gerente|gestor|gestora|respons[aá]vel|coordenador|coordenadora|chefe|manager|supervisor|supervisora)\b/i;
 
 /** Departamentos que ficam no topo, entre a empresa e os restantes. */
 const BOARD_PATTERN = /^(dire[cç][aã]o|administra[cç][aã]o|ger[eê]ncia|board)/i;
 
 export interface OrgDepartment {
   name: string;
+  /** Por nível (direção, chefias, restantes) e depois por nome. */
   people: DirectoryPerson[];
+  /** Direção (CEO, diretores): leva a coroa. Gestores e chefes não. */
+  leads: string[];
 }
 
 export interface OrgChart {
@@ -23,15 +30,19 @@ export interface OrgChart {
   total: number;
 }
 
-export const isLead = (person: Pick<DirectoryPerson, 'position'>) =>
-  !!person.position && LEAD_PATTERN.test(person.position);
+/** Nível do cargo: 2 direção, 1 chefia intermédia, 0 restantes. */
+export const rankOf = (position: string | null | undefined): number =>
+  !position ? 0 : DIRECTOR_PATTERN.test(position) ? 2 : MANAGER_PATTERN.test(position) ? 1 : 0;
+
+/** Cargo de chefia (direção ou chefia intermédia). */
+export const isLead = (person: Pick<DirectoryPerson, 'position'>) => rankOf(person.position) > 0;
 
 const matches = (person: DirectoryPerson, term: string) =>
   matchesText(term, person.name, person.position, person.department);
 
 /**
- * Agrupa por departamento (chefias primeiro, depois por nome). Com pesquisa, ficam só as
- * pessoas que correspondem — ou o departamento inteiro, se o nome dele corresponder.
+ * Agrupa por departamento (direção, chefias e restantes, depois por nome). Com pesquisa,
+ * ficam só as pessoas que correspondem — ou o departamento inteiro, se o nome corresponder.
  */
 export const buildOrgChart = (people: DirectoryPerson[], search = ''): OrgChart => {
   const term = search.trim();
@@ -51,8 +62,10 @@ export const buildOrgChart = (people: DirectoryPerson[], search = ''): OrgChart 
     departments.push({
       name,
       people: [...visible].sort(
-        (a, b) => Number(isLead(b)) - Number(isLead(a)) || compareText(a.name, b.name)
+        (a, b) => rankOf(b.position) - rankOf(a.position) || compareText(a.name, b.name)
       ),
+      // Coroa só para a direção; os gestores (ex.: Gestor TVDE) aparecem por baixo do diretor.
+      leads: visible.filter(p => rankOf(p.position) === 2).map(p => p.userId),
     });
   }
   departments.sort((a, b) =>

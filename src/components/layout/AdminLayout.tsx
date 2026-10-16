@@ -12,6 +12,7 @@ import { AdminSidebar } from './AdminSidebar';
 import { AdminMobileHeader } from './AdminMobileHeader';
 import { AdminMobileSidebar } from './AdminMobileSidebar';
 import { PrintPreviewHost } from '@/components/admin/PrintPreviewHost';
+import { useAdminBadges } from '@/modules/admin/hooks/useAdminBadges';
 import { ADMIN_SETTINGS_ITEM, visibleAdminGroups } from './adminNavigation';
 import './admin-theme.css';
 
@@ -33,6 +34,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   const { canView, isLoading: isLoadingPermissions, isSuperAdmin } = useAdminPermissions();
 
   useRzTheme();
+  const badges = useAdminBadges();
 
   // Retoques do admin (admin-theme.css) também nos diálogos e popovers, que abrem em portais.
   useEffect(() => {
@@ -87,6 +89,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         collapsed={collapsed}
         onToggle={toggleCollapsed}
         onLogout={handleLogout}
+        badges={badges}
       />
 
       <AdminMobileHeader isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
@@ -99,6 +102,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
         userName={userName}
         userInitial={userInitial}
         onLogout={handleLogout}
+        badges={badges}
       />
 
       <div

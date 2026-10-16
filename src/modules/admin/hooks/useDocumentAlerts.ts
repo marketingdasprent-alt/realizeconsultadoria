@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { EXPIRY_WARNING_DAYS } from '@/lib/documents';
 import {
   documentService,
@@ -19,6 +19,7 @@ const group = (docs: EmployeeDocumentWithEmployee[]) => {
  * e os que expiram nos próximos 60 dias (ou já expiraram), agrupados por colaborador.
  */
 export const useDocumentAlerts = () => {
+  const queryClient = useQueryClient();
   const query = useQuery({
     queryKey: ['admin', 'document-alerts'],
     queryFn: async () => {
@@ -44,6 +45,10 @@ export const useDocumentAlerts = () => {
     expiring,
     pendingOf: (employeeId: string) => pendingBy.get(employeeId) ?? [],
     expiringOf: (employeeId: string) => expiringBy.get(employeeId) ?? [],
-    refetch: query.refetch,
+    // Depois de aprovar ou rejeitar, os números do menu também mudam já.
+    refetch: () => {
+      queryClient.invalidateQueries({ queryKey: ['admin', 'badges'] });
+      return query.refetch();
+    },
   };
 };

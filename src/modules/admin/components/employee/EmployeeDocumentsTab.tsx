@@ -1,4 +1,5 @@
 import { useMemo, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { AlertCircle, Check, Clock, Upload, X } from 'lucide-react';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
@@ -42,7 +43,14 @@ const detail = (doc: EmployeeDocument) =>
  * aprovado, com validade). O que o colaborador envia pela app aprova-se aqui.
  */
 const EmployeeDocumentsTab = ({ employeeId }: EmployeeDocumentsTabProps) => {
-  const { all, isLoading, refetch } = useEmployeeDocuments(employeeId);
+  const queryClient = useQueryClient();
+  const documents = useEmployeeDocuments(employeeId);
+  const { all, isLoading } = documents;
+  // Ao aprovar/rejeitar, o número do menu (Colaboradores) acompanha.
+  const refetch = () => {
+    queryClient.invalidateQueries({ queryKey: ['admin', 'badges'] });
+    return documents.refetch();
+  };
   const { openingId, open } = useDocumentDownload();
   const removal = useDocumentRemoval(refetch);
   const [uploadFor, setUploadFor] = useState<RegistrationSlot | null>(null);

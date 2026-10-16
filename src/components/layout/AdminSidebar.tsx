@@ -17,6 +17,7 @@ interface AdminSidebarProps {
   collapsed: boolean;
   onToggle: () => void;
   onLogout: () => void;
+  badges?: Record<string, number>;
 }
 
 /** Menu lateral do admin sobre a aurora (como o do colaborador), fixo à esquerda. */
@@ -28,6 +29,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
   collapsed,
   onToggle,
   onLogout,
+  badges,
 }) => (
   <aside
     className={cn(
@@ -45,7 +47,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     </Link>
 
     <nav className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-3 pb-3 pt-2">
-      <AdminNavGroups groups={groups} collapsed={collapsed} />
+      <AdminNavGroups groups={groups} collapsed={collapsed} badges={badges} />
     </nav>
 
     <div className="space-y-2 px-3 pb-4 pt-2">

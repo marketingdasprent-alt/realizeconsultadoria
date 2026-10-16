@@ -10,6 +10,8 @@ interface AdminNavLinkProps {
   item: AdminNavItem;
   collapsed?: boolean;
   onNavigate?: () => void;
+  /** Número vermelho (ex.: tickets abertos); 0 não mostra. */
+  badge?: number;
 }
 
 /** Entrada do menu do admin: mosaico colorido + nome; recolhido mostra só o ícone. */
@@ -17,6 +19,7 @@ export const AdminNavLink: React.FC<AdminNavLinkProps> = ({
   item,
   collapsed = false,
   onNavigate,
+  badge = 0,
 }) => {
   const link = (
     <NavLink
@@ -39,6 +42,16 @@ export const AdminNavLink: React.FC<AdminNavLinkProps> = ({
         className="transition-transform duration-200 group-hover:scale-105"
       />
       {!collapsed && <span className="min-w-0 flex-1 truncate">{item.label}</span>}
+      {badge > 0 && (
+        <span
+          className={cn(
+            'min-w-5 rounded-full bg-rose-500 px-1.5 text-center text-[11px] font-bold leading-5 text-white',
+            collapsed && 'absolute right-1.5 top-1'
+          )}
+        >
+          {badge > 99 ? '99+' : badge}
+        </span>
+      )}
     </NavLink>
   );
 
@@ -48,6 +61,7 @@ export const AdminNavLink: React.FC<AdminNavLinkProps> = ({
       <TooltipTrigger asChild>{link}</TooltipTrigger>
       <TooltipContent side="right" className="rounded-xl font-medium">
         {item.label}
+        {badge > 0 && ` · ${badge}`}
       </TooltipContent>
     </Tooltip>
   );

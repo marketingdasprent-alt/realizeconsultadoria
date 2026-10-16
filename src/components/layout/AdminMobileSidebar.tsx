@@ -12,6 +12,7 @@ interface AdminMobileSidebarProps {
   userName: string;
   userInitial: string;
   onLogout: () => void;
+  badges?: Record<string, number>;
 }
 
 /** Menu do telemóvel/tablet: abre por baixo da barra do topo, com os mesmos grupos. */
@@ -23,6 +24,7 @@ export const AdminMobileSidebar: React.FC<AdminMobileSidebarProps> = ({
   userName,
   userInitial,
   onLogout,
+  badges,
 }) => {
   if (!isOpen) return null;
 
@@ -33,7 +35,7 @@ export const AdminMobileSidebar: React.FC<AdminMobileSidebarProps> = ({
         onClick={event => event.stopPropagation()}
       >
         <nav className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-3 py-4">
-          <AdminNavGroups groups={groups} onNavigate={onClose} />
+          <AdminNavGroups groups={groups} onNavigate={onClose} badges={badges} />
         </nav>
         <div className="space-y-2 px-3 pb-6 pt-2">
           {settings && <AdminNavLink item={settings} onNavigate={onClose} />}

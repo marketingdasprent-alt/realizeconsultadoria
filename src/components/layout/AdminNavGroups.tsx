@@ -6,6 +6,8 @@ interface AdminNavGroupsProps {
   groups: AdminNavGroup[];
   collapsed?: boolean;
   onNavigate?: () => void;
+  /** Números vermelhos por página (href → contagem). */
+  badges?: Record<string, number>;
 }
 
 /** Os grupos do menu (Geral, Pessoas, Empresa, Apoio), no menu lateral e no do telemóvel. */
@@ -13,6 +15,7 @@ export const AdminNavGroups: React.FC<AdminNavGroupsProps> = ({
   groups,
   collapsed = false,
   onNavigate,
+  badges = {},
 }) => (
   <>
     {groups.map(group => (
@@ -27,7 +30,12 @@ export const AdminNavGroups: React.FC<AdminNavGroupsProps> = ({
         <ul className="space-y-1">
           {group.items.map(item => (
             <li key={item.href}>
-              <AdminNavLink item={item} collapsed={collapsed} onNavigate={onNavigate} />
+              <AdminNavLink
+                item={item}
+                collapsed={collapsed}
+                onNavigate={onNavigate}
+                badge={badges[item.href]}
+              />
             </li>
           ))}
         </ul>

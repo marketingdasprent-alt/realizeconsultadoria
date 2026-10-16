@@ -1742,17 +1742,23 @@ export type Database = {
       mail_account_members: {
         Row: {
           account_id: string;
+          color: string | null;
           created_at: string;
+          signature: string | null;
           user_id: string;
         };
         Insert: {
           account_id: string;
+          color?: string | null;
           created_at?: string;
+          signature?: string | null;
           user_id: string;
         };
         Update: {
           account_id?: string;
+          color?: string | null;
           created_at?: string;
+          signature?: string | null;
           user_id?: string;
         };
         Relationships: [

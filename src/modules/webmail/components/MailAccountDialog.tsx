@@ -51,32 +51,13 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
 
   if (!account) return null;
   const provider = providerOf(account.provider);
-  if (account.shared)
-    return (
-      <Dialog open onOpenChange={open => !open && onClose()}>
-        <DialogContent className="rounded-[28px] sm:max-w-md sm:rounded-[28px]">
-          <DialogTitle className="text-[17px] font-extrabold">{account.email}</DialogTitle>
-          <p className="flex gap-2 rounded-2xl bg-rz-primary-soft px-4 py-3 text-[13.5px]">
-            <Users className="mt-0.5 h-4 w-4 shrink-0 text-rz-primary" />
-            Caixa partilhada pela empresa. Quem tem acesso, a palavra-passe e os servidores são
-            geridos pelo administrador, nos Acessos.
-          </p>
-          {account.status !== 'active' && (
-            <p className="flex gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-[13px] text-amber-900 ring-1 ring-amber-200">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              {account.lastError ?? 'Houve um erro ao sincronizar. Avise o administrador.'}
-            </p>
-          )}
-        </DialogContent>
-      </Dialog>
-    );
   // Fecha logo: a alteração aparece na hora e grava em fundo (avisa se falhar).
   const save = () => {
     void onSave(account.id, {
-      displayName: form.displayName.trim() || null,
+      displayName: account.shared ? account.displayName : form.displayName.trim() || null,
       signature: form.signature.trim() || null,
       color: form.color,
-      isDefault: form.isDefault,
+      isDefault: account.shared ? account.isDefault : form.isDefault,
     });
     onClose();
   };
@@ -100,6 +81,14 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
             </div>
           </div>
 
+          {account.shared && (
+            <p className="flex gap-2 rounded-2xl bg-rz-primary-soft px-4 py-3 text-[13px]">
+              <Users className="mt-0.5 h-4 w-4 shrink-0 text-rz-primary" />
+              Caixa partilhada pela empresa: quem tem acesso e a ligação são geridos pelo
+              administrador. A assinatura e a cor aqui são só suas.
+            </p>
+          )}
+
           {account.status !== 'active' && (
             <div className="flex items-start gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-[13px] text-amber-900 ring-1 ring-amber-200">
               <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
@@ -108,7 +97,7 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
                   ? 'A autorização expirou.'
                   : (account.lastError ?? 'Houve um erro ao sincronizar.')}
               </span>
-              {account.authMethod !== 'imap' && (
+              {account.authMethod !== 'imap' && !account.shared && (
                 <button
                   type="button"
                   onClick={() => onReconnect(account)}
@@ -121,14 +110,16 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
           )}
 
           <div className="space-y-4">
-            <label className="block">
-              <span className={LABEL}>Nome do remetente</span>
-              <input
-                value={form.displayName}
-                onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))}
-                className={cn(FIELD, 'h-11')}
-              />
-            </label>
+            {!account.shared && (
+              <label className="block">
+                <span className={LABEL}>Nome do remetente</span>
+                <input
+                  value={form.displayName}
+                  onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))}
+                  className={cn(FIELD, 'h-11')}
+                />
+              </label>
+            )}
             <label className="block">
               <span className={LABEL}>Assinatura</span>
               <textarea
@@ -157,25 +148,29 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
                 ))}
               </div>
             </div>
-            <label className="flex items-center gap-3 text-[14px] font-semibold">
-              <input
-                type="checkbox"
-                checked={form.isDefault}
-                onChange={e => setForm(f => ({ ...f, isDefault: e.target.checked }))}
-                className="h-5 w-5 accent-violet-600"
-              />
-              Caixa predefinida para escrever
-            </label>
+            {!account.shared && (
+              <label className="flex items-center gap-3 text-[14px] font-semibold">
+                <input
+                  type="checkbox"
+                  checked={form.isDefault}
+                  onChange={e => setForm(f => ({ ...f, isDefault: e.target.checked }))}
+                  className="h-5 w-5 accent-violet-600"
+                />
+                Caixa predefinida para escrever
+              </label>
+            )}
           </div>
 
           <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setConfirm(true)}
-              className="inline-flex h-11 items-center gap-2 rounded-full px-4 text-[13.5px] font-bold text-rose-600 hover:bg-rose-50"
-            >
-              <Unplug className="h-4 w-4" /> Desligar
-            </button>
+            {!account.shared && (
+              <button
+                type="button"
+                onClick={() => setConfirm(true)}
+                className="inline-flex h-11 items-center gap-2 rounded-full px-4 text-[13.5px] font-bold text-rose-600 hover:bg-rose-50"
+              >
+                <Unplug className="h-4 w-4" /> Desligar
+              </button>
+            )}
             <button
               type="button"
               onClick={save}

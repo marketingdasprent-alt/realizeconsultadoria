@@ -110,17 +110,49 @@ const call = async <T>(
 
 export const mailService = {
   listAccounts: async () => {
-    const { data, error } = await supabase
-      .from('mail_accounts')
-      .select(ACCOUNT_COLUMNS)
-      .order('created_at');
-    return { data: ((data ?? []) as Row[]).map(toAccount), error };
+    const { data: auth } = await supabase.auth.getSession();
+    const userId = auth.session?.user.id ?? '';
+    const [accounts, prefs] = await Promise.all([
+      supabase.from('mail_accounts').select(ACCOUNT_COLUMNS).order('created_at'),
+      // Nas caixas partilhadas, a assinatura e a cor são de cada pessoa.
+      supabase
+        .from('mail_account_members')
+        .select('account_id, signature, color')
+        .eq('user_id', userId),
+    ]);
+    const mine = new Map(((prefs.data ?? []) as Row[]).map(p => [str(p.account_id), p]));
+    const data = ((accounts.data ?? []) as Row[]).map(row => {
+      const account = toAccount(row);
+      const pref = account.shared ? mine.get(account.id) : undefined;
+      return pref
+        ? {
+            ...account,
+            signature: (pref.signature as string | null) ?? null,
+            color: (pref.color as MailAccount['color'] | null) ?? account.color,
+          }
+        : account;
+    });
+    return { data, error: accounts.error };
   },
 
   updateAccount: async (
     id: string,
-    patch: Partial<Pick<MailAccount, 'displayName' | 'signature' | 'isDefault' | 'color'>>
+    patch: Partial<Pick<MailAccount, 'displayName' | 'signature' | 'isDefault' | 'color'>>,
+    shared = false
   ) => {
+    if (shared) {
+      // Caixa partilhada: só as preferências da própria pessoa (assinatura e cor).
+      const { data: auth } = await supabase.auth.getSession();
+      const { error } = await supabase
+        .from('mail_account_members')
+        .update({
+          ...(patch.signature !== undefined && { signature: patch.signature }),
+          ...(patch.color !== undefined && { color: patch.color }),
+        })
+        .eq('account_id', id)
+        .eq('user_id', auth.session?.user.id ?? '');
+      return { error };
+    }
     const { error } = await supabase
       .from('mail_accounts')
       .update({

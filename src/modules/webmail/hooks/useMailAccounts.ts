@@ -50,13 +50,15 @@ export const useMailAccounts = () => {
         }));
         return true;
       }
+      const shared = !!qc.getQueryData<MailAccount[]>(MAIL_ACCOUNTS_KEY)?.find(a => a.id === id)
+        ?.shared;
       // Na hora no ecrã; grava em fundo e só volta atrás se falhar.
       qc.setQueryData<MailAccount[]>(MAIL_ACCOUNTS_KEY, list =>
         list?.map(a =>
           a.id === id ? { ...a, ...patch } : patch.isDefault ? { ...a, isDefault: false } : a
         )
       );
-      const { error } = await mailService.updateAccount(id, patch);
+      const { error } = await mailService.updateAccount(id, patch, shared);
       if (error) {
         fail(null, 'As alterações não foram guardadas.');
         void qc.invalidateQueries({ queryKey: MAIL_ACCOUNTS_KEY });

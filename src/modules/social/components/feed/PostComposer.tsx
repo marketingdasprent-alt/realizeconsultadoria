@@ -1,7 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { Building2, ImagePlus, Loader2, Paperclip, Users, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
+import { useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { MAX_POST_FILES, POST_FILE_TYPES } from '../../lib/feed';
 import type { NewPostInput } from '../../types';
@@ -24,8 +26,10 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPublish, isPublish
   const fileRef = useRef<HTMLInputElement>(null);
   const canPublish = (body.trim().length > 0 || files.length > 0) && !isPublishing;
 
-  const addFiles = (list: FileList | null) =>
+  const addFiles = (list: FileList | File[] | null) =>
     list && setFiles(current => [...current, ...Array.from(list)].slice(0, MAX_POST_FILES));
+  // Arrastar fotografias e documentos para cima da caixa (ou colar com Ctrl+V).
+  const { isDragging, dropProps } = useFileDrop(addFiles, !isPublishing);
 
   const publish = async () => {
     if (!canPublish) return;
@@ -37,12 +41,26 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPublish, isPublish
   };
 
   return (
-    <section className="rounded-[28px] bg-white p-4 shadow-rz-soft ring-1 ring-rz-line md:p-5">
+    <section
+      className="relative rounded-[28px] bg-white p-4 shadow-rz-soft ring-1 ring-rz-line md:p-5"
+      {...dropProps}
+    >
+      <DropOverlay
+        visible={isDragging}
+        label="Largue para juntar à publicação"
+        className="rounded-[28px]"
+      />
       <div className="flex gap-3">
         <UserAvatar name={user.name} userId={user.userId} size="md" />
         <textarea
           value={body}
           onChange={event => setBody(event.target.value.slice(0, 5000))}
+          onPaste={event => {
+            const pasted = Array.from(event.clipboardData.files);
+            if (!pasted.length) return;
+            event.preventDefault();
+            addFiles(pasted);
+          }}
           rows={body ? Math.min(8, body.split('\n').length + 1) : 2}
           placeholder={`Partilhe uma novidade, ${user.name.split(' ')[0]}… use #hashtags`}
           className="min-h-[52px] flex-1 resize-none rounded-2xl bg-rz-canvas px-4 py-3 text-[15px] outline-none ring-1 ring-transparent placeholder:text-rz-muted focus:bg-white focus:ring-rz-primary/40"

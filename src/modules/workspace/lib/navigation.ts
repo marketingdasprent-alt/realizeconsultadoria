@@ -140,7 +140,7 @@ export const WORKSPACE_GROUPS: WorkspaceGroup[] = [
         tint: 'from-amber-400 to-orange-500',
         ready: true,
         description:
-          'Em breve: o editor de documentos da empresa. Os documentos pessoais e recibos estão nas Definições.',
+          'As pastas da empresa: abra e edite Word, Excel e PDF sem sair do Realize. Os documentos pessoais e recibos estão nas Definições.',
       },
       {
         key: 'tickets',

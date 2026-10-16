@@ -6,6 +6,7 @@ import {
   PAYSLIP_CATEGORY,
   type EmployeeDocument,
 } from '@/lib/documents';
+import { isReviewable } from '@/modules/documents/lib/registration';
 
 interface EmployeeDocumentAlertsProps {
   documents: EmployeeDocument[];
@@ -25,7 +26,8 @@ export const EmployeeDocumentAlerts: React.FC<EmployeeDocumentAlertsProps> = ({
     .map(doc => ({ doc, info: getExpiryInfo(doc.expiry_date) }))
     .filter(({ info }) => info.state === 'expiring' || info.state === 'expired')
     .sort((a, b) => (a.info.daysLeft ?? 0) - (b.info.daysLeft ?? 0));
-  const pendingDocs = documents.filter(doc => doc.status === 'pending');
+  // Só os documentos de registo (ou ainda sem tipo) pedem aprovação.
+  const pendingDocs = documents.filter(isReviewable);
   const pending = pendingDocs.length;
 
   if (expiring.length === 0 && pending === 0) return null;

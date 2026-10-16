@@ -4,6 +4,24 @@ import { sanitizeFileName } from '@/lib/utils';
 
 export type EmployeeAttachment = Database['public']['Tables']['employee_attachments']['Row'];
 
+/** Documento enviado num pedido de ausência (baixa, justificação…), com o pedido. */
+export interface AbsenceFile {
+  id: string;
+  file_name: string;
+  file_path: string;
+  file_size: number;
+  created_at: string;
+  absence: { type: string; status: string; start_date: string; end_date: string };
+}
+
+interface AbsenceRow {
+  absence_type: string;
+  status: string;
+  start_date: string;
+  end_date: string;
+  absence_documents: Omit<AbsenceFile, 'absence'>[] | null;
+}
+
 const BUCKET = 'employee-files';
 // Ficheiros antigos podem ter ficado noutros buckets (antes de tudo ir para employee-files).
 const LEGACY_BUCKETS = ['absence-documents', 'documents', 'employees'];
@@ -62,10 +80,35 @@ export const attachmentService = {
     }
   },
 
+  /** Documentos enviados pelo colaborador nos pedidos de ausência, do mais recente. */
+  listAbsenceFiles: async (employeeId: string) => {
+    const { data, error } = await supabase
+      .from('absences')
+      .select(
+        'absence_type, status, start_date, end_date, absence_documents(id, file_name, file_path, file_size, created_at)'
+      )
+      .eq('employee_id', employeeId);
+    const files: AbsenceFile[] = ((data ?? []) as unknown as AbsenceRow[]).flatMap(row =>
+      (row.absence_documents ?? []).map(doc => ({
+        ...doc,
+        absence: {
+          type: row.absence_type,
+          status: row.status,
+          start_date: row.start_date,
+          end_date: row.end_date,
+        },
+      }))
+    );
+    return { data: files.sort((a, b) => b.created_at.localeCompare(a.created_at)), error };
+  },
+
   /** Ligação temporária (1 min) para abrir o ficheiro, procurando também nos buckets antigos. */
-  signedUrl: async (attachment: EmployeeAttachment): Promise<string | null> => {
+  signedUrl: async (
+    attachment: Pick<EmployeeAttachment, 'file_path'>,
+    first = BUCKET
+  ): Promise<string | null> => {
     const path = cleanPath(attachment.file_path);
-    for (const bucket of [BUCKET, ...LEGACY_BUCKETS]) {
+    for (const bucket of [first, ...[BUCKET, ...LEGACY_BUCKETS].filter(b => b !== first)]) {
       const { data } = await supabase.storage.from(bucket).createSignedUrl(path, 60);
       if (data?.signedUrl) return data.signedUrl;
     }

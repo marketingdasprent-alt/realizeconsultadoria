@@ -4,7 +4,6 @@ import {
   Building2,
   ClipboardList,
   Clock,
-  FileCheck,
   Headset,
   KeyRound,
   LayoutDashboard,
@@ -52,13 +51,6 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: 'Colaboradores',
         moduleKey: 'employees',
         tint: 'from-fuchsia-400 to-purple-600',
-      },
-      {
-        href: ROUTES.ADMIN.DOCUMENTS,
-        icon: FileCheck,
-        label: 'Documentos',
-        moduleKey: 'employees',
-        tint: 'from-amber-400 to-orange-500',
       },
       {
         href: ROUTES.ADMIN.CALENDAR,

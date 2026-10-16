@@ -14,6 +14,7 @@ import { ReviewDocumentDialog } from '@/modules/documents/components/admin/Revie
 import { DocumentStatusBadge, ExpiryBadge } from '@/modules/documents/components/DocumentBadges';
 import { useDocumentDownload } from '@/modules/documents/hooks/useDocumentDownload';
 import { useEmployeeDocuments } from '@/modules/documents/hooks/useEmployeeDocuments';
+import { isReviewable } from '@/modules/documents/lib/registration';
 import { useDocumentRemoval } from '../../hooks/useDocumentRemoval';
 import {
   registrationHistory,
@@ -53,10 +54,7 @@ const EmployeeDocumentsTab = ({ employeeId }: EmployeeDocumentsTabProps) => {
   // Tudo o que o colaborador enviou e espera decisão, de qualquer tipo (ao aprovar pode
   // corrigir-se o tipo, se ele escolheu mal na app).
   const pending = useMemo(
-    () =>
-      all
-        .filter(doc => doc.status === 'pending')
-        .sort((a, b) => a.created_at.localeCompare(b.created_at)),
+    () => all.filter(isReviewable).sort((a, b) => a.created_at.localeCompare(b.created_at)),
     [all]
   );
 

@@ -36,7 +36,6 @@ const PersonalDocumentsPage = lazy(() => import('./modules/documents/pages/Perso
 const MyTimeClockPage = lazy(() => import('./modules/timeclock/pages/MyTimeClockPage'));
 const TimeClockNfcPage = lazy(() => import('./modules/timeclock/pages/TimeClockNfcPage'));
 const TimeClockAdminPage = lazy(() => import('./modules/timeclock/pages/TimeClockAdminPage'));
-const DocumentsAdminPage = lazy(() => import('./modules/documents/pages/DocumentsAdminPage'));
 const ModuleComingSoonPage = lazy(() => import('./modules/workspace/pages/ModuleComingSoonPage'));
 const ProfilePage = lazy(() => import('./modules/workspace/pages/ProfilePage'));
 const AccountSettingsPage = lazy(() => import('./modules/workspace/pages/SettingsPage'));
@@ -116,7 +115,11 @@ const App = () => (
                   <Route path="/admin/suporte" element={<SupportTicketsPage />} />
                   <Route path="/admin/acessos" element={<AccessesPage />} />
                   <Route path="/admin/ponto" element={<TimeClockAdminPage />} />
-                  <Route path="/admin/documentos" element={<DocumentsAdminPage />} />
+                  {/* Documentos passou para Colaboradores (aprovar, importar recibos, validades) */}
+                  <Route
+                    path="/admin/documentos"
+                    element={<Navigate to="/admin/colaboradores" replace />}
+                  />
                   <Route path="/admin/configuracoes" element={<SettingsPage />} />
                 </Route>
 

@@ -5,6 +5,7 @@ import {
   documentService,
   type EmployeeDocumentWithEmployee,
 } from '@/modules/documents/services/documentService';
+import { isReviewable } from '@/modules/documents/lib/registration';
 
 const group = (docs: EmployeeDocumentWithEmployee[]) => {
   const byEmployee = new Map<string, EmployeeDocumentWithEmployee[]>();
@@ -27,7 +28,8 @@ export const useDocumentAlerts = () => {
       ]);
       if (pending.error) throw pending.error;
       if (expiring.error) throw expiring.error;
-      return { pending: pending.data, expiring: expiring.data };
+      // Só os documentos de registo (ou ainda sem tipo) pedem aprovação.
+      return { pending: pending.data.filter(isReviewable), expiring: expiring.data };
     },
     staleTime: 30_000,
   });

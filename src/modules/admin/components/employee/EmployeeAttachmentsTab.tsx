@@ -1,5 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
-import { format } from 'date-fns';
+import { format, parseISO } from 'date-fns';
+import { absenceTypeLabels } from '@/lib/absence-types';
 import { Loader2, Paperclip, Share2 } from 'lucide-react';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import { Input } from '@/components/ui/input';
@@ -30,6 +31,30 @@ const SHARE_CATEGORIES = ADMIN_UPLOAD_CATEGORIES.filter(
 
 const day = (iso: string) => format(new Date(iso), 'dd/MM/yyyy');
 
+const short = (iso: string) => format(parseISO(iso), 'dd/MM/yyyy');
+
+/** "12/10/2026" ou "12/10/2026 – 16/10/2026". */
+const absencePeriod = (absence: { start_date: string; end_date: string }) =>
+  absence.start_date === absence.end_date
+    ? short(absence.start_date)
+    : `${short(absence.start_date)} – ${short(absence.end_date)}`;
+
+const STATUS: Record<string, { label: string; tone: string }> = {
+  approved: { label: 'Aprovado', tone: 'bg-emerald-100 text-emerald-700' },
+  partially_approved: { label: 'Aprovado em parte', tone: 'bg-emerald-100 text-emerald-700' },
+  pending: { label: 'Pedido pendente', tone: 'bg-amber-100 text-amber-700' },
+  rejected: { label: 'Pedido rejeitado', tone: 'bg-slate-100 text-slate-500' },
+};
+
+const AbsenceStatus = ({ status }: { status: string }) => {
+  const info = STATUS[status] ?? { label: status, tone: 'bg-slate-100 text-slate-500' };
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${info.tone}`}>
+      {info.label}
+    </span>
+  );
+};
+
 /**
  * Anexos: o que não tem lugar nos outros separadores — documentos das ausências e baixas
  * (enviados pelo colaborador no pedido), documentos partilhados (comunicados, contrato…) e
@@ -46,7 +71,13 @@ const EmployeeAttachmentsTab = ({ employeeId }: EmployeeAttachmentsTabProps) => 
   const [isDeleting, setIsDeleting] = useState(false);
   const fileInput = useRef<HTMLInputElement>(null);
 
-  const absence = files.attachments.filter(a => a.source === 'absence');
+  // Ausências: os documentos dos pedidos (com o tipo e os dias) e, dos anexos antigos de
+  // ausências, só os que não são cópia de um documento de pedido (ex.: baixas enviadas à parte).
+  const absenceNames = new Set(files.absenceFiles.map(f => f.file_name));
+  const absenceExtras = files.attachments.filter(
+    a => a.source === 'absence' && !absenceNames.has(a.file_name)
+  );
+  const absenceCount = files.absenceFiles.length + absenceExtras.length;
   const internal = files.attachments.filter(a => a.source !== 'absence');
   const shared = useMemo(() => sharedDocuments(docs.all), [docs.all]);
 
@@ -69,7 +100,7 @@ const EmployeeAttachmentsTab = ({ employeeId }: EmployeeAttachmentsTabProps) => 
 
   const upload = async (file: File | undefined) => {
     if (fileInput.current) fileInput.current.value = '';
-    if (file && (await files.upload(file, description))) setDescription('');
+    if (file && description.trim() && (await files.upload(file, description))) setDescription('');
   };
 
   const loading = files.isLoading || docs.isLoading;
@@ -78,15 +109,27 @@ const EmployeeAttachmentsTab = ({ employeeId }: EmployeeAttachmentsTabProps) => 
     <div className="space-y-4">
       <FileSection
         title="Ausências e baixas"
-        description="Documentos enviados nos pedidos de ausência (ficam aqui quando o pedido é aprovado)."
-        count={absence.length}
+        description="Documentos enviados pelo colaborador nos pedidos de ausência (baixas, justificações)."
+        count={absenceCount}
       >
         {loading ? (
           <div className="h-14 animate-pulse rounded-2xl bg-rz-canvas" />
-        ) : absence.length === 0 ? (
+        ) : absenceCount === 0 ? (
           <p className="px-1 py-3 text-[13px] text-rz-muted">Sem documentos de ausências.</p>
         ) : (
-          <ul>{absence.map(attachmentRow)}</ul>
+          <ul>
+            {files.absenceFiles.map(file => (
+              <FileRow
+                key={file.id}
+                title={`${absenceTypeLabels[file.absence.type] ?? 'Ausência'} · ${absencePeriod(file.absence)}`}
+                subtitle={`${file.file_name} · enviado a ${day(file.created_at)}`}
+                badges={<AbsenceStatus status={file.absence.status} />}
+                onOpen={() => files.open(file)}
+                isOpening={files.openingId === file.id}
+              />
+            ))}
+            {absenceExtras.map(attachmentRow)}
+          </ul>
         )}
       </FileSection>
 
@@ -133,12 +176,13 @@ const EmployeeAttachmentsTab = ({ employeeId }: EmployeeAttachmentsTabProps) => 
           <Input
             value={description}
             onChange={event => setDescription(event.target.value)}
-            placeholder="Descrição (opcional)"
+            placeholder="Título do documento (ex.: Declaração de IRS 2025)"
           />
           <button
             type="button"
             onClick={() => fileInput.current?.click()}
-            disabled={files.isUploading}
+            disabled={files.isUploading || !description.trim()}
+            title={description.trim() ? undefined : 'Escreva primeiro o título do documento'}
             className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full px-4 text-[13.5px] font-semibold ring-1 ring-rz-line hover:bg-rz-canvas"
           >
             {files.isUploading ? (

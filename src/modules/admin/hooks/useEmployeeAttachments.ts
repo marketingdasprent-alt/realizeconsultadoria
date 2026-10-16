@@ -1,7 +1,11 @@
 import { useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { attachmentService, type EmployeeAttachment } from '../services/attachmentService';
+import {
+  attachmentService,
+  type AbsenceFile,
+  type EmployeeAttachment,
+} from '../services/attachmentService';
 
 const message = (error: unknown) =>
   error instanceof Error ? error.message : 'Ocorreu um erro inesperado.';
@@ -22,6 +26,14 @@ export const useEmployeeAttachments = (employeeId: string) => {
       return data;
     },
   });
+  const absenceFiles = useQuery({
+    queryKey: ['admin', 'absence-files', employeeId],
+    queryFn: async () => {
+      const { data, error } = await attachmentService.listAbsenceFiles(employeeId);
+      if (error) throw error;
+      return data;
+    },
+  });
   const refresh = () => queryClient.invalidateQueries({ queryKey: key });
 
   const upload = async (file: File, description: string) => {
@@ -37,11 +49,14 @@ export const useEmployeeAttachments = (employeeId: string) => {
     return true;
   };
 
-  const open = async (attachment: EmployeeAttachment) => {
+  const open = async (attachment: EmployeeAttachment | AbsenceFile) => {
     // A janela abre já (no clique), senão o browser bloqueia-a depois do pedido.
     const win = window.open('', '_blank');
     setOpeningId(attachment.id);
-    const url = await attachmentService.signedUrl(attachment);
+    const url = await attachmentService.signedUrl(
+      attachment,
+      'absence' in attachment ? 'absence-documents' : undefined
+    );
     setOpeningId(null);
     if (!url) {
       win?.close();
@@ -67,7 +82,8 @@ export const useEmployeeAttachments = (employeeId: string) => {
 
   return {
     attachments: query.data ?? [],
-    isLoading: query.isLoading,
+    absenceFiles: absenceFiles.data ?? [],
+    isLoading: query.isLoading || absenceFiles.isLoading,
     isUploading,
     upload,
     open,

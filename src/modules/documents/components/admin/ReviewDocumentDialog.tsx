@@ -18,6 +18,7 @@ import { useDocumentDownload } from '../../hooks/useDocumentDownload';
 import { toServiceFields, useDocumentMetadata } from '../../hooks/useDocumentMetadata';
 import { documentService, type EmployeeDocumentWithEmployee } from '../../services/documentService';
 import { DocumentMetadataFields } from '../DocumentMetadataFields';
+import { REGISTRATION_CATEGORIES } from '../../lib/registration';
 
 interface ReviewDocumentDialogProps {
   doc: EmployeeDocumentWithEmployee;
@@ -101,7 +102,7 @@ export const ReviewDocumentDialog: React.FC<ReviewDocumentDialogProps> = ({
             Abrir documento
           </Button>
           <DocumentMetadataFields
-            categories={DOCUMENT_CATEGORIES}
+            categories={DOCUMENT_CATEGORIES.filter(c => REGISTRATION_CATEGORIES.includes(c.value))}
             value={metadata}
             onChange={update}
             showIssueDate

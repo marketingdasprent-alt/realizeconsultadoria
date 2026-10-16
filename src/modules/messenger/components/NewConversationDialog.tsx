@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { matchesText } from '@/lib/text';
-import { Check, Loader2, Search, Users } from 'lucide-react';
+import { Check, Loader2, Search, Users, X } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useMessengerApi } from '../context/useMessengerApi';
+import { groupTitle } from '../lib/groupTitle';
 
 interface NewConversationDialogProps {
   open: boolean;
@@ -20,7 +21,7 @@ interface NewConversationDialogProps {
 
 /**
  * Nova conversa (briefing §5): colegas da mesma empresa, com pesquisa por nome, cargo ou
- * departamento. Um colega → conversa privada; vários → grupo com nome.
+ * departamento. Um colega → conversa privada; vários → grupo (o nome é opcional).
  */
 export const NewConversationDialog: React.FC<NewConversationDialogProps> = ({
   open,
@@ -50,13 +51,17 @@ export const NewConversationDialog: React.FC<NewConversationDialogProps> = ({
     );
 
   const isGroup = selected.length > 1;
-  const canCreate = selected.length > 0 && (!isGroup || title.trim().length > 0) && !isBusy;
+  const canCreate = selected.length > 0 && !isBusy;
+  // Sem nome escrito, o grupo fica com os primeiros nomes de quem lá está.
+  const defaultTitle = groupTitle(
+    selected.map(id => api.directory.find(p => p.userId === id)?.name.split(' ')[0] ?? '')
+  );
 
   const create = async () => {
     if (!canCreate) return;
     setIsBusy(true);
     const id = isGroup
-      ? await api.createGroup(title.trim(), selected)
+      ? await api.createGroup(title.trim() || defaultTitle, selected)
       : await api.startDirect(selected[0]);
     setIsBusy(false);
     if (!id) return;
@@ -75,7 +80,42 @@ export const NewConversationDialog: React.FC<NewConversationDialogProps> = ({
           <DialogTitle className="text-xl font-extrabold">Nova conversa</DialogTitle>
           <DialogDescription>Escolha um colega, ou vários para criar um grupo.</DialogDescription>
         </DialogHeader>
-        <div className="space-y-2 px-6 pb-3">
+        <div className="space-y-3 px-6 pb-3">
+          {isGroup && (
+            <div className="rounded-2xl bg-rz-primary-soft p-3 ring-1 ring-rz-primary/20">
+              <label className="mb-2 flex items-center gap-1.5 text-[12.5px] font-bold uppercase tracking-[0.08em] text-rz-primary">
+                <Users className="h-4 w-4" /> Novo grupo · {selected.length} colegas
+              </label>
+              <input
+                value={title}
+                onChange={event => setTitle(event.target.value.slice(0, 80))}
+                placeholder="Dê um nome ao grupo"
+                aria-label="Nome do grupo"
+                className="h-12 w-full rounded-xl bg-white px-4 text-[15px] font-semibold text-rz-ink outline-none ring-2 ring-rz-primary/30 placeholder:font-normal placeholder:text-rz-muted focus:ring-rz-primary"
+              />
+              <p className="mt-1.5 text-[12px] text-rz-muted">
+                Opcional. Se não escrever, fica <b className="text-rz-ink">{defaultTitle}</b>.
+              </p>
+              <div className="mt-2 flex flex-wrap gap-1.5">
+                {selected.map(id => {
+                  const person = api.directory.find(p => p.userId === id);
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => toggle(id)}
+                      className="inline-flex items-center gap-1 rounded-full bg-white py-1 pl-1 pr-2 text-[12px] font-semibold ring-1 ring-rz-line hover:ring-rose-300"
+                      aria-label={`Tirar ${person?.name ?? ''} do grupo`}
+                    >
+                      <UserAvatar name={person?.name ?? '?'} userId={id} size="xs" />
+                      {person?.name.split(' ')[0]}
+                      <X className="h-3 w-3 text-rz-muted" />
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+          )}
           <label className="flex h-11 items-center gap-2 rounded-2xl bg-rz-canvas px-3 text-rz-muted focus-within:bg-white focus-within:ring-1 focus-within:ring-rz-primary/40">
             <Search className="h-4 w-4" />
             <input
@@ -86,17 +126,6 @@ export const NewConversationDialog: React.FC<NewConversationDialogProps> = ({
               className="w-full bg-transparent text-sm text-rz-ink outline-none"
             />
           </label>
-          {isGroup && (
-            <label className="flex h-11 items-center gap-2 rounded-2xl bg-rz-primary-soft px-3 text-rz-primary">
-              <Users className="h-4 w-4" />
-              <input
-                value={title}
-                onChange={event => setTitle(event.target.value.slice(0, 80))}
-                placeholder="Nome do grupo"
-                className="w-full bg-transparent text-sm font-semibold text-rz-ink outline-none placeholder:font-normal"
-              />
-            </label>
-          )}
         </div>
         <ul className="rz-scroll min-h-0 flex-1 space-y-0.5 overflow-y-auto px-3 pb-3">
           {people.map(person => {

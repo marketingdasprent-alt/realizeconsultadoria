@@ -43,11 +43,15 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // Monotonic counter that lets us discard role lookups whose result
   // arrives after a newer auth event has already updated the state.
   const lookupGenerationRef = useRef(0);
+  // Utilizador cujo papel já foi lido: renovações do token (e o SIGNED_IN que o Supabase
+  // volta a emitir ao regressar à app) não precisam de o ler outra vez.
+  const resolvedUserIdRef = useRef<string | null>(null);
 
   const applySession = async (session: Session | null) => {
     const generation = ++lookupGenerationRef.current;
 
     if (!session?.user) {
+      resolvedUserIdRef.current = null;
       setUser(null);
       setRole(null);
       return;
@@ -64,6 +68,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    resolvedUserIdRef.current = session.user.id;
     setUser({ ...session.user, role: normalized } as AuthUser);
     setRole(normalized);
     setError(null);
@@ -131,6 +136,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       // INITIAL_SESSION is already handled by checkAuth above — skipping it
       // prevents a race where two concurrent role lookups overwrite each other.
       if (event === 'INITIAL_SESSION') return;
+      if (
+        (event === 'TOKEN_REFRESHED' || event === 'SIGNED_IN') &&
+        session?.user &&
+        session.user.id === resolvedUserIdRef.current
+      )
+        return;
       applySession(session);
     });
 

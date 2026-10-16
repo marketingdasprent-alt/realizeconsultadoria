@@ -1,6 +1,7 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, format, startOfMonth } from 'date-fns';
 import { summarizeDays, type DaySummary, type TimeClockEntryWithRelations } from '@/lib/timeclock';
+import { shouldRefreshOnVisible } from '../lib/refreshPolicy';
 import { timeClockService } from '../services/timeClockService';
 
 interface UseMyTimeClockResult {
@@ -20,6 +21,7 @@ export const useMyTimeClock = (employeeId: string | null): UseMyTimeClockResult 
   const [entries, setEntries] = useState<TimeClockEntryWithRelations[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const loadedAt = useRef(0);
 
   const fetchEntries = useCallback(
     async (silent = false) => {
@@ -35,7 +37,10 @@ export const useMyTimeClock = (employeeId: string | null): UseMyTimeClockResult 
         to.toISOString()
       );
       if (fetchError) setError('Erro ao carregar os registos de ponto');
-      else setEntries(data);
+      else {
+        setEntries(data);
+        loadedAt.current = Date.now();
+      }
       setIsLoading(false);
     },
     [employeeId]
@@ -48,7 +53,8 @@ export const useMyTimeClock = (employeeId: string | null): UseMyTimeClockResult 
   // Ao voltar à app (ex.: depois de picar na tag, que abre no browser) mostra o registo novo.
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible') fetchEntries(true);
+      if (document.visibilityState === 'visible' && shouldRefreshOnVisible(loadedAt.current))
+        fetchEntries(true);
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);

@@ -1,12 +1,13 @@
 // Estado partilhado da jornada (relógio no cabeçalho, painel do ponto e página da
 // tag): registos recentes do colaborador e a ação em curso.
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, startOfDay } from 'date-fns';
 import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
 import { ACTION_ENTRY, deriveWorkday, type WorkdayAction } from '@/lib/workday';
 import { useCurrentEmployee } from '../hooks/useCurrentEmployee';
 import { useNow } from '../hooks/useNow';
 import { usePunch } from '../hooks/usePunch';
+import { markPunched, shouldRefreshOnVisible } from '../lib/refreshPolicy';
 import { timeClockService } from '../services/timeClockService';
 import { WorkdayContext, type RunOptions, type WorkdayContextValue } from './workdayContext';
 
@@ -50,6 +51,7 @@ export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ child
   const { phase, outcome, isBusy, punch, warmUp, clear } = usePunch();
   const now = useNow(30_000);
   const employeeId = employee?.id ?? null;
+  const loadedAt = useRef(0);
 
   const refetch = useCallback(async () => {
     if (!employeeId) return;
@@ -59,7 +61,10 @@ export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addDays(today, -1).toISOString(),
       addDays(today, 2).toISOString()
     );
-    if (!error) setEntries(data);
+    if (!error) {
+      setEntries(data);
+      loadedAt.current = Date.now();
+    }
     setEntriesLoaded(true);
   }, [employeeId]);
 
@@ -67,10 +72,12 @@ export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ child
     refetch();
   }, [refetch]);
 
-  // Ao voltar à app (ex.: depois de registar na tag, que pode abrir no browser).
+  // Ao voltar à app: só se já passou algum tempo ou se houve um registo noutra janela
+  // (ex.: tag aberta no browser). Trocar de separador não volta a pedir os registos.
   useEffect(() => {
     const onVisible = () => {
-      if (document.visibilityState === 'visible') refetch();
+      if (document.visibilityState === 'visible' && shouldRefreshOnVisible(loadedAt.current))
+        refetch();
     };
     document.addEventListener('visibilitychange', onVisible);
     return () => document.removeEventListener('visibilitychange', onVisible);
@@ -96,6 +103,7 @@ export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ child
       });
       // Registado, ou o ecrã estava desatualizado: recarrega para mostrar o estado real.
       if (result && (result.entry || result.code === 'invalid_state')) {
+        if (result.entry) markPunched();
         await refetch();
         setVersion(v => v + 1);
       } else if (provisional) {

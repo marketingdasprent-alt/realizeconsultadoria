@@ -1738,6 +1738,44 @@ export type Database = {
           },
         ];
       };
+      folder_assignments: {
+        Row: {
+          created_at: string;
+          created_by: string | null;
+          employee_id: string;
+          id: string;
+          label: string | null;
+          path: string;
+          permission: string;
+        };
+        Insert: {
+          created_at?: string;
+          created_by?: string | null;
+          employee_id: string;
+          id?: string;
+          label?: string | null;
+          path: string;
+          permission?: string;
+        };
+        Update: {
+          created_at?: string;
+          created_by?: string | null;
+          employee_id?: string;
+          id?: string;
+          label?: string | null;
+          path?: string;
+          permission?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'folder_assignments_employee_id_fkey';
+            columns: ['employee_id'];
+            isOneToOne: false;
+            referencedRelation: 'employees';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       holidays: {
         Row: {
           created_at: string;

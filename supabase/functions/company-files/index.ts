@@ -7,6 +7,9 @@
 // POST { action: 'download', path }  → link de descarga direto do agente (5 min)
 // POST { action: 'mkdir', path }     → nova pasta (precisa de permissão de edição)
 // POST { action: 'create', path, name, kind } → documento em branco (docx/xlsx/pptx) na pasta
+// Só admins (para atribuir pastas aos colaboradores na ficha de cada um):
+// POST { action: 'admin-list', path? }  → pastas do servidor (sem path: as raízes)
+// POST { action: 'admin-mkdir', path }  → nova pasta (dentro de uma raiz)
 // POST { action: 'upload', path, name, size } → link para o browser enviar o ficheiro direto
 //                                               ao agente (PUT, 10 min), com um nome livre
 //
@@ -57,7 +60,16 @@ const TTL = {
 };
 
 interface CompanyFilesRequest {
-  action?: 'folders' | 'list' | 'open' | 'download' | 'mkdir' | 'create' | 'upload';
+  action?:
+    | 'folders'
+    | 'list'
+    | 'open'
+    | 'download'
+    | 'mkdir'
+    | 'create'
+    | 'upload'
+    | 'admin-list'
+    | 'admin-mkdir';
   path?: unknown;
   name?: unknown;
   kind?: unknown;
@@ -110,7 +122,8 @@ const callAgent = async <T>(
         Authorization: `Bearer ${token}`,
         ...(file ? { 'Content-Type': file.type } : {}),
       },
-      body: file?.bytes,
+      // Uint8Array é um corpo válido; os tipos do Deno é que não o aceitam diretamente
+      body: file ? (file.bytes as unknown as BodyInit) : undefined,
     });
   } catch {
     throw new FilesError('O servidor de ficheiros não responde. Tente daqui a pouco.');
@@ -121,6 +134,52 @@ const callAgent = async <T>(
     throw new FilesError(AGENT_ERRORS[res.status] ?? 'O servidor de ficheiros deu um erro.');
   }
   return body as T;
+};
+
+/** Raízes de D:\\Shares que o agente serve (se ele não as listar). */
+const ROOTS = (Deno.env.get('FILES_ROOTS') ?? 'DASPRENT,RAZÃO DINÂMICA LDA,_SAAS_TESTE')
+  .split(',')
+  .map(name => name.trim())
+  .filter(Boolean);
+
+/**
+ * Explorador do admin: vê todas as pastas do servidor (não só as atribuídas a ele) e cria
+ * pastas novas, para as atribuir na ficha de cada colaborador. Só pastas, sem ficheiros.
+ */
+const adminAction = async (
+  db: ReturnType<typeof serviceClient>,
+  userId: string,
+  body: CompanyFilesRequest,
+  secret: string
+) => {
+  const { data: isAdmin } = await db.rpc('has_role', { _user_id: userId, _role: 'admin' });
+  if (isAdmin !== true) return fail('Só os administradores podem gerir as pastas.');
+
+  if (body.action === 'admin-list') {
+    const raw = typeof body.path === 'string' ? body.path : '';
+    if (!raw) {
+      return ok({
+        path: null,
+        entries: ROOTS.map(name => ({ name, type: 'dir', path: name })),
+      });
+    }
+    const path = cleanPath(raw);
+    if (!path) return fail('Caminho inválido.');
+    const listing = await callAgent<AgentListing>(secret, 'list', '/api/list', path);
+    return ok({
+      path,
+      entries: listing.entries
+        .filter(entry => entry.type === 'dir')
+        .map(entry => ({ name: entry.name, type: 'dir', path: `${path}/${entry.name}` })),
+      truncated: listing.truncated,
+    });
+  }
+
+  // admin-mkdir: sempre dentro de uma raiz (não cria raízes novas em D:\\Shares)
+  const path = cleanPath(body.path);
+  if (!path || !parentPath(path)) return fail('Escolha primeiro a pasta onde a quer criar.');
+  const result = await callAgent<{ created: boolean }>(secret, 'mkdir', '/api/mkdir', path);
+  return ok({ path, created: result.created });
 };
 
 /** Nomes do que já existe numa pasta (para não substituir nada). */
@@ -184,6 +243,14 @@ serve(async (req: Request) => {
     return fail('O editor de documentos ainda não está configurado.');
 
   const body = (await req.json().catch(() => ({}))) as CompanyFilesRequest;
+  if (body.action === 'admin-list' || body.action === 'admin-mkdir') {
+    try {
+      return await adminAction(db, userId, body, agentSecret);
+    } catch (err) {
+      if (err instanceof FilesError) return fail(err.message);
+      throw err;
+    }
+  }
   const { data: employees, error } = await db
     .from('employees')
     .select('name, folder_assignments(path, label, permission)')

@@ -210,8 +210,9 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
         title="Desligar esta caixa?"
         description="O Realize deixa de ter acesso a esta caixa. Os emails continuam no seu fornecedor."
         confirmLabel="Desligar"
-        onConfirm={async () => {
-          await onDisconnect(account);
+        onConfirm={() => {
+          // Fecha logo: a caixa sai da lista na hora e o servidor confirma em fundo.
+          void onDisconnect(account);
           onClose();
         }}
         onClose={() => setConfirm(false)}

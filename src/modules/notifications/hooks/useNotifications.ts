@@ -45,8 +45,11 @@ export const useNotifications = () => {
           filter: `user_id=eq.${user.userId}`,
         },
         payload => {
+          const row = payload.new as NotificationRow;
           qc.invalidateQueries({ queryKey: KEY });
-          toast({ title: (payload.new as NotificationRow).title });
+          // Email novo: a lista do Webmail e os "por ler" atualizam-se já (sem sair e entrar).
+          if (row.kind === 'mail') qc.invalidateQueries({ queryKey: ['mail'] });
+          toast({ title: row.title });
         }
       )
       // Marcadas como lidas noutro sítio: atualiza o contador (sem aviso).

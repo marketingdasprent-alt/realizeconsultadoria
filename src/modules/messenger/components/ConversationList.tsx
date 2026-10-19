@@ -3,6 +3,7 @@ import { matchesText } from '@/lib/text';
 import { Link } from 'react-router-dom';
 import { MessageSquarePlus, Search, Sparkles, SquarePen } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { PushPrompt } from '@/modules/workspace/components/PushPrompt';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { FILTERS } from '../lib/format';
 import type { ConversationFilter, ConversationSummary } from '../types';
@@ -71,6 +72,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
             className="w-full bg-transparent text-sm text-rz-ink outline-none placeholder:text-rz-muted"
           />
         </label>
+        <PushPrompt />
         <div className="scrollbar-hide -mx-4 flex gap-2 overflow-x-auto px-4">
           <button
             type="button"

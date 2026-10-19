@@ -5,8 +5,8 @@ import { useWorkspace } from '../context/workspaceContext';
 import { disablePush, enablePush, pushState, type PushState } from '../services/pushService';
 
 const HINTS: Record<PushState, string> = {
-  on: 'Ativas neste dispositivo. Recebe as mensagens novas, avisos de ponto e lembretes, mesmo com a app fechada (as conversas silenciadas não avisam).',
-  off: 'Receba os avisos (ex.: "Já registou a entrada?") mesmo com a app fechada.',
+  on: 'Ativas neste dispositivo. Recebe as mensagens e os emails novos, avisos de ponto e lembretes, mesmo com a app fechada (as conversas silenciadas não avisam).',
+  off: 'Receba as mensagens, os emails novos e os avisos (ex.: "Já registou a entrada?") mesmo com a app fechada.',
   denied:
     'Bloqueou as notificações neste browser. Para ativar, permita-as nas definições do site (cadeado na barra de endereço).',
   'ios-install':
@@ -31,8 +31,12 @@ export const PushCard: React.FC = () => {
       const next = state === 'on' ? await disablePush() : await enablePush(user.userId);
       setState(next);
       if (next === 'on') toast({ title: 'Notificações ativas neste dispositivo' });
-    } catch {
-      toast({ title: 'Não foi possível ativar as notificações', variant: 'destructive' });
+    } catch (error: unknown) {
+      toast({
+        title: 'Não foi possível ativar as notificações',
+        description: error instanceof Error ? error.message : undefined,
+        variant: 'destructive',
+      });
     } finally {
       setBusy(false);
     }

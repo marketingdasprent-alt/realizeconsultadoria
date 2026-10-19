@@ -29,6 +29,9 @@ export default defineConfig(({ mode }) => ({
         display: 'standalone',
         orientation: 'portrait',
         lang: 'pt',
+        // App do colaborador. O do admin (/admin) tem o seu manifest em
+        // public/manifest-admin.webmanifest; src/lib/app-manifest.ts escolhe pelo endereço.
+        id: '/colaborador',
         start_url: '/colaborador',
         scope: '/',
         categories: ['business', 'productivity'],

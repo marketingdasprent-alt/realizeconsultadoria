@@ -3,6 +3,10 @@ import App from './App.tsx';
 import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
+import { applyAppManifest } from './lib/app-manifest';
+
+// App do admin ou do colaborador, antes de o browser ler o manifest para instalar.
+applyAppManifest(window.location.pathname);
 
 // Register service worker with auto-update
 registerSW({

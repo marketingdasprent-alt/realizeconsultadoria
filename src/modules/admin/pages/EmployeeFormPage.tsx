@@ -10,6 +10,7 @@ import EmployeeGeneralTab, { type EmployeeRecord } from '../components/employee/
 import EmployeeVacationTab from '../components/employee/EmployeeVacationTab';
 import EmployeeDocumentsTab from '../components/employee/EmployeeDocumentsTab';
 import EmployeeAttachmentsTab from '../components/employee/EmployeeAttachmentsTab';
+import EmployeeFoldersTab from '../components/employee/EmployeeFoldersTab';
 import EmployeePayslipsTab from '../components/employee/EmployeePayslipsTab';
 import EmployeeFinanceHistoryTab from '../components/employee/EmployeeFinanceHistoryTab';
 import { EmployeeProfileHeader } from '../components/employee/EmployeeProfileHeader';
@@ -139,6 +140,7 @@ const EmployeeFormPage = () => {
             {canEdit && <TabsTrigger value="recibos">Recibos</TabsTrigger>}
             {canEdit && <TabsTrigger value="financeiro">Financeiro</TabsTrigger>}
             {canEdit && <TabsTrigger value="anexos">Anexos</TabsTrigger>}
+            {canEdit && <TabsTrigger value="pastas">Pastas</TabsTrigger>}
           </TabsList>
         )}
 
@@ -170,6 +172,9 @@ const EmployeeFormPage = () => {
             </TabsContent>
             <TabsContent value="anexos" className="mt-0">
               <EmployeeAttachmentsTab employeeId={employee.id} />
+            </TabsContent>
+            <TabsContent value="pastas" className="mt-0">
+              <EmployeeFoldersTab employeeId={employee.id} />
             </TabsContent>
           </>
         )}

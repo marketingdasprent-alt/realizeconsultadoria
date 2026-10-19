@@ -19,8 +19,13 @@ const APPS: Record<AppKind, { manifest: string; title: string; icon: string; the
   },
 };
 
-export const appKindFor = (pathname: string): AppKind =>
-  pathname === '/admin' || pathname.startsWith('/admin/') ? 'admin' : 'colaborador';
+/** O endereço próprio do admin (admin.realizeconsultadoria.pt): aí tudo é o app do admin. */
+export const isAdminHost = (hostname: string): boolean => hostname.startsWith('admin.');
+
+export const appKindFor = (pathname: string, hostname = ''): AppKind =>
+  isAdminHost(hostname) || pathname === '/admin' || pathname.startsWith('/admin/')
+    ? 'admin'
+    : 'colaborador';
 
 const setAttribute = (selector: string, attribute: string, value: string) => {
   const element = document.querySelector(selector);
@@ -28,8 +33,8 @@ const setAttribute = (selector: string, attribute: string, value: string) => {
 };
 
 /** Manifest, ícone do iPhone, nome e cor do app a que pertence este endereço. */
-export const applyAppManifest = (pathname: string): void => {
-  const app = APPS[appKindFor(pathname)];
+export const applyAppManifest = (pathname: string, hostname = window.location.hostname): void => {
+  const app = APPS[appKindFor(pathname, hostname)];
   setAttribute('link[rel="manifest"]', 'href', app.manifest);
   setAttribute('link[rel="apple-touch-icon"]', 'href', app.icon);
   setAttribute('meta[name="apple-mobile-web-app-title"]', 'content', app.title);

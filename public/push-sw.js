@@ -6,7 +6,7 @@ self.addEventListener('push', event => {
   } catch {
     data = { title: 'Realize', body: event.data ? event.data.text() : '' };
   }
-  event.waitUntil(
+  const show = () =>
     self.registration.showNotification(data.title || 'Realize', {
       body: data.body || '',
       icon: '/pwa-192x192.png',
@@ -14,6 +14,18 @@ self.addEventListener('push', event => {
       tag: data.tag || undefined,
       renotify: !!data.tag,
       data: { url: data.url || '/colaborador' },
+    });
+  // Mensagem de uma conversa que a pessoa tem aberta e à frente: não precisa de aviso.
+  if (!data.conversationId) return event.waitUntil(show());
+  event.waitUntil(
+    self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
+      const reading = clients.some(
+        client =>
+          client.focused &&
+          client.visibilityState === 'visible' &&
+          client.url.includes('c=' + data.conversationId)
+      );
+      return reading ? undefined : show();
     })
   );
 });

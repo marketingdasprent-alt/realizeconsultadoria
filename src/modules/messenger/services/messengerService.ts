@@ -15,13 +15,9 @@ export type DirectoryRow = Database['public']['Functions']['chat_directory']['Re
 const BUCKET = 'chat-files';
 export const PAGE_SIZE = 60;
 
-/** Coluna de chat_members que guarda cada opção da conversa. */
-const flagPatch = (flag: MemberFlag, value: boolean): Tables['chat_members']['Update'] =>
-  flag === 'pinned'
-    ? { is_pinned: value }
-    : flag === 'muted'
-      ? { is_muted: value }
-      : { is_archived: value };
+/** Coluna das preferências (só do próprio) que guarda cada opção da conversa. */
+const flagColumn = (flag: MemberFlag) =>
+  flag === 'pinned' ? 'is_pinned' : flag === 'muted' ? 'is_muted' : 'is_archived';
 
 // URLs assinados guardados até perto de expirarem (1 h).
 const signedUrls = new Map<string, { url: string; expires: number }>();
@@ -107,6 +103,12 @@ export const messengerService = {
     return { error };
   },
 
+  /** Apaga o ficheiro de uma mensagem eliminada (só quem o enviou pode). */
+  deleteFile: async (path: string) => {
+    const { error } = await supabase.storage.from(BUCKET).remove([path]);
+    return { error };
+  },
+
   /** Eliminar apaga o conteúdo na BD (fica "Mensagem eliminada"). */
   deleteMessage: async (messageId: string) => {
     const { error } = await supabase
@@ -134,11 +136,20 @@ export const messengerService = {
     return { error };
   },
 
+  /**
+   * Fixar, silenciar ou arquivar: preferências só do próprio (os outros membros não as veem).
+   * O upsert cria a linha na primeira vez e depois só muda a coluna enviada.
+   */
   setFlag: async (conversationId: string, userId: string, flag: MemberFlag, value: boolean) => {
+    const row: Database['public']['Tables']['chat_member_settings']['Insert'] = {
+      conversation_id: conversationId,
+      user_id: userId,
+      updated_at: new Date().toISOString(),
+    };
+    row[flagColumn(flag)] = value;
     const { error } = await supabase
-      .from('chat_members')
-      .update(flagPatch(flag, value))
-      .match({ conversation_id: conversationId, user_id: userId });
+      .from('chat_member_settings')
+      .upsert(row, { onConflict: 'conversation_id,user_id' });
     return { error };
   },
 

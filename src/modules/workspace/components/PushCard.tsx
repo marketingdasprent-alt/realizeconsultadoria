@@ -5,7 +5,7 @@ import { useWorkspace } from '../context/workspaceContext';
 import { disablePush, enablePush, pushState, type PushState } from '../services/pushService';
 
 const HINTS: Record<PushState, string> = {
-  on: 'Ativas neste dispositivo. Recebe avisos de ponto, mensagens importantes e lembretes, mesmo com a app fechada.',
+  on: 'Ativas neste dispositivo. Recebe as mensagens novas, avisos de ponto e lembretes, mesmo com a app fechada (as conversas silenciadas não avisam).',
   off: 'Receba os avisos (ex.: "Já registou a entrada?") mesmo com a app fechada.',
   denied:
     'Bloqueou as notificações neste browser. Para ativar, permita-as nas definições do site (cadeado na barra de endereço).',

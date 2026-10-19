@@ -47,10 +47,14 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
     setText('');
   };
 
-  const pickFile = (file: File | undefined) => {
-    if (!file) return;
-    onSend({ file, text: text.trim() || undefined, replyToId: replyTo?.id });
-    setText('');
+  // Vários ficheiros de uma vez: o texto e a resposta vão só com o primeiro.
+  const pickFiles = (files: File[]) => {
+    files.forEach((file, index) =>
+      onSend(
+        index === 0 ? { file, text: text.trim() || undefined, replyToId: replyTo?.id } : { file }
+      )
+    );
+    if (files.length) setText('');
   };
 
   const startRecording = async () => {
@@ -112,7 +116,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
                 accept={ACCEPT_ATTRIBUTE}
                 className="hidden"
                 onChange={event => {
-                  pickFile(event.target.files?.[0]);
+                  pickFiles(Array.from(event.target.files ?? []).slice(0, 1));
                   event.target.value = '';
                 }}
               />
@@ -128,7 +132,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
                   const files = filesFromPaste(event);
                   if (!files.length || disabled || editing) return;
                   event.preventDefault();
-                  files.forEach(pickFile);
+                  pickFiles(files);
                 }}
                 onKeyDown={event => {
                   if (event.key === 'Enter' && !event.shiftKey) {

@@ -74,6 +74,8 @@ export interface ChatMessage {
   read?: boolean;
   /** A enviar (ainda sem confirmação do servidor). */
   pending?: boolean;
+  /** Não foi enviada (sem ligação…): fica na conversa para tentar outra vez ou descartar. */
+  failed?: boolean;
   /** Pré-visualização local de um ficheiro a enviar. */
   localUrl?: string;
 }
@@ -120,4 +122,8 @@ export interface MessengerApi {
   getFileUrl: (path: string) => Promise<string | null>;
   /** Reenvia uma mensagem (texto, imagem, ficheiro ou voz) para outras conversas. */
   forwardMessage: (message: ChatMessage, conversationIds: string[]) => Promise<void>;
+  /** Mensagem que falhou: tentar enviar outra vez. */
+  retryMessage: (messageId: string) => Promise<void>;
+  /** Mensagem que falhou: tirá-la da conversa. */
+  discardMessage: (messageId: string) => void;
 }

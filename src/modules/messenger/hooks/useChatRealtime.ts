@@ -2,10 +2,18 @@ import { useEffect, useRef } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import type { MessageRow } from '../services/messengerService';
 
+export interface MembershipChange {
+  conversationId: string;
+  userId: string | null;
+  event: 'INSERT' | 'UPDATE' | 'DELETE';
+}
+
 interface ChatRealtimeHandlers {
   onMessage: (row: MessageRow, event: 'INSERT' | 'UPDATE') => void;
-  /** Participações mudaram (conversa nova, lida pelo colega, arquivada…). */
-  onMembership: (conversationId: string) => void;
+  /** Participações mudaram (conversa nova, saída, lida por alguém). */
+  onMembership: (change: MembershipChange) => void;
+  /** As minhas preferências (fixar, silenciar, arquivar) mudaram noutro dispositivo. */
+  onSettings: () => void;
 }
 
 /**
@@ -27,9 +35,27 @@ export const useChatRealtime = (userId: string | null, handlers: ChatRealtimeHan
         handlersRef.current.onMessage(p.new as MessageRow, 'UPDATE')
       )
       .on('postgres_changes', { event: '*', schema: 'public', table: 'chat_members' }, p => {
-        const row = (p.new ?? p.old) as { conversation_id?: string };
-        if (row?.conversation_id) handlersRef.current.onMembership(row.conversation_id);
+        const row = (p.eventType === 'DELETE' ? p.old : p.new) as {
+          conversation_id?: string;
+          user_id?: string;
+        };
+        if (!row?.conversation_id) return;
+        handlersRef.current.onMembership({
+          conversationId: row.conversation_id,
+          userId: row.user_id ?? null,
+          event: p.eventType,
+        });
       })
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'chat_member_settings',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => handlersRef.current.onSettings()
+      )
       .subscribe();
     return () => {
       supabase.removeChannel(channel);

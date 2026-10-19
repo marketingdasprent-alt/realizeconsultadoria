@@ -1,9 +1,9 @@
 // Ações do Messenger com servidor real: enviar (texto, ficheiro, áudio), editar,
 // eliminar, reagir, fixar/silenciar/arquivar e começar conversas.
-import React, { useCallback } from 'react';
+import React, { useCallback, useRef } from 'react';
 import { useQueryClient, type InfiniteData } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
-import { baseMime, extensionFor, validateFile } from '../lib/files';
+import { extensionFor, normalizeMime, validateFile } from '../lib/files';
 import {
   messengerService,
   type ConversationRow,
@@ -36,6 +36,8 @@ type Actions = Pick<
   | 'renameGroup'
   | 'getFileUrl'
   | 'forwardMessage'
+  | 'retryMessage'
+  | 'discardMessage'
 >;
 
 const fail = (description: string): void => {
@@ -52,13 +54,16 @@ export const useMessengerActions = ({
   refreshList,
 }: ActionsInput): Actions => {
   const qc = useQueryClient();
+  // Envios que falharam: o que se pediu, para "Tentar outra vez" (por id temporário).
+  const failedRef = useRef(new Map<string, { input: SendInput; conversationId: string }>());
 
   const send = useCallback(
-    async (input: SendInput) => {
-      const conversationId = activeId;
+    async (input: SendInput, retryOf?: { tempId: string; conversationId: string }) => {
+      const conversationId = retryOf?.conversationId ?? activeId;
       if (!conversationId) return;
       const blob = input.audio?.blob ?? input.file;
-      const mime = blob ? baseMime(blob.type || 'application/octet-stream') : '';
+      // ZIP do Windows, ficheiros sem tipo…: o tipo é normalizado antes de validar e enviar.
+      const mime = blob ? normalizeMime(blob.type, input.file?.name ?? '') : '';
       if (blob) {
         const problem = validateFile(blob.size, mime);
         if (problem) return fail(problem);
@@ -71,10 +76,10 @@ export const useMessengerActions = ({
             ? 'image'
             : 'file'
           : 'text';
-      const tempId = `tmp-${crypto.randomUUID()}`;
+      const tempId = retryOf?.tempId ?? `tmp-${crypto.randomUUID()}`;
       const localUrl = blob ? URL.createObjectURL(blob) : undefined;
       setPending(list => [
-        ...list,
+        ...list.filter(m => m.id !== tempId),
         {
           id: tempId,
           conversationId,
@@ -114,14 +119,36 @@ export const useMessengerActions = ({
           upsertThreadRow(cache, data)
         );
         refreshList();
-      } catch {
-        fail('A mensagem não foi enviada. Verifique a ligação e tente outra vez.');
-      } finally {
+        failedRef.current.delete(tempId);
         setPending(list => list.filter(m => m.id !== tempId));
         if (localUrl) setTimeout(() => URL.revokeObjectURL(localUrl), 60_000);
+      } catch {
+        // A mensagem fica na conversa marcada como não enviada (o texto não se perde).
+        failedRef.current.set(tempId, { input, conversationId });
+        setPending(list =>
+          list.map(m => (m.id === tempId ? { ...m, pending: false, failed: true } : m))
+        );
+        fail('A mensagem não foi enviada. Toque em "Tentar outra vez".');
       }
     },
     [activeId, user.userId, setPending, qc, refreshList]
+  );
+
+  const retryMessage = useCallback(
+    async (messageId: string) => {
+      const failed = failedRef.current.get(messageId);
+      if (!failed) return;
+      await send(failed.input, { tempId: messageId, conversationId: failed.conversationId });
+    },
+    [send]
+  );
+
+  const discardMessage = useCallback(
+    (messageId: string) => {
+      failedRef.current.delete(messageId);
+      setPending(list => list.filter(m => m.id !== messageId));
+    },
+    [setPending]
   );
 
   const reloadThread = useCallback(
@@ -141,12 +168,16 @@ export const useMessengerActions = ({
 
   const deleteMessage = useCallback(
     async (messageId: string) => {
+      // O ficheiro também sai do armazenamento (deixa de estar acessível a quem tinha o link).
+      const rows = qc.getQueryData<InfiniteData<MessageRow[]>>(CHAT_KEYS.thread(activeId));
+      const path = rows?.pages.flat().find(row => row.id === messageId)?.attachment_path;
       const { error } = await messengerService.deleteMessage(messageId);
       if (error) return fail('A mensagem não foi eliminada.');
+      if (path) await messengerService.deleteFile(path);
       reloadThread();
       refreshList();
     },
-    [reloadThread, refreshList]
+    [qc, activeId, reloadThread, refreshList]
   );
 
   const toggleReaction = useCallback(
@@ -313,5 +344,7 @@ export const useMessengerActions = ({
     renameGroup,
     getFileUrl,
     forwardMessage,
+    retryMessage,
+    discardMessage,
   };
 };

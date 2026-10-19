@@ -107,12 +107,15 @@ export const useLiveMessenger = (user: LiveMessengerUser): MessengerApi => {
       }
       refreshList();
     },
-    onMembership: conversationId => {
+    onMembership: ({ conversationId, userId, event }) => {
       if (conversationId === activeId) {
         qc.invalidateQueries({ queryKey: CHAT_KEYS.members(conversationId) });
       }
+      // Um colega a ler (UPDATE de outro membro) só mexe nos vistos da conversa aberta.
+      if (event === 'UPDATE' && userId && userId !== user.userId) return;
       refreshList();
     },
+    onSettings: refreshList,
   });
 
   const channel = useConversationChannel(activeId, user.userId, () =>
@@ -179,7 +182,8 @@ export const useLiveMessenger = (user: LiveMessengerUser): MessengerApi => {
     conversations,
     directory: (directoryQ.data ?? []).map(toPerson).filter(p => p.userId !== user.userId),
     isOnline: (userId: string) => online.has(userId),
-    unreadTotal: conversations.reduce((sum, c) => sum + (c.muted ? 0 : c.unread), 0),
+    // Menu: mensagens por ler, sem as silenciadas nem as arquivadas.
+    unreadTotal: conversations.reduce((sum, c) => sum + (c.muted || c.archived ? 0 : c.unread), 0),
     activeId,
     setActive,
     messages,

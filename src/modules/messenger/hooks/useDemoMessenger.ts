@@ -197,5 +197,8 @@ export const useDemoMessenger = (): MessengerApi => {
         description: `Pré-visualização: ${conversationIds.length} conversa(s).`,
       });
     },
+    // Na pré-visualização os envios nunca falham.
+    retryMessage: async () => undefined,
+    discardMessage: () => undefined,
   };
 };

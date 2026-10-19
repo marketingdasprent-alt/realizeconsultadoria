@@ -23,13 +23,8 @@ export const searchService = {
   search: async (term: string, employeeId: string) => {
     const pattern = likePattern(term);
     const [messages, tasks, events, documents, tickets, posts] = await Promise.all([
-      supabase
-        .from('chat_messages')
-        .select('id, conversation_id, sender_id, body, created_at')
-        .ilike('body', pattern)
-        .is('deleted_at', null)
-        .order('created_at', { ascending: false })
-        .limit(PER_GROUP),
+      // Mensagens: sem distinguir acentos nem maiúsculas ("reuniao" encontra "Reunião").
+      supabase.rpc('chat_search_messages', { _term: term.trim(), _limit: PER_GROUP }),
       supabase
         .from('tasks')
         .select('id, title, status, due_at')

@@ -1,7 +1,8 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { Ban, CheckCheck, Clock3 } from 'lucide-react';
+import { AlertCircle, Ban, CheckCheck, Clock3, RotateCw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useOptionalMessenger } from '../context/useMessengerApi';
 import type { ChatMessage } from '../types';
 import { AudioAttachment } from './attachments/AudioAttachment';
 import { FileAttachment } from './attachments/FileAttachment';
@@ -43,6 +44,30 @@ const Body: React.FC<{ message: ChatMessage }> = ({ message }) => {
   );
 };
 
+/** Mensagem que não foi enviada: o texto fica e pode tentar-se outra vez ou descartar. */
+const FailedNotice: React.FC<{ messageId: string }> = ({ messageId }) => {
+  const api = useOptionalMessenger();
+  return (
+    <span className="mt-1 flex items-center gap-2 text-[12px] font-semibold text-red-600">
+      <AlertCircle className="h-3.5 w-3.5" /> Não enviada
+      <button
+        type="button"
+        onClick={() => api?.retryMessage(messageId)}
+        className="inline-flex items-center gap-1 rounded-full bg-red-50 px-2 py-0.5 hover:bg-red-100"
+      >
+        <RotateCw className="h-3 w-3" /> Tentar outra vez
+      </button>
+      <button
+        type="button"
+        onClick={() => api?.discardMessage(messageId)}
+        className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-rz-muted hover:bg-rz-canvas"
+      >
+        <X className="h-3 w-3" /> Descartar
+      </button>
+    </span>
+  );
+};
+
 /** Mensagem: texto ou anexo, resposta citada, hora, leitura, reações e ações. */
 export const MessageBubble: React.FC<MessageBubbleProps> = ({
   message,
@@ -53,7 +78,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   ...handlers
 }) => {
   const mine = message.isMine;
-  const canAct = !message.deleted && !message.pending;
+  const canAct = !message.deleted && !message.pending && !message.failed;
   return (
     <div className={cn('group flex flex-col', mine ? 'items-end' : 'items-start')}>
       {showAuthor && !mine && (
@@ -70,6 +95,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               ? 'rounded-br-md bg-gradient-to-br from-violet-500 to-indigo-600 text-white'
               : 'rounded-bl-md bg-white text-rz-ink ring-1 ring-rz-line',
             message.pending && 'opacity-70',
+            message.failed && 'opacity-80 ring-2 ring-red-300',
             isMatch && 'ring-2 ring-amber-400'
           )}
         >
@@ -103,6 +129,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
           </div>
         )}
       </div>
+      {message.failed && <FailedNotice messageId={message.id} />}
       {!message.deleted && message.reactions && message.reactions.length > 0 && (
         <div className={cn('-mt-1.5 flex flex-wrap gap-1', mine ? 'mr-3' : 'ml-3')}>
           {message.reactions.map(reaction => (

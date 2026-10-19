@@ -32,6 +32,50 @@ export const ACCEPT_ATTRIBUTE = [...ALLOWED_MIME].filter(m => !m.startsWith('aud
 /** "audio/webm;codecs=opus" → "audio/webm". */
 export const baseMime = (mime: string): string => mime.split(';')[0].trim().toLowerCase();
 
+// Nomes alternativos que alguns sistemas dão aos mesmos formatos (ex.: o ZIP do Windows).
+const MIME_ALIASES: Record<string, string> = {
+  'application/x-zip-compressed': 'application/zip',
+  'application/x-zip': 'application/zip',
+  'image/jpg': 'image/jpeg',
+  'audio/x-wav': 'audio/wav',
+  'audio/wave': 'audio/wav',
+  'audio/x-m4a': 'audio/mp4',
+  'audio/mp3': 'audio/mpeg',
+};
+
+// Tipo pela extensão, para ficheiros que chegam sem tipo (comum no Windows).
+const BY_EXTENSION: Record<string, string> = {
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  png: 'image/png',
+  webp: 'image/webp',
+  gif: 'image/gif',
+  heic: 'image/heic',
+  pdf: 'application/pdf',
+  txt: 'text/plain',
+  csv: 'text/csv',
+  zip: 'application/zip',
+  doc: 'application/msword',
+  docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel',
+  xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  ppt: 'application/vnd.ms-powerpoint',
+  pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  mp3: 'audio/mpeg',
+  m4a: 'audio/mp4',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  webm: 'audio/webm',
+};
+
+/** Tipo do ficheiro já normalizado (alias e, sem tipo, pela extensão do nome). */
+export const normalizeMime = (mime: string, fileName = ''): string => {
+  const base = baseMime(mime || '');
+  if (base && base !== 'application/octet-stream') return MIME_ALIASES[base] ?? base;
+  const extension = fileName.split('.').pop()?.toLowerCase() ?? '';
+  return BY_EXTENSION[extension] ?? (base || 'application/octet-stream');
+};
+
 export const extensionFor = (mime: string): string =>
   ({ 'audio/webm': 'webm', 'audio/ogg': 'ogg', 'audio/mp4': 'm4a', 'audio/mpeg': 'mp3' })[
     baseMime(mime)

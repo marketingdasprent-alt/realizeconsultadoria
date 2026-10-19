@@ -21,6 +21,8 @@ export interface MailAccount {
   color: MailAccountColor;
   /** Partilhada pelo admin (email departamental dos Acessos): só o admin a gere. */
   shared: boolean;
+  /** Avisar (notificação) dos emails novos desta caixa; nas partilhadas é de cada pessoa. */
+  notify: boolean;
 }
 
 export interface MailAddress {

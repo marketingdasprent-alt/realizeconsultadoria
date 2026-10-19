@@ -1806,6 +1806,7 @@ export type Database = {
           account_id: string;
           color: string | null;
           created_at: string;
+          notify: boolean;
           signature: string | null;
           user_id: string;
         };
@@ -1813,6 +1814,7 @@ export type Database = {
           account_id: string;
           color?: string | null;
           created_at?: string;
+          notify?: boolean;
           signature?: string | null;
           user_id: string;
         };
@@ -1820,6 +1822,7 @@ export type Database = {
           account_id?: string;
           color?: string | null;
           created_at?: string;
+          notify?: boolean;
           signature?: string | null;
           user_id?: string;
         };
@@ -1877,6 +1880,9 @@ export type Database = {
           is_default: boolean;
           last_error: string | null;
           last_sync_at: string | null;
+          notified_until: string | null;
+          notify: boolean;
+          polled_at: string | null;
           provider: string;
           secret_id: string | null;
           signature: string | null;
@@ -1900,6 +1906,9 @@ export type Database = {
           is_default?: boolean;
           last_error?: string | null;
           last_sync_at?: string | null;
+          notified_until?: string | null;
+          notify?: boolean;
+          polled_at?: string | null;
           provider: string;
           secret_id?: string | null;
           signature?: string | null;
@@ -1923,6 +1932,9 @@ export type Database = {
           is_default?: boolean;
           last_error?: string | null;
           last_sync_at?: string | null;
+          notified_until?: string | null;
+          notify?: boolean;
+          polled_at?: string | null;
           provider?: string;
           secret_id?: string | null;
           signature?: string | null;
@@ -3480,6 +3492,7 @@ export type Database = {
         Args: { p_account: string; p_user: string };
         Returns: boolean;
       };
+      mail_request_share: { Args: { p_access: string }; Returns: undefined };
       mail_secret_get: { Args: { p_account: string }; Returns: string };
       mail_secret_set: {
         Args: { p_account: string; p_secret: string };

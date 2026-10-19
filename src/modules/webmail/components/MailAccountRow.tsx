@@ -1,5 +1,5 @@
 import React from 'react';
-import { AlertTriangle, GripVertical, Settings2, Users } from 'lucide-react';
+import { AlertTriangle, BellOff, GripVertical, Settings2, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ACCOUNT_DOTS, SIDEBAR_ROW } from '../lib/mailFormat';
 import type { MailAccount } from '../types';
@@ -69,6 +69,9 @@ export const MailAccountRow: React.FC<MailAccountRowProps> = ({
     >
       <span className={cn('h-2.5 w-2.5 shrink-0 rounded-full', ACCOUNT_DOTS[account.color])} />
       <span className="min-w-0 flex-1 truncate">{account.email}</span>
+      {!account.notify && (
+        <BellOff className="h-3.5 w-3.5 shrink-0 text-rz-muted" aria-label="Sem avisos" />
+      )}
       {account.shared && (
         <Users
           className="h-3.5 w-3.5 shrink-0 text-rz-muted"

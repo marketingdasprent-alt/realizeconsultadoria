@@ -147,12 +147,18 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
     async list({ folder, query, pageToken, limit }) {
       let url: string;
       let postFilterFlagged = false;
+      let postFilterUnread = false;
       if (pageToken) {
         if (!isAllowedGraphNextLink(pageToken)) throw mailError('bad_request');
         url = pageToken;
         postFilterFlagged = folder === 'starred' && !!query;
+        postFilterUnread = folder === 'unread' && !!query;
       } else {
-        ({ url, postFilterFlagged } = buildGraphListUrl(folder, { query, limit, root: ME }));
+        ({ url, postFilterFlagged, postFilterUnread } = buildGraphListUrl(folder, {
+          query,
+          limit,
+          root: ME,
+        }));
       }
 
       const res = await session.fetch(url);
@@ -165,6 +171,7 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
       const data = (await res.json()) as { value?: GraphMessage[]; '@odata.nextLink'?: string };
       let messages = (data.value ?? []).map(parseGraphSummary);
       if (postFilterFlagged) messages = messages.filter(m => m.starred);
+      if (postFilterUnread) messages = messages.filter(m => m.unread);
       return { messages, next_page_token: data['@odata.nextLink'] ?? null };
     },
 

@@ -5,6 +5,7 @@ import type { ComposeDraft, MailAddress, MailFolder, MailMessage, MailSummary } 
 
 export const FOLDERS: { key: MailFolder; label: string }[] = [
   { key: 'inbox', label: 'Entrada' },
+  { key: 'unread', label: 'Não lidos' },
   { key: 'starred', label: 'Com estrela' },
   { key: 'sent', label: 'Enviados' },
   { key: 'drafts', label: 'Rascunhos' },

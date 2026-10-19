@@ -98,7 +98,7 @@ export const useMailChanges = (folder?: MailFolder) => {
   const { isPreview, user } = useWorkspace();
   const qc = useQueryClient();
   const bump = (mail: MailSummary, delta: number) => {
-    if (folder === 'inbox') bumpUnread(qc, mail.accountId, delta);
+    if (folder === 'inbox' || folder === 'unread') bumpUnread(qc, mail.accountId, delta);
   };
 
   return async (mails: MailSummary[], kind: MailChange): Promise<MailError[]> => {

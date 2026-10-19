@@ -1,7 +1,9 @@
 // Tipos partilhados do Webmail (edge functions mail-oauth / mail-api e testes Vitest).
 // Sem dependências de Deno/Node. As respostas para o browser usam snake_case.
 
-export type MailFolder = 'inbox' | 'sent' | 'drafts' | 'trash' | 'archive' | 'spam' | 'starred';
+/** 'unread' = os por ler da Entrada (como 'starred', é um filtro e não uma pasta). */
+export type MailFolder =
+  'inbox' | 'unread' | 'sent' | 'drafts' | 'trash' | 'archive' | 'spam' | 'starred';
 
 export type MailProviderKey =
   | 'gmail'

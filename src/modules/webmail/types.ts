@@ -2,7 +2,9 @@
 // falam com o Gmail, o Microsoft Graph ou o servidor IMAP; nada é guardado na BD.
 import type { MailProviderKey } from './lib/providers';
 
-export type MailFolder = 'inbox' | 'starred' | 'sent' | 'drafts' | 'archive' | 'spam' | 'trash';
+/** 'unread' = os por ler da Entrada (um filtro, como 'starred'). */
+export type MailFolder =
+  'inbox' | 'unread' | 'starred' | 'sent' | 'drafts' | 'archive' | 'spam' | 'trash';
 export type MailAccountColor = 'violet' | 'sky' | 'emerald' | 'amber' | 'rose' | 'slate';
 
 export interface MailAccount {

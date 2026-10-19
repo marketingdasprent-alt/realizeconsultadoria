@@ -4,9 +4,15 @@ import './index.css';
 import { registerSW } from 'virtual:pwa-register';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import { applyAppManifest } from './lib/app-manifest';
+import { reloadForNewVersion } from './lib/chunk-reload';
 
 // App do admin ou do colaborador, antes de o browser ler o manifest para instalar.
 applyAppManifest(window.location.pathname);
+
+// Ficheiro de uma versão anterior que já não existe (houve atualização): recarrega uma vez.
+window.addEventListener('vite:preloadError', event => {
+  if (reloadForNewVersion()) event.preventDefault();
+});
 
 // Register service worker with auto-update
 registerSW({

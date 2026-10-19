@@ -37,7 +37,8 @@ export const absenceRequestService = {
     const [absencesRes, holidaysRes, balanceRes] = await Promise.all([
       supabase
         .from('absences')
-        .select('*, absence_periods(*)')
+        // A contagem dos anexos vem no mesmo pedido (antes era um pedido a seguir a este).
+        .select('*, absence_periods(*), absence_documents(count)')
         .eq('employee_id', employeeId)
         .order('start_date', { ascending: false }),
       supabase
@@ -55,17 +56,17 @@ export const absenceRequestService = {
     const error = absencesRes.error ?? holidaysRes.error ?? balanceRes.error;
     if (error) return { data: null, error };
 
-    const rows = (absencesRes.data ?? []) as (AbsenceRow & { created_by_role?: string | null })[];
-    const ids = rows.map(a => a.id);
-    const docs = ids.length
-      ? await supabase.from('absence_documents').select('absence_id').in('absence_id', ids)
-      : { data: [] as { absence_id: string }[] };
-    const counts: Record<string, number> = {};
-    for (const doc of docs.data ?? []) counts[doc.absence_id] = (counts[doc.absence_id] ?? 0) + 1;
+    const rows = (absencesRes.data ?? []) as unknown as (AbsenceRow & {
+      created_by_role?: string | null;
+      absence_documents?: { count: number }[];
+    })[];
 
     const vacations = rows.filter(a => a.absence_type === 'vacation');
     const data: AbsencesData = {
-      absences: rows.map(a => ({ ...a, document_count: counts[a.id] ?? 0 })),
+      absences: rows.map(({ absence_documents, ...a }) => ({
+        ...a,
+        document_count: absence_documents?.[0]?.count ?? 0,
+      })),
       holidays: (holidaysRes.data ?? []) as Holiday[],
       balance: balanceRes.data,
       scheduledByEmployee: sumDays(

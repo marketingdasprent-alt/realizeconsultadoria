@@ -89,10 +89,16 @@ export const useMailAccounts = () => {
         setDemoMail(s => ({ ...s, accounts: s.accounts.filter(a => a.id !== id) }));
         return;
       }
-      const { error } = await mailService.disconnect(id);
-      if (error) return fail(error, 'A caixa não foi desligada.');
+      // Sai já da lista; o servidor desliga em fundo e, se falhar, a caixa volta.
+      const previous = qc.getQueryData<MailAccount[]>(MAIL_ACCOUNTS_KEY);
+      qc.setQueryData<MailAccount[]>(MAIL_ACCOUNTS_KEY, list => list?.filter(a => a.id !== id));
       toast({ title: 'Caixa de correio desligada' });
-      await refresh();
+      const { error } = await mailService.disconnect(id);
+      if (error) {
+        qc.setQueryData(MAIL_ACCOUNTS_KEY, previous);
+        return fail(error, 'A caixa não foi desligada.');
+      }
+      void refresh();
     },
 
     /** Abre a autorização do Google/Microsoft; volta a /email?mail=ligada. */

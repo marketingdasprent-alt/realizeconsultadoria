@@ -45,7 +45,9 @@ const WebmailPage: React.FC = () => {
   const accounts = mail.accounts;
   const actions = useMailActions(folder);
   const unread = useUnreadCounts(accounts);
-  const current = scope ?? (accounts.length > 1 ? 'all' : (accounts[0]?.id ?? 'all'));
+  // Caixa escolhida que deixou de existir (ex.: acabou de ser desligada): volta ao normal.
+  const chosen = scope === 'all' || accounts.some(a => a.id === scope) ? scope : null;
+  const current = chosen ?? (accounts.length > 1 ? 'all' : (accounts[0]?.id ?? 'all'));
   const box = useMailbox(accounts, current, folder, query);
   usePrefetchTop(box.messages);
   const selected = active

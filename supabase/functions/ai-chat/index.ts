@@ -41,12 +41,19 @@ const MAX_CONTENT = 8000;
 const PER_MINUTE = 12;
 const PER_DAY = 300;
 const MAX_ROUNDS = 4;
+/**
+ * Tempo total para responder. A função é cortada aos 150 s; acima disto devolve-se o que houver
+ * (ou um aviso), em vez de a pessoa ficar sem resposta nenhuma.
+ */
+const TIME_BUDGET_MS = 115_000;
+const SLOW = 'A IA está a demorar demasiado neste momento. Tente outra vez daqui a pouco.';
 
 // Só pedidos para FAZER algo (marcar, criar, lembrar, convidar) usam o modelo das ferramentas,
 // mais capaz mas lento no CPU. Perguntas ("quantos dias de férias tenho?", "o que tenho
 // amanhã?") vão para o modelo rápido, com os dados da pessoa já incluídos.
+// "Agenda" sozinha ("o que tenho na agenda?") é a agenda, não o verbo: vai para o modelo rápido.
 const ACTION_HINT =
-  /\b(marca|marcar|marque|agenda[r]?|agende|desmarca|lembra|lembrar|lembre|lembrete|convida|convidar|convide|cria|criar|crie|adiciona|adicionar|nova reuniao|nova tarefa)\b/;
+  /\b(marca|marcar|marque|agendar|agende|agenda (uma?|reuniao|evento|chamada)|desmarca|lembra|lembrar|lembre|lembrete|convida|convidar|convide|cria|criar|crie|adiciona|adicionar|nova reuniao|nova tarefa)\b/;
 
 type Role = 'user' | 'assistant';
 interface ChatMessage {
@@ -93,7 +100,8 @@ const callModel = async (
   model: string,
   apiKey: string | undefined,
   messages: ModelMessage[],
-  withTools: boolean
+  withTools: boolean,
+  timeoutMs = 90_000
 ): Promise<{ message?: ModelMessage; status: number }> => {
   const response = await fetchWithTimeout(
     `${baseUrl}/chat/completions`,
@@ -114,7 +122,7 @@ const callModel = async (
           : {}),
       }),
     },
-    90_000
+    timeoutMs
   );
   if (!response.ok) {
     console.error(
@@ -126,6 +134,48 @@ const callModel = async (
   }
   const body = (await response.json()) as { choices?: { message?: ModelMessage }[] };
   return { message: body.choices?.[0]?.message, status: 200 };
+};
+
+/**
+ * Verificação interna: o modelo da conversa e o das ferramentas respondem, e em quanto tempo?
+ * Só com o token do sistema (a base de dados chama-a por pg_net); não devolve segredos.
+ */
+const healthCheck = async (baseUrl: string, chatModel: string, toolsModel: string) => {
+  const apiKey = (Deno.env.get('AI_API_KEY') ?? Deno.env.get('OLLAMA_API_KEY'))?.trim();
+  const probe = async (model: string, withTools: boolean) => {
+    const started = Date.now();
+    try {
+      const { message, status } = await callModel(
+        baseUrl,
+        model,
+        apiKey,
+        [
+          { role: 'system', content: 'Responde em português de Portugal, numa frase.' },
+          { role: 'user', content: withTools ? 'O que tenho na agenda esta semana?' : 'Diz olá.' },
+        ],
+        withTools
+      );
+      return {
+        model,
+        withTools,
+        status,
+        ms: Date.now() - started,
+        toolCalls: Array.isArray(message?.tool_calls) ? message.tool_calls.length : 0,
+        reply: typeof message?.content === 'string' ? message.content.slice(0, 80) : null,
+      };
+    } catch (error) {
+      return {
+        model,
+        withTools,
+        ms: Date.now() - started,
+        error: error instanceof Error ? error.message : String(error),
+      };
+    }
+  };
+  return {
+    ok: true,
+    probes: await Promise.all([probe(chatModel, false), probe(toolsModel, true)]),
+  };
 };
 
 const parseArgs = (raw: unknown): Record<string, unknown> => {
@@ -147,6 +197,13 @@ serve(async (req: Request) => {
   const toolsModel = Deno.env.get('AI_TOOLS_MODEL') || chatModel;
   if (!baseUrl || !chatModel || !toolsModel)
     return fail('not_configured', 'A IA ainda não está configurada.');
+
+  if (req.headers.get('x-system-token')) {
+    const systemToken = Deno.env.get('MAIL_SYSTEM_TOKEN');
+    if (!systemToken || req.headers.get('x-system-token') !== systemToken)
+      return json({ ok: false }, 401);
+    return json(await healthCheck(baseUrl, chatModel, toolsModel));
+  }
 
   const admin = serviceClient();
   const userId = await authenticatedUserId(req, admin);
@@ -237,12 +294,21 @@ serve(async (req: Request) => {
     ...history,
   ];
   const proposals: Proposal[] = [];
-  const deadline = Date.now() + 100_000;
+  const deadline = Date.now() + TIME_BUDGET_MS;
   let reply = '';
 
   try {
     for (let round = 0; round < MAX_ROUNDS; round += 1) {
-      const { message, status } = await callModel(baseUrl, model, apiKey, messages, withTools);
+      const remaining = deadline - Date.now();
+      if (remaining < 5_000) break;
+      const { message, status } = await callModel(
+        baseUrl,
+        model,
+        apiKey,
+        messages,
+        withTools,
+        Math.min(90_000, remaining)
+      );
       if (status === 401 || status === 403)
         return fail('not_configured', 'A chave da IA não é válida. Fale com a administração.');
       if (status === 404)
@@ -273,12 +339,15 @@ serve(async (req: Request) => {
           content: result.content,
         });
       }
-      if (Date.now() > deadline) break;
     }
   } catch (error) {
-    console.error('ai-chat: sem ligação ao modelo', error instanceof Error ? error.message : error);
-    return fail('unavailable', UNAVAILABLE);
+    const timedOut = error instanceof DOMException && error.name === 'AbortError';
+    console.error('ai-chat: sem resposta do modelo', timedOut ? 'tempo esgotado' : error);
+    // Se já havia algo preparado, mostra-se; senão, diz-se porquê.
+    if (!proposals.length) return fail('unavailable', timedOut ? SLOW : UNAVAILABLE);
   }
+  if (!reply && !proposals.length && Date.now() >= deadline - 5_000)
+    return fail('unavailable', SLOW);
 
   if (!reply)
     reply = proposals.length

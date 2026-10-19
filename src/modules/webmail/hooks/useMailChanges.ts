@@ -2,6 +2,7 @@ import { useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/r
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { mapPerGroup } from '../lib/concurrency';
 import { patchDemoMail, type DemoMail } from '../lib/demoStore';
+import { patchListCaches } from '../lib/mailCache';
 import { mailService, type MailError } from '../services/mailService';
 import type { MailFolder, MailSummary } from '../types';
 import { bumpUnread, refreshUnreadSoon } from './useUnreadCounts';
@@ -13,12 +14,14 @@ const PER_ACCOUNT = 3;
 
 type ListData = InfiniteData<{ messages: MailSummary[] }>;
 
-/** Atualiza já as listas em cache (antes da resposta do fornecedor). */
+/** Atualiza já as listas em memória e as guardadas no browser (antes da resposta). */
 const patchLists = (
   qc: QueryClient,
+  userId: string,
   target: MailSummary,
   patch: Partial<MailSummary> | 'remove'
 ) => {
+  patchListCaches(userId, target, patch);
   const same = (m: MailSummary) => m.id === target.id && m.accountId === target.accountId;
   qc.setQueriesData<ListData>({ queryKey: ['mail', 'list'] }, data =>
     data
@@ -92,7 +95,7 @@ const UNAVAILABLE: MailError = { code: 'unavailable', message: '' };
  * `folder`: a pasta à vista; os "por ler" contam a Entrada, por isso só aí se acertam já.
  */
 export const useMailChanges = (folder?: MailFolder) => {
-  const { isPreview } = useWorkspace();
+  const { isPreview, user } = useWorkspace();
   const qc = useQueryClient();
   const bump = (mail: MailSummary, delta: number) => {
     if (folder === 'inbox') bumpUnread(qc, mail.accountId, delta);
@@ -108,7 +111,7 @@ export const useMailChanges = (folder?: MailFolder) => {
     }
 
     targets.forEach(mail => {
-      patchLists(qc, mail, change.patch);
+      patchLists(qc, user.userId, mail, change.patch);
       bump(mail, change.unread(mail));
     });
     const results = await mapPerGroup(
@@ -119,14 +122,23 @@ export const useMailChanges = (folder?: MailFolder) => {
     );
 
     const errors: MailError[] = [];
+    let gone = false;
     results.forEach(({ error }, index) => {
       if (!error) return;
-      errors.push(error);
       const mail = targets[index];
+      // Já não existe nesta caixa (apagado noutro sítio ou num clique anterior): sai da lista,
+      // sem aviso de erro, e a lista atualiza-se.
+      if (error.code === 'message_not_found') {
+        gone = true;
+        if (change.patch !== 'remove') patchLists(qc, user.userId, mail, 'remove');
+        return;
+      }
+      errors.push(error);
       bump(mail, -change.unread(mail));
       if (change.patch !== 'remove')
-        patchLists(qc, mail, { unread: mail.unread, starred: mail.starred });
+        patchLists(qc, user.userId, mail, { unread: mail.unread, starred: mail.starred });
     });
+    if (gone) void qc.invalidateQueries({ queryKey: ['mail', 'list'] });
     // Os que não foram para o lixo voltam a aparecer com a lista atualizada.
     if (errors.length && change.patch === 'remove')
       void qc.invalidateQueries({ queryKey: ['mail', 'list'] });

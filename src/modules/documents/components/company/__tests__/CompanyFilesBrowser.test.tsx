@@ -28,6 +28,14 @@ vi.mock('../../../services/companyFilesService', () => ({
       error: null,
     })),
     createFolder: vi.fn(async (path: string) => ({ data: { path, created: true }, error: null })),
+    createDocument: vi.fn(async (folder: string, name: string, kind: string) => ({
+      data: { path: `${folder}/${name}.${kind}`, name: `${name}.${kind}` },
+      error: null,
+    })),
+    upload: vi.fn(async (folder: string, file: File) => ({
+      data: { path: `${folder}/${file.name}`, name: file.name },
+      error: null,
+    })),
   },
 }));
 
@@ -76,5 +84,51 @@ describe('CompanyFilesBrowser', () => {
       () => expect(companyFilesService.createFolder).toHaveBeenCalledWith('_SAAS_TESTE/Ana Silva'),
       { timeout: 3000 }
     );
+  });
+
+  it('cria um documento em branco e abre-o no editor', async () => {
+    const { onOpenFile } = renderBrowser('_SAAS_TESTE');
+    fireEvent.click(await screen.findByText('Novo documento'));
+    fireEvent.click(screen.getByText('Folha de cálculo'));
+    fireEvent.change(screen.getByLabelText('Nome do documento'), {
+      target: { value: 'Orçamento 2027' },
+    });
+    fireEvent.click(screen.getByText('Criar e abrir'));
+    await waitFor(
+      () =>
+        expect(onOpenFile).toHaveBeenCalledWith(
+          expect.objectContaining({ path: '_SAAS_TESTE/Orçamento 2027.xlsx', type: 'file' })
+        ),
+      { timeout: 3000 }
+    );
+    expect(companyFilesService.createDocument).toHaveBeenCalledWith(
+      '_SAAS_TESTE',
+      'Orçamento 2027',
+      'xlsx'
+    );
+  });
+
+  it('carrega os ficheiros escolhidos na pasta aberta', async () => {
+    renderBrowser('_SAAS_TESTE');
+    await screen.findByText('Carregar');
+    const files = [new File(['a'], 'a.pdf'), new File(['b'], 'b.png')];
+    fireEvent.change(screen.getByLabelText('Escolher ficheiros para carregar'), {
+      target: { files },
+    });
+    await waitFor(() => expect(companyFilesService.upload).toHaveBeenCalledTimes(2), {
+      timeout: 3000,
+    });
+    expect(vi.mocked(companyFilesService.upload).mock.calls[0][0]).toBe('_SAAS_TESTE');
+  });
+
+  it('só leitura: sem criar nem carregar', async () => {
+    vi.mocked(companyFilesService.list).mockResolvedValueOnce({
+      data: { path: '_SAAS_TESTE', permission: 'read', truncated: false, entries: [] },
+      error: null,
+    });
+    renderBrowser('_SAAS_TESTE');
+    expect(await screen.findByText('Só leitura')).toBeInTheDocument();
+    expect(screen.queryByText('Novo documento')).toBeNull();
+    expect(screen.queryByText('Carregar')).toBeNull();
   });
 });

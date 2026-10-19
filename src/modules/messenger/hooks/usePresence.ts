@@ -11,7 +11,8 @@ export const usePresence = (companyId: string | null, userId: string | null): Se
   useEffect(() => {
     if (!companyId || !userId) return;
     const channel = supabase.channel(`chat-presence-${companyId}`, {
-      config: { presence: { key: userId } },
+      // Privado: só os colegas ativos da empresa (regras em realtime.messages).
+      config: { private: true, presence: { key: userId } },
     });
     channel
       .on('presence', { event: 'sync' }, () => {

@@ -46,7 +46,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
       .sort((a, b) => Number(!!b.pinned) - Number(!!a.pinned) || b.lastAt.localeCompare(a.lastAt));
   }, [conversations, filter, onlyUnread, query, showArchived]);
 
-  const unreadTotal = conversations.filter(c => c.unread > 0).length;
+  const unreadTotal = conversations.filter(c => c.unread > 0 && !c.archived).length;
 
   return (
     <section className={cn('flex min-h-0 flex-col bg-white', className)} aria-label="Conversas">

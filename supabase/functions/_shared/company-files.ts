@@ -9,7 +9,7 @@
 // com os nomes exatamente como o agente os devolve.
 
 export type FolderPermission = 'read' | 'edit';
-export type AgentOp = 'list' | 'download' | 'mkdir' | 'callback';
+export type AgentOp = 'list' | 'download' | 'mkdir' | 'upload' | 'callback';
 export type OnlyOfficeDocumentType = 'word' | 'cell' | 'slide' | 'pdf';
 export type EditorMode = 'edit' | 'view';
 
@@ -95,6 +95,53 @@ const EDITABLE_EXTENSIONS = ['docx', 'xlsx', 'pptx', 'pdf'];
 
 export const editorModeFor = (extension: string, permission: FolderPermission): EditorMode =>
   permission === 'edit' && EDITABLE_EXTENSIONS.includes(extension) ? 'edit' : 'view';
+
+/** Tamanho máximo de um ficheiro carregado pelo Realize (o agente aplica o mesmo limite). */
+export const UPLOAD_MAX_BYTES = 100 * 1024 * 1024;
+
+/** Programas e scripts não entram nas pastas partilhadas. */
+const BLOCKED_EXTENSIONS = [
+  'bat',
+  'cmd',
+  'com',
+  'cpl',
+  'dll',
+  'exe',
+  'hta',
+  'jar',
+  'js',
+  'jse',
+  'lnk',
+  'msc',
+  'msi',
+  'pif',
+  'ps1',
+  'reg',
+  'scr',
+  'vbe',
+  'vbs',
+  'wsf',
+];
+
+export const isBlockedUpload = (name: string): boolean =>
+  BLOCKED_EXTENSIONS.includes(extensionOf(name));
+
+/**
+ * Nome livre na pasta, sem distinguir maiúsculas (como o Windows): "Ata.docx" passa a
+ * "Ata (2).docx" se já existir, e assim por diante.
+ */
+export const freeName = (name: string, taken: string[]): string => {
+  const used = new Set(taken.map(item => item.toLowerCase()));
+  if (!used.has(name.toLowerCase())) return name;
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const extension = dot > 0 ? name.slice(dot) : '';
+  for (let index = 2; index < 10_000; index += 1) {
+    const candidate = `${stem} (${index})${extension}`;
+    if (!used.has(candidate.toLowerCase())) return candidate;
+  }
+  return `${stem} (${Date.now()})${extension}`;
+};
 
 const toHex = (bytes: ArrayBuffer) =>
   [...new Uint8Array(bytes)].map(b => b.toString(16).padStart(2, '0')).join('');

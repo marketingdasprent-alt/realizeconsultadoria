@@ -1,30 +1,10 @@
 import React from 'react';
-import {
-  ChevronRight,
-  Download,
-  File,
-  FileImage,
-  FileSpreadsheet,
-  FileText,
-  FileType2,
-  Folder,
-  Presentation,
-  type LucideIcon,
-} from 'lucide-react';
+import { ChevronRight, Download } from 'lucide-react';
 import { formatFileSize } from '@/lib/documents';
 import { cn } from '@/lib/utils';
-import { fileKind, type FileKind } from '../../lib/companyFiles';
+import { fileKind } from '../../lib/companyFiles';
 import type { CompanyEntry } from '../../services/companyFilesService';
-
-const KIND_STYLES: Record<FileKind, { icon: LucideIcon; tint: string }> = {
-  folder: { icon: Folder, tint: 'bg-amber-100 text-amber-600' },
-  word: { icon: FileText, tint: 'bg-blue-100 text-blue-600' },
-  cell: { icon: FileSpreadsheet, tint: 'bg-emerald-100 text-emerald-600' },
-  slide: { icon: Presentation, tint: 'bg-orange-100 text-orange-600' },
-  pdf: { icon: FileType2, tint: 'bg-rose-100 text-rose-600' },
-  image: { icon: FileImage, tint: 'bg-violet-100 text-violet-600' },
-  other: { icon: File, tint: 'bg-slate-100 text-slate-500' },
-};
+import { KIND_STYLES } from './fileKindStyles';
 
 const formatModified = (iso?: string) =>
   iso

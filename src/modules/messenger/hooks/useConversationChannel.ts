@@ -32,7 +32,8 @@ export const useConversationChannel = (
     setTyping({});
     if (!conversationId) return;
     const channel = supabase.channel(`chat-conv-${conversationId}`, {
-      config: { broadcast: { self: false } },
+      // Privado: só os membros da conversa ouvem e enviam (regras em realtime.messages).
+      config: { private: true, broadcast: { self: false } },
     });
     channel
       .on('broadcast', { event: 'typing' }, ({ payload }) => {

@@ -1,6 +1,7 @@
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
+import { applyAccountOrder } from '../lib/accountOrder';
 import { setDemoMail, useDemoMail } from '../lib/demoStore';
 import type { MailProviderKey } from '../lib/providers';
 import { mailErrorText, mailService, type MailError } from '../services/mailService';
@@ -65,6 +66,22 @@ export const useMailAccounts = () => {
         return false;
       }
       return true;
+    },
+
+    /** Nova ordem das caixas (arrastar ou alfabética): já no ecrã; grava em fundo. */
+    reorder: async (ids: string[]) => {
+      const sort = (list: MailAccount[]) =>
+        applyAccountOrder(list, new Map(ids.map((id, index) => [id, index])));
+      if (isPreview) {
+        setDemoMail(s => ({ ...s, accounts: sort(s.accounts) }));
+        return;
+      }
+      qc.setQueryData<MailAccount[]>(MAIL_ACCOUNTS_KEY, list => list && sort(list));
+      const { error } = await mailService.saveAccountOrder(ids);
+      if (error) {
+        fail(null, 'A ordem das caixas não foi guardada.');
+        void qc.invalidateQueries({ queryKey: MAIL_ACCOUNTS_KEY });
+      }
     },
 
     disconnect: async (id: string) => {

@@ -93,6 +93,7 @@ export const TaskDetailSheet: React.FC<TaskDetailSheetProps> = props => {
               </Row>
               <Row label="Participantes">
                 <PeoplePicker
+                  includeMe
                   value={task.participantIds}
                   onChange={ids => props.onParticipants(task, ids)}
                   placeholder="Adicionar"

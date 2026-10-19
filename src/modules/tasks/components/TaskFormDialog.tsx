@@ -110,6 +110,7 @@ export const TaskFormDialog: React.FC<TaskFormDialogProps> = ({
           <div>
             <span className={LABEL}>Participantes</span>
             <PeoplePicker
+              includeMe
               value={form.participantIds}
               onChange={ids => set('participantIds', ids)}
               placeholder="Adicionar"

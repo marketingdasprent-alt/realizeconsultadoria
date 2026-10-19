@@ -22,6 +22,10 @@ export const ACCOUNT_DOTS: Record<string, string> = {
   slate: 'bg-slate-500',
 };
 
+/** Linha da barra lateral (caixas e pastas). */
+export const SIDEBAR_ROW =
+  'flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-[13.5px] font-semibold transition-colors';
+
 /** Chave única de um email (os ids só são únicos dentro da caixa). */
 export const mailKey = (mail: Pick<MailSummary, 'accountId' | 'id'>) =>
   `${mail.accountId}:${mail.id}`;

@@ -1,0 +1,19 @@
+{
+  "id": "/admin",
+  "name": "Realize Admin",
+  "short_name": "Realize Admin",
+  "description": "Painel de administração da Realize Consultadoria: colaboradores, férias e ausências, pedidos, ponto e financeiro.",
+  "start_url": "/admin",
+  "scope": "/admin",
+  "display": "standalone",
+  "orientation": "any",
+  "theme_color": "#6949E8",
+  "background_color": "#ffffff",
+  "lang": "pt",
+  "categories": ["business", "productivity"],
+  "icons": [
+    { "src": "/admin-pwa-192x192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
+    { "src": "/admin-pwa-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
+    { "src": "/admin-pwa-512x512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

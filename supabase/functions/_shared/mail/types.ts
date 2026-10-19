@@ -101,6 +101,8 @@ export interface MailDriver {
   setRead(messageId: string, read: boolean): Promise<void>;
   setStarred(messageId: string, starred: boolean): Promise<void>;
   trash(messageId: string): Promise<void>;
+  /** Emails por ler na caixa de entrada (um pedido leve, sem listar mensagens). */
+  unreadCount(): Promise<number>;
 }
 
 /** Segredo guardado no Vault para contas OAuth. */

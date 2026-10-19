@@ -9,6 +9,14 @@ import { storeSecret, updateAccountStatus } from '../_shared/mail-server/account
 import { errorMessage, fetchWithTimeout } from '../_shared/mail-server/http.ts';
 import { oauthCredentials, refreshAccessToken } from '../_shared/mail-server/oauth-client.ts';
 
+/** Pausa pedida pelo fornecedor (Retry-After, em segundos), limitada a 4 s. */
+const retryDelayMs = (res: Response) => {
+  const seconds = Number(res.headers.get('retry-after'));
+  return Math.min(Number.isFinite(seconds) && seconds > 0 ? seconds * 1000 : 1000, 4000);
+};
+
+const sleep = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export interface ApiRequestInit {
   method?: string;
   headers?: Record<string, string>;
@@ -79,7 +87,7 @@ export class OAuthSession {
 
   /** Pedido autenticado à API do fornecedor (erros de rede → provider_error). */
   async fetch(url: string, init: ApiRequestInit = {}): Promise<Response> {
-    const send = async (token: string) => {
+    const sendOnce = async (token: string) => {
       try {
         return await fetchWithTimeout(url, {
           method: init.method ?? 'GET',
@@ -90,6 +98,17 @@ export class OAuthSession {
         console.error(`mail-api ${this.provider}: sem resposta`, errorMessage(error));
         throw mailError('provider_error', 'Sem resposta do fornecedor de email.');
       }
+    };
+    // O Microsoft Graph limita os pedidos em simultâneo por caixa (429): espera o que ele
+    // pede e tenta outra vez, até duas vezes, antes de mostrar o erro.
+    const send = async (token: string) => {
+      let res = await sendOnce(token);
+      for (let attempt = 0; res.status === 429 && attempt < 2; attempt += 1) {
+        await res.body?.cancel();
+        await sleep(retryDelayMs(res));
+        res = await sendOnce(token);
+      }
+      return res;
     };
     const used = await this.token();
     let res = await send(used);

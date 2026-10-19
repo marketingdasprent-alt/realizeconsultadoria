@@ -2,6 +2,7 @@ import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw, Copy, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { isChunkLoadError, reloadForNewVersion } from '@/lib/chunk-reload';
 
 interface Props {
   children: ReactNode;
@@ -27,6 +28,8 @@ class GlobalErrorBoundary extends Component<Props, State> {
   }
 
   public componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Página de uma versão anterior (houve atualização com a app aberta): recarrega já.
+    if (isChunkLoadError(error) && reloadForNewVersion()) return;
     console.error('Uncaught error:', error, errorInfo);
     this.setState({ errorInfo });
   }

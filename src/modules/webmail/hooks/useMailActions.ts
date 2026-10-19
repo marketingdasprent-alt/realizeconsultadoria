@@ -1,39 +1,12 @@
-import { useQueryClient, type InfiniteData, type QueryClient } from '@tanstack/react-query';
+import { useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { DEMO_MAIL_ACCOUNTS } from '../lib/demoData';
-import { patchDemoMail, setDemoMail } from '../lib/demoStore';
+import { setDemoMail } from '../lib/demoStore';
 import { composeWithSignature } from '../lib/signature';
 import { mailErrorText, mailService, type MailError } from '../services/mailService';
-import type { ComposeInput, MailSummary } from '../types';
-
-type ListData = InfiniteData<{ messages: MailSummary[] }>;
-
-/** Atualiza já as listas em cache (antes da resposta do fornecedor). */
-const patchLists = (
-  qc: QueryClient,
-  target: MailSummary,
-  patch: Partial<MailSummary> | 'remove'
-) => {
-  qc.setQueriesData<ListData>({ queryKey: ['mail', 'list'] }, data =>
-    data
-      ? {
-          ...data,
-          pages: data.pages.map(page => ({
-            ...page,
-            messages:
-              patch === 'remove'
-                ? page.messages.filter(
-                    m => !(m.id === target.id && m.accountId === target.accountId)
-                  )
-                : page.messages.map(m =>
-                    m.id === target.id && m.accountId === target.accountId ? { ...m, ...patch } : m
-                  ),
-          })),
-        }
-      : data
-  );
-};
+import type { ComposeInput, MailFolder, MailSummary } from '../types';
+import { useMailChanges, type MailChange } from './useMailChanges';
 
 const fail = (error: MailError | null, fallback: string): void => {
   toast({
@@ -51,37 +24,41 @@ const toBase64 = (file: File) =>
     reader.readAsDataURL(file);
   });
 
-/** Ler/não lido, estrela, lixo, enviar e descarregar anexos. */
-export const useMailActions = () => {
+/**
+ * Ler/não lido, estrela, lixo (um email ou os selecionados), enviar e descarregar anexos.
+ * `folder`: a pasta à vista (para acertar já os "por ler" da Entrada).
+ */
+export const useMailActions = (folder?: MailFolder) => {
   const { isPreview } = useWorkspace();
   const qc = useQueryClient();
-
-  const setRead = async (mail: MailSummary, read: boolean) => {
-    if (mail.unread === !read) return;
-    if (isPreview) return patchDemoMail(mail.id, { unread: !read });
-    patchLists(qc, mail, { unread: !read });
-    const { error } = await mailService.setRead(mail.accountId, mail.id, read);
-    if (error) fail(error, 'O estado do email não foi alterado.');
+  const apply = useMailChanges(folder);
+  const one = async (mail: MailSummary, kind: MailChange, fallback: string) => {
+    const [error] = await apply([mail], kind);
+    if (error) fail(error, fallback);
   };
 
   return {
-    setRead,
+    setRead: (mail: MailSummary, read: boolean) =>
+      one(mail, read ? 'read' : 'unread', 'O estado do email não foi alterado.'),
 
-    toggleStar: async (mail: MailSummary) => {
-      if (isPreview) return patchDemoMail(mail.id, { starred: !mail.starred });
-      patchLists(qc, mail, { starred: !mail.starred });
-      const { error } = await mailService.setStarred(mail.accountId, mail.id, !mail.starred);
-      if (error) fail(error, 'A estrela não foi guardada.');
-    },
+    toggleStar: (mail: MailSummary) =>
+      one(mail, mail.starred ? 'unstar' : 'star', 'A estrela não foi guardada.'),
 
-    trash: async (mail: MailSummary) => {
-      if (isPreview) return patchDemoMail(mail.id, { folder: 'trash' });
-      patchLists(qc, mail, 'remove');
-      const { error } = await mailService.trash(mail.accountId, mail.id);
-      if (error) {
-        fail(error, 'O email não foi para o lixo.');
-        await qc.invalidateQueries({ queryKey: ['mail', 'list'] });
-      }
+    trash: (mail: MailSummary) => one(mail, 'trash', 'O email não foi para o lixo.'),
+
+    /** Ação sobre os emails selecionados: um só aviso com quantos falharam. */
+    bulk: async (mails: MailSummary[], kind: MailChange) => {
+      const errors = await apply(mails, kind);
+      if (!errors.length) return;
+      const count =
+        errors.length === 1
+          ? '1 email não foi alterado'
+          : `${errors.length} emails não foram alterados`;
+      toast({
+        title: 'Não foi possível',
+        description: `${count}. ${mailErrorText(errors[0])}`.trim(),
+        variant: 'destructive',
+      });
     },
 
     send: async (input: ComposeInput) => {

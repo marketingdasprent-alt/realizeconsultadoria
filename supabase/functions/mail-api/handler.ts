@@ -11,6 +11,8 @@
 //            attachments?: { filename, mime, base64 }[] }            → { id }
 //   set-read { account_id, message_id, read } · set-starred { ..., starred } · trash
 //   disconnect { account_id }
+//   unread-counts → { counts: { [account_id]: n }, errors: { [account_id]: code } } (Entrada de
+//                   todas as caixas de quem chama, ver unread.ts)
 //   discover { email } → { servers, oauth, source } (servidores IMAP/SMTP do domínio, por DNS)
 //   share-access { access_id } (só admin) → caixa partilhada de um email dos Acessos (share.ts)
 // Pela BD (cabeçalho x-mail-system-token): { access_id } partilha automática; { action:
@@ -60,6 +62,7 @@ import { createImapDriver, testImapLogin, type ImapAccountConfig } from './drive
 import { pollNewMail } from './poll.ts';
 import { OAuthSession } from './session.ts';
 import { shareAccess, shareAccessById } from './share.ts';
+import { unreadCounts } from './unread.ts';
 
 type Body = Record<string, unknown>;
 
@@ -193,6 +196,7 @@ const ACTIONS = [
   'disconnect',
   'discover',
   'share-access',
+  'unread-counts',
 ] as const;
 type Action = (typeof ACTIONS)[number];
 
@@ -201,6 +205,7 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
   if (!action) return badRequest();
   if (action === 'connect-imap') return connectImap(db, userId, body);
   if (action === 'share-access') return ok(await shareAccess(db, userId, body.access_id));
+  if (action === 'unread-counts') return ok(await unreadCounts(db, userId, createDriver));
   if (action === 'discover') {
     const email = optionalString(body.email, 320);
     return email ? ok(await discoverDomain(domainOfEmail(email), denoResolver)) : badRequest();

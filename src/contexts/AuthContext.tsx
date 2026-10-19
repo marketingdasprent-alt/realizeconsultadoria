@@ -16,6 +16,28 @@ const normalizeRole = (raw: unknown): UserRole | null => {
   return (VALID_ROLES as readonly string[]).includes(raw) ? (raw as UserRole) : null;
 };
 
+// Papel guardado neste aparelho depois de confirmado: no arranque seguinte a app abre logo
+// (sem esperar pelo pedido do papel) e confirma-o em segundo plano. Os dados continuam
+// protegidos pelas regras da BD; se o papel mudou, a app corrige-se ao confirmar.
+const roleCacheKey = (userId: string) => `rz.role.${userId}`;
+
+const readCachedRole = (userId: string): UserRole | null => {
+  try {
+    return normalizeRole(localStorage.getItem(roleCacheKey(userId)));
+  } catch {
+    return null;
+  }
+};
+
+const writeCachedRole = (userId: string, role: UserRole | null) => {
+  try {
+    if (role) localStorage.setItem(roleCacheKey(userId), role);
+    else localStorage.removeItem(roleCacheKey(userId));
+  } catch {
+    // sem armazenamento (janela privada): só perde o arranque rápido
+  }
+};
+
 export interface AuthUser extends User {
   role?: UserRole;
   permissions?: string[];
@@ -57,11 +79,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return;
     }
 
+    const cached = readCachedRole(session.user.id);
+    if (cached) {
+      resolvedUserIdRef.current = session.user.id;
+      setUser({ ...session.user, role: cached } as AuthUser);
+      setRole(cached);
+      setError(null);
+      void resolveRole(session, generation);
+      return;
+    }
+    await resolveRole(session, generation);
+  };
+
+  /** Lê o papel na BD (e guarda-o para o próximo arranque). */
+  const resolveRole = async (session: Session, generation: number) => {
     const { role: rawRole } = await accessService.getUserRole(session.user.id);
     if (generation !== lookupGenerationRef.current) return;
 
     const normalized = normalizeRole(rawRole);
+    writeCachedRole(session.user.id, normalized);
     if (!normalized) {
+      resolvedUserIdRef.current = null;
       setUser(null);
       setRole(null);
       setError('Sua conta ainda não está habilitada. Contate o administrador.');

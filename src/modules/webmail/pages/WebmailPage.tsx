@@ -14,6 +14,8 @@ import { MailToTaskOrEvent, type MailConversion } from '../components/MailToTask
 import { ProviderGrid } from '../components/ProviderGrid';
 import { useMailAccounts } from '../hooks/useMailAccounts';
 import { useMailActions } from '../hooks/useMailActions';
+import type { MailChange } from '../hooks/useMailChanges';
+import { useUnreadCounts } from '../hooks/useUnreadCounts';
 import {
   useMailbox,
   useMailMessage,
@@ -27,7 +29,6 @@ import type { ComposeDraft, MailAccount, MailFolder, MailSummary } from '../type
 /** Webmail (briefing §9): caixas ligadas, caixa unificada, ler, escrever e organizar. */
 const WebmailPage: React.FC = () => {
   const mail = useMailAccounts();
-  const actions = useMailActions();
   const prefetch = usePrefetchMessage();
   const [params, setParams] = useSearchParams();
   const [scope, setScope] = useState<string | null>(null);
@@ -42,6 +43,8 @@ const WebmailPage: React.FC = () => {
   const [menuOpen, setMenuOpen] = useState(false);
 
   const accounts = mail.accounts;
+  const actions = useMailActions(folder);
+  const unread = useUnreadCounts(accounts);
   const current = scope ?? (accounts.length > 1 ? 'all' : (accounts[0]?.id ?? 'all'));
   const box = useMailbox(accounts, current, folder, query);
   usePrefetchTop(box.messages);
@@ -74,6 +77,14 @@ const WebmailPage: React.FC = () => {
   const open = (summary: MailSummary) => {
     setActive(summary);
     void actions.setRead(summary, true);
+  };
+  // Lixo pela lista (um ou vários): se o email aberto for um deles, o leitor fecha.
+  const closeIfAmong = (mails: MailSummary[]) => {
+    if (active && mails.some(m => mailKey(m) === mailKey(active))) setActive(null);
+  };
+  const bulk = (mails: MailSummary[], kind: MailChange) => {
+    if (kind === 'trash') closeIfAmong(mails);
+    void actions.bulk(mails, kind);
   };
   const choose = (next: () => void) => {
     next();
@@ -121,6 +132,9 @@ const WebmailPage: React.FC = () => {
       accounts={accounts}
       scope={current}
       folder={folder}
+      unread={unread.counts}
+      unreadTotal={unread.total}
+      onReorder={ids => void mail.reorder(ids)}
       onScope={id => choose(() => setScope(id))}
       onFolder={key => choose(() => setFolder(key))}
       onCompose={() => {
@@ -142,10 +156,16 @@ const WebmailPage: React.FC = () => {
         accounts={accounts}
         activeKey={active ? mailKey(active) : null}
         showAccount={current === 'all'}
+        selectionKey={`${current}|${folder}|${query}`}
         search={search}
         onSearch={setSearch}
         onOpen={open}
         onToggleStar={actions.toggleStar}
+        onTrash={target => {
+          closeIfAmong([target]);
+          void actions.trash(target);
+        }}
+        onBulk={bulk}
         onHover={prefetch}
         onRefresh={() => void box.refetch()}
         onMenu={() => setMenuOpen(true)}

@@ -220,5 +220,10 @@ export const createGmailDriver = (
     async trash(messageId) {
       await session.json(`${GMAIL}/messages/${enc(messageId)}/trash`, { method: 'POST' });
     },
+
+    async unreadCount() {
+      const inbox = await session.json<{ messagesUnread?: number }>(`${GMAIL}/labels/INBOX`);
+      return inbox.messagesUnread ?? 0;
+    },
   };
 };

@@ -1,6 +1,7 @@
 // Webmail no Supabase: contas (tabela mail_accounts, sem o segredo) e as edge functions
 // mail-oauth (ligar Google/Microsoft) e mail-api (ler, enviar, organizar).
 import { supabase } from '@/integrations/supabase/client';
+import { applyAccountOrder } from '../lib/accountOrder';
 import type { Discovery } from '../lib/autodiscover';
 import type { MailProviderKey } from '../lib/providers';
 import type {
@@ -112,16 +113,19 @@ export const mailService = {
   listAccounts: async () => {
     const { data: auth } = await supabase.auth.getSession();
     const userId = auth.session?.user.id ?? '';
-    const [accounts, prefs] = await Promise.all([
+    const [accounts, prefs, order] = await Promise.all([
       supabase.from('mail_accounts').select(ACCOUNT_COLUMNS).order('created_at'),
       // Nas caixas partilhadas, a assinatura e a cor são de cada pessoa.
       supabase
         .from('mail_account_members')
         .select('account_id, signature, color')
         .eq('user_id', userId),
+      // Ordem escolhida pela pessoa na barra lateral (sem ela, fica a da ligação).
+      supabase.from('mail_account_order').select('account_id, position').eq('user_id', userId),
     ]);
     const mine = new Map(((prefs.data ?? []) as Row[]).map(p => [str(p.account_id), p]));
-    const data = ((accounts.data ?? []) as Row[]).map(row => {
+    const positions = new Map((order.data ?? []).map(row => [row.account_id, row.position]));
+    const list = ((accounts.data ?? []) as Row[]).map(row => {
       const account = toAccount(row);
       const pref = account.shared ? mine.get(account.id) : undefined;
       return pref
@@ -132,8 +136,32 @@ export const mailService = {
           }
         : account;
     });
-    return { data, error: accounts.error };
+    return { data: applyAccountOrder(list, positions), error: accounts.error };
   },
+
+  /** Grava a ordem das caixas desta pessoa (posição = índice na lista). */
+  saveAccountOrder: async (accountIds: string[]) => {
+    const { data: auth } = await supabase.auth.getSession();
+    const userId = auth.session?.user.id;
+    if (!userId) return { error: new Error('Sessão terminada.') };
+    const now = new Date().toISOString();
+    const { error } = await supabase.from('mail_account_order').upsert(
+      accountIds.map((accountId, position) => ({
+        user_id: userId,
+        account_id: accountId,
+        position,
+        updated_at: now,
+      })),
+      { onConflict: 'user_id,account_id' }
+    );
+    return { error };
+  },
+
+  /** Emails por ler na Entrada de cada caixa (as que falharem ficam sem número). */
+  unreadCounts: () =>
+    call<{ counts: Record<string, number>; errors: Record<string, string> }>('mail-api', {
+      action: 'unread-counts',
+    }),
 
   updateAccount: async (
     id: string,

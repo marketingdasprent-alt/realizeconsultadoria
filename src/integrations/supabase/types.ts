@@ -1797,6 +1797,35 @@ export type Database = {
           },
         ];
       };
+      mail_account_order: {
+        Row: {
+          account_id: string;
+          position: number;
+          updated_at: string;
+          user_id: string;
+        };
+        Insert: {
+          account_id: string;
+          position: number;
+          updated_at?: string;
+          user_id: string;
+        };
+        Update: {
+          account_id?: string;
+          position?: number;
+          updated_at?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'mail_account_order_account_id_fkey';
+            columns: ['account_id'];
+            isOneToOne: false;
+            referencedRelation: 'mail_accounts';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       mail_accounts: {
         Row: {
           access_id: string | null;

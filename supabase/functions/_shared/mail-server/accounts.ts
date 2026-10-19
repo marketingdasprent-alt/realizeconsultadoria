@@ -49,6 +49,24 @@ export const loadAccount = async (
   return member ? account : null;
 };
 
+/** Todas as contas que a pessoa pode usar: as suas e as partilhadas com ela. */
+export const loadUserAccounts = async (
+  db: SupabaseClient,
+  userId: string
+): Promise<MailAccountRow[]> => {
+  const [own, shared] = await Promise.all([
+    db.from('mail_accounts').select(ACCOUNT_COLUMNS).eq('user_id', userId),
+    db.from('mail_account_members').select('account_id').eq('user_id', userId),
+  ]);
+  if (own.error) throw own.error;
+  if (shared.error) throw shared.error;
+  const ids = (shared.data ?? []).map(row => row.account_id as string);
+  if (!ids.length) return (own.data ?? []) as MailAccountRow[];
+  const { data, error } = await db.from('mail_accounts').select(ACCOUNT_COLUMNS).in('id', ids);
+  if (error) throw error;
+  return [...(own.data ?? []), ...(data ?? [])] as MailAccountRow[];
+};
+
 /** Empresa do colaborador ativo (null para quem não é colaborador, ex. admins). */
 const activeCompanyId = async (db: SupabaseClient, userId: string): Promise<string | null> => {
   const { data } = await db

@@ -68,6 +68,7 @@ interface ImapClient {
   on(event: 'error', listener: (error: unknown) => void): void;
   list(): Promise<ImapMailboxEntry[]>;
   getMailboxLock(path: string, options?: { readOnly?: boolean }): Promise<ImapLock>;
+  status(path: string, query: { unseen?: boolean }): Promise<{ unseen?: number }>;
   search(query: Record<string, unknown>, options: UidOption): Promise<number[] | false>;
   fetch(range: string, query: FetchQuery, options: UidOption): AsyncIterable<ImapFetchMessage>;
   fetchOne(range: string, query: FetchQuery, options: UidOption): Promise<ImapFetchMessage | false>;
@@ -521,6 +522,13 @@ export const createImapDriver = (
           await client.messageMove(String(uid), trashPath, { uid: true });
         });
       });
+    },
+
+    unreadCount() {
+      // STATUS INBOX (UNSEEN): não abre a pasta nem lê mensagens.
+      return withClient(
+        async client => (await client.status('INBOX', { unseen: true })).unseen ?? 0
+      );
     },
   };
 };

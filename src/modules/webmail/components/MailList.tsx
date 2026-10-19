@@ -1,9 +1,12 @@
 import React from 'react';
 import { AlertTriangle, Loader2, Menu, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import type { MailChange } from '../hooks/useMailChanges';
+import { useMailSelection } from '../hooks/useMailSelection';
 import { ACCOUNT_DOTS, mailKey } from '../lib/mailFormat';
 import { mailErrorText, type MailError } from '../services/mailService';
 import type { MailAccount, MailSummary } from '../types';
+import { MailBulkBar } from './MailBulkBar';
 import { MailListItem } from './MailListItem';
 
 interface MailListProps {
@@ -12,10 +15,15 @@ interface MailListProps {
   accounts: MailAccount[];
   activeKey: string | null;
   showAccount: boolean;
+  /** Caixa + pasta + pesquisa: ao mudar, a seleção limpa-se. */
+  selectionKey: string;
   search: string;
   onSearch: (value: string) => void;
   onOpen: (mail: MailSummary) => void;
   onToggleStar: (mail: MailSummary) => void;
+  onTrash: (mail: MailSummary) => void;
+  /** Ação sobre os emails selecionados. */
+  onBulk: (mails: MailSummary[], kind: MailChange) => void;
   onHover?: (mail: MailSummary | null) => void;
   onRefresh: () => void;
   onMenu: () => void;
@@ -28,10 +36,15 @@ interface MailListProps {
   className?: string;
 }
 
-/** Lista de emails (pesquisa, estrela, anexos e a cor da caixa na vista unificada). */
+/** Lista de emails (pesquisa, seleção, estrela, lixo e a cor da caixa na vista unificada). */
 export const MailList: React.FC<MailListProps> = props => {
   const colorOf = new Map(props.accounts.map(a => [a.id, ACCOUNT_DOTS[a.color]]));
   const emailOf = new Map(props.accounts.map(a => [a.id, a.email]));
+  const selection = useMailSelection(props.messages, props.selectionKey);
+  const onBulk = (kind: MailChange) => {
+    props.onBulk(selection.selected, kind);
+    if (kind === 'trash') selection.clear();
+  };
   return (
     <section className={cn('flex min-h-0 flex-col bg-white', props.className)} aria-label="Emails">
       <div className="space-y-3 px-4 pb-2 pt-4">
@@ -54,15 +67,25 @@ export const MailList: React.FC<MailListProps> = props => {
             <RefreshCw className={cn('h-4 w-4', props.isRefreshing && 'animate-spin')} />
           </button>
         </div>
-        <label className="flex h-10 items-center gap-2 rounded-full bg-rz-canvas px-4 text-rz-muted focus-within:ring-2 focus-within:ring-rz-primary/30">
-          <Search className="h-4 w-4" />
-          <input
-            value={props.search}
-            onChange={event => props.onSearch(event.target.value)}
-            placeholder="Pesquisar emails"
-            className="w-full bg-transparent text-sm text-rz-ink outline-none"
-          />
-        </label>
+        <MailBulkBar
+          count={selection.count}
+          allSelected={selection.allSelected}
+          allStarred={selection.selected.every(m => m.starred)}
+          hasMessages={props.messages.length > 0}
+          onToggleAll={selection.toggleAll}
+          onAction={onBulk}
+          onClear={selection.clear}
+        >
+          <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-rz-canvas px-4 text-rz-muted focus-within:ring-2 focus-within:ring-rz-primary/30">
+            <Search className="h-4 w-4 shrink-0" />
+            <input
+              value={props.search}
+              onChange={event => props.onSearch(event.target.value)}
+              placeholder="Pesquisar emails"
+              className="w-full bg-transparent text-sm text-rz-ink outline-none"
+            />
+          </label>
+        </MailBulkBar>
         {Object.entries(props.errors).map(([accountId, error]) => (
           <p
             key={accountId}
@@ -88,9 +111,13 @@ export const MailList: React.FC<MailListProps> = props => {
             key={mailKey(mail)}
             mail={mail}
             isActive={props.activeKey === mailKey(mail)}
+            isSelected={selection.isSelected(mailKey(mail))}
+            selecting={selection.count > 0}
             accountDot={props.showAccount ? colorOf.get(mail.accountId) : undefined}
             onOpen={props.onOpen}
+            onSelect={(target, range) => selection.toggle(mailKey(target), range)}
             onToggleStar={props.onToggleStar}
+            onTrash={props.onTrash}
             onHover={props.onHover}
           />
         ))}

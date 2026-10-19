@@ -300,5 +300,12 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
         body: JSON.stringify({ destinationId: 'deleteditems' }),
       });
     },
+
+    async unreadCount() {
+      const inbox = await session.json<{ unreadItemCount?: number }>(
+        `${ME}/mailFolders/inbox?$select=unreadItemCount`
+      );
+      return inbox.unreadItemCount ?? 0;
+    },
   };
 };

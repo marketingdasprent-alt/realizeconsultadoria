@@ -98,10 +98,20 @@ const AGENT_ERRORS: Record<number, string> = {
 };
 
 /** Erro com mensagem para o colaborador. */
-class FilesError extends Error {}
+class FilesError extends Error {
+  /** Resposta do agente (código e erro), mostrada só aos admins para diagnóstico. */
+  constructor(
+    message: string,
+    readonly detail?: string
+  ) {
+    super(message);
+  }
+}
 
 const ok = (data: unknown) => json({ ok: true, data });
-const fail = (message: string) => json({ ok: false, message });
+/** `detail`: resposta do agente (código HTTP e erro), para diagnóstico; o ecrã mostra só a mensagem. */
+const fail = (message: string, detail?: string) =>
+  json({ ok: false, message, ...(detail ? { detail } : {}) });
 
 const READ_ONLY = 'Nesta pasta só tem acesso de leitura.';
 
@@ -128,10 +138,20 @@ const callAgent = async <T>(
   } catch {
     throw new FilesError('O servidor de ficheiros não responde. Tente daqui a pouco.');
   }
-  const body = await res.json().catch(() => null);
+  const text = await res.text().catch(() => '');
+  let body: { error?: unknown } | null = null;
+  try {
+    body = text ? JSON.parse(text) : null;
+  } catch {
+    body = null;
+  }
   if (!res.ok) {
-    console.error('company-files: agente', res.status, body?.error);
-    throw new FilesError(AGENT_ERRORS[res.status] ?? 'O servidor de ficheiros deu um erro.');
+    const detail = `HTTP ${res.status}${body?.error ? `: ${String(body.error)}` : text ? `: ${text.slice(0, 120)}` : ''}`;
+    console.error('company-files: agente', route, detail);
+    throw new FilesError(
+      AGENT_ERRORS[res.status] ?? 'O servidor de ficheiros deu um erro.',
+      detail
+    );
   }
   return body as T;
 };
@@ -247,7 +267,9 @@ serve(async (req: Request) => {
     try {
       return await adminAction(db, userId, body, agentSecret);
     } catch (err) {
-      if (err instanceof FilesError) return fail(err.message);
+      // Aos admins mostra-se também a resposta do agente (para diagnosticar com o servidor).
+      if (err instanceof FilesError)
+        return fail(err.detail ? `${err.message} (${err.detail})` : err.message);
       throw err;
     }
   }
@@ -341,7 +363,7 @@ serve(async (req: Request) => {
         return fail('Ação desconhecida.');
     }
   } catch (err) {
-    if (err instanceof FilesError) return fail(err.message);
+    if (err instanceof FilesError) return fail(err.message, err.detail);
     throw err;
   }
 });

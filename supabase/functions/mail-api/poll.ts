@@ -1,4 +1,4 @@
-// Avisos de email novo: a BD chama isto a cada 2 minutos (pg_cron → pg_net, token de sistema).
+// Avisos de email novo: a BD chama isto a cada 30 segundos (pg_cron → pg_net, token de sistema).
 // Para cada conta ativa lê os últimos emails da caixa de entrada e avisa quem a usa (o dono ou
 // os membros de uma caixa partilhada) dos que chegaram por ler desde a última vez: aviso no
 // Realize e notificação no telemóvel (trigger de user_notifications → push-send).
@@ -11,6 +11,9 @@ import { ACCOUNT_COLUMNS, type MailAccountRow } from '../_shared/mail-server/acc
 import { errorMessage } from '../_shared/mail-server/http.ts';
 
 const PER_ACCOUNT = 10;
+/** Intervalo mínimo entre leituras da mesma caixa (as IMAP limitam logins: 2 em 2 minutos). */
+const GAP_MS = 25_000;
+const IMAP_GAP_MS = 110_000;
 /** Acima disto, um só aviso com o número de emails novos. */
 const MAX_SINGLE = 3;
 const LINK = '/colaborador/email';
@@ -90,6 +93,23 @@ const pollAccount = async (
   return fresh.length;
 };
 
+/**
+ * Reserva a caixa para esta passagem (atómico): duas passagens seguidas nunca leem a mesma caixa
+ * ao mesmo tempo (o que avisaria duas vezes do mesmo email) e as IMAP só a cada 2 minutos.
+ */
+const claim = async (db: SupabaseClient, account: PollAccount): Promise<boolean> => {
+  const gap = account.auth_method === 'imap' ? IMAP_GAP_MS : GAP_MS;
+  const before = new Date(Date.now() - gap).toISOString();
+  const { data, error } = await db
+    .from('mail_accounts')
+    .update({ polled_at: new Date().toISOString() })
+    .eq('id', account.id)
+    .or(`polled_at.is.null,polled_at.lt.${before}`)
+    .select('id');
+  if (error) console.error('mail-api poll: reserva falhou', error.message);
+  return !error && (data ?? []).length > 0;
+};
+
 /** Passa por todas as contas ativas; os erros de uma conta não param as outras. */
 export const pollNewMail = async (
   db: SupabaseClient,
@@ -104,6 +124,7 @@ export const pollNewMail = async (
   const results = await Promise.all(
     accounts.map(async account => {
       try {
+        if (!(await claim(db, account))) return 0;
         return await pollAccount(db, account, await createDriver(db, account));
       } catch (err) {
         console.error(`mail-api poll ${account.id}:`, errorMessage(err));

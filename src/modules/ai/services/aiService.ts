@@ -61,8 +61,7 @@ const callFunction = async <T>(payload: unknown, signal?: AbortSignal): Promise<
   });
 
   const body = (await response.json().catch(() => null)) as
-    | ({ ok?: boolean; code?: string; message?: string } & Record<string, unknown>)
-    | null;
+    ({ ok?: boolean; code?: string; message?: string } & Record<string, unknown>) | null;
   if (!body || body.ok === false || !response.ok)
     throw new AiError(body?.message ?? GENERIC, body?.code ?? 'error');
   return body as T;
@@ -97,11 +96,12 @@ export const getDigestEnabled = async (userId: string): Promise<boolean> => {
   return data?.daily_digest ?? false;
 };
 
-export const setDigestEnabled = async (userId: string, enabled: boolean) => {
+/** Liga ou desliga o resumo diário; lança erro se não gravar (o interruptor volta atrás). */
+export const setDigestEnabled = async (userId: string, enabled: boolean): Promise<void> => {
   const { error } = await supabase
     .from('ai_preferences')
     .upsert({ user_id: userId, daily_digest: enabled }, { onConflict: 'user_id' });
-  return { error };
+  if (error) throw error;
 };
 
 export const getSuggestions = async (): Promise<AiSuggestion[]> => {

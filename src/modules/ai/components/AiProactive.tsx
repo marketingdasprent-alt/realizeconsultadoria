@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AlertTriangle, ChevronRight, Sunrise } from 'lucide-react';
 import { Switch } from '@/components/ui/switch';
+import { toast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { getDigestEnabled, getSuggestions, setDigestEnabled } from '../services/aiService';
 
@@ -35,7 +36,16 @@ export const AiProactive: React.FC = () => {
     onMutate: async enabled => {
       qc.setQueryData(['ai', 'digest', user.userId], enabled);
     },
-    onError: () => qc.invalidateQueries({ queryKey: ['ai', 'digest', user.userId] }),
+    onSuccess: (_, enabled) =>
+      toast({
+        title: enabled ? 'Resumo diário ativo' : 'Resumo diário desligado',
+        description: enabled
+          ? 'Recebe-o nos dias úteis às 08:30 (com as notificações ligadas).'
+          : undefined,
+      }),
+    onError: () =>
+      toast({ title: 'Não foi possível guardar. Tente outra vez.', variant: 'destructive' }),
+    onSettled: () => qc.invalidateQueries({ queryKey: ['ai', 'digest', user.userId] }),
   });
 
   const list = isPreview ? DEMO : (suggestions.data ?? []);

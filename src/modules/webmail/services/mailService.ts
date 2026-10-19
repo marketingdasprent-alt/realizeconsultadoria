@@ -16,7 +16,7 @@ import type {
 
 /** Colunas que o colaborador pode ler (secret_id fica de fora por GRANT). */
 const ACCOUNT_COLUMNS =
-  'id, provider, auth_method, email, display_name, signature, status, last_error, last_sync_at, is_default, color, access_id';
+  'id, provider, auth_method, email, display_name, signature, status, last_error, last_sync_at, is_default, color, access_id, notify';
 
 export interface MailError {
   code: string;
@@ -61,6 +61,7 @@ const toAccount = (row: Row): MailAccount => ({
   isDefault: !!row.is_default,
   color: row.color as MailAccount['color'],
   shared: !!row.access_id,
+  notify: row.notify !== false,
 });
 
 const toSummary = (accountId: string, row: Row): MailSummary => ({
@@ -118,7 +119,7 @@ export const mailService = {
       // Nas caixas partilhadas, a assinatura e a cor são de cada pessoa.
       supabase
         .from('mail_account_members')
-        .select('account_id, signature, color')
+        .select('account_id, signature, color, notify')
         .eq('user_id', userId),
       // Ordem escolhida pela pessoa na barra lateral (sem ela, fica a da ligação).
       supabase.from('mail_account_order').select('account_id, position').eq('user_id', userId),
@@ -133,6 +134,7 @@ export const mailService = {
             ...account,
             signature: (pref.signature as string | null) ?? null,
             color: (pref.color as MailAccount['color'] | null) ?? account.color,
+            notify: pref.notify !== false,
           }
         : account;
     });
@@ -165,7 +167,9 @@ export const mailService = {
 
   updateAccount: async (
     id: string,
-    patch: Partial<Pick<MailAccount, 'displayName' | 'signature' | 'isDefault' | 'color'>>,
+    patch: Partial<
+      Pick<MailAccount, 'displayName' | 'signature' | 'isDefault' | 'color' | 'notify'>
+    >,
     shared = false
   ) => {
     if (shared) {
@@ -176,6 +180,7 @@ export const mailService = {
         .update({
           ...(patch.signature !== undefined && { signature: patch.signature }),
           ...(patch.color !== undefined && { color: patch.color }),
+          ...(patch.notify !== undefined && { notify: patch.notify }),
         })
         .eq('account_id', id)
         .eq('user_id', auth.session?.user.id ?? '');
@@ -188,6 +193,7 @@ export const mailService = {
         ...(patch.signature !== undefined && { signature: patch.signature }),
         ...(patch.isDefault !== undefined && { is_default: patch.isDefault }),
         ...(patch.color !== undefined && { color: patch.color }),
+        ...(patch.notify !== undefined && { notify: patch.notify }),
       })
       .eq('id', id);
     return { error };

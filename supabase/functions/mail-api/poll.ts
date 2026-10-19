@@ -18,14 +18,16 @@ const IMAP_GAP_MS = 110_000;
 const MAX_SINGLE = 3;
 const LINK = '/colaborador/email';
 
-type PollAccount = MailAccountRow & { notified_until: string | null };
+type PollAccount = MailAccountRow & { notified_until: string | null; notify: boolean };
 
+/** Quem recebe os avisos: o dono ou os membros, só se não os desligaram nesta caixa. */
 const recipientsOf = async (db: SupabaseClient, account: PollAccount): Promise<string[]> => {
-  if (account.user_id) return [account.user_id];
+  if (account.user_id) return account.notify ? [account.user_id] : [];
   const { data } = await db
     .from('mail_account_members')
     .select('user_id')
-    .eq('account_id', account.id);
+    .eq('account_id', account.id)
+    .eq('notify', true);
   return (data ?? []).map(row => row.user_id as string);
 };
 
@@ -117,7 +119,7 @@ export const pollNewMail = async (
 ) => {
   const { data, error } = await db
     .from('mail_accounts')
-    .select(`${ACCOUNT_COLUMNS}, notified_until`)
+    .select(`${ACCOUNT_COLUMNS}, notified_until, notify`)
     .eq('status', 'active');
   if (error) throw error;
   const accounts = (data ?? []) as PollAccount[];

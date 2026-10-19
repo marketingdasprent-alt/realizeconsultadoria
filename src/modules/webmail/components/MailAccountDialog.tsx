@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, RefreshCw, Unplug, Users } from 'lucide-react';
+import { AlertTriangle, BellRing, RefreshCw, Unplug, Users } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/modules/workspace/components/ConfirmDialog';
@@ -19,13 +19,16 @@ interface MailAccountDialogProps {
   onClose: () => void;
   onSave: (
     id: string,
-    patch: Pick<MailAccount, 'displayName' | 'signature' | 'isDefault' | 'color'>
+    patch: Pick<MailAccount, 'displayName' | 'signature' | 'isDefault' | 'color' | 'notify'>
   ) => Promise<boolean>;
   onReconnect: (account: MailAccount) => void;
   onDisconnect: (account: MailAccount) => Promise<void>;
 }
 
-/** Definições de uma caixa: nome, assinatura, cor, predefinida, voltar a ligar e desligar. */
+/**
+ * Definições de uma caixa: nome, assinatura, cor, avisos de email novo, predefinida, voltar a
+ * ligar e desligar.
+ */
 export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
   account,
   onClose,
@@ -38,6 +41,7 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
     signature: '',
     color: 'violet' as MailAccountColor,
     isDefault: false,
+    notify: true,
   });
   const [confirm, setConfirm] = useState(false);
 
@@ -48,6 +52,7 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
       signature: account.signature ?? '',
       color: account.color,
       isDefault: account.isDefault,
+      notify: account.notify,
     });
   }, [account]);
 
@@ -60,6 +65,7 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
       signature: sanitizeSignatureHtml(form.signature) || null,
       color: form.color,
       isDefault: account.shared ? account.isDefault : form.isDefault,
+      notify: form.notify,
     });
     onClose();
   };
@@ -148,6 +154,24 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
                 ))}
               </div>
             </div>
+            <label className="flex items-start gap-3 rounded-2xl bg-rz-canvas px-4 py-3">
+              <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-rz-primary" />
+              <span className="flex-1">
+                <span className="block text-[14px] font-semibold">Avisar emails novos</span>
+                <span className="block text-[12.5px] text-rz-muted">
+                  Notificação no Realize e no telemóvel quando chega um email a esta caixa
+                  {account.shared ? ' (só para si)' : ''}.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                role="switch"
+                checked={form.notify}
+                onChange={e => setForm(f => ({ ...f, notify: e.target.checked }))}
+                className="mt-1 h-5 w-5 accent-violet-600"
+                aria-label="Avisar emails novos desta caixa"
+              />
+            </label>
             {!account.shared && (
               <label className="flex items-center gap-3 text-[14px] font-semibold">
                 <input

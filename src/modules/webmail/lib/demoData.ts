@@ -17,6 +17,7 @@ export const DEMO_MAIL_ACCOUNTS: MailAccount[] = [
     isDefault: true,
     color: 'violet',
     shared: false,
+    notify: true,
   },
   {
     id: 'gmail',
@@ -31,6 +32,7 @@ export const DEMO_MAIL_ACCOUNTS: MailAccount[] = [
     isDefault: false,
     color: 'rose',
     shared: false,
+    notify: true,
   },
 ];
 

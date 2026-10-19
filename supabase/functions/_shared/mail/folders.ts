@@ -5,6 +5,7 @@ import type { MailFolder } from './types.ts';
 
 export const MAIL_FOLDERS: readonly MailFolder[] = [
   'inbox',
+  'unread',
   'sent',
   'drafts',
   'trash',
@@ -20,6 +21,7 @@ export const isMailFolder = (value: unknown): value is MailFolder =>
 
 export const GMAIL_FOLDER_QUERY: Record<MailFolder, string> = {
   inbox: 'in:inbox',
+  unread: 'in:inbox is:unread',
   sent: 'in:sent',
   drafts: 'in:drafts',
   trash: 'in:trash',
@@ -46,6 +48,7 @@ export const GRAPH_BASE = 'https://graph.microsoft.com/v1.0';
 
 export const GRAPH_WELL_KNOWN_FOLDER: Record<Exclude<MailFolder, 'starred'>, string> = {
   inbox: 'inbox',
+  unread: 'inbox',
   sent: 'sentitems',
   drafts: 'drafts',
   trash: 'deleteditems',
@@ -79,13 +82,14 @@ const graphSearchTerm = (query: string): string =>
 
 /**
  * URL da listagem no Graph. $orderby não se combina com $search (fica a ordem de
- * relevância/data do serviço). Nas marcadas com pesquisa também não há $filter
- * possível, por isso `postFilterFlagged` pede para filtrar a página no servidor da função.
+ * relevância/data do serviço). Nas marcadas e nas por ler com pesquisa também não há $filter
+ * possível, por isso `postFilterFlagged`/`postFilterUnread` pedem para filtrar a página no
+ * servidor da função.
  */
 export const buildGraphListUrl = (
   folder: MailFolder,
   options: { query: string | null; limit: number; root?: string }
-): { url: string; postFilterFlagged: boolean } => {
+): { url: string; postFilterFlagged: boolean; postFilterUnread: boolean } => {
   // A própria caixa (/me) ou, com a permissão da app, a de outra pessoa (/users/<email>).
   const root = options.root ?? `${GRAPH_BASE}/me`;
   const base =
@@ -97,7 +101,11 @@ export const buildGraphListUrl = (
 
   if (query) {
     params.push(`$search=${encodeURIComponent(graphSearchTerm(query))}`);
-    return { url: `${base}?${params.join('&')}`, postFilterFlagged: folder === 'starred' };
+    return {
+      url: `${base}?${params.join('&')}`,
+      postFilterFlagged: folder === 'starred',
+      postFilterUnread: folder === 'unread',
+    };
   }
   if (folder === 'starred') {
     // O Graph exige que a propriedade do $orderby apareça primeiro no $filter.
@@ -107,8 +115,13 @@ export const buildGraphListUrl = (
       )}`
     );
   }
+  if (folder === 'unread') {
+    params.push(
+      `$filter=${encodeURIComponent('receivedDateTime ge 1900-01-01T00:00:00Z and isRead eq false')}`
+    );
+  }
   params.push(`$orderby=${encodeURIComponent('receivedDateTime desc')}`);
-  return { url: `${base}?${params.join('&')}`, postFilterFlagged: false };
+  return { url: `${base}?${params.join('&')}`, postFilterFlagged: false, postFilterUnread: false };
 };
 
 /** O page_token do Graph é o @odata.nextLink: só se aceita se for do próprio Graph. */
@@ -119,6 +132,7 @@ export const isAllowedGraphNextLink = (url: string): boolean =>
 
 export const IMAP_SPECIAL_USE: Record<MailFolder, string | null> = {
   inbox: null,
+  unread: null,
   sent: '\\Sent',
   drafts: '\\Drafts',
   trash: '\\Trash',
@@ -130,6 +144,8 @@ export const IMAP_SPECIAL_USE: Record<MailFolder, string | null> = {
 /** Nomes habituais quando o servidor não anuncia special-use (comparação sem maiúsculas). */
 export const IMAP_FALLBACK_NAMES: Record<MailFolder, string[]> = {
   inbox: ['INBOX'],
+  // Por ler: UNSEEN na INBOX (ver driver IMAP).
+  unread: ['INBOX'],
   sent: ['Sent', 'Sent Items', 'Sent Messages', 'Sent Mail', 'Enviados', 'Itens Enviados'],
   drafts: ['Drafts', 'Rascunhos'],
   trash: ['Trash', 'Deleted Items', 'Deleted Messages', 'Bin', 'Lixo', 'Reciclagem'],

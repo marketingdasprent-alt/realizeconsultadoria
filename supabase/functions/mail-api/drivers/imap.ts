@@ -338,7 +338,10 @@ export const createImapDriver = (
         if (before !== null && (!Number.isInteger(before) || before <= 1)) return empty;
 
         // A Entrada é sempre "INBOX": poupa o LIST de todas as pastas (um pedido a menos).
-        let path = folder === 'inbox' ? 'INBOX' : resolveImapFolder(folder, await client.list());
+        let path =
+          folder === 'inbox' || folder === 'unread'
+            ? 'INBOX'
+            : resolveImapFolder(folder, await client.list());
         // Sem pasta \Flagged: marcadas = \Flagged na INBOX.
         const flaggedSearch = folder === 'starred' && !path;
         if (flaggedSearch) path = 'INBOX';
@@ -349,6 +352,7 @@ export const createImapDriver = (
           const criteria: Record<string, unknown> = {};
           if (before) criteria.uid = `1:${before - 1}`;
           if (flaggedSearch) criteria.flagged = true;
+          if (folder === 'unread') criteria.seen = false;
           if (query) criteria.or = [{ subject: query }, { from: query }, { body: query }];
           if (!Object.keys(criteria).length) criteria.all = true;
 

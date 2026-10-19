@@ -3,6 +3,7 @@ import {
   Archive,
   File,
   Inbox,
+  Mail,
   OctagonAlert,
   PenSquare,
   Send,
@@ -14,9 +15,11 @@ import { cn } from '@/lib/utils';
 import { FOLDERS, SIDEBAR_ROW } from '../lib/mailFormat';
 import type { MailAccount, MailFolder } from '../types';
 import { MailAccountList } from './MailAccountList';
+import { UnreadCount } from './MailAccountRow';
 
 const FOLDER_ICONS: Record<MailFolder, LucideIcon> = {
   inbox: Inbox,
+  unread: Mail,
   starred: Star,
   sent: Send,
   drafts: File,
@@ -84,7 +87,12 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
               props.folder === key ? 'bg-rz-primary-soft text-rz-primary' : 'hover:bg-white/70'
             )}
           >
-            <Icon className="h-4 w-4" /> {label}
+            <Icon className="h-4 w-4" /> <span className="flex-1 text-left">{label}</span>
+            {key === 'unread' && (
+              <UnreadCount
+                value={props.scope === 'all' ? props.unreadTotal : props.unread[props.scope]}
+              />
+            )}
           </button>
         );
       })}

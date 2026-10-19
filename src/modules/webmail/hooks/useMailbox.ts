@@ -84,7 +84,11 @@ export const useMailbox = (
       demo.mails
         .filter(m => ids.includes(m.accountId))
         .filter(m =>
-          folder === 'starred' ? m.starred && m.folder !== 'trash' : m.folder === folder
+          folder === 'starred'
+            ? m.starred && m.folder !== 'trash'
+            : folder === 'unread'
+              ? m.unread && m.folder === 'inbox'
+              : m.folder === folder
         )
         .filter(m => matchesTerm(search, m.subject, m.snippet, m.from?.name, m.from?.email))
         .sort((a, b) => b.date.localeCompare(a.date)),

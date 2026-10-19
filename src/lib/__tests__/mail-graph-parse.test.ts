@@ -176,6 +176,17 @@ describe('listagem no Graph', () => {
     );
   });
 
+  it('não lidos: a Entrada com isRead eq false (e filtro na função quando há pesquisa)', () => {
+    const { url } = buildGraphListUrl('unread', { query: null, limit: 10 });
+    expect(url.startsWith('https://graph.microsoft.com/v1.0/me/mailFolders/inbox/messages?')).toBe(
+      true
+    );
+    expect(new URL(url).searchParams.get('$filter')).toBe(
+      'receivedDateTime ge 1900-01-01T00:00:00Z and isRead eq false'
+    );
+    expect(buildGraphListUrl('unread', { query: 'x', limit: 10 }).postFilterUnread).toBe(true);
+  });
+
   it('pesquisa usa $search sem $orderby e limpa aspas', () => {
     const { url, postFilterFlagged } = buildGraphListUrl('inbox', {
       query: 'fatura "abril"',

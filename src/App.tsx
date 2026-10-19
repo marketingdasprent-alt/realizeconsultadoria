@@ -7,6 +7,8 @@ import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AppManifestSync } from '@/components/AppManifestSync';
+import { isAdminHost } from '@/lib/app-manifest';
+import { ROUTES } from '@/lib/constants';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
 import AdminLayout from './components/layout/AdminLayout';
 import { WorkdayProvider } from './modules/timeclock/context/WorkdayProvider';
@@ -86,7 +88,17 @@ const App = () => (
             <Suspense fallback={null}>
               <Routes>
                 {/* Public Routes */}
-                <Route path="/" element={<ComingSoonPage />} />
+                <Route
+                  path="/"
+                  element={
+                    // admin.realizeconsultadoria.pt abre logo o painel de administração.
+                    isAdminHost(window.location.hostname) ? (
+                      <Navigate to={ROUTES.ADMIN.DASHBOARD} replace />
+                    ) : (
+                      <ComingSoonPage />
+                    )
+                  }
+                />
                 <Route path="/site" element={<Index />} />
                 <Route path="/instalar" element={<InstallPage />} />
                 <Route path="/politica-privacidade" element={<PrivacyPolicyPage />} />

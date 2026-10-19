@@ -1,11 +1,14 @@
-import React, { useState } from 'react';
-import { useQueryClient } from '@tanstack/react-query';
-import { ChevronRight, Eye, FolderOpen, FolderPlus, Loader2 } from 'lucide-react';
-import { companyFolderKey, useCompanyFolder } from '../../hooks/useCompanyFolder';
+import React from 'react';
+import { ChevronRight, Eye, FolderOpen, Loader2, Upload } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
+import { useCompanyFolder } from '../../hooks/useCompanyFolder';
+import { useCompanyUploads } from '../../hooks/useCompanyUploads';
 import { breadcrumbsFor } from '../../lib/companyFiles';
-import { companyFilesService, type CompanyEntry } from '../../services/companyFilesService';
+import type { CompanyEntry } from '../../services/companyFilesService';
 import { CompanyFileRow } from './CompanyFileRow';
-import { NewFolderDialog } from './NewFolderDialog';
+import { CompanyFolderActions } from './CompanyFolderActions';
+import { CompanyUploadList } from './CompanyUploadList';
 
 interface CompanyFilesBrowserProps {
   /** Pasta aberta (null = pastas atribuídas). */
@@ -15,40 +18,45 @@ interface CompanyFilesBrowserProps {
   onDownload: (entry: CompanyEntry) => void;
 }
 
-/** Navegação nas pastas do servidor de ficheiros atribuídas ao colaborador. */
+/**
+ * Navegação nas pastas do servidor de ficheiros atribuídas ao colaborador. Nas pastas com
+ * edição: novo documento, carregar (botão ou arrastar para cima da lista) e nova pasta.
+ */
 export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
   path,
   onNavigate,
   onOpenFile,
   onDownload,
 }) => {
-  const queryClient = useQueryClient();
   const roots = useCompanyFolder(null);
   const folder = useCompanyFolder(path, path !== null);
   const listing = path === null ? roots : folder;
-  const [creating, setCreating] = useState(false);
 
   const folders = (roots.data?.entries ?? []).map(entry => ({
     path: entry.path,
     name: entry.name,
   }));
   const crumbs = breadcrumbsFor(path, folders);
-  const canEdit = listing.data?.permission === 'edit';
-
-  const createFolder = async (name: string) => {
-    if (!path) return null;
-    const { data, error } = await companyFilesService.createFolder(`${path}/${name}`);
-    if (error || !data) return error;
-    if (!data.created) return 'Já existe uma pasta com esse nome.';
-    await queryClient.invalidateQueries({ queryKey: companyFolderKey(path) });
-    return null;
-  };
+  const canEdit = !!path && listing.data?.permission === 'edit';
+  const uploads = useCompanyUploads(path);
+  const { isDragging, dropProps } = useFileDrop(uploads.upload, canEdit);
 
   const open = (entry: CompanyEntry) =>
     entry.type === 'dir' ? onNavigate(entry.path) : onOpenFile(entry);
 
   return (
-    <section className="rounded-[28px] bg-white p-3 shadow-rz-soft ring-1 ring-rz-line md:p-5">
+    <section
+      {...dropProps}
+      className={cn(
+        'relative rounded-[28px] bg-white p-3 shadow-rz-soft ring-1 ring-rz-line md:p-5',
+        isDragging && 'ring-2 ring-rz-primary'
+      )}
+    >
+      {isDragging && (
+        <div className="pointer-events-none absolute inset-0 z-10 flex flex-col items-center justify-center gap-2 rounded-[28px] bg-rz-primary-soft/90 text-[15px] font-bold text-rz-primary">
+          <Upload className="h-8 w-8" /> Largue para carregar nesta pasta
+        </div>
+      )}
       <div className="mb-2 flex flex-wrap items-center gap-2 px-1">
         <nav aria-label="Caminho" className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5">
           {crumbs.map((crumb, index) => (
@@ -71,15 +79,11 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
           </span>
         )}
         {path && canEdit && (
-          <button
-            type="button"
-            onClick={() => setCreating(true)}
-            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-rz-canvas px-4 text-[13px] font-semibold text-rz-ink ring-1 ring-rz-line hover:bg-rz-primary-soft"
-          >
-            <FolderPlus className="h-4 w-4 text-rz-primary" /> Nova pasta
-          </button>
+          <CompanyFolderActions path={path} onOpenFile={onOpenFile} onUpload={uploads.upload} />
         )}
       </div>
+
+      <CompanyUploadList items={uploads.items} onDismiss={uploads.dismiss} />
 
       {listing.isLoading ? (
         <Loader2 className="mx-auto my-10 h-6 w-6 animate-spin text-rz-primary" />
@@ -92,7 +96,9 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
           <FolderOpen className="h-10 w-10 text-rz-muted/60" />
           <p className="mt-3 max-w-sm text-[14px] text-rz-muted">
             {path
-              ? 'Esta pasta está vazia.'
+              ? canEdit
+                ? 'Esta pasta está vazia. Crie um documento ou arraste ficheiros para aqui.'
+                : 'Esta pasta está vazia.'
               : 'Ainda não tem pastas da empresa atribuídas. Peça acesso ao administrador.'}
           </p>
         </div>
@@ -108,8 +114,6 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
           Esta pasta tem demasiados ficheiros; só aparecem os primeiros 5000.
         </p>
       )}
-
-      <NewFolderDialog open={creating} onClose={() => setCreating(false)} onCreate={createFolder} />
     </section>
   );
 };

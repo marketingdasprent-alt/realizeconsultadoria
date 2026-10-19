@@ -61,3 +61,12 @@ export const fileKind = (entry: Pick<CompanyEntry, 'name' | 'type'>): FileKind =
 /** Abre no editor ONLYOFFICE (os outros ficheiros descarregam-se). */
 export const opensInEditor = (entry: Pick<CompanyEntry, 'name' | 'type'>): boolean =>
   entry.type === 'file' && documentTypeFor(extensionOf(entry.name)) !== null;
+
+export type NewDocumentKind = 'docx' | 'xlsx' | 'pptx';
+
+/** Documentos em branco que se podem criar numa pasta (abrem logo no editor). */
+export const NEW_DOCUMENT_KINDS: { kind: NewDocumentKind; label: string; fileKind: FileKind }[] = [
+  { kind: 'docx', label: 'Documento', fileKind: 'word' },
+  { kind: 'xlsx', label: 'Folha de cálculo', fileKind: 'cell' },
+  { kind: 'pptx', label: 'Apresentação', fileKind: 'slide' },
+];

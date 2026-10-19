@@ -7,6 +7,8 @@ import {
   documentKey,
   documentTypeFor,
   editorModeFor,
+  freeName,
+  isBlockedUpload,
   isValidName,
   parentPath,
   signJwt,
@@ -163,5 +165,21 @@ describe('agente', () => {
       encoder.encode(`${header}.${body}`)
     );
     expect(valid).toBe(true);
+  });
+});
+
+describe('carregar ficheiros', () => {
+  it('escolhe um nome livre, sem distinguir maiúsculas (como o Windows)', () => {
+    expect(freeName('Ata.docx', ['Outro.xlsx'])).toBe('Ata.docx');
+    expect(freeName('Ata.docx', ['ata.DOCX'])).toBe('Ata (2).docx');
+    expect(freeName('Ata.docx', ['Ata.docx', 'Ata (2).docx'])).toBe('Ata (3).docx');
+    expect(freeName('LEIA-ME', ['leia-me'])).toBe('LEIA-ME (2)');
+  });
+
+  it('recusa programas e scripts', () => {
+    expect(isBlockedUpload('instalar.EXE')).toBe(true);
+    expect(isBlockedUpload('script.ps1')).toBe(true);
+    expect(isBlockedUpload('Relatório.pdf')).toBe(false);
+    expect(isBlockedUpload('fotos.zip')).toBe(false);
   });
 });

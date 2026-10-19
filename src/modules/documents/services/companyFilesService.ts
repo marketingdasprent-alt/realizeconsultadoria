@@ -1,4 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
+import type { NewDocumentKind } from '../lib/companyFiles';
 import type {
   EditorMode,
   FolderPermission,
@@ -41,6 +42,33 @@ interface ServiceResult<T> {
 
 const UNAVAILABLE = 'O servidor de ficheiros não respondeu. Tente outra vez.';
 
+const UPLOAD_ERRORS: Record<number, string> = {
+  401: 'O link de envio expirou. Tente outra vez.',
+  403: 'O servidor de ficheiros recusou o envio.',
+  404: 'A pasta já não existe.',
+  409: 'Já existe um ficheiro com esse nome.',
+  413: 'O ficheiro é demasiado grande.',
+};
+
+/** Envia o ficheiro direto ao agente (PUT), com o progresso de 0 a 1. */
+const putFile = (url: string, file: File, onProgress: (ratio: number) => void) =>
+  new Promise<string | null>(resolve => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('PUT', url);
+    xhr.setRequestHeader('Content-Type', file.type || 'application/octet-stream');
+    xhr.upload.onprogress = event => {
+      if (event.lengthComputable) onProgress(event.loaded / event.total);
+    };
+    xhr.onload = () =>
+      resolve(
+        xhr.status >= 200 && xhr.status < 300
+          ? null
+          : (UPLOAD_ERRORS[xhr.status] ?? 'O servidor de ficheiros deu um erro.')
+      );
+    xhr.onerror = () => resolve(UNAVAILABLE);
+    xhr.send(file);
+  });
+
 const call = async <T>(body: Record<string, string>): Promise<ServiceResult<T>> => {
   try {
     const { data, error } = await supabase.functions.invoke('company-files', { body });
@@ -73,4 +101,30 @@ export const companyFilesService = {
   /** Cria uma pasta (a pasta-mãe tem de existir e ter permissão de edição). */
   createFolder: (path: string) =>
     call<{ path: string; created: boolean }>({ action: 'mkdir', path }),
+
+  /** Documento em branco (Word, Excel ou PowerPoint) na pasta; devolve o caminho. */
+  createDocument: (folder: string, name: string, kind: NewDocumentKind) =>
+    call<{ path: string; name: string }>({ action: 'create', path: folder, name, kind }),
+
+  /**
+   * Carrega um ficheiro na pasta. Se o nome já existir fica "Nome (2).ext"; devolve o nome
+   * com que ficou.
+   */
+  upload: async (
+    folder: string,
+    file: File,
+    onProgress: (ratio: number) => void
+  ): Promise<ServiceResult<{ path: string; name: string }>> => {
+    const target = await call<{ path: string; name: string; url: string }>({
+      action: 'upload',
+      path: folder,
+      name: file.name,
+      size: String(file.size),
+    });
+    if (target.error || !target.data) return { data: null, error: target.error };
+    const error = await putFile(target.data.url, file, onProgress);
+    return error
+      ? { data: null, error }
+      : { data: { path: target.data.path, name: target.data.name }, error: null };
+  },
 };

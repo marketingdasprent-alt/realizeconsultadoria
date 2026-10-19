@@ -6,6 +6,9 @@
 // POST { action: 'open', path }      → config do editor ONLYOFFICE, assinada
 // POST { action: 'download', path }  → link de descarga direto do agente (5 min)
 // POST { action: 'mkdir', path }     → nova pasta (precisa de permissão de edição)
+// POST { action: 'create', path, name, kind } → documento em branco (docx/xlsx/pptx) na pasta
+// POST { action: 'upload', path, name, size } → link para o browser enviar o ficheiro direto
+//                                               ao agente (PUT, 10 min), com um nome livre
 //
 // Respostas { ok: true, data } ou { ok: false, message }. Os segredos nunca saem daqui: o
 // browser só recebe tokens curtos, de uma operação e de um caminho; o document.url e o
@@ -29,11 +32,16 @@ import {
   documentTypeFor,
   editorModeFor,
   extensionOf,
+  freeName,
+  isBlockedUpload,
+  isValidName,
   parentPath,
   signJwt,
   type AgentOp,
   type FolderPermission,
+  UPLOAD_MAX_BYTES,
 } from '../_shared/company-files.ts';
+import { BLANK_MIME, blankFile, isBlankKind } from './templates.ts';
 
 const AGENT_URL = Deno.env.get('FILES_AGENT_URL') ?? 'https://files.dasprent.pt';
 const LOCAL_AGENT_URL = Deno.env.get('FILES_AGENT_LOCAL_URL') ?? 'http://127.0.0.1:8181';
@@ -43,13 +51,17 @@ const ONLYOFFICE_URL = Deno.env.get('ONLYOFFICE_URL') ?? 'https://office.daspren
 const TTL = {
   request: 60,
   browserDownload: 5 * 60,
+  browserUpload: 10 * 60,
   editorDownload: 12 * 3600,
   callback: 48 * 3600,
 };
 
 interface CompanyFilesRequest {
-  action?: 'folders' | 'list' | 'open' | 'download' | 'mkdir';
+  action?: 'folders' | 'list' | 'open' | 'download' | 'mkdir' | 'create' | 'upload';
   path?: unknown;
+  name?: unknown;
+  kind?: unknown;
+  size?: unknown;
 }
 
 interface AgentEntry {
@@ -79,14 +91,26 @@ class FilesError extends Error {}
 const ok = (data: unknown) => json({ ok: true, data });
 const fail = (message: string) => json({ ok: false, message });
 
+const READ_ONLY = 'Nesta pasta só tem acesso de leitura.';
+
 /** Pedido ao agente pelo túnel, com um token só para esta operação e caminho. */
-const callAgent = async <T>(secret: string, op: AgentOp, route: string, path: string) => {
+const callAgent = async <T>(
+  secret: string,
+  op: AgentOp,
+  route: string,
+  path: string,
+  file?: { bytes: Uint8Array; type: string }
+) => {
   const token = await agentToken(op, path, TTL.request, secret);
   let res: Response;
   try {
     res = await fetchWithTimeout(agentUrl(AGENT_URL, route, path), {
-      method: op === 'mkdir' ? 'POST' : 'GET',
-      headers: { Authorization: `Bearer ${token}` },
+      method: file ? 'PUT' : op === 'mkdir' ? 'POST' : 'GET',
+      headers: {
+        Authorization: `Bearer ${token}`,
+        ...(file ? { 'Content-Type': file.type } : {}),
+      },
+      body: file?.bytes,
     });
   } catch {
     throw new FilesError('O servidor de ficheiros não responde. Tente daqui a pouco.');
@@ -98,6 +122,12 @@ const callAgent = async <T>(secret: string, op: AgentOp, route: string, path: st
   }
   return body as T;
 };
+
+/** Nomes do que já existe numa pasta (para não substituir nada). */
+const namesIn = async (secret: string, path: string) =>
+  (await callAgent<AgentListing>(secret, 'list', '/api/list', path)).entries.map(
+    entry => entry.name
+  );
 
 /** Config do editor para um ficheiro, assinada com o segredo do ONLYOFFICE. */
 const openEditor = async (
@@ -188,7 +218,7 @@ serve(async (req: Request) => {
         return ok({ url: agentUrl(AGENT_URL, '/api/file', path, token) });
       }
       case 'mkdir': {
-        if (permission !== 'edit') return fail('Nesta pasta só tem acesso de leitura.');
+        if (permission !== 'edit') return fail(READ_ONLY);
         const result = await callAgent<{ created: boolean }>(
           agentSecret,
           'mkdir',
@@ -196,6 +226,43 @@ serve(async (req: Request) => {
           path
         );
         return ok({ path, created: result.created });
+      }
+      case 'create': {
+        if (permission !== 'edit') return fail(READ_ONLY);
+        if (!isBlankKind(body.kind)) return fail('Tipo de documento inválido.');
+        const title = typeof body.name === 'string' ? body.name.trim() : '';
+        const name = `${title}.${body.kind}`;
+        if (!title || !isValidName(name)) return fail('Nome inválido.');
+        const taken = await namesIn(agentSecret, path);
+        if (freeName(name, taken) !== name)
+          return fail('Já existe um ficheiro com esse nome nesta pasta.');
+        const filePath = `${path}/${name}`;
+        await callAgent(agentSecret, 'upload', '/api/upload', filePath, {
+          bytes: blankFile(body.kind),
+          type: BLANK_MIME[body.kind],
+        });
+        return ok({ path: filePath, name });
+      }
+      case 'upload': {
+        if (permission !== 'edit') return fail(READ_ONLY);
+        const original = typeof body.name === 'string' ? body.name.trim() : '';
+        const size = Number(body.size);
+        if (!isValidName(original))
+          return fail(
+            'O servidor não aceita este nome de ficheiro. Mude o nome e tente outra vez.'
+          );
+        if (isBlockedUpload(original))
+          return fail('Por segurança, programas e scripts não podem ser carregados.');
+        if (!Number.isFinite(size) || size < 0) return fail('Ficheiro inválido.');
+        if (size > UPLOAD_MAX_BYTES) return fail('O ficheiro é demasiado grande (máximo 100 MB).');
+        const name = freeName(original, await namesIn(agentSecret, path));
+        const filePath = `${path}/${name}`;
+        const token = await agentToken('upload', filePath, TTL.browserUpload, agentSecret);
+        return ok({
+          path: filePath,
+          name,
+          url: agentUrl(AGENT_URL, '/api/upload', filePath, token),
+        });
       }
       case 'open': {
         const user = { id: userId, name: employees?.[0]?.name || 'Colaborador' };

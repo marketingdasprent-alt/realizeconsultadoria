@@ -38,6 +38,44 @@ export const writeListCache = <T>(userId: string, key: string, page: T) => {
   }
 };
 
+interface CachedMail {
+  id: string;
+  accountId: string;
+}
+
+/**
+ * Aplica a mesma mudança às listas guardadas (todas as caixas/pastas deste utilizador): um
+ * email apagado não volta a aparecer ao mudar de caixa ou ao reabrir o Webmail.
+ */
+export const patchListCaches = (
+  userId: string,
+  target: CachedMail,
+  patch: Record<string, unknown> | 'remove'
+) => {
+  try {
+    const same = (m: CachedMail) => m.id === target.id && m.accountId === target.accountId;
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(`${PREFIX}${userId}:`))
+      .forEach(k => {
+        const entry = JSON.parse(localStorage.getItem(k) ?? 'null') as CacheEntry<{
+          messages?: CachedMail[];
+        }> | null;
+        const messages = entry?.page?.messages;
+        if (!entry || !Array.isArray(messages) || !messages.some(same)) return;
+        const next =
+          patch === 'remove'
+            ? messages.filter(m => !same(m))
+            : messages.map(m => (same(m) ? { ...m, ...patch } : m));
+        localStorage.setItem(
+          k,
+          JSON.stringify({ ...entry, page: { ...entry.page, messages: next } })
+        );
+      });
+  } catch {
+    // sem acesso ao armazenamento: a lista nova corrige na mesma
+  }
+};
+
 /** Ao terminar a sessão: nada de emails fica no browser. */
 export const clearMailCache = () => {
   try {

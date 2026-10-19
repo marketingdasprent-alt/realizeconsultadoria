@@ -66,10 +66,11 @@ export default defineConfig(({ mode }) => ({
         clientsClaim: true,
         runtimeCaching: [
           {
-            urlPattern: ({ request }) =>
-              request.destination === 'document' ||
-              request.destination === 'script' ||
-              request.destination === 'style',
+            urlPattern: ({ request, sameOrigin }) =>
+              sameOrigin &&
+              (request.destination === 'document' ||
+                request.destination === 'script' ||
+                request.destination === 'style'),
             handler: 'NetworkFirst',
             options: {
               cacheName: 'app-shell',
@@ -77,8 +78,10 @@ export default defineConfig(({ mode }) => ({
             },
           },
           {
-            urlPattern: ({ request }) =>
-              request.destination === 'image' || request.destination === 'font',
+            // Só as imagens e fontes do próprio site: as de outros sites (ex.: dentro dos emails)
+            // vão direto à rede, senão o service worker falhava-as ("no-response").
+            urlPattern: ({ request, sameOrigin }) =>
+              sameOrigin && (request.destination === 'image' || request.destination === 'font'),
             handler: 'CacheFirst',
             options: {
               cacheName: 'static-assets',

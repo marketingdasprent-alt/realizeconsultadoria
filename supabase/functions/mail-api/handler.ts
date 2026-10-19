@@ -13,6 +13,8 @@
 //   disconnect { account_id }
 //   discover { email } → { servers, oauth, source } (servidores IMAP/SMTP do domínio, por DNS)
 //   share-access { access_id } (só admin) → caixa partilhada de um email dos Acessos (share.ts)
+// Pela BD (cabeçalho x-mail-system-token): { access_id } partilha automática; { action:
+// 'poll-new' } avisos de email novo a cada 2 minutos (poll.ts).
 //
 // Cada ação carrega a conta com service role e `user_id = <quem chama>`; os tokens e
 // palavras-passe ficam no Vault e nunca vão para o browser. Drivers: Gmail API,
@@ -55,6 +57,7 @@ import { discoverDomain, domainOfEmail } from '../_shared/mail/discover.ts';
 import { createGmailDriver } from './drivers/gmail.ts';
 import { createGraphDriver } from './drivers/graph.ts';
 import { createImapDriver, testImapLogin, type ImapAccountConfig } from './drivers/imap.ts';
+import { pollNewMail } from './poll.ts';
 import { OAuthSession } from './session.ts';
 import { shareAccess, shareAccessById } from './share.ts';
 
@@ -289,6 +292,8 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
   const systemToken = Deno.env.get('MAIL_SYSTEM_TOKEN');
   if (systemToken && req.headers.get('x-mail-system-token') === systemToken) {
     const body: unknown = await req.json().catch(() => null);
+    if (isRecord(body) && body.action === 'poll-new')
+      return ok(await pollNewMail(db, createDriver));
     if (!isRecord(body) || !isUuid(body.access_id)) return badRequest();
     try {
       return ok(await shareAccessById(db, body.access_id));

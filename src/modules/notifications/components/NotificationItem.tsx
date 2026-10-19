@@ -1,7 +1,16 @@
 import React from 'react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Award, Bell, FolderOpen, LifeBuoy, MessageCircle, Palmtree, Sparkles } from 'lucide-react';
+import {
+  Award,
+  Bell,
+  FolderOpen,
+  LifeBuoy,
+  Mail,
+  MessageCircle,
+  Palmtree,
+  Sparkles,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ModuleIcon } from '@/modules/workspace/components/ModuleIcon';
 import type { NotificationRow } from '../services/notificationService';
@@ -13,6 +22,7 @@ const KINDS: Record<string, { icon: typeof Bell; tint: string }> = {
   ticket: { icon: LifeBuoy, tint: 'from-cyan-400 to-sky-600' },
   document: { icon: FolderOpen, tint: 'from-amber-400 to-orange-500' },
   assistant: { icon: Sparkles, tint: 'from-violet-500 via-fuchsia-500 to-amber-400' },
+  mail: { icon: Mail, tint: 'from-sky-400 to-blue-600' },
 };
 
 interface NotificationItemProps {

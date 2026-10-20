@@ -1,3 +1,5 @@
+// Lembrete diário dos serviços pagos (Acessos → Serviços pagos): internet, assinaturas e,
+// desde 20/10, também os domínios (antes tinham um email à parte, send-domain-renewal-reminders).
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.45.0';
 
@@ -15,9 +17,12 @@ const corsHeaders = {
 };
 
 const TYPE_LABELS: Record<string, string> = {
+  domain: 'Domínio',
   internet: 'Internet',
   subscription: 'Assinatura',
 };
+
+const SERVICES_URL = 'https://admin.realizeconsultadoria.pt/admin/acessos?tab=servicos';
 
 const CYCLE_LABELS: Record<string, string> = {
   monthly: '/mês',
@@ -53,14 +58,28 @@ serve(async req => {
     const today = new Date();
     today.setHours(0, 0, 0, 0);
 
-    const { data: allServices, error } = await supabase
-      .from('recurring_services')
-      .select('*, companies(name)')
-      .order('renewal_date', { ascending: true });
+    const [servicesRes, domainsRes] = await Promise.all([
+      supabase.from('recurring_services').select('*, companies(name)'),
+      supabase.from('site_domains').select('id, domain_name, renewal_value, renewal_date'),
+    ]);
+    if (servicesRes.error) throw servicesRes.error;
+    if (domainsRes.error) throw domainsRes.error;
 
-    if (error) {
-      throw error;
-    }
+    // Os domínios entram como serviços anuais (sem empresa nem fornecedor).
+    const allServices = [
+      ...(servicesRes.data ?? []),
+      ...(domainsRes.data ?? []).map(domain => ({
+        id: domain.id,
+        name: domain.domain_name,
+        service_type: 'domain',
+        provider: null,
+        companies: null,
+        amount: domain.renewal_value,
+        billing_cycle: 'yearly',
+        renewal_date: domain.renewal_date,
+        fidelity_end: null,
+      })),
+    ].sort((a, b) => String(a.renewal_date).localeCompare(String(b.renewal_date)));
 
     const expiringServices: any[] = [];
     const endingFidelity: any[] = [];
@@ -223,7 +242,7 @@ serve(async req => {
           <p style="margin: 0; color: #991b1b; font-size: 13px; line-height: 1.5;">
             ⚠️ ${overdueCount === 1 ? 'Há 1 serviço' : `Há ${overdueCount} serviços`} com a data de pagamento
             ultrapassada. Se já ${overdueCount === 1 ? 'foi pago' : 'foram pagos'}, marque como pago em
-            Acessos &rsaquo; Serviços para a data avançar.
+            Acessos &rsaquo; Serviços pagos para a data avançar.
           </p>
         </div>
       `
@@ -266,7 +285,7 @@ serve(async req => {
             <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 28px auto 0;">
               <tr>
                 <td style="background-color: #d5b884; border-radius: 6px;">
-                  <a href="https://realize.dasprent.pt/admin/acessos"
+                  <a href="${SERVICES_URL}"
                     style="display: inline-block; padding: 14px 36px; color: #000000; text-decoration: none; font-weight: 600; font-size: 15px;">
                     Ver Serviços
                   </a>

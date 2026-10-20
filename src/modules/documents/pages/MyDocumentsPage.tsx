@@ -1,19 +1,19 @@
 import React, { useEffect } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { FolderLock } from 'lucide-react';
-import { toast } from '@/hooks/use-toast';
 import { WorkspacePage } from '@/modules/workspace/components/WorkspacePage';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { CompanyFilesBrowser } from '../components/company/CompanyFilesBrowser';
-import { CompanyFilePreview } from '../components/company/CompanyFilePreview';
-import { OnlyOfficeEditor } from '../components/company/OnlyOfficeEditor';
 import { opensInEditor, previewKind } from '../lib/companyFiles';
-import { companyFilesService, type CompanyEntry } from '../services/companyFilesService';
+import { useCompanyDownload } from '../hooks/useCompanyDownload';
+import { preloadEditor } from '../lib/onlyoffice';
+import type { CompanyEntry } from '../services/companyFilesService';
 
 /**
  * Documentos da empresa: as pastas do servidor de ficheiros (D:\Shares) atribuídas ao
  * colaborador, abertas e editadas no ONLYOFFICE sem sair do Realize. A pasta aberta fica em
- * ?pasta= e o ficheiro aberto em ?abrir=, para o "voltar" do browser funcionar. Os documentos
+ * ?pasta=; cada ficheiro aberto (?abrir= no editor, ?ver= imagens e vídeos) fica na sua aba
+ * (OpenFilesHost, na estrutura) e continua carregado ao voltar aqui para abrir outro. Os documentos
  * pessoais e os recibos estão em Definições → Os meus documentos (os atalhos antigos
  * ?enviar=… e ?tab=… seguem para lá).
  */
@@ -23,8 +23,6 @@ const MyDocumentsPage: React.FC = () => {
   const navigate = useNavigate();
   const personal = `${basePath}/definicoes/documentos`;
   const folder = params.get('pasta');
-  const opened = params.get('abrir');
-  const viewing = params.get('ver');
 
   useEffect(() => {
     if (params.has('enviar') || params.has('tab'))
@@ -43,23 +41,12 @@ const MyDocumentsPage: React.FC = () => {
     setParams(search, { replace });
   };
 
-  const download = async (entry: CompanyEntry) => {
-    // A janela abre já (no clique), senão o browser bloqueia-a depois do pedido
-    const win = window.open('', '_blank');
-    const { data, error } = await companyFilesService.downloadUrl(entry.path);
-    if (error || !data) {
-      win?.close();
-      return toast({
-        title: 'Não foi possível descarregar',
-        description: error ?? '',
-        variant: 'destructive',
-      });
-    }
-    if (win) {
-      win.opener = null;
-      win.location.href = data.url;
-    } else window.location.assign(data.url);
-  };
+  const download = useCompanyDownload();
+
+  // O editor (ONLYOFFICE) começa a carregar já: o primeiro documento abre mais depressa.
+  useEffect(() => {
+    if (!isPreview) preloadEditor();
+  }, [isPreview]);
 
   // Documentos no editor; imagens, vídeos e áudio na visualização; o resto descarrega-se.
   const openFile = (entry: CompanyEntry) =>
@@ -92,18 +79,6 @@ const MyDocumentsPage: React.FC = () => {
           onOpenFile={openFile}
           onDownload={download}
         />
-      )}
-
-      {viewing && !isPreview && (
-        <CompanyFilePreview
-          path={viewing}
-          onNavigate={path => show({ ver: path }, true)}
-          onClose={() => show({ ver: null })}
-          onDownload={download}
-        />
-      )}
-      {opened && !isPreview && (
-        <OnlyOfficeEditor path={opened} onClose={() => show({ abrir: null })} />
       )}
     </WorkspacePage>
   );

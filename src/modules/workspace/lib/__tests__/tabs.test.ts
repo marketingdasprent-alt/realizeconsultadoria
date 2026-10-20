@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closeTab, parseTabs, tabForPath, visitTab } from '../tabs';
+import { closeTab, fileOfTab, parseTabs, tabForPath, tabInfo, visitTab } from '../tabs';
 
 const BASE = '/colaborador';
 
@@ -10,6 +10,24 @@ describe('abas da área do colaborador', () => {
     expect(tabForPath('/colaborador/definicoes/documentos', BASE)?.key).toBe('settings');
     expect(tabForPath('/colaborador/perfil', BASE)?.key).toBe('profile');
     expect(tabForPath('/admin', BASE)).toBeNull();
+  });
+
+  it('cada ficheiro aberto dos Documentos tem a sua aba', () => {
+    const doc = tabForPath('/colaborador/documentos', BASE, '?pasta=A&abrir=A%2FPlano.xlsx');
+    expect(doc?.key).toBe('file:A/Plano.xlsx');
+    expect(doc?.label).toBe('Plano.xlsx');
+    expect(tabForPath('/colaborador/documentos', BASE, '?pasta=A')?.key).toBe('documents');
+    // As imagens de uma pasta partilham uma aba (as setas mudam de imagem)
+    const view = tabForPath('/colaborador/documentos', BASE, '?pasta=A&ver=A%2Ffoto.png');
+    expect(view?.key).toBe('view:A');
+    expect(view?.label).toBe('foto.png');
+    expect(tabInfo('view:A', '/colaborador/documentos?ver=A%2Foutra.gif')?.label).toBe('outra.gif');
+    expect(fileOfTab('/colaborador/documentos?pasta=A&abrir=A%2FPlano.xlsx')).toEqual({
+      path: 'A/Plano.xlsx',
+      mode: 'edit',
+    });
+    // Ficam guardadas como as outras
+    expect(parseTabs(JSON.stringify([{ key: 'file:A/x.docx', url: '/u' }]))).toHaveLength(1);
   });
 
   it('abrir um módulo novo acrescenta a aba; voltar a um atualiza a página', () => {

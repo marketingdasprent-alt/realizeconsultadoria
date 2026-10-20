@@ -20,7 +20,7 @@ export const WorkspaceTabs: React.FC = () => {
       className="scrollbar-hide flex shrink-0 items-end gap-1 overflow-x-auto bg-black/[0.04] px-3 pt-2"
     >
       {tabs.map((tab, index) => {
-        const info = tabInfo(tab.key);
+        const info = tabInfo(tab.key, tab.url);
         if (!info) return null;
         const isActive = tab.key === active;
         return (

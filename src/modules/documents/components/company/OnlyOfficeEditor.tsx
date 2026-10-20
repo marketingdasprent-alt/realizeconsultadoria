@@ -18,7 +18,7 @@ type EditorState =
 let editorCount = 0;
 
 /**
- * Ficheiro aberto no ONLYOFFICE, em ecrã inteiro. As alterações gravam-se sozinhas em
+ * Ficheiro aberto no ONLYOFFICE, na área do painel (a aba do ficheiro). As alterações gravam-se sozinhas em
  * D:\Shares (o ONLYOFFICE chama o agente do servidor); "Guardar" grava logo.
  */
 export const OnlyOfficeEditor: React.FC<OnlyOfficeEditorProps> = ({ path, onClose }) => {
@@ -73,7 +73,7 @@ export const OnlyOfficeEditor: React.FC<OnlyOfficeEditorProps> = ({ path, onClos
   }, [path]);
 
   return (
-    <div className="fixed inset-0 z-[80] flex flex-col bg-white">
+    <div className="absolute inset-0 flex flex-col bg-white">
       <header className="flex h-14 shrink-0 items-center gap-2 border-b border-rz-line px-2 md:px-4">
         <button
           type="button"

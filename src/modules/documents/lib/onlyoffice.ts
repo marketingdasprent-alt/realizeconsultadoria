@@ -35,3 +35,24 @@ export const loadDocsApi = (src: string): Promise<DocsApi> => {
   });
   return loading;
 };
+
+const OFFICE_URL = 'https://office.dasprent.pt';
+let preloaded = false;
+
+/**
+ * Pré-carrega o editor (página do próprio ONLYOFFICE, escondida): os ficheiros dele ficam na
+ * cache do browser e o primeiro documento abre mais depressa. Uma vez por sessão.
+ */
+export const preloadEditor = () => {
+  if (preloaded || typeof document === 'undefined') return;
+  preloaded = true;
+  const frame = document.createElement('iframe');
+  frame.src = `${OFFICE_URL}/web-apps/apps/api/documents/preload.html`;
+  frame.title = 'Pré-carregamento do editor';
+  frame.setAttribute('aria-hidden', 'true');
+  frame.tabIndex = -1;
+  frame.style.cssText = 'position:absolute;width:0;height:0;border:0;visibility:hidden';
+  document.body.appendChild(frame);
+  // Depois de carregar, sai (os ficheiros já estão na cache).
+  setTimeout(() => frame.remove(), 60_000);
+};

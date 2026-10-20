@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
 import type { EmailPeopleValue } from '../components/accesses/EmailPeopleDialog';
-import type { Credential } from '../lib/credentials';
+import type { Credential, CredentialEmployee } from '../lib/credentials';
 import { credentialService } from '../services/credentialService';
 
 const people = (count: number) => `${count} ${count === 1 ? 'pessoa' : 'pessoas'}`;
@@ -71,6 +71,22 @@ export const useEmailActions = (refresh: () => Promise<unknown> | void) => {
     await link(credential);
   };
 
+  /** O email que já existia (sem dono) passa a ser deste colaborador; a BD liga a caixa. */
+  const associate = async (employee: CredentialEmployee, credential: Credential) => {
+    const { ok } = await credentialService.setOwner(credential.id, employee.id);
+    toast(
+      ok
+        ? {
+            title: `${credential.username} é agora de ${employee.name}`,
+            description: employee.user_id ? 'A caixa liga ao Webmail dele em segundos.' : undefined,
+          }
+        : { title: 'Erro ao associar', variant: 'destructive' }
+    );
+    void refresh();
+    // A caixa é criada em segundo plano (pela BD): volta a ler o estado daqui a pouco.
+    setTimeout(() => void refresh(), 8000);
+  };
+
   const remove = async (credential: Credential) => {
     const { ok } = await credentialService.remove(credential.id);
     toast(
@@ -79,5 +95,5 @@ export const useEmailActions = (refresh: () => Promise<unknown> | void) => {
     void refresh();
   };
 
-  return { linking, bulk, link, linkAll, savePeople, remove };
+  return { linking, bulk, link, linkAll, savePeople, associate, remove };
 };

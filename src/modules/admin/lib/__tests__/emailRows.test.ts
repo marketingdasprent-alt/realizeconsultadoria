@@ -1,6 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import type { Credential, CredentialEmployee } from '../credentials';
-import { buildEmailRows, countStates, filterEmailRows, withoutPersonalEmail } from '../emailRows';
+import {
+  buildEmailRows,
+  countStates,
+  emailCandidates,
+  emailsOfEmployee,
+  filterEmailRows,
+  suggestedEmails,
+  withoutPersonalEmail,
+} from '../emailRows';
 
 const employee = (id: string, name: string, extra: Partial<CredentialEmployee> = {}) => ({
   id,
@@ -88,5 +96,51 @@ describe('buildEmailRows', () => {
 
   it('lists active employees with an account and no personal email', () => {
     expect(withoutPersonalEmail(source, 'all').map(e => e.id)).toEqual(['rui', 'lia']);
+  });
+});
+
+describe('suggestedEmails', () => {
+  it('suggests ownerless personal emails with two of the names', () => {
+    const list = [
+      credential('a', 'filipe.soares@daspautorepair.pt', 'Email Pessoal'),
+      credential('b', 'carlos.matos@x.pt', 'Email Pessoal', 'someone'),
+      credential('c', 'soares@x.pt', 'Email Pessoal'),
+      credential('d', 'filipe.soares@x.pt', 'Email Departamental'),
+    ];
+    expect(suggestedEmails({ name: 'Carlos Filipe Matos Soares' }, list).map(c => c.id)).toEqual([
+      'a',
+    ]);
+    expect(suggestedEmails({ name: 'Dércio António do Rosário' }, list)).toEqual([]);
+  });
+});
+
+describe('emails de um colaborador', () => {
+  it('lists the mailboxes the person owns or shares', () => {
+    expect(emailsOfEmployee('ana', source).map(e => [e.credential.id, e.role])).toEqual([
+      ['p1', 'owner'],
+      ['d1', 'shared'],
+    ]);
+    expect(emailsOfEmployee('lia', source).map(e => [e.credential.id, e.role])).toEqual([
+      ['p1', 'shared'],
+    ]);
+  });
+
+  it('suggests and searches emails that are not theirs yet', () => {
+    const extra = {
+      ...source,
+      credentials: [
+        ...source.credentials,
+        credential('x', 'rui.lima@dasprent.pt', 'Email Pessoal'),
+      ],
+    };
+    expect(emailCandidates({ id: 'rui', name: 'Rui Lima' }, extra, '').map(c => c.id)).toEqual([
+      'x',
+    ]);
+    expect(emailCandidates({ id: 'rui', name: 'Rui Lima' }, extra, 'geral').map(c => c.id)).toEqual(
+      []
+    );
+    expect(emailCandidates({ id: 'ana', name: 'Ana' }, extra, 'eva').map(c => c.id)).toEqual([
+      'p2',
+    ]);
   });
 });

@@ -7,6 +7,7 @@ import {
   buildEmailRows,
   countStates,
   filterEmailRows,
+  suggestedEmails,
   withoutPersonalEmail,
   type EmailFilters,
 } from '../../lib/emailRows';
@@ -45,6 +46,8 @@ export const EmailsTab: React.FC<{ canManage: boolean }> = ({ canManage }) => {
       <MissingPeopleNotice
         people={missing}
         what="com conta na app mas sem email pessoal"
+        suggest={employee => suggestedEmails(employee, data.credentials)}
+        onLink={(employee, credential) => void actions.associate(employee, credential)}
         canManage={canManage}
         onCreate={employee =>
           setPanel({

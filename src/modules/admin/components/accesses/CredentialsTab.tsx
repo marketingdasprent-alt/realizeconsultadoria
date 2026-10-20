@@ -16,6 +16,7 @@ import { groupCredentials, withoutMainAccess } from '../../lib/credentialGroups'
 import { isEmailCategory, type Credential } from '../../lib/credentials';
 import { credentialService } from '../../services/credentialService';
 import { CredentialRow } from './CredentialRow';
+import { EmailPeopleDialog } from './EmailPeopleDialog';
 import { MissingPeopleNotice } from './MissingPeopleNotice';
 import { AccessPanel } from './panel/AccessPanel';
 import type { AccessPanelTarget } from './panel/useAccessForm';
@@ -30,6 +31,15 @@ export const CredentialsTab: React.FC<{ canManage: boolean }> = ({ canManage }) 
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [panel, setPanel] = useState<AccessPanelTarget | null>(null);
   const [toDelete, setToDelete] = useState<Credential | null>(null);
+  const [peopleOf, setPeopleOf] = useState<Credential | null>(null);
+
+  const saveOwner = async (credential: Credential, ownerId: string | null) => {
+    const { ok } = await credentialService.setOwner(credential.id, ownerId);
+    toast(
+      ok ? { title: 'Colaborador guardado' } : { title: 'Erro ao guardar', variant: 'destructive' }
+    );
+    void data.refresh();
+  };
 
   const groups = useMemo(
     () => groupCredentials(data.credentials, filters),
@@ -154,6 +164,7 @@ export const CredentialsTab: React.FC<{ canManage: boolean }> = ({ canManage }) 
                     credential={credential}
                     showCompany={filters.companyId === 'all'}
                     canManage={canManage}
+                    onPeople={() => setPeopleOf(credential)}
                     onEdit={() => setPanel({ credential })}
                     onDelete={() => setToDelete(credential)}
                   />
@@ -169,6 +180,15 @@ export const CredentialsTab: React.FC<{ canManage: boolean }> = ({ canManage }) 
         data={data}
         onClose={() => setPanel(null)}
         onSaved={() => void data.refresh()}
+      />
+      <EmailPeopleDialog
+        credential={peopleOf}
+        mode="credential"
+        shares={[]}
+        employees={data.employees}
+        companies={data.companies}
+        onClose={() => setPeopleOf(null)}
+        onSave={(credential, value) => saveOwner(credential, value.ownerId)}
       />
       <DeleteConfirmDialog
         open={!!toDelete}

@@ -105,7 +105,11 @@ export const EmailsTab: React.FC<{ canManage: boolean }> = ({ canManage }) => {
       />
       <EmailPeopleDialog
         credential={peopleOf}
-        department={!!peopleOf && isDepartmentCategory(peopleOf.access_categories?.name)}
+        mode={
+          peopleOf && isDepartmentCategory(peopleOf.access_categories?.name)
+            ? 'department'
+            : 'personal'
+        }
         shares={peopleOf ? (data.shares.get(peopleOf.id) ?? []) : []}
         employees={data.employees}
         companies={data.companies}

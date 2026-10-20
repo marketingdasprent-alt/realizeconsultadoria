@@ -158,7 +158,6 @@ export const useAccessForm = (
       return setOutcome({ tone: 'error', message: 'Não foi possível guardar o acesso.' });
     }
     setSavedId(id);
-    if (form.kind === 'email_department') await credentialService.setShares(id, form.people);
     onSaved();
     if (!isEmail) {
       setPhase('done');
@@ -180,19 +179,19 @@ const linkOutcome = async (
   data: CredentialsData,
   employee: CredentialsData['employees'][number] | null
 ): Promise<Outcome> => {
-  const receivers =
-    form.kind === 'email_department'
-      ? data.employees.filter(e => form.people.includes(e.id) && e.is_active && e.user_id)
-      : employee?.is_active && employee.user_id
-        ? [employee]
-        : [];
+  // Quem já tem acesso (as pessoas escolhem-se na janela das pessoas, na lista).
+  const shared = data.shares.get(id) ?? form.people;
+  const receivers = data.employees.filter(
+    e =>
+      e.is_active &&
+      e.user_id &&
+      (shared.includes(e.id) || (form.kind === 'email_personal' && e.id === employee?.id))
+  );
   if (receivers.length === 0) {
     const message =
-      form.kind === 'email_department'
-        ? 'Guardado. Junte pessoas (com conta na app) para a caixa aparecer no Webmail.'
-        : employee
-          ? `Guardado. ${employee.name} ainda não tem conta na app — a caixa liga quando tiver.`
-          : 'Guardado. Sem colaborador, a caixa não aparece no Webmail de ninguém.';
+      employee && form.kind === 'email_personal'
+        ? `Guardado. ${employee.name} ainda não tem conta na app — a caixa liga quando tiver.`
+        : 'Guardado. Para a caixa aparecer no Webmail, escolha as pessoas no ícone de pessoas da lista.';
     return { tone: 'warn', message };
   }
   const { members, error } = await credentialService.linkMailbox(id);

@@ -1,5 +1,5 @@
 import React from 'react';
-import { ExternalLink, Pencil, Trash2 } from 'lucide-react';
+import { ExternalLink, Pencil, Trash2, Users } from 'lucide-react';
 import type { Credential } from '../../lib/credentials';
 import { CopyText, SecretText } from './SecretText';
 
@@ -7,6 +7,7 @@ interface CredentialRowProps {
   credential: Credential;
   showCompany: boolean;
   canManage: boolean;
+  onPeople: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }
@@ -21,6 +22,7 @@ export const CredentialRow: React.FC<CredentialRowProps> = ({
   credential,
   showCompany,
   canManage,
+  onPeople,
   onEdit,
   onDelete,
 }) => {
@@ -52,6 +54,15 @@ export const CredentialRow: React.FC<CredentialRowProps> = ({
         )}
         {canManage && (
           <>
+            <button
+              type="button"
+              onClick={onPeople}
+              className={ACTION}
+              aria-label="Colaborador"
+              title="Colaborador"
+            >
+              <Users className="h-4 w-4" />
+            </button>
             <button type="button" onClick={onEdit} className={ACTION} aria-label="Editar">
               <Pencil className="h-4 w-4" />
             </button>

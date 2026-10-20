@@ -11,7 +11,6 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import type { CredentialsData } from '../../../services/credentialService';
 import { PasswordInput } from './PasswordInput';
-import { PeoplePicker } from './PeoplePicker';
 import type { AccessForm } from './useAccessForm';
 
 interface AccessPanelFieldsProps {
@@ -22,8 +21,6 @@ interface AccessPanelFieldsProps {
   isEmail: boolean;
   update: (patch: Partial<AccessForm>) => void;
 }
-
-const NONE = '__none';
 
 const Field: React.FC<{ id: string; label: string; error?: string; children: React.ReactNode }> = ({
   id,
@@ -49,14 +46,6 @@ export const AccessPanelFields: React.FC<AccessPanelFieldsProps> = ({
   isEmail,
   update,
 }) => {
-  // Todos os ativos (um email pode ser de outra empresa do grupo); os da empresa primeiro.
-  const employees = data.employees
-    .filter(e => e.is_active)
-    .sort(
-      (a, b) =>
-        Number(b.company_id === form.companyId) - Number(a.company_id === form.companyId) ||
-        a.name.localeCompare(b.name)
-    );
   const showSuffix = isEmail && !!domain && !form.local.includes('@');
   return (
     <div className="space-y-4">
@@ -130,41 +119,6 @@ export const AccessPanelFields: React.FC<AccessPanelFieldsProps> = ({
           onChange={password => update({ password })}
         />
       </Field>
-
-      {form.kind === 'email_department' ? (
-        <Field id="acc-people" label="Quem tem esta caixa no Webmail">
-          <PeoplePicker
-            employees={employees}
-            companies={data.companies}
-            preferCompanyId={form.companyId}
-            value={form.people}
-            onChange={people => update({ people })}
-          />
-        </Field>
-      ) : (
-        <Field
-          id="acc-employee"
-          label={form.kind === 'email_personal' ? 'Colaborador' : 'Colaborador (opcional)'}
-        >
-          <Select
-            value={form.employeeId || NONE}
-            onValueChange={value => update({ employeeId: value === NONE ? '' : value })}
-          >
-            <SelectTrigger id="acc-employee" className="h-10">
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value={NONE}>Nenhum</SelectItem>
-              {employees.map(employee => (
-                <SelectItem key={employee.id} value={employee.id}>
-                  {employee.name}
-                  {employee.user_id ? '' : ' (sem conta na app)'}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </Field>
-      )}
 
       {isEmail && (
         <Field id="acc-title" label="Nome (opcional)">

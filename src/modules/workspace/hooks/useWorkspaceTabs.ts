@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useWorkspace } from '../context/workspaceContext';
 import { closeTab, parseTabs, tabForPath, visitTab, type WorkspaceTab } from '../lib/tabs';
@@ -6,10 +6,12 @@ import { closeTab, parseTabs, tabForPath, visitTab, type WorkspaceTab } from '..
 const storageKey = (userId: string) => `rz-tabs:${userId || 'preview'}`;
 
 /**
- * Abas (como no Chrome): navegar para um módulo abre/atualiza a sua aba; as abas ficam
- * guardadas neste dispositivo. Atalhos: Alt+1…9 muda de aba, Alt+W fecha a atual.
+ * Abas (como no Chrome): navegar para um módulo (ou abrir um ficheiro dos Documentos) abre ou
+ * atualiza a sua aba; as abas ficam guardadas neste dispositivo. Atalhos: Alt+1…9 muda de
+ * aba, Alt+W fecha a atual. Um só estado para a barra e para os ficheiros abertos
+ * (WorkspaceTabsProvider).
  */
-export const useWorkspaceTabs = () => {
+export const useWorkspaceTabsState = () => {
   const { basePath, user } = useWorkspace();
   const location = useLocation();
   const navigate = useNavigate();
@@ -20,7 +22,7 @@ export const useWorkspaceTabs = () => {
       return [];
     }
   });
-  const active = tabForPath(location.pathname, basePath)?.key ?? null;
+  const active = tabForPath(location.pathname, basePath, location.search)?.key ?? null;
 
   // A página atual entra (ou atualiza) a sua aba.
   useEffect(() => {
@@ -38,11 +40,12 @@ export const useWorkspaceTabs = () => {
 
   const open = useCallback((tab: WorkspaceTab) => navigate(tab.url), [navigate]);
 
+  /** Fecha a aba; se era a atual, vai para `goTo` (ex.: a pasta do ficheiro) ou a vizinha. */
   const close = useCallback(
-    (key: string) => {
+    (key: string, goTo?: string) => {
       const result = closeTab(tabs, key, active);
       setTabs(result.tabs);
-      if (key === active) navigate(result.goTo ?? basePath);
+      if (key === active) navigate(goTo ?? result.goTo ?? basePath);
     },
     [tabs, active, navigate, basePath]
   );
@@ -72,4 +75,15 @@ export const useWorkspaceTabs = () => {
   }, [tabs, active, navigate, close]);
 
   return { tabs, active, open, close, openExternal };
+};
+
+export type WorkspaceTabsValue = ReturnType<typeof useWorkspaceTabsState>;
+
+export const WorkspaceTabsContext = createContext<WorkspaceTabsValue | null>(null);
+
+/** Abas da área do colaborador (dentro do WorkspaceShell). */
+export const useWorkspaceTabs = (): WorkspaceTabsValue => {
+  const value = useContext(WorkspaceTabsContext);
+  if (!value) throw new Error('useWorkspaceTabs tem de ser usado dentro do WorkspaceTabsProvider');
+  return value;
 };

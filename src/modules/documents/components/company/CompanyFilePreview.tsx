@@ -1,5 +1,4 @@
 import React, { useEffect } from 'react';
-import { createPortal } from 'react-dom';
 import { useQuery } from '@tanstack/react-query';
 import { ChevronLeft, ChevronRight, Download, Loader2, X } from 'lucide-react';
 import { baseName, parentPath } from '../../../../../supabase/functions/_shared/company-files';
@@ -9,6 +8,8 @@ import { companyFilesService, type CompanyEntry } from '../../services/companyFi
 
 interface CompanyFilePreviewProps {
   path: string;
+  /** Aba visível (só então responde ao teclado). */
+  active?: boolean;
   onNavigate: (path: string) => void;
   onClose: () => void;
   onDownload: (entry: CompanyEntry) => void;
@@ -18,11 +19,12 @@ const ARROW =
   'absolute top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/10 text-white backdrop-blur hover:bg-white/20';
 
 /**
- * Ver uma imagem, um vídeo ou um áudio da pasta sem o descarregar (como no Windows): ecrã
- * inteiro, ← → para os outros da mesma pasta, Esc para fechar.
+ * Ver uma imagem, um vídeo ou um áudio da pasta sem o descarregar (como no Windows), na aba
+ * do ficheiro: ← → para os outros da mesma pasta, Esc para fechar.
  */
 export const CompanyFilePreview: React.FC<CompanyFilePreviewProps> = ({
   path,
+  active = true,
   onNavigate,
   onClose,
   onDownload,
@@ -47,6 +49,7 @@ export const CompanyFilePreview: React.FC<CompanyFilePreviewProps> = ({
   });
 
   useEffect(() => {
+    if (!active) return;
     const onKey = (event: KeyboardEvent) => {
       if (event.key === 'Escape') onClose();
       if (event.key === 'ArrowLeft' && prev) onNavigate(prev.path);
@@ -54,14 +57,13 @@ export const CompanyFilePreview: React.FC<CompanyFilePreviewProps> = ({
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [prev, next, onClose, onNavigate]);
+  }, [active, prev, next, onClose, onNavigate]);
 
-  // No body (portal): cobre o ecrã todo, por cima do menu e do painel.
-  return createPortal(
+  return (
     <div
       role="dialog"
       aria-label={name}
-      className="fixed inset-0 z-[100] flex flex-col bg-black/95 text-white"
+      className="absolute inset-0 flex flex-col bg-black/95 text-white"
     >
       <header className="flex items-center gap-3 px-4 py-3">
         <p className="min-w-0 flex-1 truncate text-[15px] font-semibold">{name}</p>
@@ -134,7 +136,6 @@ export const CompanyFilePreview: React.FC<CompanyFilePreviewProps> = ({
           </button>
         )}
       </div>
-    </div>,
-    document.body
+    </div>
   );
 };

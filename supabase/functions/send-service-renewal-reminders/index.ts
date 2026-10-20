@@ -26,6 +26,8 @@ const SERVICES_URL = 'https://admin.realizeconsultadoria.pt/admin/acessos?tab=se
 
 const CYCLE_LABELS: Record<string, string> = {
   monthly: '/mês',
+  quarterly: '/trimestre',
+  semiannual: '/semestre',
   yearly: '/ano',
 };
 

@@ -2374,6 +2374,7 @@ export type Database = {
           provider: string | null;
           renewal_date: string;
           service_type: string;
+          start_date: string | null;
           updated_at: string;
         };
         Insert: {
@@ -2390,6 +2391,7 @@ export type Database = {
           provider?: string | null;
           renewal_date: string;
           service_type: string;
+          start_date?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -2406,6 +2408,7 @@ export type Database = {
           provider?: string | null;
           renewal_date?: string;
           service_type?: string;
+          start_date?: string | null;
           updated_at?: string;
         };
         Relationships: [
@@ -2453,6 +2456,7 @@ export type Database = {
           last_paid_year: number | null;
           renewal_date: string;
           renewal_value: number;
+          start_date: string | null;
           updated_at: string | null;
         };
         Insert: {
@@ -2462,6 +2466,7 @@ export type Database = {
           last_paid_year?: number | null;
           renewal_date: string;
           renewal_value?: number;
+          start_date?: string | null;
           updated_at?: string | null;
         };
         Update: {
@@ -2471,6 +2476,7 @@ export type Database = {
           last_paid_year?: number | null;
           renewal_date?: string;
           renewal_value?: number;
+          start_date?: string | null;
           updated_at?: string | null;
         };
         Relationships: [];

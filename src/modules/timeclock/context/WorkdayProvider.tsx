@@ -2,6 +2,7 @@
 // tag): registos recentes do colaborador e a ação em curso.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, startOfDay } from 'date-fns';
+import { readDeviceCache, sessionUserId, writeDeviceCache } from '@/lib/device-cache';
 import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
 import { ACTION_ENTRY, deriveWorkday, type WorkdayAction } from '@/lib/workday';
 import { useCurrentEmployee } from '../hooks/useCurrentEmployee';
@@ -40,13 +41,19 @@ const optimisticEntry = (
   } as TimeClockEntryWithRelations;
 };
 
+const ENTRIES_CACHE = 'workday-entries';
+
 /** Um erro de registo fica visível este tempo (ou até ao registo seguinte). */
 const OUTCOME_VISIBLE_MS = 60 * 1000;
 
 export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { employee, isLoading: employeeLoading } = useCurrentEmployee();
-  const [entries, setEntries] = useState<TimeClockEntryWithRelations[]>([]);
-  const [entriesLoaded, setEntriesLoaded] = useState(false);
+  // Os registos da última vez (no aparelho) aparecem já; os do servidor substituem-nos.
+  const [cached] = useState(() =>
+    readDeviceCache<TimeClockEntryWithRelations[]>(ENTRIES_CACHE, sessionUserId())
+  );
+  const [entries, setEntries] = useState<TimeClockEntryWithRelations[]>(cached ?? []);
+  const [entriesLoaded, setEntriesLoaded] = useState(!!cached);
   const [version, setVersion] = useState(0);
   const { phase, outcome, isBusy, punch, warmUp, clear } = usePunch();
   const now = useNow(30_000);
@@ -64,6 +71,7 @@ export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!error) {
       setEntries(data);
       loadedAt.current = Date.now();
+      writeDeviceCache(ENTRIES_CACHE, sessionUserId(), data);
     }
     setEntriesLoaded(true);
   }, [employeeId]);

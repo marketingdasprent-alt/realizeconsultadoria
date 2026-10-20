@@ -9,6 +9,7 @@ import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AppManifestSync } from '@/components/AppManifestSync';
 import { isAdminHost } from '@/lib/app-manifest';
 import { ROUTES } from '@/lib/constants';
+import { persistQueries, restoreQueries } from '@/lib/query-persist';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
 import AdminLayout from './components/layout/AdminLayout';
 import { WorkdayProvider } from './modules/timeclock/context/WorkdayProvider';
@@ -63,9 +64,13 @@ const NotFound = lazy(() => import('./pages/NotFound'));
 // sem pedidos novos só por mudar de janela.
 const queryClient = new QueryClient({
   defaultOptions: {
-    queries: { staleTime: 60_000, gcTime: 10 * 60_000, refetchOnWindowFocus: false, retry: 1 },
+    // gcTime longo: o que veio do aparelho (query-persist) não se perde antes de abrir a página.
+    queries: { staleTime: 60_000, gcTime: 24 * 3600_000, refetchOnWindowFocus: false, retry: 1 },
   },
 });
+// O que se viu da última vez aparece logo; a versão nova chega em segundo plano.
+restoreQueries(queryClient);
+persistQueries(queryClient);
 
 // Pré-visualização do Realize 2.0 com dados de exemplo: só em desenvolvimento.
 const WorkspacePreview = import.meta.env.DEV

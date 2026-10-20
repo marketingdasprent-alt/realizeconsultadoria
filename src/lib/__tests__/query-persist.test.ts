@@ -38,7 +38,8 @@ describe('cache no aparelho', () => {
     expect(isPersisted(['chat', 'thread', 'c1'])).toBe(true);
     expect(isPersisted(['calendar', 'events', 'a', 'b'])).toBe(true);
     expect(isPersisted(['chat', 'boot'])).toBe(false);
-    expect(isPersisted(['company-files', ''])).toBe(false);
+    expect(isPersisted(['company-files', 'DASPRENT/MARKETING'])).toBe(true);
+    expect(isPersisted(['company-files', 'url', 'DASPRENT/x.png'])).toBe(false);
     expect(isPersisted(['documents'])).toBe(false);
     expect(isPersisted(['mail', 'list', 'all'])).toBe(false);
   });
@@ -50,7 +51,7 @@ describe('cache no aparelho', () => {
       pages: [['m3'], ['m2'], ['m1']],
       pageParams: [null, 'a', 'b'],
     });
-    client.setQueryData(['company-files', 'x'], { secret: true });
+    client.setQueryData(['documents', 'x'], { secret: true });
     const state = snapshot(client);
     expect(state.queries.map(q => q.queryKey)).toEqual([
       ['chat', 'conversations'],
@@ -66,7 +67,7 @@ describe('cache no aparelho', () => {
       pages: [['m3']],
       pageParams: [null],
     });
-    expect(fresh.getQueryData(['company-files', 'x'])).toBeUndefined();
+    expect(fresh.getQueryData(['documents', 'x'])).toBeUndefined();
   });
 
   it('não mostra a cache de outro utilizador nem cache com mais de uma semana', () => {

@@ -116,7 +116,6 @@ export const WARNING_FLAGS = new Set([
   'vpn_or_proxy',
   'no_gps',
   'stale_gps',
-  'imprecise_gps',
   'ip_far_from_location',
   'suspicious_accuracy',
   'repeated_coordinates',
@@ -341,7 +340,12 @@ const blocked = (flags: string[], distanceM: number): PunchDecision => ({
   presence: null,
 });
 
-/** Presença não comprovada pelo GPS: decide pela rede, pela tag ou pela ação. */
+/**
+ * Presença não comprovada pelo GPS (fora dos locais, sem GPS, GPS fraco). Desde 20/10 a
+ * equipa trabalha em vários escritórios: o registo fica válido, com o sítio gravado (morada
+ * ou "Sem localização"), e só vai para revisão com sinais de fraude. Continua a precisar de
+ * aprovação o registo sem tag num local que a exige.
+ */
 const notValidated = (
   ctx: DecideContext,
   flags: string[],
@@ -358,20 +362,22 @@ const notValidated = (
   });
   // Wi-Fi do escritório comprova a presença (exceto onde o local exige a tag).
   if (ctx.trustedNetwork && !ctx.manualNotAllowed) return decision(review, 'network');
-  // Parar o relógio não acrescenta horas: a pausa nunca precisa de aprovação.
-  if (ctx.action === 'pause') return decision(review, tagPresence ? 'tag' : null);
-  // A tag prova a presença; sem GPS para a confirmar, os RH revêem.
-  if (tagPresence) return decision('flagged', 'tag');
-  flags.push('remote');
-  return decision('pending', null);
+  // A tag prova a presença, mesmo sem GPS.
+  if (tagPresence) return decision(review, 'tag');
+  // Local que exige a tag, registado sem ela: os RH aprovam (a pausa nunca precisa).
+  if (ctx.manualNotAllowed && ctx.action !== 'pause') {
+    flags.push('remote');
+    return decision('pending', null);
+  }
+  return decision(review, null);
 };
 
 /**
  * Decide como registar. Como no Bitrix24, o ponto nunca falha por GPS ou distância:
  *  - presença comprovada (GPS dentro do raio, tag ou Wi-Fi do escritório) →
  *    válido, ou em revisão se houver alertas;
- *  - fora dos locais ou sem GPS → registado na mesma, a aguardar aprovação, com o
- *    motivo nas flags (a pausa fica logo válida);
+ *  - fora dos locais ou sem GPS → válido na mesma, com o motivo nas flags e o sítio
+ *    gravado; em revisão só com sinais de fraude (VPN, GPS falso, telemóvel partilhado…);
  *  - só recusa VPN/Tor quando o local o bloqueia.
  */
 export const decidePunch = (ctx: DecideContext): PunchDecision => {

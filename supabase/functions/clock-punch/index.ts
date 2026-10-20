@@ -7,9 +7,10 @@
 //
 // Toda a validação é feita aqui (service role): identidade, tag NFC, distância
 // ao local, precisão GPS, IP/VPN, dispositivo e anti-replay. O ponto regista-se
-// sempre (decidePunch): fora dos locais ou sem GPS fica 'pending' até um admin
-// aprovar, com email para a lista de aprovações. Só se recusa tag inválida ou
-// repetida, tag de outra empresa e VPN/Tor quando o local o bloqueia.
+// sempre (decidePunch): fora dos locais ou sem GPS fica válido com o sítio gravado
+// (a equipa trabalha em vários escritórios); só vai para revisão com sinais de fraude.
+// Só se recusa tag inválida ou repetida, tag de outra empresa e VPN/Tor quando o
+// local o bloqueia.
 // `at` é a hora indicada pelo colaborador para um registo esquecido (✎): exige
 // motivo e fica sempre a aguardar aprovação. Fora dos locais guarda-se a morada
 // aproximada (OpenStreetMap) para mostrar onde a pessoa estava.
@@ -402,7 +403,7 @@ serve(async (req: Request) => {
     ]
   );
 
-  // 3. Regras: regista sempre; fora dos locais ou sem GPS fica a aguardar aprovação.
+  // 3. Regras: regista sempre; fora dos locais ou sem GPS fica válido, com a morada.
   const now = Date.now();
   const last = lastRes.data;
   const decision = decidePunch({

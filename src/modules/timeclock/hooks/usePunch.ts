@@ -1,5 +1,11 @@
 import { useCallback, useRef, useState } from 'react';
-import { getBestPosition, getDeviceId, type PositionPayload } from '@/lib/geolocation';
+import {
+  getBestPosition,
+  getDeviceId,
+  getGeoPermission,
+  rememberGeoGranted,
+  type PositionPayload,
+} from '@/lib/geolocation';
 import type { TagPayload } from '@/lib/nfc';
 import { getPunchMessage, type PunchMethod } from '@/lib/timeclock';
 import type { WorkdayAction, WorkdayStatus } from '@/lib/workday';
@@ -32,7 +38,10 @@ interface UsePunchResult {
   isBusy: boolean;
   /** Lê o GPS e regista a ação. Sem GPS regista na mesma (fica a aguardar aprovação). */
   punch: (input: PunchInput) => Promise<PunchOutcome | null>;
-  /** Começa já a ler o GPS (ao abrir o painel), para o registo ser imediato. */
+  /**
+   * Começa já a ler o GPS (ao abrir o painel), para o registo ser imediato — só se a
+   * localização já estiver permitida: abrir o relógio nunca mostra o pedido de permissão.
+   */
   warmUp: () => void;
   /** Esquece o último resultado. */
   clear: () => void;
@@ -66,6 +75,7 @@ export const usePunch = (): UsePunchResult => {
         if (ageOf(reading) >= REUSE_POSITION_MS) reading = null;
       }
       reading ??= { position: await getBestPosition(), capturedAt: Date.now() };
+      rememberGeoGranted();
       return { ...reading.position, age_ms: ageOf(reading) };
     } catch {
       return null;
@@ -112,10 +122,15 @@ export const usePunch = (): UsePunchResult => {
   );
 
   const warmUp = useCallback(() => {
-    if (warm.current && Date.now() - warm.current.startedAt < REUSE_POSITION_MS) return;
-    const reading = getBestPosition().then(position => ({ position, capturedAt: Date.now() }));
-    reading.catch(() => undefined); // o erro só interessa quando o registo for enviado
-    warm.current = { startedAt: Date.now(), reading };
+    const isWarm = () => !!warm.current && Date.now() - warm.current.startedAt < REUSE_POSITION_MS;
+    if (isWarm()) return;
+    // Sem permissão dada, a localização só se pede ao carregar no botão.
+    void getGeoPermission().then(state => {
+      if (state !== 'granted' || isWarm()) return;
+      const reading = getBestPosition().then(position => ({ position, capturedAt: Date.now() }));
+      reading.catch(() => undefined); // o erro só interessa quando o registo for enviado
+      warm.current = { startedAt: Date.now(), reading };
+    });
   }, []);
 
   const clear = useCallback(() => {

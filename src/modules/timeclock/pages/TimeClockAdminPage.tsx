@@ -9,10 +9,12 @@ import { HistoryTab } from '../components/admin/HistoryTab';
 import { LocationsTab } from '../components/admin/LocationsTab';
 import { ReviewTab } from '../components/admin/ReviewTab';
 import { TimesheetTab } from '../components/admin/TimesheetTab';
+import { TodayTab } from '../components/admin/TodayTab';
 import { useTimeClockReview } from '../hooks/useTimeClockReview';
 
 /** ?tab= em português (usado no link dos emails de aprovação). */
 const TAB_PARAMS: Record<string, string> = {
+  hoje: 'today',
   folha: 'timesheet',
   revisao: 'review',
   locais: 'locations',
@@ -43,13 +45,13 @@ const TimeClockAdminPage: React.FC = () => {
 
   const canEdit = canExecuteTopic('timeclock', 'edit');
   const canManageLocations = canExecuteTopic('timeclock', 'locations');
-  const tab = TAB_PARAMS[searchParams.get('tab') ?? ''] ?? 'timesheet';
+  const tab = TAB_PARAMS[searchParams.get('tab') ?? ''] ?? 'today';
   const toReview = review.pending.length + review.flagged.length;
 
   const changeTab = (value: string) => {
     // Decisões tomadas na folha de ponto também mudam a lista de revisão.
     if (value === 'review') review.refetch();
-    setSearchParams(value === 'timesheet' ? {} : { tab: PARAM_BY_TAB[value] }, { replace: true });
+    setSearchParams(value === 'today' ? {} : { tab: PARAM_BY_TAB[value] }, { replace: true });
   };
 
   return (
@@ -61,6 +63,7 @@ const TimeClockAdminPage: React.FC = () => {
 
       <Tabs value={tab} onValueChange={changeTab}>
         <TabsList className="flex-wrap h-auto">
+          <TabsTrigger value="today">Hoje</TabsTrigger>
           <TabsTrigger value="timesheet">Folha de Ponto</TabsTrigger>
           <TabsTrigger value="review" className="gap-2">
             Revisão
@@ -73,6 +76,9 @@ const TimeClockAdminPage: React.FC = () => {
           <TabsTrigger value="locations">Locais & Tags</TabsTrigger>
           <TabsTrigger value="history">Histórico</TabsTrigger>
         </TabsList>
+        <TabsContent value="today" className="mt-4">
+          <TodayTab />
+        </TabsContent>
         <TabsContent value="timesheet" className="mt-4">
           <TimesheetTab canEdit={canEdit} />
         </TabsContent>

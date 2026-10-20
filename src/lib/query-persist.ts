@@ -1,7 +1,7 @@
 // A cache do React Query também fica no aparelho (por utilizador): ao abrir a app, as
 // conversas, o calendário, as tarefas… aparecem logo com o que se viu da última vez, e o
 // React Query vai buscar a versão nova em segundo plano (os dados guardados contam como
-// antigos). Só as áreas do dia a dia; nada de documentos, recibos ou dados financeiros.
+// antigos). Só as áreas do dia a dia; nada de documentos pessoais, recibos ou dados financeiros.
 import { dehydrate, hydrate, type DehydratedState, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { clearDeviceCache, readDeviceCache, sessionUserId, writeDeviceCache } from './device-cache';
@@ -27,11 +27,14 @@ const PERSISTED: readonly (readonly string[])[] = [
   ['mail', 'accounts'],
   ['mail', 'unread'],
   ['ai', 'suggestions'],
+  // Pastas da empresa: só os nomes e as datas (os links de leitura expiram e não se guardam).
+  ['company-files'],
 ];
 
 export const isPersisted = (key: readonly unknown[]): boolean =>
   // O arranque do Messenger (entrar no canal Geral…) corre sempre em cada sessão.
   !(key[0] === 'chat' && key[1] === 'boot') &&
+  !(key[0] === 'company-files' && key[1] === 'url') &&
   PERSISTED.some(prefix => prefix.every((part, index) => key[index] === part));
 
 interface Saved {

@@ -58,6 +58,15 @@ export const PeoplePicker: React.FC<PeoplePickerProps> = ({ employees, value, on
         placeholder="Juntar pessoa (escreva o nome)…"
         value={search}
         onChange={event => setSearch(event.target.value)}
+        onKeyDown={event => {
+          // Enter junta a primeira pessoa da lista (não guarda o formulário).
+          if (event.key !== 'Enter') return;
+          event.preventDefault();
+          if (options[0]) {
+            onChange([...value, options[0].id]);
+            setSearch('');
+          }
+        }}
         className="h-10"
       />
       {options.length > 0 && (

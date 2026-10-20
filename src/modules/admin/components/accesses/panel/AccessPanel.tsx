@@ -47,7 +47,15 @@ export const AccessPanel: React.FC<AccessPanelProps> = ({ target, data, onClose,
           </SheetTitle>
         </SheetHeader>
 
-        <div className="flex-1 space-y-5 overflow-y-auto p-5">
+        {/* Enter num campo guarda (o botão Guardar é o submit do formulário). */}
+        <form
+          id="access-panel-form"
+          onSubmit={event => {
+            event.preventDefault();
+            if (!busy) void save();
+          }}
+          className="flex-1 space-y-5 overflow-y-auto p-5"
+        >
           <KindPicker value={form.kind} onChange={kind => update({ kind })} />
           <AccessPanelFields
             form={form}
@@ -57,7 +65,7 @@ export const AccessPanel: React.FC<AccessPanelProps> = ({ target, data, onClose,
             isEmail={isEmail}
             update={update}
           />
-        </div>
+        </form>
 
         <div className="space-y-3 border-t border-rz-line p-4">
           {outcome && result && ResultIcon && (
@@ -72,7 +80,7 @@ export const AccessPanel: React.FC<AccessPanelProps> = ({ target, data, onClose,
             <Button variant="outline" className="rounded-full" onClick={onClose} disabled={busy}>
               {phase === 'done' ? 'Fechar' : 'Cancelar'}
             </Button>
-            <Button className="rounded-full" onClick={() => void save()} disabled={busy}>
+            <Button type="submit" form="access-panel-form" className="rounded-full" disabled={busy}>
               {busy && <Loader2 className="h-4 w-4 animate-spin" />}
               {phase === 'linking'
                 ? 'A ligar a caixa…'

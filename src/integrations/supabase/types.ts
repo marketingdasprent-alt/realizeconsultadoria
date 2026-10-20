@@ -2359,6 +2359,65 @@ export type Database = {
         };
         Relationships: [];
       };
+      recurring_services: {
+        Row: {
+          amount: number;
+          billing_cycle: string;
+          company_id: string | null;
+          created_at: string;
+          fidelity_end: string | null;
+          id: string;
+          last_paid_date: string | null;
+          location: string | null;
+          name: string;
+          notes: string | null;
+          provider: string | null;
+          renewal_date: string;
+          service_type: string;
+          updated_at: string;
+        };
+        Insert: {
+          amount?: number;
+          billing_cycle?: string;
+          company_id?: string | null;
+          created_at?: string;
+          fidelity_end?: string | null;
+          id?: string;
+          last_paid_date?: string | null;
+          location?: string | null;
+          name: string;
+          notes?: string | null;
+          provider?: string | null;
+          renewal_date: string;
+          service_type: string;
+          updated_at?: string;
+        };
+        Update: {
+          amount?: number;
+          billing_cycle?: string;
+          company_id?: string | null;
+          created_at?: string;
+          fidelity_end?: string | null;
+          id?: string;
+          last_paid_date?: string | null;
+          location?: string | null;
+          name?: string;
+          notes?: string | null;
+          provider?: string | null;
+          renewal_date?: string;
+          service_type?: string;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'recurring_services_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       session_transfers: {
         Row: {
           created_at: string | null;
@@ -2383,6 +2442,36 @@ export type Database = {
           token?: string;
           used_at?: string | null;
           user_id?: string;
+        };
+        Relationships: [];
+      };
+      site_domains: {
+        Row: {
+          created_at: string | null;
+          domain_name: string;
+          id: string;
+          last_paid_year: number | null;
+          renewal_date: string;
+          renewal_value: number;
+          updated_at: string | null;
+        };
+        Insert: {
+          created_at?: string | null;
+          domain_name: string;
+          id?: string;
+          last_paid_year?: number | null;
+          renewal_date: string;
+          renewal_value?: number;
+          updated_at?: string | null;
+        };
+        Update: {
+          created_at?: string | null;
+          domain_name?: string;
+          id?: string;
+          last_paid_year?: number | null;
+          renewal_date?: string;
+          renewal_value?: number;
+          updated_at?: string | null;
         };
         Relationships: [];
       };

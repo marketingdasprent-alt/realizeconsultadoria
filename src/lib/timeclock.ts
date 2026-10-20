@@ -62,7 +62,7 @@ export const FLAG_INFO: Record<string, { label: string; warning: boolean }> = {
   trusted_network: { label: 'Rede do local', warning: false },
   gps_only: { label: 'Sem tag (só GPS)', warning: false },
   ip_check_unavailable: { label: 'IP não verificado', warning: false },
-  remote: { label: 'Fora do local (a aprovar)', warning: false },
+  remote: { label: 'Fora do local', warning: false },
   outside_location: { label: 'Fora do local', warning: false },
   no_gps: { label: 'Sem GPS', warning: true },
   stale_gps: { label: 'GPS desatualizado', warning: true },

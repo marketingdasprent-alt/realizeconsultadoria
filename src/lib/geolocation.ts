@@ -136,3 +136,51 @@ export const getDeviceId = (): string | null => {
     return null;
   }
 };
+
+export type GeoPermission = 'granted' | 'denied' | 'prompt' | 'unknown';
+
+/**
+ * Estado da permissão de localização, sem a pedir. 'unknown' em browsers sem a
+ * Permissions API (iPhone antigo): aí a localização só se pede ao registar.
+ */
+export const getGeoPermission = async (): Promise<GeoPermission> => {
+  try {
+    if (typeof navigator === 'undefined' || !navigator.permissions?.query) return 'unknown';
+    const status = await navigator.permissions.query({ name: 'geolocation' as PermissionName });
+    return status.state;
+  } catch {
+    return 'unknown';
+  }
+};
+
+const GRANTED_KEY = 'rz.geo.granted';
+
+/** Este aparelho já deu a localização alguma vez (para notar quando a "esquece"). */
+export const rememberGeoGranted = (): void => {
+  try {
+    localStorage.setItem(GRANTED_KEY, '1');
+  } catch {
+    // Sem armazenamento: só se perde a dica de "permitir sempre".
+  }
+};
+
+export const wasGeoGranted = (): boolean => {
+  try {
+    return localStorage.getItem(GRANTED_KEY) === '1';
+  } catch {
+    return false;
+  }
+};
+
+/**
+ * Explicar como deixar a localização sempre permitida: quando está bloqueada, ou quando
+ * o aparelho a deu antes e voltou a perguntar (escolheu "só desta vez").
+ */
+export const geoHintReason = (
+  state: GeoPermission,
+  grantedBefore: boolean
+): 'blocked' | 'asks-again' | null => {
+  if (state === 'denied') return 'blocked';
+  if (state === 'prompt' && grantedBefore) return 'asks-again';
+  return null;
+};

@@ -80,13 +80,13 @@ describe('evaluatePunch', () => {
     expect(evaluatePunch({ ...ctx, method: 'gps' }).rejected).toBe('out_of_radius');
   });
 
-  it('accepts an NFC punch with imprecise GPS, for review (the tag proves presence)', () => {
+  it('accepts an NFC punch with imprecise GPS (the tag proves presence)', () => {
     // Caso real: iPhone na tag do escritório com GPS a ±10 km.
     const ctx = baseContext({ method: 'nfc', position: { ...NEAR, accuracy: 10_516, ageMs: 0 } });
     const result = evaluatePunch(ctx);
     expect(result.rejected).toBeNull();
     expect(result.flags).toContain('imprecise_gps');
-    expect(result.status).toBe('flagged');
+    expect(result.status).toBe('valid');
   });
 
   it('tells manual punches with approximate location apart from merely weak GPS', () => {
@@ -269,12 +269,13 @@ describe('decidePunch — regista sempre (como o Bitrix24)', () => {
     expect(result).toMatchObject({ rejected: null, status: 'valid', presence: 'location' });
   });
 
-  it('registers outside the office as pending instead of refusing', () => {
+  it('registers outside the offices as valid (several offices), with the reason', () => {
     const result = decidePunch(decideContext({ position: { ...HOME, accuracy: 15, ageMs: 0 } }));
     expect(result.rejected).toBeNull();
-    expect(result.status).toBe('pending');
+    expect(result.status).toBe('valid');
     expect(result.presence).toBeNull();
-    expect(result.flags).toEqual(expect.arrayContaining(['outside_location', 'remote']));
+    expect(result.flags).toContain('outside_location');
+    expect(result.flags).not.toContain('remote');
     expect(result.distanceM).toBeGreaterThan(10_000);
   });
 
@@ -291,25 +292,25 @@ describe('decidePunch — regista sempre (como o Bitrix24)', () => {
     expect(noGps.flags).toContain('no_gps');
   });
 
-  it('registers without GPS as pending, with the reason in the flags', () => {
+  it('registers without GPS as valid, with the reason in the flags', () => {
     const result = decidePunch(decideContext({ position: null }));
-    expect(result.status).toBe('pending');
-    expect(result.flags).toEqual(expect.arrayContaining(['no_gps', 'remote', 'gps_only']));
+    expect(result.status).toBe('valid');
+    expect(result.flags).toEqual(expect.arrayContaining(['no_gps', 'gps_only']));
 
     const stale = decidePunch(
       decideContext({ position: { ...NEAR, accuracy: 10, ageMs: 5 * 60_000 } })
     );
-    expect(stale.status).toBe('pending');
+    expect(stale.status).toBe('valid');
     expect(stale.flags).toContain('stale_gps');
   });
 
-  it('turns weak or approximate GPS into pending with a clear reason', () => {
+  it('accepts weak or approximate GPS, with a clear reason', () => {
     const weak = decidePunch(decideContext({ position: { ...NEAR, accuracy: 150, ageMs: 0 } }));
-    expect(weak.status).toBe('pending');
+    expect(weak.status).toBe('valid');
     expect(weak.flags).toContain('weak_gps');
 
     const approx = decidePunch(decideContext({ position: { ...NEAR, accuracy: 1_986, ageMs: 0 } }));
-    expect(approx.status).toBe('pending');
+    expect(approx.status).toBe('valid');
     expect(approx.flags).toContain('approximate_location');
   });
 
@@ -330,9 +331,9 @@ describe('decidePunch — regista sempre (como o Bitrix24)', () => {
     expect(shared.status).toBe('flagged');
   });
 
-  it('accepts a tag without GPS for review (flagged), and a tag pause as valid', () => {
+  it('accepts a tag without GPS, and a tag pause, as valid', () => {
     const tag = decidePunch(decideContext({ method: 'nfc', position: null }));
-    expect(tag).toMatchObject({ status: 'flagged', presence: 'tag' });
+    expect(tag).toMatchObject({ status: 'valid', presence: 'tag' });
     const pause = decidePunch(decideContext({ method: 'nfc', action: 'pause', position: null }));
     expect(pause).toMatchObject({ status: 'valid', presence: 'tag' });
   });
@@ -343,11 +344,22 @@ describe('decidePunch — regista sempre (como o Bitrix24)', () => {
     expect(result.flags).toContain('tag_required');
     const onWifi = decidePunch(decideContext({ manualNotAllowed: true, trustedNetwork: true }));
     expect(onWifi.status).toBe('pending');
+    const pause = decidePunch(decideContext({ manualNotAllowed: true, action: 'pause' }));
+    expect(pause.status).toBe('valid');
   });
 
-  it('registers companies without locations as pending', () => {
+  it('still sends fraud signals to review when outside the offices', () => {
+    const shared = decidePunch(
+      decideContext({ position: { ...HOME, accuracy: 15, ageMs: 0 }, deviceUsedByOthers: true })
+    );
+    expect(shared.status).toBe('flagged');
+    const fake = decidePunch(decideContext({ position: { ...HOME, accuracy: 1, ageMs: 0 } }));
+    expect(fake.status).toBe('flagged');
+  });
+
+  it('registers companies without locations as valid', () => {
     const result = decidePunch(decideContext({ location: null }));
-    expect(result.status).toBe('pending');
+    expect(result.status).toBe('valid');
     expect(result.flags).toContain('no_location_configured');
   });
 
@@ -355,7 +367,7 @@ describe('decidePunch — regista sempre (como o Bitrix24)', () => {
     const result = decidePunch(
       decideContext({ action: null, position: { ...HOME, accuracy: 15, ageMs: 0 } })
     );
-    expect(result.status).toBe('pending');
+    expect(result.status).toBe('valid');
   });
 
   it('only refuses VPN/Tor when the location blocks it', () => {

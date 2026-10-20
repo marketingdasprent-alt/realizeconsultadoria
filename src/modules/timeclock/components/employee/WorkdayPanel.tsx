@@ -7,6 +7,7 @@ import { buildCorrection, type WorkdayAction } from '@/lib/workday';
 import { useWorkday } from '../../context/useWorkday';
 import { WorkdayActions } from './WorkdayActions';
 import { WorkdayCorrection, type CorrectionValue } from './WorkdayCorrection';
+import { LocationPermissionHint } from './LocationPermissionHint';
 import { WorkdayError } from './WorkdayError';
 import { WorkdayStatusLine } from './WorkdayStatusLine';
 import { WorkdayTimeline } from './WorkdayTimeline';
@@ -131,6 +132,7 @@ export const WorkdayPanel: React.FC<WorkdayPanelProps> = ({
           onAction={handleAction}
         />
         {outcome && !outcome.ok && phase === 'done' && <WorkdayError message={outcome.message} />}
+        <LocationPermissionHint refreshKey={outcome} />
       </section>
       {!hideTimeline && <WorkdayTimeline entries={workday.entries} />}
     </div>

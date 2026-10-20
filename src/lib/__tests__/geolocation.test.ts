@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { getBestPosition } from '../geolocation';
+import { geoHintReason, getBestPosition, getGeoPermission } from '../geolocation';
 
 const mockGeolocation = (timestamp: number, accuracy = 10) => {
   const watchPosition = vi.fn((onSuccess: PositionCallback) => {
@@ -74,5 +74,30 @@ describe('getBestPosition', () => {
     const position = await getBestPosition();
     expect(position.age_ms).toBeGreaterThanOrEqual(0);
     expect(position.age_ms).toBeLessThan(1000);
+  });
+});
+
+describe('geoHintReason', () => {
+  it('explains how to allow it for good only when it is needed', () => {
+    expect(geoHintReason('denied', false)).toBe('blocked');
+    expect(geoHintReason('prompt', true)).toBe('asks-again');
+    expect(geoHintReason('prompt', false)).toBeNull();
+    expect(geoHintReason('granted', true)).toBeNull();
+    expect(geoHintReason('unknown', true)).toBeNull();
+  });
+});
+
+describe('getGeoPermission', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('reads the permission without asking, and copes with browsers without the API', async () => {
+    vi.stubGlobal('navigator', {
+      permissions: { query: vi.fn().mockResolvedValue({ state: 'granted' }) },
+    });
+    expect(await getGeoPermission()).toBe('granted');
+    vi.stubGlobal('navigator', {});
+    expect(await getGeoPermission()).toBe('unknown');
   });
 });

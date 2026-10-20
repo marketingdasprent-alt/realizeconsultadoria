@@ -3567,6 +3567,10 @@ export type Database = {
         Args: { _decision: string; _entry_ids: string[]; _reason?: string | null };
         Returns: number;
       };
+      time_clock_recent_punchers: {
+        Args: { _days?: number };
+        Returns: { employee_id: string }[];
+      };
       time_clock_admin_set_status: {
         Args: { _entry_id: string; _reason: string; _status: string };
         Returns: undefined;

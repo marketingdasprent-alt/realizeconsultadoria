@@ -9,7 +9,12 @@ import { WorkdayClockButton } from '../WorkdayClockButton';
 import { WorkdayPanel } from '../WorkdayPanel';
 
 vi.mock('@/integrations/supabase/client', () => ({ supabase: {} }));
-vi.mock('@/lib/geolocation', () => ({ getBestPosition: vi.fn(), getDeviceId: () => 'device-1' }));
+vi.mock('@/lib/geolocation', async importOriginal => ({
+  ...(await importOriginal<typeof import('@/lib/geolocation')>()),
+  getBestPosition: vi.fn(),
+  getDeviceId: () => 'device-1',
+  getGeoPermission: vi.fn().mockResolvedValue('granted'),
+}));
 vi.mock('../../../services/timeClockService', () => ({
   timeClockService: {
     getCurrentEmployee: vi.fn(),

@@ -14,6 +14,23 @@ const PER_ACCOUNT = 10;
 /** Intervalo mínimo entre leituras da mesma caixa (as IMAP limitam logins: 2 em 2 minutos). */
 const GAP_MS = 25_000;
 const IMAP_GAP_MS = 110_000;
+/** Tempo máximo por caixa em cada passagem. */
+const ACCOUNT_TIMEOUT_MS = 20_000;
+
+const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> =>
+  new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error(`sem resposta em ${ms / 1000} s`)), ms);
+    promise.then(
+      value => {
+        clearTimeout(timer);
+        resolve(value);
+      },
+      error => {
+        clearTimeout(timer);
+        reject(error);
+      }
+    );
+  });
 /** Acima disto, um só aviso com o número de emails novos. */
 const MAX_SINGLE = 3;
 const LINK = '/colaborador/email';
@@ -55,6 +72,7 @@ const pollAccount = async (
     query: null,
     pageToken: null,
     limit: PER_ACCOUNT,
+    withoutSnippets: true,
   });
   const newest = messages.reduce(
     (max, mail) => Math.max(max, Date.parse(mail.date) || 0),
@@ -127,7 +145,11 @@ export const pollNewMail = async (
     accounts.map(async account => {
       try {
         if (!(await claim(db, account))) return 0;
-        return await pollAccount(db, account, await createDriver(db, account));
+        // Uma caixa lenta (ex.: servidor IMAP pendurado) não atrasa as outras.
+        return await withTimeout(
+          (async () => pollAccount(db, account, await createDriver(db, account)))(),
+          ACCOUNT_TIMEOUT_MS
+        );
       } catch (err) {
         console.error(`mail-api poll ${account.id}:`, errorMessage(err));
         return 0;

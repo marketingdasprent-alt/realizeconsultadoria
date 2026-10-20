@@ -66,6 +66,8 @@ export interface MailListParams {
   query: string | null;
   pageToken: string | null;
   limit: number;
+  /** Sem o início do texto de cada email (mais rápido; os avisos de email novo não o usam). */
+  withoutSnippets?: boolean;
 }
 
 export interface MailListResult {

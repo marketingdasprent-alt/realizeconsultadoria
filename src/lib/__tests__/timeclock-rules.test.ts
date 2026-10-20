@@ -6,6 +6,7 @@ import {
   decidePunch,
   evaluatePunch,
   formatOsmAddress,
+  formatPhotonAddress,
   haversineMeters,
   ipMatchesAny,
   nextEntryType,
@@ -455,6 +456,21 @@ describe('formatOsmAddress', () => {
     expect(formatOsmAddress({ hamlet: 'Leiria', city: 'Leiria' })).toBe('Leiria');
     expect(formatOsmAddress({})).toBeNull();
     expect(formatOsmAddress(null)).toBeNull();
+  });
+});
+
+describe('formatPhotonAddress', () => {
+  it('formats a Photon result like the Nominatim one', () => {
+    expect(
+      formatPhotonAddress({ street: 'Rua da Quinta', housenumber: '42', city: 'Leiria' })
+    ).toBe('Rua da Quinta 42, Leiria');
+    expect(
+      formatPhotonAddress({ osm_key: 'highway', name: 'Rua da Quinta', district: 'São Romão' })
+    ).toBe('Rua da Quinta, São Romão');
+    expect(formatPhotonAddress({ locality: 'Vale do Mocho', city: 'Leiria' })).toBe(
+      'Vale do Mocho, Leiria'
+    );
+    expect(formatPhotonAddress(null)).toBeNull();
   });
 });
 

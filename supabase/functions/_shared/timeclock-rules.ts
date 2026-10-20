@@ -525,3 +525,32 @@ export const sha256Hex = async (value: string): Promise<string> => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest), b => b.toString(16).padStart(2, '0')).join('');
 };
+
+/** Campos de um resultado do Photon (komoot) que interessam para a morada. */
+export interface PhotonProperties {
+  name?: string;
+  street?: string;
+  housenumber?: string;
+  locality?: string;
+  district?: string;
+  city?: string;
+  county?: string;
+  osm_key?: string;
+  type?: string;
+}
+
+/**
+ * Morada curta a partir do Photon, no mesmo formato do Nominatim (o Nominatim recusa os
+ * servidores da Supabase). Quando o resultado é a própria rua, o nome é a rua.
+ */
+export const formatPhotonAddress = (props: PhotonProperties | null | undefined): string | null =>
+  props
+    ? formatOsmAddress({
+        road: props.street ?? (props.osm_key === 'highway' ? props.name : undefined),
+        house_number: props.housenumber,
+        neighbourhood: props.locality,
+        suburb: props.district,
+        city: props.city,
+        county: props.county,
+      })
+    : null;

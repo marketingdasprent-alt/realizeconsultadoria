@@ -25,7 +25,6 @@ import {
   WORKDAY_ACTIONS,
   applyManualTime,
   decidePunch,
-  formatOsmAddress,
   haversineMeters,
   ipMatchesAny,
   isValidPosition,
@@ -36,6 +35,7 @@ import {
   type LocationRules,
   type PositionReading,
 } from '../_shared/timeclock-rules.ts';
+import { saveEntryAddress } from './geocode.ts';
 import { notifyApprovers } from './notify.ts';
 
 declare const EdgeRuntime: { waitUntil(promise: Promise<unknown>): void } | undefined;
@@ -153,32 +153,6 @@ const lookupIp = async (ip: string | null): Promise<IpInfo> => {
     };
   } catch {
     return { checked: false };
-  } finally {
-    clearTimeout(timer);
-  }
-};
-
-/**
- * Morada aproximada (rua, localidade) via Nominatim do OpenStreetMap, para mostrar
- * onde estava quem registou fora dos locais. Timeout curto; nunca bloqueia o registo.
- * Política do Nominatim: identificar a aplicação e não passar de 1 pedido/s.
- */
-const reverseGeocode = async (lat: number, lng: number): Promise<string | null> => {
-  const url =
-    'https://nominatim.openstreetmap.org/reverse?format=jsonv2&zoom=18&addressdetails=1' +
-    `&accept-language=pt-PT&lat=${lat.toFixed(5)}&lon=${lng.toFixed(5)}`;
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), 2000);
-  try {
-    const res = await fetch(url, {
-      signal: controller.signal,
-      headers: { 'User-Agent': 'RealizeConsultadoria-Ponto/1.0 (+https://realize.dasprent.pt)' },
-    });
-    if (!res.ok) return null;
-    const data = await res.json();
-    return formatOsmAddress(data?.address);
-  } catch {
-    return null;
   } finally {
     clearTimeout(timer);
   }
@@ -350,7 +324,7 @@ serve(async (req: Request) => {
     location = networkLocation ?? locations.find(l => l.block_vpn) ?? null;
   }
 
-  // Morada só quando não está claramente dentro do local mais próximo (poupa o Nominatim).
+  // Morada só quando não está claramente dentro do local mais próximo (poupa o OpenStreetMap).
   const insideNearest =
     !!location &&
     latitude !== null &&
@@ -361,47 +335,42 @@ serve(async (req: Request) => {
     ) <= location.radius_m &&
     (accuracyM ?? Infinity) <= location.max_accuracy_m;
 
-  // 2. Contexto: IP, último registo, dispositivo, coordenadas repetidas, morada.
+  // 2. Contexto: IP, último registo, dispositivo, coordenadas repetidas.
   const since60d = new Date(Date.now() - 60 * 86_400_000).toISOString();
-  const [ipInfo, lastRes, deviceSeenRes, deviceOthersRes, repeatedRes, address] = await Promise.all(
-    [
-      lookupIp(ip),
-      db
-        .from('time_clock_entries')
-        .select('punched_at, latitude, longitude')
-        .eq('employee_id', employee.id)
-        .neq('status', 'voided')
-        .order('punched_at', { ascending: false })
-        .limit(1)
-        .maybeSingle(),
-      deviceId
-        ? db
-            .from('time_clock_entries')
-            .select('id', { count: 'exact', head: true })
-            .eq('employee_id', employee.id)
-            .eq('device_id', deviceId)
-        : Promise.resolve({ count: 0 }),
-      deviceId
-        ? db
-            .from('time_clock_entries')
-            .select('id', { count: 'exact', head: true })
-            .eq('device_id', deviceId)
-            .neq('employee_id', employee.id)
-            .gte('punched_at', since60d)
-        : Promise.resolve({ count: 0 }),
-      latitude !== null && longitude !== null
-        ? db
-            .from('time_clock_entries')
-            .select('id', { count: 'exact', head: true })
-            .eq('employee_id', employee.id)
-            .eq('latitude', latitude)
-            .eq('longitude', longitude)
-        : Promise.resolve({ count: 0 }),
-      method === 'gps' && latitude !== null && longitude !== null && !insideNearest
-        ? reverseGeocode(latitude, longitude)
-        : Promise.resolve(null),
-    ]
-  );
+  const [ipInfo, lastRes, deviceSeenRes, deviceOthersRes, repeatedRes] = await Promise.all([
+    lookupIp(ip),
+    db
+      .from('time_clock_entries')
+      .select('punched_at, latitude, longitude')
+      .eq('employee_id', employee.id)
+      .neq('status', 'voided')
+      .order('punched_at', { ascending: false })
+      .limit(1)
+      .maybeSingle(),
+    deviceId
+      ? db
+          .from('time_clock_entries')
+          .select('id', { count: 'exact', head: true })
+          .eq('employee_id', employee.id)
+          .eq('device_id', deviceId)
+      : Promise.resolve({ count: 0 }),
+    deviceId
+      ? db
+          .from('time_clock_entries')
+          .select('id', { count: 'exact', head: true })
+          .eq('device_id', deviceId)
+          .neq('employee_id', employee.id)
+          .gte('punched_at', since60d)
+      : Promise.resolve({ count: 0 }),
+    latitude !== null && longitude !== null
+      ? db
+          .from('time_clock_entries')
+          .select('id', { count: 'exact', head: true })
+          .eq('employee_id', employee.id)
+          .eq('latitude', latitude)
+          .eq('longitude', longitude)
+      : Promise.resolve({ count: 0 }),
+  ]);
 
   // 3. Regras: regista sempre; fora dos locais ou sem GPS fica válido, com a morada.
   const now = Date.now();
@@ -476,7 +445,7 @@ serve(async (req: Request) => {
       longitude,
       accuracy_m: accuracyM,
       distance_m: distanceM,
-      address,
+      address: null,
       ip_address: ip,
       ip_country: ipInfo.country ?? null,
       ip_city: ipInfo.city ?? null,
@@ -531,7 +500,14 @@ serve(async (req: Request) => {
     return json({ ok: true, code: 'duplicate', state: result.state, entry: toResponse(entry) });
   }
 
-  // 6. Email aos admins só com sinais suspeitos ou correção de hora; fora do local fica
+  // 6. Morada aproximada (OpenStreetMap), em segundo plano: o registo não espera.
+  if (method === 'gps' && latitude !== null && longitude !== null && !insideNearest) {
+    const task = saveEntryAddress(db, entry.id, latitude, longitude);
+    if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(task);
+    else await task;
+  }
+
+  // 7. Email aos admins só com sinais suspeitos ou correção de hora; fora do local fica
   //    só na Revisão (sem atrasar a resposta).
   if (shouldNotifyApprovers(entry.status, entry.flags)) {
     const company = employee.companies as unknown as { name: string } | null;

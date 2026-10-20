@@ -1,5 +1,6 @@
 import { supabase } from '@/integrations/supabase/client';
 import { mailErrorText, mailService } from '@/modules/webmail/services/mailService';
+import { isEmailCategory } from '../lib/credentials';
 import type {
   Credential,
   CredentialCategory,
@@ -78,16 +79,20 @@ export const credentialService = {
     }
   },
 
-  /** Já existe este utilizador nesta empresa (noutro acesso)? */
-  isDuplicate: async (username: string, companyId: string, excludeId?: string) => {
+  /**
+   * Este endereço já é a caixa de outro acesso de email? (Daria duas caixas iguais no
+   * Webmail.) O mesmo utilizador noutros acessos — sites, sistemas — é normal e pode repetir.
+   */
+  isDuplicateEmail: async (address: string, excludeId?: string) => {
     let query = supabase
       .from('accesses')
-      .select('id', { count: 'exact', head: true })
-      .eq('company_id', companyId)
-      .ilike('username', username.trim());
+      .select('id, access_categories(name)')
+      .ilike('username', address.trim());
     if (excludeId) query = query.neq('id', excludeId);
-    const { count } = await query;
-    return (count ?? 0) > 0;
+    const { data } = await query;
+    return ((data ?? []) as { access_categories: { name: string } | null }[]).some(row =>
+      isEmailCategory(row.access_categories?.name)
+    );
   },
 
   /** Cria ou atualiza o acesso; devolve o id. */

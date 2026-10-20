@@ -5,6 +5,7 @@ import AssignmentsTab from '@/components/admin/AssignmentsTab';
 import EquipmentsTab from '@/components/admin/EquipmentsTab';
 import PhonesTab from '@/components/admin/PhonesTab';
 import { cn } from '@/lib/utils';
+import { EquipmentDriftNotice } from './EquipmentDriftNotice';
 
 const VIEWS = [
   { value: 'inventario', label: 'Equipamentos', icon: Package },
@@ -58,6 +59,7 @@ export const EquipmentArea: React.FC<EquipmentAreaProps> = props => {
           </button>
         ))}
       </div>
+      {view === 'inventario' && <EquipmentDriftNotice canManage={props.canManage} />}
       {view === 'inventario' && <EquipmentsTab {...props} />}
       {view === 'sim' && <PhonesTab {...props} />}
       {view === 'entregas' && <AssignmentsTab />}

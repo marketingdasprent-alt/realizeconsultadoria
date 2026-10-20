@@ -132,9 +132,9 @@ export const useAccessForm = (
 
     setPhase('saving');
     const editingId = target?.credential?.id ?? savedId ?? undefined;
-    if (await credentialService.isDuplicate(username, form.companyId, editingId)) {
+    if (isEmail && (await credentialService.isDuplicateEmail(username, editingId))) {
       setPhase('form');
-      return setErrors({ local: 'Já existe um acesso com este utilizador nesta empresa.' });
+      return setErrors({ local: 'Este email já é a caixa de outro acesso de email.' });
     }
     const { data: id, error } = await credentialService.save(
       {

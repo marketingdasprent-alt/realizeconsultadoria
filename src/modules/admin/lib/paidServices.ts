@@ -4,6 +4,8 @@
 import { addYears, format, parseISO, subYears } from 'date-fns';
 import {
   advanceRenewalDate,
+  CYCLE_MONTHS,
+  toBillingCycle,
   getCycleStatus,
   isCyclePaid,
   type BillingCycle,
@@ -25,6 +27,7 @@ export interface DomainRow {
   renewal_value: number;
   renewal_date: string;
   last_paid_year: number | null;
+  start_date?: string | null;
 }
 
 export interface ServiceRow {
@@ -40,6 +43,7 @@ export interface ServiceRow {
   last_paid_date: string | null;
   fidelity_end: string | null;
   notes: string | null;
+  start_date?: string | null;
   companies?: { name: string } | null;
 }
 
@@ -62,6 +66,8 @@ export interface PaidService {
   notes: string | null;
   /** Para desfazer o pagamento de um serviço (a data guardada antes de avançar). */
   lastPaidDate: string | null;
+  /** Data de início (a renovação calcula-se a partir dela e do ciclo); antigos não têm. */
+  startDate: string | null;
 }
 
 export const fromDomain = (row: DomainRow): PaidService => ({
@@ -82,10 +88,11 @@ export const fromDomain = (row: DomainRow): PaidService => ({
   fidelityEnd: null,
   notes: null,
   lastPaidDate: null,
+  startDate: row.start_date ?? null,
 });
 
 export const fromService = (row: ServiceRow): PaidService => {
-  const cycle: BillingCycle = row.billing_cycle === 'yearly' ? 'yearly' : 'monthly';
+  const cycle: BillingCycle = toBillingCycle(row.billing_cycle);
   return {
     key: `service:${row.id}`,
     id: row.id,
@@ -107,12 +114,13 @@ export const fromService = (row: ServiceRow): PaidService => {
     fidelityEnd: row.fidelity_end,
     notes: row.notes,
     lastPaidDate: row.last_paid_date,
+    startDate: row.start_date ?? null,
   };
 };
 
-/** Custo mensal equivalente (anuais divididos por 12). */
+/** Custo mensal equivalente (o valor do ciclo dividido pelos meses do ciclo). */
 export const monthlyCost = (service: Pick<PaidService, 'amount' | 'cycle'>): number =>
-  service.cycle === 'monthly' ? service.amount : service.amount / 12;
+  service.amount / CYCLE_MONTHS[service.cycle];
 
 export interface PaidFilters {
   kind: PaidKind | 'all';

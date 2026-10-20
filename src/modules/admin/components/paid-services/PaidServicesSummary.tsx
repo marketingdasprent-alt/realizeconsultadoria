@@ -33,7 +33,7 @@ export const PaidServicesSummary: React.FC<{ summary: PaidSummary; count: number
     <Tile
       label="Por mês"
       value={formatEuro(summary.perMonth)}
-      hint={`${count} ${count === 1 ? 'serviço' : 'serviços'} · anuais ÷ 12`}
+      hint={`${count} ${count === 1 ? 'serviço' : 'serviços'} · em média`}
     />
     <Tile label="Por ano" value={formatEuro(summary.perYear)} hint="Custo anual previsto" />
     <Tile

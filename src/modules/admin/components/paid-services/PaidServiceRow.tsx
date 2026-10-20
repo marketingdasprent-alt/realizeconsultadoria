@@ -2,7 +2,7 @@ import React from 'react';
 import { format, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Check, Globe, Pencil, Repeat, Trash2, Wifi } from 'lucide-react';
-import { getFidelityStatus, type StatusTone } from '@/lib/recurring-services';
+import { CYCLE_PER, getFidelityStatus } from '@/lib/recurring-services';
 import { cn } from '@/lib/utils';
 import {
   PAID_KIND_LABELS,
@@ -18,13 +18,31 @@ const KIND_STYLES: Record<PaidKind, { icon: typeof Globe; className: string }> =
   subscription: { icon: Repeat, className: 'bg-amber-100 text-amber-700' },
 };
 
-const TONE_CLASSES: Record<StatusTone, string> = {
-  ok: 'bg-rz-canvas text-rz-muted',
-  soon: 'bg-amber-100 text-amber-800',
-  urgent: 'bg-orange-100 text-orange-800',
-  overdue: 'bg-rose-100 text-rose-700',
-  ended: 'bg-rz-canvas text-rz-muted',
+/** Colunas da lista (o cabeçalho usa as mesmas, para alinhar). */
+export const PAID_GRID =
+  'xl:grid xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_120px_120px_150px_196px] xl:items-center xl:gap-4';
+
+/** Estado numa palavra: pago, atrasado, a vencer ou em dia. */
+const statusOf = (service: PaidService) => {
+  if (service.paid) return { label: 'Pago', className: 'bg-emerald-50 text-emerald-700' };
+  const status = paidStatus(service);
+  if (status.tone === 'overdue') {
+    const days = Math.abs(status.daysUntil);
+    return {
+      label: `Atrasado ${days} ${days === 1 ? 'dia' : 'dias'}`,
+      className: 'bg-rose-50 text-rose-700',
+    };
+  }
+  if (status.tone === 'urgent' || status.tone === 'soon')
+    return {
+      label: status.daysUntil === 0 ? 'Vence hoje' : `Vence em ${status.daysUntil} dias`,
+      className: 'bg-amber-50 text-amber-800',
+    };
+  return { label: 'Em dia', className: 'bg-rz-canvas text-rz-muted' };
 };
+
+const ICON =
+  'flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-ink';
 
 interface PaidServiceRowProps {
   service: PaidService;
@@ -34,9 +52,7 @@ interface PaidServiceRowProps {
   onDelete: () => void;
 }
 
-const day = (iso: string) => format(parseISO(iso), 'd MMM yyyy', { locale: pt });
-
-/** Um serviço pago: o quê, de quem, quanto, quando renova e se este período está pago. */
+/** Uma linha: o quê, de que empresa, quanto, quando renova, o estado e as ações. */
 export const PaidServiceRow: React.FC<PaidServiceRowProps> = ({
   service,
   canManage,
@@ -46,82 +62,103 @@ export const PaidServiceRow: React.FC<PaidServiceRowProps> = ({
 }) => {
   const kind = KIND_STYLES[service.kind];
   const Icon = kind.icon;
-  const status = paidStatus(service);
+  const status = statusOf(service);
   const fidelity = getFidelityStatus(service.fidelityEnd);
-  const detail = [service.provider, service.location].filter(Boolean).join(' · ');
 
   return (
-    <li className="flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3 sm:flex-nowrap">
-      <span
-        className={cn(
-          'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
-          kind.className
-        )}
-        title={PAID_KIND_LABELS[service.kind]}
-      >
-        <Icon className="h-4 w-4" />
-      </span>
-
-      <span className="min-w-0 flex-1 basis-40">
-        <span className="block truncate text-[14px] font-semibold text-rz-ink">{service.name}</span>
-        <span className="block truncate text-[12.5px] text-rz-muted">
-          {PAID_KIND_LABELS[service.kind]}
-          {detail ? ` · ${detail}` : ''}
-          {service.companyName ? ` · ${service.companyName}` : ''}
+    <li className={cn('flex flex-wrap items-center gap-x-4 gap-y-2 px-4 py-3', PAID_GRID)}>
+      <span className="flex min-w-0 flex-1 basis-56 items-center gap-3">
+        <span
+          className={cn(
+            'flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+            kind.className
+          )}
+        >
+          <Icon className="h-4 w-4" />
+        </span>
+        <span className="min-w-0">
+          <span
+            className="block truncate text-[14px] font-semibold text-rz-ink"
+            title={service.name}
+          >
+            {service.name}
+          </span>
+          <span className="block truncate text-[12.5px] text-rz-muted">
+            {[PAID_KIND_LABELS[service.kind], service.provider, service.location]
+              .filter(Boolean)
+              .join(' · ')}
+            {service.companyName && <span className="xl:hidden"> · {service.companyName}</span>}
+          </span>
         </span>
       </span>
 
-      <span className="w-[110px] shrink-0 text-right">
+      <span
+        className="hidden truncate text-[13px] text-rz-muted xl:block"
+        title={service.companyName ?? ''}
+      >
+        {service.companyName ?? '—'}
+      </span>
+
+      <span className="text-right">
         <span className="block text-[14px] font-semibold tabular-nums">
           {formatEuro(service.amount)}
         </span>
-        <span className="block text-[12px] text-rz-muted">
-          {service.cycle === 'monthly' ? 'por mês' : 'por ano'}
+        <span className="block text-[12px] text-rz-muted">{CYCLE_PER[service.cycle]}</span>
+      </span>
+
+      <span>
+        <span className="block text-[13.5px] font-medium">
+          {format(parseISO(service.renewalDate), 'd MMM yyyy', { locale: pt })}
+        </span>
+        {fidelity && fidelity.tone !== 'ended' && (
+          <span className="block text-[11.5px] text-rz-muted">
+            Fideliz. {fidelity.label.toLowerCase()}
+          </span>
+        )}
+      </span>
+
+      <span>
+        <span
+          className={cn(
+            'inline-block rounded-full px-2.5 py-0.5 text-[12px] font-semibold',
+            status.className
+          )}
+        >
+          {status.label}
         </span>
       </span>
 
-      <span className="w-[150px] shrink-0">
-        <span className="block text-[13px] font-medium">{day(service.renewalDate)}</span>
-        {service.paid ? (
-          <span className="text-[12px] text-emerald-700">Período pago</span>
-        ) : (
-          <span
-            className={cn(
-              'inline-block rounded-full px-2 py-0.5 text-[11.5px] font-semibold',
-              TONE_CLASSES[status.tone]
-            )}
-          >
-            {status.label}
-          </span>
-        )}
-        {fidelity && fidelity.tone !== 'ended' && (
-          <span className="block text-[11.5px] text-rz-muted">Fidelização: {fidelity.label}</span>
-        )}
-      </span>
-
-      <span className="flex shrink-0 items-center gap-1.5">
-        <button
-          type="button"
-          onClick={onTogglePaid}
-          disabled={!canManage}
-          title={service.paid ? 'Desfazer o pagamento' : 'Marcar este período como pago'}
-          className={cn(
-            'inline-flex h-8 items-center gap-1 rounded-full px-3 text-[12.5px] font-semibold ring-1 transition-colors disabled:opacity-50',
-            service.paid
-              ? 'bg-emerald-50 text-emerald-700 ring-emerald-200 hover:bg-emerald-100'
-              : 'bg-white text-rz-ink ring-rz-line hover:bg-rz-canvas'
-          )}
-        >
-          <Check className="h-3.5 w-3.5" />
-          {service.paid ? 'Pago' : 'Marcar pago'}
-        </button>
+      <span className="flex items-center justify-end gap-1">
         {canManage && (
           <>
             <button
               type="button"
+              onClick={onTogglePaid}
+              title={
+                service.paid
+                  ? 'Desfazer o pagamento deste período'
+                  : 'Marcar este período como pago'
+              }
+              className={cn(
+                'inline-flex h-8 w-[112px] items-center justify-center gap-1 rounded-full text-[12.5px] font-semibold ring-1 transition-colors',
+                service.paid
+                  ? 'bg-white text-rz-muted ring-rz-line hover:bg-rz-canvas'
+                  : 'bg-rz-primary text-white ring-rz-primary hover:bg-rz-primary/90'
+              )}
+            >
+              {service.paid ? (
+                'Desfazer'
+              ) : (
+                <>
+                  <Check className="h-3.5 w-3.5" /> Marcar pago
+                </>
+              )}
+            </button>
+            <button
+              type="button"
               onClick={onEdit}
               aria-label={`Editar ${service.name}`}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
+              className={ICON}
             >
               <Pencil className="h-4 w-4" />
             </button>
@@ -129,7 +166,7 @@ export const PaidServiceRow: React.FC<PaidServiceRowProps> = ({
               type="button"
               onClick={onDelete}
               aria-label={`Remover ${service.name}`}
-              className="flex h-8 w-8 items-center justify-center rounded-full text-rz-muted hover:bg-rose-50 hover:text-rose-600"
+              className={cn(ICON, 'hover:bg-rose-50 hover:text-rose-600')}
             >
               <Trash2 className="h-4 w-4" />
             </button>

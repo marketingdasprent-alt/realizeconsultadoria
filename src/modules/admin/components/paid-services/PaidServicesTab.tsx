@@ -1,55 +1,27 @@
 import React, { useMemo, useState } from 'react';
 import { format, parseISO } from 'date-fns';
-import { Globe, Plus, Repeat, Search, Wifi } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
-import { DomainModal } from '@/components/admin/domains/DomainModal';
-import { ServiceModal } from '@/components/admin/services/ServiceModal';
 import { useToast } from '@/hooks/use-toast';
-import { cn } from '@/lib/utils';
 import { usePaidServices } from '../../hooks/usePaidServices';
+import type { PaidForm } from '../../lib/paidServiceForm';
 import {
   filterPaid,
   summarizePaid,
   type PaidFilters,
-  type PaidKind,
   type PaidService,
 } from '../../lib/paidServices';
-import { PaidServiceRow } from './PaidServiceRow';
+import { paidServicesService } from '../../services/paidServicesService';
+import { PaidServiceDialog, type PaidDialogTarget } from './PaidServiceDialog';
+import { PAID_GRID, PaidServiceRow } from './PaidServiceRow';
 import { PaidServicesSummary } from './PaidServicesSummary';
-import { editorFor, newEditor, type PaidEditor } from './paidServiceForms';
-
-const KINDS: { value: PaidFilters['kind']; label: string }[] = [
-  { value: 'all', label: 'Todos' },
-  { value: 'domain', label: 'Domínios' },
-  { value: 'internet', label: 'Internet' },
-  { value: 'subscription', label: 'Assinaturas' },
-];
-
-const ADD: { kind: PaidKind; label: string; icon: typeof Globe }[] = [
-  { kind: 'domain', label: 'Domínio', icon: Globe },
-  { kind: 'internet', label: 'Internet', icon: Wifi },
-  { kind: 'subscription', label: 'Assinatura', icon: Repeat },
-];
+import { PaidServicesToolbar } from './PaidServicesToolbar';
 
 interface PaidServicesTabProps {
   canManage: boolean;
   companies: { id: string; name: string }[];
 }
+
+const HEADER = ['Serviço', 'Empresa', 'Valor', 'Renova a', 'Estado', ''];
 
 /** Acessos → Serviços pagos: domínios, internet e assinaturas numa só lista. */
 export const PaidServicesTab: React.FC<PaidServicesTabProps> = ({ canManage, companies }) => {
@@ -60,7 +32,7 @@ export const PaidServicesTab: React.FC<PaidServicesTabProps> = ({ canManage, com
     companyId: 'all',
     search: '',
   });
-  const [editor, setEditor] = useState<PaidEditor>(null);
+  const [dialog, setDialog] = useState<PaidDialogTarget>(null);
   const [toDelete, setToDelete] = useState<PaidService | null>(null);
 
   const list = useMemo(() => filterPaid(data.services, filters), [data.services, filters]);
@@ -79,81 +51,36 @@ export const PaidServicesTab: React.FC<PaidServicesTabProps> = ({ canManage, com
     );
   };
 
+  const save = async (form: PaidForm, existing: PaidService | null) => {
+    const { error } = await paidServicesService.save(form, existing);
+    toast(
+      error ? { title: 'Erro ao guardar', variant: 'destructive' } : { title: 'Serviço guardado' }
+    );
+    void data.refresh();
+    return !error;
+  };
+
   return (
     <div className="space-y-4">
       <PaidServicesSummary summary={summary} count={list.length} />
 
       <section className="overflow-hidden rounded-[28px] bg-white shadow-rz-soft ring-1 ring-rz-line">
-        <div className="flex flex-wrap items-center gap-2 border-b border-rz-line p-3 sm:p-4">
-          <div
-            className="flex gap-1 rounded-full bg-rz-canvas p-1 ring-1 ring-rz-line"
-            role="tablist"
-          >
-            {KINDS.map(option => (
-              <button
-                key={option.value}
-                type="button"
-                role="tab"
-                aria-selected={filters.kind === option.value}
-                onClick={() => setFilters(f => ({ ...f, kind: option.value }))}
-                className={cn(
-                  'h-8 rounded-full px-3.5 text-[13px] font-semibold transition-colors',
-                  filters.kind === option.value
-                    ? 'bg-white text-rz-ink shadow-sm'
-                    : 'text-rz-muted hover:text-rz-ink'
-                )}
-              >
-                {option.label}
-              </button>
-            ))}
-          </div>
-          <div className="relative min-w-[180px] flex-1 sm:max-w-xs">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-rz-muted" />
-            <Input
-              type="search"
-              placeholder="Pesquisar serviço…"
-              value={filters.search}
-              onChange={event => setFilters(f => ({ ...f, search: event.target.value }))}
-              className="h-9 rounded-full border-rz-line pl-9 text-[13px]"
-            />
-          </div>
-          <Select
-            value={filters.companyId}
-            onValueChange={companyId => setFilters(f => ({ ...f, companyId }))}
-          >
-            <SelectTrigger
-              className="h-9 w-full rounded-full border-rz-line text-[13px] sm:w-[200px]"
-              aria-label="Empresa"
-            >
-              <SelectValue />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as empresas</SelectItem>
-              {companies.map(company => (
-                <SelectItem key={company.id} value={company.id}>
-                  {company.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          {canManage && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="gold" className="ml-auto rounded-full">
-                  <Plus className="h-4 w-4" /> Adicionar
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                {ADD.map(({ kind, label, icon: Icon }) => (
-                  <DropdownMenuItem key={kind} onClick={() => setEditor(newEditor(kind))}>
-                    <Icon className="mr-2 h-4 w-4" /> {label}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+        <PaidServicesToolbar
+          filters={filters}
+          companies={companies}
+          canManage={canManage}
+          onChange={patch => setFilters(current => ({ ...current, ...patch }))}
+          onAdd={kind => setDialog({ kind })}
+        />
+        <div
+          className={`hidden border-b border-rz-line bg-rz-canvas/50 px-4 py-2 text-[11.5px] font-semibold uppercase tracking-wide text-rz-muted ${PAID_GRID}`}
+        >
+          {HEADER.map((title, index) => (
+            <span key={index} className={index === 2 ? 'text-right' : undefined}>
+              {title}
+            </span>
+          ))}
         </div>
-
         {data.isLoading ? (
           <div className="space-y-2 p-4">
             {[0, 1, 2, 3].map(key => (
@@ -174,7 +101,7 @@ export const PaidServicesTab: React.FC<PaidServicesTabProps> = ({ canManage, com
                 service={service}
                 canManage={canManage}
                 onTogglePaid={() => void togglePaid(service)}
-                onEdit={() => setEditor(editorFor(service))}
+                onEdit={() => setDialog({ service })}
                 onDelete={() => setToDelete(service)}
               />
             ))}
@@ -182,18 +109,11 @@ export const PaidServicesTab: React.FC<PaidServicesTabProps> = ({ canManage, com
         )}
       </section>
 
-      <DomainModal
-        open={editor?.kind === 'domain'}
-        onOpenChange={open => !open && setEditor(null)}
-        domain={editor?.kind === 'domain' ? editor.domain : null}
-        onSave={() => void data.refresh()}
-      />
-      <ServiceModal
-        open={editor?.kind === 'service'}
-        onOpenChange={open => !open && setEditor(null)}
-        service={editor?.kind === 'service' ? editor.service : null}
+      <PaidServiceDialog
+        target={dialog}
         companies={companies}
-        onSave={() => void data.refresh()}
+        onClose={() => setDialog(null)}
+        onSave={save}
       />
       <DeleteConfirmDialog
         open={!!toDelete}

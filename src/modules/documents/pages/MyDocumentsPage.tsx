@@ -1,6 +1,5 @@
 import React, { useEffect } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { FolderLock } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { WorkspacePage } from '@/modules/workspace/components/WorkspacePage';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { CompanyFilesBrowser } from '../components/company/CompanyFilesBrowser';
@@ -58,15 +57,7 @@ const MyDocumentsPage: React.FC = () => {
 
   return (
     <WorkspacePage>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-[26px] font-extrabold">Documentos</h1>
-        <Link
-          to={personal}
-          className="inline-flex h-10 items-center gap-2 rounded-full bg-white px-4 text-[13.5px] font-semibold text-rz-ink ring-1 ring-rz-line hover:bg-rz-primary-soft"
-        >
-          <FolderLock className="h-4 w-4 text-rz-primary" /> Os meus documentos e recibos
-        </Link>
-      </div>
+      <h1 className="mb-4 text-[26px] font-extrabold">Documentos</h1>
 
       {isPreview ? (
         <p className="rounded-[28px] bg-white px-6 py-10 text-center text-[14px] text-rz-muted shadow-rz-soft ring-1 ring-rz-line">

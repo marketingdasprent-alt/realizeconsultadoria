@@ -22,23 +22,27 @@ const KIND_STYLES: Record<PaidKind, { icon: typeof Globe; className: string }> =
 export const PAID_GRID =
   'xl:grid xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_120px_120px_150px_196px] xl:items-center xl:gap-4';
 
-/** Estado numa palavra: pago, atrasado, a vencer ou em dia. */
+/**
+ * Estado só pela data: atrasado, a vencer (7 dias) ou em dia. "Pago" não é um estado à parte
+ * — depois de pagar, a renovação avança e fica em dia.
+ */
 const statusOf = (service: PaidService) => {
-  if (service.paid) return { label: 'Pago', className: 'bg-emerald-50 text-emerald-700' };
   const status = paidStatus(service);
   if (status.tone === 'overdue') {
     const days = Math.abs(status.daysUntil);
     return {
+      due: true,
       label: `Atrasado ${days} ${days === 1 ? 'dia' : 'dias'}`,
       className: 'bg-rose-50 text-rose-700',
     };
   }
-  if (status.tone === 'urgent' || status.tone === 'soon')
+  if (status.tone === 'urgent')
     return {
+      due: true,
       label: status.daysUntil === 0 ? 'Vence hoje' : `Vence em ${status.daysUntil} dias`,
       className: 'bg-amber-50 text-amber-800',
     };
-  return { label: 'Em dia', className: 'bg-rz-canvas text-rz-muted' };
+  return { due: false, label: 'Em dia', className: 'bg-emerald-50 text-emerald-700' };
 };
 
 const ICON =
@@ -142,8 +146,10 @@ export const PaidServiceRow: React.FC<PaidServiceRowProps> = ({
               className={cn(
                 'inline-flex h-8 w-[112px] items-center justify-center gap-1 rounded-full text-[12.5px] font-semibold ring-1 transition-colors',
                 service.paid
-                  ? 'bg-white text-rz-muted ring-rz-line hover:bg-rz-canvas'
-                  : 'bg-rz-primary text-white ring-rz-primary hover:bg-rz-primary/90'
+                  ? 'bg-transparent text-rz-muted ring-transparent hover:bg-rz-canvas hover:text-rz-ink'
+                  : status.due
+                    ? 'bg-rz-primary text-white ring-rz-primary hover:bg-rz-primary/90'
+                    : 'bg-white text-rz-primary ring-rz-line hover:bg-rz-primary-soft'
               )}
             >
               {service.paid ? (

@@ -62,7 +62,7 @@ export const PaidServicesTab: React.FC<PaidServicesTabProps> = ({ canManage, com
 
   return (
     <div className="space-y-4">
-      <PaidServicesSummary summary={summary} count={list.length} />
+      <PaidServicesSummary summary={summary} />
 
       <section className="overflow-hidden rounded-[28px] bg-white shadow-rz-soft ring-1 ring-rz-line">
         <PaidServicesToolbar

@@ -145,8 +145,14 @@ export const filterPaid = (services: PaidService[], filters: PaidFilters): PaidS
     .sort((a, b) => a.renewalDate.localeCompare(b.renewalDate) || a.name.localeCompare(b.name));
 
 export interface PaidSummary {
+  /** Soma só dos serviços mensais (e quantos são). */
   perMonth: number;
+  monthlyCount: number;
+  /** Soma só dos serviços anuais (e quantos são). */
   perYear: number;
+  yearlyCount: number;
+  /** Trimestrais e semestrais (não entram em nenhum dos dois totais). */
+  otherCount: number;
   /** Por pagar com renovação nos próximos 30 dias (ou já passada). */
   dueSoon: number;
   dueSoonAmount: number;
@@ -154,11 +160,24 @@ export interface PaidSummary {
 }
 
 export const summarizePaid = (services: PaidService[], today = new Date()): PaidSummary => {
-  const summary = { perMonth: 0, perYear: 0, dueSoon: 0, dueSoonAmount: 0, overdue: 0 };
+  const summary = {
+    perMonth: 0,
+    monthlyCount: 0,
+    perYear: 0,
+    yearlyCount: 0,
+    otherCount: 0,
+    dueSoon: 0,
+    dueSoonAmount: 0,
+    overdue: 0,
+  };
   for (const service of services) {
-    const monthly = monthlyCost(service);
-    summary.perMonth += monthly;
-    summary.perYear += monthly * 12;
+    if (service.cycle === 'monthly') {
+      summary.perMonth += service.amount;
+      summary.monthlyCount += 1;
+    } else if (service.cycle === 'yearly') {
+      summary.perYear += service.amount;
+      summary.yearlyCount += 1;
+    } else summary.otherCount += 1;
     const { daysUntil } = getCycleStatus(service.renewalDate, today);
     if (!service.paid && daysUntil <= 30) {
       summary.dueSoon += 1;

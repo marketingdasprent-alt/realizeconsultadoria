@@ -25,17 +25,20 @@ const Tile: React.FC<{ label: string; value: string; hint: string; tone?: 'warn'
 );
 
 /** Quanto se paga por mês/ano e o que está a vencer. */
-export const PaidServicesSummary: React.FC<{ summary: PaidSummary; count: number }> = ({
-  summary,
-  count,
-}) => (
+export const PaidServicesSummary: React.FC<{ summary: PaidSummary }> = ({ summary }) => (
   <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
     <Tile
       label="Por mês"
       value={formatEuro(summary.perMonth)}
-      hint={`${count} ${count === 1 ? 'serviço' : 'serviços'} · em média`}
+      hint={`${summary.monthlyCount} ${summary.monthlyCount === 1 ? 'serviço mensal' : 'serviços mensais'}`}
     />
-    <Tile label="Por ano" value={formatEuro(summary.perYear)} hint="Custo anual previsto" />
+    <Tile
+      label="Por ano"
+      value={formatEuro(summary.perYear)}
+      hint={`${summary.yearlyCount} ${summary.yearlyCount === 1 ? 'serviço anual' : 'serviços anuais'}${
+        summary.otherCount ? ` · ${summary.otherCount} noutros ciclos` : ''
+      }`}
+    />
     <Tile
       label="A pagar em 30 dias"
       value={String(summary.dueSoon)}

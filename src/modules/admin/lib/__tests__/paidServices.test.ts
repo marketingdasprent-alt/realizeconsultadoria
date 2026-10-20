@@ -77,11 +77,10 @@ describe('totals and filters', () => {
     }),
   ];
 
-  it('adds up the monthly equivalent (yearly / 12)', () => {
+  it('adds monthly services per month and yearly ones per year', () => {
     expect(monthlyCost({ amount: 36, cycle: 'yearly' })).toBe(3);
     const summary = summarizePaid(list, TODAY);
-    expect(summary.perMonth).toBe(163);
-    expect(summary.perYear).toBe(1956);
+    expect(summary).toMatchObject({ perMonth: 160, monthlyCount: 2, perYear: 36, yearlyCount: 1 });
     expect(summary).toMatchObject({ dueSoon: 2, dueSoonAmount: 160, overdue: 1 });
   });
 

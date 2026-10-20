@@ -90,3 +90,7 @@ export const previewKind = (entry: Pick<CompanyEntry, 'name' | 'type'>): Preview
     ) ?? null
   );
 };
+
+/** Ficheiros com miniatura na grelha (documentos, PDF e imagens). */
+export const hasThumbnail = (entry: Pick<CompanyEntry, 'name' | 'type'>): boolean =>
+  entry.type === 'file' && (opensInEditor(entry) || previewKind(entry) === 'image');

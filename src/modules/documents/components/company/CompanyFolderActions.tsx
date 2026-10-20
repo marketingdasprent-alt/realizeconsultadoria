@@ -3,7 +3,12 @@ import { useQueryClient } from '@tanstack/react-query';
 import { FilePlus2, FolderPlus, Upload } from 'lucide-react';
 import { companyFolderKey } from '../../hooks/useCompanyFolder';
 import type { NewDocumentKind } from '../../lib/companyFiles';
-import { companyFilesService, type CompanyEntry } from '../../services/companyFilesService';
+import { sortEntries } from '../../lib/companyFiles';
+import {
+  companyFilesService,
+  type CompanyEntry,
+  type CompanyListing,
+} from '../../services/companyFilesService';
 import { NewDocumentDialog } from './NewDocumentDialog';
 import { NewFolderDialog } from './NewFolderDialog';
 
@@ -28,11 +33,21 @@ export const CompanyFolderActions: React.FC<CompanyFolderActionsProps> = ({
   const [dialog, setDialog] = useState<'document' | 'folder' | null>(null);
   const refresh = () => queryClient.invalidateQueries({ queryKey: companyFolderKey(path) });
 
+  // Ficheiro ou pasta nova aparece já na lista; a lista do servidor chega em segundo plano.
+  const addToList = (entry: CompanyEntry) => {
+    queryClient.setQueryData<CompanyListing>(companyFolderKey(path), listing =>
+      listing && !listing.entries.some(item => item.path === entry.path)
+        ? { ...listing, entries: sortEntries([...listing.entries, entry]) }
+        : listing
+    );
+    void refresh();
+  };
+
   const createFolder = async (name: string) => {
     const { data, error } = await companyFilesService.createFolder(`${path}/${name}`);
     if (error || !data) return error;
     if (!data.created) return 'Já existe uma pasta com esse nome.';
-    await refresh();
+    addToList({ name, type: 'dir', path: data.path, modified: new Date().toISOString() });
     return null;
   };
 
@@ -40,7 +55,12 @@ export const CompanyFolderActions: React.FC<CompanyFolderActionsProps> = ({
   const createDocument = async (name: string, kind: NewDocumentKind) => {
     const { data, error } = await companyFilesService.createDocument(path, name, kind);
     if (error || !data) return error;
-    await refresh();
+    addToList({
+      name: data.name,
+      type: 'file',
+      path: data.path,
+      modified: new Date().toISOString(),
+    });
     onOpenFile({ name: data.name, type: 'file', path: data.path });
     return null;
   };

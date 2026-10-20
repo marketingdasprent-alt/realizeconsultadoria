@@ -18,13 +18,7 @@
 // callbackUrl do editor apontam para o agente local (127.0.0.1), que só o ONLYOFFICE alcança.
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
-import {
-  authenticatedUserId,
-  corsHeaders,
-  fetchWithTimeout,
-  json,
-  serviceClient,
-} from '../_shared/mail-server/http.ts';
+import { corsHeaders, fetchWithTimeout, json, serviceClient } from '../_shared/mail-server/http.ts';
 import {
   accessFor,
   agentToken,
@@ -202,6 +196,46 @@ const adminAction = async (
   return ok({ path, created: result.created });
 };
 
+/**
+ * Utilizador da sessão: a assinatura do JWT verifica-se aqui (chaves públicas do projeto), sem
+ * ir ao servidor de login a cada pedido.
+ */
+const sessionUserId = async (req: Request, db: ReturnType<typeof serviceClient>) => {
+  const header = req.headers.get('Authorization');
+  if (!header?.startsWith('Bearer ')) return null;
+  const { data, error } = await db.auth.getClaims(header.slice(7).trim());
+  return error ? null : ((data?.claims?.sub as string | undefined) ?? null);
+};
+
+type EmployeeFolders = {
+  name: string;
+  folders: { path: string; label: string | null; permission: FolderPermission }[];
+};
+
+/** Pastas de cada pessoa guardadas uns segundos (cada clique já não vai à base de dados). */
+const FOLDERS_TTL_MS = 30_000;
+const folderCache = new Map<string, { at: number; value: EmployeeFolders }>();
+
+const loadEmployeeFolders = async (
+  db: ReturnType<typeof serviceClient>,
+  userId: string
+): Promise<EmployeeFolders | null> => {
+  const cached = folderCache.get(userId);
+  if (cached && Date.now() - cached.at < FOLDERS_TTL_MS) return cached.value;
+  const { data: employees, error } = await db
+    .from('employees')
+    .select('name, folder_assignments(path, label, permission)')
+    .eq('user_id', userId)
+    .eq('is_active', true);
+  if (error) return null;
+  const value: EmployeeFolders = {
+    name: employees?.[0]?.name || 'Colaborador',
+    folders: (employees ?? []).flatMap(employee => employee.folder_assignments ?? []),
+  };
+  folderCache.set(userId, { at: Date.now(), value });
+  return value;
+};
+
 /** Nomes do que já existe numa pasta (para não substituir nada). */
 const namesIn = async (secret: string, path: string) =>
   (await callAgent<AgentListing>(secret, 'list', '/api/list', path)).entries.map(
@@ -254,7 +288,7 @@ serve(async (req: Request) => {
   if (req.method !== 'POST') return json({ error: 'Método não permitido' }, 405);
 
   const db = serviceClient();
-  const userId = await authenticatedUserId(req, db);
+  const userId = await sessionUserId(req, db);
   if (!userId) return json({ error: 'Não autorizado' }, 401);
 
   const agentSecret = Deno.env.get('FILES_AGENT_SECRET');
@@ -273,13 +307,9 @@ serve(async (req: Request) => {
       throw err;
     }
   }
-  const { data: employees, error } = await db
-    .from('employees')
-    .select('name, folder_assignments(path, label, permission)')
-    .eq('user_id', userId)
-    .eq('is_active', true);
-  if (error) return fail('Não foi possível ler as suas pastas.');
-  const folders = (employees ?? []).flatMap(employee => employee.folder_assignments ?? []);
+  const mine = await loadEmployeeFolders(db, userId);
+  if (!mine) return fail('Não foi possível ler as suas pastas.');
+  const folders = mine.folders;
 
   if (body.action === 'folders')
     return ok(
@@ -354,7 +384,7 @@ serve(async (req: Request) => {
         });
       }
       case 'open': {
-        const user = { id: userId, name: employees?.[0]?.name || 'Colaborador' };
+        const user = { id: userId, name: mine.name };
         return ok(
           await openEditor(path, permission, user, { agent: agentSecret, office: officeSecret })
         );

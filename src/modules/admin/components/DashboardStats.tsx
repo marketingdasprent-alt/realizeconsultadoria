@@ -37,7 +37,7 @@ const TILES: Tile[] = [
   {
     label: 'Pedidos pendentes',
     hint: 'férias e ausências por aprovar',
-    href: `${ROUTES.ADMIN.REQUESTS}?status=pending`,
+    href: ROUTES.ADMIN.PENDING_REQUESTS,
     icon: ClipboardList,
     tint: 'from-lime-400 to-green-600',
     value: data => data.pendingAbsences,

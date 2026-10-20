@@ -22,7 +22,10 @@ import {
   describeConflicts,
   type OverlapPeriod,
 } from '@/lib/absence-overlap';
-import { absenceTypeLabels } from '@/lib/absence-types';
+import {
+  absenceDecisionService,
+  copyDocumentsToAttachments,
+} from '@/modules/admin/services/absenceDecisionService';
 
 interface AbsencePeriod {
   id: string;
@@ -137,79 +140,80 @@ const AbsenceApprovalDialog = ({
     }
   }, [allRequestedDates, holidays]);
 
-  const copyAbsenceDocumentsToAttachments = async (
-    absenceId: string,
-    employeeId: string,
-    userId: string
-  ) => {
-    try {
-      // Fetch absence documents
-      const { data: docs, error: fetchError } = await supabase
-        .from('absence_documents')
-        .select('*')
-        .eq('absence_id', absenceId);
+  const showConflict = (target: AbsenceRequest, reason: string) =>
+    toast({
+      title: 'Conflito com ausência já aprovada',
+      description: `${target.employee.name}: ${reason} Reprove um dos pedidos antes de aprovar este.`,
+      variant: 'destructive',
+    });
 
-      if (fetchError || !docs || docs.length === 0) return;
+  // Aprovação parcial: os períodos são refeitos dia a dia (dias seguidos com a mesma decisão
+  // ficam num só período, aprovado ou rejeitado).
+  const approvePartially = async (target: AbsenceRequest): Promise<boolean> => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+    if (!session) throw new Error('Não autenticado');
 
-      // Get absence details for description
-      const { data: absence } = await supabase
-        .from('absences')
-        .select('absence_type, start_date, end_date')
-        .eq('id', absenceId)
-        .single();
-
-      const absenceTypeLabel = absence
-        ? absenceTypeLabels[absence.absence_type] || absence.absence_type
-        : 'Ausência';
-      const dateRange = absence
-        ? `${format(parseISO(absence.start_date), 'dd/MM/yyyy', { locale: pt })} - ${format(parseISO(absence.end_date), 'dd/MM/yyyy', { locale: pt })}`
-        : '';
-
-      for (const doc of docs) {
-        // Copy file in storage from absence-documents to employee-files
-        const { data: fileData, error: downloadError } = await supabase.storage
-          .from('absence-documents')
-          .download(doc.file_path);
-
-        if (downloadError || !fileData) {
-          console.error('Error downloading absence document:', downloadError);
-          continue;
-        }
-
-        // Sanitize filename for new path
-        const sanitizedName = doc.file_name
-          .normalize('NFD')
-          .replace(/[\u0300-\u036f]/g, '')
-          .replace(/\s+/g, '_')
-          .replace(/[^a-zA-Z0-9_.-]/g, '');
-
-        const newPath = `${employeeId}/attachments/${Date.now()}_${sanitizedName}`;
-
-        // Upload to employee-files bucket
-        const { error: uploadError } = await supabase.storage
-          .from('employee-files')
-          .upload(newPath, fileData);
-
-        if (uploadError) {
-          console.error('Error uploading to employee-files:', uploadError);
-          continue;
-        }
-
-        // Create attachment record
-        await supabase.from('employee_attachments').insert({
-          employee_id: employeeId,
-          file_name: doc.file_name,
-          file_path: newPath,
-          file_size: doc.file_size,
-          mime_type: doc.mime_type,
-          source: 'absence',
-          description: `${absenceTypeLabel} (${dateRange})`,
-          uploaded_by: userId,
-        });
-      }
-    } catch (error) {
-      console.error('Error copying absence documents to attachments:', error);
+    // Impedir dois pedidos aprovados no mesmo dia: só contam os dias aceites.
+    const periodsBeingApproved: OverlapPeriod[] = selectedDates.map(d => ({
+      start_date: format(d, 'yyyy-MM-dd'),
+      end_date: format(d, 'yyyy-MM-dd'),
+      period_type: 'full_day',
+    }));
+    const { data: conflicts, error: conflictError } = await findApprovedConflicts(
+      target.employee_id,
+      periodsBeingApproved,
+      target.id
+    );
+    if (conflictError) throw conflictError;
+    if (conflicts && conflicts.length > 0) {
+      showConflict(target, describeConflicts(conflicts));
+      return false;
     }
+
+    const { error: absenceError } = await supabase
+      .from('absences')
+      .update({
+        status: 'partially_approved',
+        approved_by: session.user.id,
+        approved_at: new Date().toISOString(),
+      })
+      .eq('id', target.id);
+    if (absenceError) throw absenceError;
+
+    const chosen = new Set(selectedDates.map(d => format(d, 'yyyy-MM-dd')));
+    const newPeriods: { start: string; end: string; status: string; businessDays: number }[] = [];
+    for (const day of allRequestedDates) {
+      const dateStr = format(day, 'yyyy-MM-dd');
+      const status = chosen.has(dateStr) ? 'approved' : 'rejected';
+      const last = newPeriods[newPeriods.length - 1];
+      if (last && last.status === status) {
+        last.end = dateStr;
+        last.businessDays += 1;
+      } else {
+        newPeriods.push({ start: dateStr, end: dateStr, status, businessDays: 1 });
+      }
+    }
+
+    const { error: deleteError } = await supabase
+      .from('absence_periods')
+      .delete()
+      .eq('absence_id', target.id);
+    if (deleteError) throw deleteError;
+    const { error: insertError } = await supabase.from('absence_periods').insert(
+      newPeriods.map(period => ({
+        absence_id: target.id,
+        start_date: period.start,
+        end_date: period.end,
+        business_days: period.businessDays,
+        status: period.status,
+      }))
+    );
+    if (insertError) throw insertError;
+
+    await copyDocumentsToAttachments(target, session.user.id);
+    return true;
   };
 
   const handleApprove = async () => {
@@ -217,11 +221,6 @@ const AbsenceApprovalDialog = ({
     setIsLoading(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) throw new Error('Não autenticado');
-
       const hasPeriods = request.periods && request.periods.length > 0;
       const daysToApprove =
         mode === 'partial'
@@ -230,133 +229,18 @@ const AbsenceApprovalDialog = ({
             ? request.periods.reduce((sum, p) => sum + p.business_days, 0)
             : request.total_business_days || allRequestedDates.length;
 
-      // Impedir que dois pedidos do mesmo colaborador acabem ambos aprovados no
-      // mesmo dia. Numa aprovação parcial só contam os dias efetivamente aceites.
-      let periodsBeingApproved: OverlapPeriod[];
-
+      let approved: boolean;
       if (mode === 'partial') {
-        periodsBeingApproved = selectedDates.map(d => ({
-          start_date: format(d, 'yyyy-MM-dd'),
-          end_date: format(d, 'yyyy-MM-dd'),
-          period_type: 'full_day',
-        }));
+        approved = await approvePartially(request);
       } else {
-        // Ler os períodos frescos da BD: os do `request` não trazem as horas.
-        const { data: freshPeriods, error: freshError } = await supabase
-          .from('absence_periods')
-          .select('start_date, end_date, period_type, start_time, end_time')
-          .eq('absence_id', request.id);
-
-        if (freshError) throw freshError;
-
-        periodsBeingApproved =
-          freshPeriods && freshPeriods.length > 0
-            ? freshPeriods
-            : [
-                {
-                  start_date: request.start_date,
-                  end_date: request.end_date,
-                  period_type: 'full_day',
-                },
-              ];
+        const { data, error } = await absenceDecisionService.approve(request);
+        if (error || !data) throw error ?? new Error('Sem resposta');
+        if (data.conflict) showConflict(request, data.conflict);
+        approved = !data.conflict;
       }
-
-      const { data: conflicts, error: conflictError } = await findApprovedConflicts(
-        request.employee_id,
-        periodsBeingApproved,
-        request.id
-      );
-
-      if (conflictError) throw conflictError;
-
-      if (conflicts && conflicts.length > 0) {
-        toast({
-          title: 'Conflito com ausência já aprovada',
-          description: `${request.employee.name}: ${describeConflicts(conflicts)} Reprove um dos pedidos antes de aprovar este.`,
-          variant: 'destructive',
-        });
-        setIsLoading(false);
-        return;
-      }
-
-      // Update absence status
-      const { error: absenceError } = await supabase
-        .from('absences')
-        .update({
-          status: mode === 'partial' ? 'partially_approved' : 'approved',
-          approved_by: session.user.id,
-          approved_at: new Date().toISOString(),
-        })
-        .eq('id', request.id);
-
-      if (absenceError) throw absenceError;
-
-      // Update period statuses for partial approval - recreate periods by day decision
-      if (mode === 'partial') {
-        // Delete existing periods
-        await supabase.from('absence_periods').delete().eq('absence_id', request.id);
-
-        // Build decisions per day
-        const dayDecisions = allRequestedDates.map(day => ({
-          date: day,
-          dateStr: format(day, 'yyyy-MM-dd'),
-          status: selectedDates.some(d => format(d, 'yyyy-MM-dd') === format(day, 'yyyy-MM-dd'))
-            ? 'approved'
-            : 'rejected',
-        }));
-
-        // Group consecutive days by status
-        const newPeriods: { start: string; end: string; status: string; businessDays: number }[] =
-          [];
-        let currentGroup: {
-          start: string;
-          end: string;
-          status: string;
-          businessDays: number;
-        } | null = null;
-
-        for (const decision of dayDecisions) {
-          if (!currentGroup || currentGroup.status !== decision.status) {
-            if (currentGroup) {
-              newPeriods.push(currentGroup);
-            }
-            currentGroup = {
-              start: decision.dateStr,
-              end: decision.dateStr,
-              status: decision.status,
-              businessDays: 1,
-            };
-          } else {
-            currentGroup.end = decision.dateStr;
-            currentGroup.businessDays += 1;
-          }
-        }
-        if (currentGroup) {
-          newPeriods.push(currentGroup);
-        }
-
-        // Insert new periods
-        for (const period of newPeriods) {
-          await supabase.from('absence_periods').insert({
-            absence_id: request.id,
-            start_date: period.start,
-            end_date: period.end,
-            business_days: period.businessDays,
-            status: period.status,
-          });
-        }
-      } else if (mode === 'approve' && request.periods && request.periods.length > 0) {
-        // Mark all periods as approved
-        for (const period of request.periods) {
-          await supabase.from('absence_periods').update({ status: 'approved' }).eq('id', period.id);
-        }
-      }
-
-      // Copy absence documents to employee attachments
-      await copyAbsenceDocumentsToAttachments(request.id, request.employee_id, session.user.id);
+      if (!approved) return;
 
       // O saldo de férias é atualizado automaticamente via database trigger
-
       toast({
         title: mode === 'partial' ? 'Pedido parcialmente aprovado' : 'Pedido aprovado',
         description: `${daysToApprove} dias úteis aprovados para ${request.employee.name}`,
@@ -382,29 +266,8 @@ const AbsenceApprovalDialog = ({
     setIsLoading(true);
 
     try {
-      const {
-        data: { session },
-      } = await supabase.auth.getSession();
-      if (!session) throw new Error('Não autenticado');
-
-      const { error } = await supabase
-        .from('absences')
-        .update({
-          status: 'rejected',
-          rejection_reason: rejectionReason.trim() || null,
-          approved_by: session.user.id,
-          approved_at: new Date().toISOString(),
-        })
-        .eq('id', request.id);
-
+      const { error } = await absenceDecisionService.reject(request, rejectionReason);
       if (error) throw error;
-
-      // Atualizar todos os períodos para rejected
-      if (request.periods && request.periods.length > 0) {
-        for (const period of request.periods) {
-          await supabase.from('absence_periods').update({ status: 'rejected' }).eq('id', period.id);
-        }
-      }
 
       toast({
         title: 'Pedido rejeitado',

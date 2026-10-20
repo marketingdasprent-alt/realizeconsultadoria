@@ -105,7 +105,7 @@ export const DayDetailsSheet: React.FC<DayDetailsSheetProps> = ({
                 Por aprovar · {pending.length}
               </h3>
               <Link
-                to={`${ROUTES.ADMIN.REQUESTS}?status=pending`}
+                to={ROUTES.ADMIN.PENDING_REQUESTS}
                 className="text-[13px] font-semibold text-rz-primary hover:underline"
               >
                 Abrir pedidos

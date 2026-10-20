@@ -4,7 +4,7 @@ import { badgeService } from '../services/badgeService';
 
 /**
  * Números do menu do admin, por página: documentos por aprovar (Colaboradores), pedidos
- * pendentes (Pedidos) e tickets abertos (Suporte). Atualiza a cada minuto e ao voltar à janela.
+ * pendentes (Férias e Ausências) e tickets abertos (Suporte). Atualiza a cada minuto e ao voltar à janela.
  */
 export const useAdminBadges = (): Record<string, number> => {
   const { data } = useQuery({
@@ -20,7 +20,7 @@ export const useAdminBadges = (): Record<string, number> => {
   });
   return {
     [ROUTES.ADMIN.EMPLOYEES]: data?.pendingDocuments ?? 0,
-    [ROUTES.ADMIN.REQUESTS]: data?.pendingRequests ?? 0,
+    [ROUTES.ADMIN.CALENDAR]: data?.pendingRequests ?? 0,
     [ROUTES.ADMIN.SUPPORT]: data?.openTickets ?? 0,
   };
 };

@@ -46,7 +46,9 @@ export const ROUTES = {
     EMPLOYEE_NEW: '/admin/colaboradores/novo',
     EMPLOYEE_EDIT: '/admin/colaboradores/:id',
     CALENDAR: '/admin/calendario',
+    /** Antiga página de pedidos; reencaminha para Férias e Ausências → Pedidos. */
     REQUESTS: '/admin/pedidos',
+    PENDING_REQUESTS: '/admin/calendario?tab=pedidos&status=pending',
     SUPPORT: '/admin/suporte',
     ACCESSES: '/admin/acessos',
     SETTINGS: '/admin/configuracoes',

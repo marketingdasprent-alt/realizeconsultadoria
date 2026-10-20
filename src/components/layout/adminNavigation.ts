@@ -2,7 +2,6 @@
 // com o mosaico colorido do colaborador. `moduleKey` é a permissão que o mostra.
 import {
   Building2,
-  ClipboardList,
   Clock,
   Headset,
   KeyRound,
@@ -21,6 +20,8 @@ export interface AdminNavItem {
   icon: LucideIcon;
   label: string;
   moduleKey: string;
+  /** Outras permissões que também mostram o módulo (ex.: Pedidos, dentro de Férias e Ausências). */
+  alsoFor?: string[];
   /** Gradiente do mosaico do ícone (classes Tailwind). */
   tint: string;
 }
@@ -58,14 +59,8 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         icon: Palmtree,
         label: 'Férias e Ausências',
         moduleKey: 'calendar',
+        alsoFor: ['requests'],
         tint: 'from-rose-400 to-red-500',
-      },
-      {
-        href: ROUTES.ADMIN.REQUESTS,
-        icon: ClipboardList,
-        label: 'Pedidos',
-        moduleKey: 'requests',
-        tint: 'from-lime-400 to-green-600',
       },
       {
         href: ROUTES.ADMIN.FINANCE,
@@ -149,5 +144,7 @@ export const findAdminNavItem = (pathname: string): AdminNavItem | null => {
 export const visibleAdminGroups = (canView: (moduleKey: string) => boolean): AdminNavGroup[] =>
   ADMIN_NAV_GROUPS.map(group => ({
     ...group,
-    items: group.items.filter(item => canView(item.moduleKey)),
+    items: group.items.filter(
+      item => canView(item.moduleKey) || (item.alsoFor ?? []).some(key => canView(key))
+    ),
   })).filter(group => group.items.length > 0);

@@ -3692,6 +3692,18 @@ export type Database = {
         Args: { _decision: string; _entry_ids: string[]; _reason?: string | null };
         Returns: number;
       };
+      mail_access_status: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          access_id: string;
+          account_id: string;
+          status: string;
+          last_error: string | null;
+          provider: string | null;
+          last_sync_at: string | null;
+          members: string[];
+        }[];
+      };
       time_clock_recent_punchers: {
         Args: { _days?: number };
         Returns: { employee_id: string }[];

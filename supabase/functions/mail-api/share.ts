@@ -55,6 +55,20 @@ const saveShared = async (
     .insert({ ...fields, access_id: row.id, user_id: null, is_default: false })
     .select('id')
     .single();
+  // A BD (trigger) e o ecrã pedem a mesma caixa ao mesmo tempo: quem chega em segundo
+  // encontra a conta já criada (access_id é único) e só a atualiza.
+  if (error && (error as { code?: string }).code === '23505') {
+    const { data: existing, error: findError } = await db
+      .from('mail_accounts')
+      .select('id')
+      .eq('access_id', row.id)
+      .single();
+    if (findError) throw findError;
+    const id = (existing as { id: string }).id;
+    const { error: updateError } = await db.from('mail_accounts').update(fields).eq('id', id);
+    if (updateError) throw updateError;
+    return id;
+  }
   if (error) throw error;
   return (data as { id: string }).id;
 };
@@ -202,30 +216,12 @@ export const shareAccessById = async (db: SupabaseClient, accessId: string) => {
     status: 'active',
     last_error: null,
   };
-  let accountId = current?.id ?? null;
-  if (accountId) {
-    const { error: updateError } = await db
-      .from('mail_accounts')
-      .update(fields)
-      .eq('id', accountId);
-    if (updateError) throw updateError;
-  } else {
-    const { data: created, error: insertError } = await db
-      .from('mail_accounts')
-      .insert({ ...fields, access_id: row.id, user_id: null, is_default: false })
-      .select('id')
-      .single();
-    if (insertError) throw insertError;
-    accountId = (created as { id: string }).id;
-  }
+  const accountId = await saveShared(db, row, current?.id ?? null, fields);
   await storeSecret(db, accountId, { username: email, password: row.password });
-
-  const { error: syncError } = await db.rpc('mail_sync_access_members', { p_access: row.id });
-  if (syncError) throw syncError;
-  const { count } = await db
-    .from('mail_account_members')
-    .select('user_id', { count: 'exact', head: true })
-    .eq('account_id', accountId);
-
-  return { account_id: accountId, email, members: count ?? 0, servers };
+  return {
+    account_id: accountId,
+    email,
+    members: await syncMembers(db, row.id, accountId),
+    servers,
+  };
 };

@@ -1,5 +1,5 @@
 import { useState, useMemo, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -11,7 +11,6 @@ import {
   MoreHorizontal,
   Pencil,
   Trash2,
-  ExternalLink,
   Lock,
   Mail,
   Monitor,
@@ -23,11 +22,8 @@ import {
   Key,
   Users,
   AlertTriangle,
-  Phone,
   Package,
-  ClipboardList,
   Info,
-  Globe,
 } from 'lucide-react';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
@@ -72,18 +68,14 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useIsMobile } from '@/hooks/use-mobile';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
-import PhonesTab from '@/components/admin/PhonesTab';
-import EquipmentsTab from '@/components/admin/EquipmentsTab';
-import AssignmentsTab from '@/components/admin/AssignmentsTab';
-import DomainsTab from '@/components/admin/DomainsTab';
-import ServicesTab from '@/components/admin/ServicesTab';
+import { EquipmentArea } from '../components/accesses/EquipmentArea';
+import { PaidServicesTab } from '../components/paid-services/PaidServicesTab';
 import { supabase } from '@/integrations/supabase/client';
 import { mailErrorText, mailService } from '@/modules/webmail/services/mailService';
 
@@ -160,6 +152,14 @@ const getCategoryIcon = (iconName: string | null | undefined) => {
   return iconMap[normalizedName] || Key;
 };
 
+/** Abas da página (?tab=): credenciais, material e serviços pagos (domínios incluídos). */
+const PAGE_TABS = [
+  { value: 'acessos', label: 'Acessos', icon: Lock },
+  { value: 'equipamentos', label: 'Equipamentos', icon: Package },
+  { value: 'servicos', label: 'Serviços pagos', icon: Wifi },
+] as const;
+type PageTab = (typeof PAGE_TABS)[number]['value'];
+
 const AccessesPage = () => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -182,6 +182,13 @@ const AccessesPage = () => {
 
   const [searchTerm, setSearchTerm] = useState('');
   const [companyFilter, setCompanyFilter] = useState<string>('all');
+  const [searchParams, setSearchParams] = useSearchParams();
+  const askedTab = searchParams.get('tab');
+  const tab: PageTab = PAGE_TABS.some(t => t.value === askedTab)
+    ? (askedTab as PageTab)
+    : 'acessos';
+  const changeTab = (value: string) =>
+    setSearchParams(value === 'acessos' ? {} : { tab: value }, { replace: true });
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [visiblePasswords, setVisiblePasswords] = useState<Set<string>>(new Set());
   const [copiedField, setCopiedField] = useState<string | null>(null);
@@ -908,58 +915,23 @@ const AccessesPage = () => {
           <AdminPageTitle title="Acessos" description="Gestão de credenciais e acessos" />
         </div>
 
-        <Tabs defaultValue="accesses" className="w-full">
+        <Tabs value={tab} onValueChange={changeTab} className="w-full">
           <ScrollArea className="w-full whitespace-nowrap pb-2">
-            <TabsList className="inline-flex w-auto min-w-full sm:grid sm:w-full sm:max-w-3xl sm:grid-cols-6 h-10">
-              <TabsTrigger
-                value="accesses"
-                className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4"
-              >
-                <Lock className="h-4 w-4 hidden sm:inline" />
-                Acessos
-              </TabsTrigger>
-              <TabsTrigger
-                value="phones"
-                className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4"
-              >
-                <Phone className="h-4 w-4 hidden sm:inline" />
-                <span className="sm:hidden">SIM</span>
-                <span className="hidden sm:inline">Cartão SIM</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="equipments"
-                className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4"
-              >
-                <Package className="h-4 w-4 hidden sm:inline" />
-                <span className="sm:hidden">Equipam.</span>
-                <span className="hidden sm:inline">Equipamentos</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="assignments"
-                className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4"
-              >
-                <ClipboardList className="h-4 w-4 hidden sm:inline" />
-                <span className="sm:hidden">Atrib.</span>
-                <span className="hidden sm:inline">Atribuições</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="dominios"
-                className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4"
-              >
-                <Globe className="h-4 w-4 hidden sm:inline" />
-                Domínios
-              </TabsTrigger>
-              <TabsTrigger
-                value="servicos"
-                className="flex items-center gap-1.5 text-xs sm:text-sm px-3 sm:px-4"
-              >
-                <Wifi className="h-4 w-4 hidden sm:inline" />
-                Serviços
-              </TabsTrigger>
+            <TabsList className="inline-flex h-10 w-auto">
+              {PAGE_TABS.map(({ value, label, icon: Icon }) => (
+                <TabsTrigger
+                  key={value}
+                  value={value}
+                  className="flex items-center gap-1.5 px-3 text-xs sm:px-4 sm:text-sm"
+                >
+                  <Icon className="hidden h-4 w-4 sm:inline" />
+                  {label}
+                </TabsTrigger>
+              ))}
             </TabsList>
           </ScrollArea>
 
-          <TabsContent value="accesses" className="mt-6">
+          <TabsContent value="acessos" className="mt-6">
             {canManage && (
               <div className="flex justify-end mb-4">
                 <Button onClick={openCreateDialog}>
@@ -1113,39 +1085,17 @@ const AccessesPage = () => {
             </Card>
           </TabsContent>
 
-          <TabsContent value="phones" className="mt-6">
-            <PhonesTab
+          <TabsContent value="equipamentos" className="mt-6">
+            <EquipmentArea
               canManage={canManage}
               companies={companies}
               companyFilter={companyFilter}
               setCompanyFilter={setCompanyFilter}
             />
-          </TabsContent>
-
-          <TabsContent value="equipments" className="mt-6">
-            <EquipmentsTab
-              canManage={canManage}
-              companies={companies}
-              companyFilter={companyFilter}
-              setCompanyFilter={setCompanyFilter}
-            />
-          </TabsContent>
-
-          <TabsContent value="assignments" className="mt-6">
-            <AssignmentsTab />
-          </TabsContent>
-
-          <TabsContent value="dominios" className="mt-6">
-            <DomainsTab />
           </TabsContent>
 
           <TabsContent value="servicos" className="mt-6">
-            <ServicesTab
-              canManage={canManage}
-              companies={companies}
-              companyFilter={companyFilter}
-              setCompanyFilter={setCompanyFilter}
-            />
+            <PaidServicesTab canManage={canManage} companies={companies} />
           </TabsContent>
         </Tabs>
       </div>

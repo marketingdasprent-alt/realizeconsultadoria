@@ -3,7 +3,7 @@
 // nova chega em segundo plano. Só a 1.ª página, sem pesquisa; limpa ao terminar a sessão.
 
 const PREFIX = 'rz-mail-cache:';
-const MAX_ENTRIES = 20;
+const MAX_ENTRIES = 60;
 
 interface CacheEntry<T> {
   savedAt: number;
@@ -42,6 +42,62 @@ interface CachedMail {
   id: string;
   accountId: string;
 }
+
+interface MailboxCachePage<M> {
+  messages: M[];
+  next: Record<string, string>;
+  errors: Record<string, never>;
+}
+
+const accountKey = (accountId: string, folder: string) => `acct|${accountId}|${folder}`;
+
+/**
+ * Lista guardada de uma ou várias caixas (a de "Todas as caixas" junta a de cada uma): não
+ * depende da ordem das caixas nem de se ligar ou desligar outra. Mostra-se o que houver.
+ */
+export const readMailboxCache = <M extends CachedMail & { date: string }>(
+  userId: string,
+  accountIds: string[],
+  folder: string
+): { savedAt: number; page: MailboxCachePage<M> } | null => {
+  const entries = accountIds
+    .map(id =>
+      readListCache<{ messages: M[]; next?: Record<string, string> }>(
+        userId,
+        accountKey(id, folder)
+      )
+    )
+    .filter(
+      (entry): entry is NonNullable<typeof entry> => !!entry && Array.isArray(entry.page?.messages)
+    );
+  if (!entries.length) return null;
+  return {
+    savedAt: Math.min(...entries.map(entry => entry.savedAt)),
+    page: {
+      messages: entries
+        .flatMap(entry => entry.page.messages)
+        .sort((a, b) => b.date.localeCompare(a.date)),
+      next: Object.assign({}, ...entries.map(entry => entry.page.next ?? {})),
+      errors: {},
+    },
+  };
+};
+
+/** Guarda a lista de cada caixa à parte (as que deram erro ficam com a anterior). */
+export const writeMailboxCache = <M extends CachedMail>(
+  userId: string,
+  accountIds: string[],
+  folder: string,
+  page: { messages: M[]; next: Record<string, string>; errors: Record<string, unknown> }
+) => {
+  for (const id of accountIds) {
+    if (page.errors[id]) continue;
+    writeListCache(userId, accountKey(id, folder), {
+      messages: page.messages.filter(message => message.accountId === id),
+      next: page.next[id] ? { [id]: page.next[id] } : {},
+    });
+  }
+};
 
 /**
  * Aplica a mesma mudança às listas guardadas (todas as caixas/pastas deste utilizador): um

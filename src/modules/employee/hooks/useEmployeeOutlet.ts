@@ -6,7 +6,8 @@ export type EmployeeProfile = Database['public']['Tables']['employees']['Row'] &
 };
 
 export interface EmployeeOutletContext {
-  employee: EmployeeProfile;
+  /** null por instantes ao abrir (a app desenha já com o utilizador guardado no aparelho). */
+  employee: EmployeeProfile | null;
   sessionEmail: string;
   refresh: () => Promise<void>;
 }

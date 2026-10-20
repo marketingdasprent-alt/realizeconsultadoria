@@ -2,6 +2,12 @@ import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'reac
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
+import {
+  clearDeviceCache,
+  readDeviceCache,
+  sessionUserId,
+  writeDeviceCache,
+} from '@/lib/device-cache';
 import { clearMailCache } from '@/modules/webmail/lib/mailCache';
 import { ROUTES } from '@/lib/constants';
 import ChangePasswordDialog from '@/components/employee/ChangePasswordDialog';
@@ -14,6 +20,24 @@ import { LiveMessengerProvider } from '@/modules/messenger/context/MessengerProv
 import type { WorkspaceContextValue } from '../context/workspaceContext';
 import { useRzTheme } from '../hooks/useRzTheme';
 import { WorkspaceShell } from './shell/WorkspaceShell';
+
+const USER_CACHE = 'workspace-user';
+
+const toUser = (
+  employee: EmployeeProfile,
+  sessionEmail: string
+): WorkspaceContextValue['user'] => ({
+  userId: employee.user_id ?? '',
+  employeeId: employee.id,
+  companyId: employee.company_id,
+  name: employee.name,
+  email: employee.email || sessionEmail,
+  position: employee.position,
+  department: employee.department,
+  companyName: employee.companies?.name ?? null,
+  phone: employee.phone,
+  hireDate: employee.hire_date,
+});
 
 /** Enquanto o código de uma página chega (só da primeira vez). */
 const PageLoading: React.FC = () => (
@@ -37,6 +61,11 @@ const WorkspaceLayout: React.FC = () => {
   const [employee, setEmployee] = useState<EmployeeProfile | null>(null);
   const [sessionEmail, setSessionEmail] = useState('');
   const [isLoading, setIsLoading] = useState(true);
+  // O utilizador da última vez (só o que a estrutura mostra): a app abre já com ele e a ficha
+  // completa chega em segundo plano.
+  const [cachedUser] = useState(() =>
+    readDeviceCache<WorkspaceContextValue['user']>(USER_CACHE, sessionUserId())
+  );
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
   useRzTheme();
 
@@ -49,6 +78,8 @@ const WorkspaceLayout: React.FC = () => {
     setEmployee(data.employee);
     setSessionEmail(data.email);
     setIsLoading(false);
+    if (data.employee)
+      writeDeviceCache(USER_CACHE, sessionUserId(), toUser(data.employee, data.email));
   }, [navigate]);
 
   useEffect(() => {
@@ -58,34 +89,26 @@ const WorkspaceLayout: React.FC = () => {
   const handleLogout = useCallback(async () => {
     await supabase.auth.signOut();
     clearMailCache();
+    clearDeviceCache();
     const standalone = window.matchMedia('(display-mode: standalone)').matches;
     navigate(standalone ? ROUTES.EMPLOYEE.LOGIN : ROUTES.PUBLIC.HOME);
   }, [navigate]);
 
+  const user = employee ? toUser(employee, sessionEmail) : cachedUser;
   const workspace = useMemo<WorkspaceContextValue | null>(
     () =>
-      employee && {
-        user: {
-          userId: employee.user_id ?? '',
-          employeeId: employee.id,
-          companyId: employee.company_id,
-          name: employee.name,
-          email: employee.email || sessionEmail,
-          position: employee.position,
-          department: employee.department,
-          companyName: employee.companies?.name ?? null,
-          phone: employee.phone,
-          hireDate: employee.hire_date,
-        },
+      user && {
+        user,
         basePath: ROUTES.EMPLOYEE.DASHBOARD,
         isPreview: false,
         onLogout: handleLogout,
         onChangePassword: () => setIsChangePasswordOpen(true),
       },
-    [employee, sessionEmail, handleLogout]
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- user deriva de employee/cachedUser
+    [employee, sessionEmail, cachedUser, handleLogout]
   );
 
-  if (isLoading) {
+  if (isLoading && !workspace) {
     return (
       <FullScreen>
         <Loader2 className="h-8 w-8 animate-spin text-white/80" />
@@ -93,7 +116,7 @@ const WorkspaceLayout: React.FC = () => {
     );
   }
 
-  if (!employee || !workspace) {
+  if (!workspace || (!isLoading && !employee)) {
     return (
       <FullScreen>
         <div className="w-full max-w-md rounded-[28px] bg-white p-8 text-center shadow-rz-pop">
@@ -119,9 +142,9 @@ const WorkspaceLayout: React.FC = () => {
     // atualizam-se em tempo real em qualquer página.
     <LiveMessengerProvider
       user={{
-        userId: employee.user_id ?? '',
-        companyId: employee.company_id,
-        name: employee.name,
+        userId: workspace.user.userId,
+        companyId: workspace.user.companyId,
+        name: workspace.user.name,
       }}
     >
       <WorkspaceShell value={workspace}>

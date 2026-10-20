@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { breadcrumbsFor, fileKind, opensInEditor, sortEntries } from '../companyFiles';
+import {
+  breadcrumbsFor,
+  fileKind,
+  opensInEditor,
+  previewKind,
+  sortEntries,
+} from '../companyFiles';
 
 const folders = [
   { path: 'DASPRENT/Marketing', name: 'Marketing' },
@@ -49,5 +55,20 @@ describe('tipos de ficheiro', () => {
     expect(opensInEditor({ name: 'Folha.xlsx', type: 'file' })).toBe(true);
     expect(opensInEditor({ name: 'Contrato.pdf', type: 'file' })).toBe(true);
     expect(opensInEditor({ name: 'Foto.png', type: 'file' })).toBe(false);
+  });
+});
+
+describe('visualização sem descarregar', () => {
+  it('imagens, vídeos e áudio abrem no Realize; o resto descarrega', () => {
+    const file = (name: string) => ({ name, type: 'file' as const });
+    expect(previewKind(file('Beatriz Dasp Rent.gif'))).toBe('image');
+    expect(previewKind(file('foto.JPG'))).toBe('image');
+    expect(previewKind(file('logo.svg'))).toBe('image');
+    expect(previewKind(file('video.mp4'))).toBe('video');
+    expect(previewKind(file('nota.mp3'))).toBe('audio');
+    expect(previewKind(file('contrato.docx'))).toBeNull();
+    expect(previewKind(file('arquivo.zip'))).toBeNull();
+    expect(previewKind(file('foto.heic'))).toBeNull();
+    expect(previewKind({ name: 'Imagens', type: 'dir' })).toBeNull();
   });
 });

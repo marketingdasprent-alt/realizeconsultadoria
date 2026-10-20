@@ -5,8 +5,9 @@ import { toast } from '@/hooks/use-toast';
 import { WorkspacePage } from '@/modules/workspace/components/WorkspacePage';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { CompanyFilesBrowser } from '../components/company/CompanyFilesBrowser';
+import { CompanyFilePreview } from '../components/company/CompanyFilePreview';
 import { OnlyOfficeEditor } from '../components/company/OnlyOfficeEditor';
-import { opensInEditor } from '../lib/companyFiles';
+import { opensInEditor, previewKind } from '../lib/companyFiles';
 import { companyFilesService, type CompanyEntry } from '../services/companyFilesService';
 
 /**
@@ -23,18 +24,23 @@ const MyDocumentsPage: React.FC = () => {
   const personal = `${basePath}/definicoes/documentos`;
   const folder = params.get('pasta');
   const opened = params.get('abrir');
+  const viewing = params.get('ver');
 
   useEffect(() => {
     if (params.has('enviar') || params.has('tab'))
       navigate(`${personal}?${params.toString()}`, { replace: true });
   }, [params, navigate, personal]);
 
-  const show = (next: { pasta?: string | null; abrir?: string | null }) => {
+  const show = (
+    next: { pasta?: string | null; abrir?: string | null; ver?: string | null },
+    replace = false
+  ) => {
     const search = new URLSearchParams();
     const pasta = next.pasta === undefined ? folder : next.pasta;
     if (pasta) search.set('pasta', pasta);
     if (next.abrir) search.set('abrir', next.abrir);
-    setParams(search);
+    if (next.ver) search.set('ver', next.ver);
+    setParams(search, { replace });
   };
 
   const download = async (entry: CompanyEntry) => {
@@ -55,8 +61,13 @@ const MyDocumentsPage: React.FC = () => {
     } else window.location.assign(data.url);
   };
 
+  // Documentos no editor; imagens, vídeos e áudio na visualização; o resto descarrega-se.
   const openFile = (entry: CompanyEntry) =>
-    opensInEditor(entry) ? show({ abrir: entry.path }) : download(entry);
+    opensInEditor(entry)
+      ? show({ abrir: entry.path })
+      : previewKind(entry)
+        ? show({ ver: entry.path })
+        : download(entry);
 
   return (
     <WorkspacePage>
@@ -83,6 +94,14 @@ const MyDocumentsPage: React.FC = () => {
         />
       )}
 
+      {viewing && !isPreview && (
+        <CompanyFilePreview
+          path={viewing}
+          onNavigate={path => show({ ver: path }, true)}
+          onClose={() => show({ ver: null })}
+          onDownload={download}
+        />
+      )}
       {opened && !isPreview && (
         <OnlyOfficeEditor path={opened} onClose={() => show({ abrir: null })} />
       )}

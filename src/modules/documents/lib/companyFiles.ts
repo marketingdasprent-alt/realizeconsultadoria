@@ -70,3 +70,23 @@ export const NEW_DOCUMENT_KINDS: { kind: NewDocumentKind; label: string; fileKin
   { kind: 'xlsx', label: 'Folha de cálculo', fileKind: 'cell' },
   { kind: 'pptx', label: 'Apresentação', fileKind: 'slide' },
 ];
+
+export type PreviewKind = 'image' | 'video' | 'audio';
+
+/** Ficheiros que se veem no próprio Realize (os browsers mostram-nos sem nada instalado). */
+const PREVIEW_EXTENSIONS: Record<PreviewKind, string[]> = {
+  image: ['jpg', 'jpeg', 'png', 'gif', 'webp', 'bmp', 'svg', 'avif'],
+  video: ['mp4', 'webm', 'mov', 'm4v'],
+  audio: ['mp3', 'wav', 'm4a', 'ogg', 'aac'],
+};
+
+/** Imagem, vídeo ou áudio que abre na visualização (null = descarrega). */
+export const previewKind = (entry: Pick<CompanyEntry, 'name' | 'type'>): PreviewKind | null => {
+  if (entry.type !== 'file') return null;
+  const extension = extensionOf(entry.name);
+  return (
+    (Object.keys(PREVIEW_EXTENSIONS) as PreviewKind[]).find(kind =>
+      PREVIEW_EXTENSIONS[kind].includes(extension)
+    ) ?? null
+  );
+};

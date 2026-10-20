@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { ChevronRight, Eye, FolderOpen, Loader2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
@@ -6,9 +6,21 @@ import { useCompanyFolder } from '../../hooks/useCompanyFolder';
 import { useCompanyUploads } from '../../hooks/useCompanyUploads';
 import { breadcrumbsFor } from '../../lib/companyFiles';
 import type { CompanyEntry } from '../../services/companyFilesService';
+import { CompanyFileGrid, ViewToggle, type FilesView } from './CompanyFileGrid';
 import { CompanyFileRow } from './CompanyFileRow';
 import { CompanyFolderActions } from './CompanyFolderActions';
 import { CompanyUploadList } from './CompanyUploadList';
+
+const VIEW_KEY = 'rz.docs.view';
+
+/** Grelha (com miniaturas) por defeito; a escolha fica guardada neste aparelho. */
+const readView = (): FilesView => {
+  try {
+    return localStorage.getItem(VIEW_KEY) === 'list' ? 'list' : 'grid';
+  } catch {
+    return 'grid';
+  }
+};
 
 interface CompanyFilesBrowserProps {
   /** Pasta aberta (null = pastas atribuídas). */
@@ -39,6 +51,15 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
   const crumbs = breadcrumbsFor(path, folders);
   const canEdit = !!path && listing.data?.permission === 'edit';
   const uploads = useCompanyUploads(path);
+  const [view, setView] = useState<FilesView>(readView);
+  const changeView = (next: FilesView) => {
+    setView(next);
+    try {
+      localStorage.setItem(VIEW_KEY, next);
+    } catch {
+      // sem armazenamento: só nesta sessão
+    }
+  };
   const { isDragging, dropProps } = useFileDrop(uploads.upload, canEdit);
 
   const open = (entry: CompanyEntry) =>
@@ -73,6 +94,7 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
             </React.Fragment>
           ))}
         </nav>
+        <ViewToggle value={view} onChange={changeView} />
         {path && listing.data?.permission === 'read' && (
           <span className="inline-flex items-center gap-1 rounded-full bg-rz-canvas px-3 py-1 text-[12px] font-semibold text-rz-muted">
             <Eye className="h-3.5 w-3.5" /> Só leitura
@@ -102,6 +124,8 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
               : 'Ainda não tem pastas da empresa atribuídas. Peça acesso ao administrador.'}
           </p>
         </div>
+      ) : view === 'grid' ? (
+        <CompanyFileGrid entries={listing.data.entries} onOpen={open} onDownload={onDownload} />
       ) : (
         <ul className="space-y-0.5">
           {listing.data.entries.map(entry => (

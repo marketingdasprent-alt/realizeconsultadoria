@@ -34,7 +34,7 @@ const PERSISTED: readonly (readonly string[])[] = [
 export const isPersisted = (key: readonly unknown[]): boolean =>
   // O arranque do Messenger (entrar no canal Geral…) corre sempre em cada sessão.
   !(key[0] === 'chat' && key[1] === 'boot') &&
-  !(key[0] === 'company-files' && key[1] === 'url') &&
+  !(key[0] === 'company-files' && (key[1] === 'url' || key[1] === 'thumbs')) &&
   PERSISTED.some(prefix => prefix.every((part, index) => key[index] === part));
 
 interface Saved {

@@ -10,6 +10,7 @@
 // Só admins (para atribuir pastas aos colaboradores na ficha de cada um):
 // POST { action: 'admin-list', path? }  → pastas do servidor (sem path: as raízes)
 // POST { action: 'admin-mkdir', path }  → nova pasta (dentro de uma raiz)
+// POST { action: 'thumbs', items: [{ path, modified, size }] } → miniaturas (vista em grelha)
 // POST { action: 'upload', path, name, size } → link para o browser enviar o ficheiro direto
 //                                               ao agente (PUT, 10 min), com um nome livre
 //
@@ -39,6 +40,7 @@ import {
   UPLOAD_MAX_BYTES,
 } from '../_shared/company-files.ts';
 import { BLANK_MIME, blankFile, isBlankKind } from './templates.ts';
+import { thumbsFor, type ThumbTarget } from './thumbs.ts';
 
 const AGENT_URL = Deno.env.get('FILES_AGENT_URL') ?? 'https://files.dasprent.pt';
 const LOCAL_AGENT_URL = Deno.env.get('FILES_AGENT_LOCAL_URL') ?? 'http://127.0.0.1:8181';
@@ -63,11 +65,14 @@ interface CompanyFilesRequest {
     | 'create'
     | 'upload'
     | 'admin-list'
-    | 'admin-mkdir';
+    | 'admin-mkdir'
+    | 'thumbs';
   path?: unknown;
   name?: unknown;
   kind?: unknown;
   size?: unknown;
+  /** thumbs: [{ path, modified, size }] da listagem da pasta (até 30). */
+  items?: unknown;
 }
 
 interface AgentEntry {
@@ -319,6 +324,36 @@ serve(async (req: Request) => {
         permission: folder.permission,
       }))
     );
+
+  if (body.action === 'thumbs') {
+    const items = Array.isArray(body.items) ? body.items.slice(0, 30) : [];
+    const targets: ThumbTarget[] = items.flatMap(item => {
+      const raw = (item ?? {}) as { path?: unknown; modified?: unknown; size?: unknown };
+      const itemPath = cleanPath(raw.path);
+      // Só ficheiros das pastas a que a pessoa tem acesso
+      if (!itemPath || !accessFor(itemPath, folders)) return [];
+      return [
+        {
+          path: itemPath,
+          modified: typeof raw.modified === 'string' ? raw.modified : '',
+          size: typeof raw.size === 'number' ? raw.size : undefined,
+        },
+      ];
+    });
+    return ok(
+      await thumbsFor(
+        {
+          db,
+          agentSecret,
+          officeSecret,
+          agentUrl: AGENT_URL,
+          localAgentUrl: LOCAL_AGENT_URL,
+          officeUrl: ONLYOFFICE_URL,
+        },
+        targets
+      )
+    );
+  }
 
   const path = cleanPath(body.path);
   if (!path) return fail('Caminho inválido.');

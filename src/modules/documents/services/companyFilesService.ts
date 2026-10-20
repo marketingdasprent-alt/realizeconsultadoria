@@ -69,7 +69,7 @@ const putFile = (url: string, file: File, onProgress: (ratio: number) => void) =
     xhr.send(file);
   });
 
-const call = async <T>(body: Record<string, string>): Promise<ServiceResult<T>> => {
+const call = async <T>(body: Record<string, unknown>): Promise<ServiceResult<T>> => {
   try {
     const { data, error } = await supabase.functions.invoke('company-files', { body });
     if (error || !data) return { data: null, error: UNAVAILABLE };
@@ -97,6 +97,13 @@ export const companyFilesService = {
 
   /** Link de descarga direta (válido 5 minutos). */
   downloadUrl: (path: string) => call<{ url: string }>({ action: 'download', path }),
+
+  /**
+   * Miniaturas (vista em grelha): 1.ª página dos documentos e PDF, ou a própria imagem.
+   * Links que valem 6 horas; null = sem miniatura (fica o ícone).
+   */
+  thumbs: (items: Pick<CompanyEntry, 'path' | 'modified' | 'size'>[]) =>
+    call<Record<string, string | null>>({ action: 'thumbs', items }),
 
   /** Cria uma pasta (a pasta-mãe tem de existir e ter permissão de edição). */
   createFolder: (path: string) =>

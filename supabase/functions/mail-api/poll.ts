@@ -1,4 +1,4 @@
-// Avisos de email novo: a BD chama isto a cada 30 segundos (pg_cron → pg_net, token de sistema).
+// Avisos de email novo: a BD chama isto a cada minuto (pg_cron → pg_net, token de sistema).
 // Para cada conta ativa lê os últimos emails da caixa de entrada e avisa quem a usa (o dono ou
 // os membros de uma caixa partilhada) dos que chegaram por ler desde a última vez: aviso no
 // Realize e notificação no telemóvel (trigger de user_notifications → push-send).

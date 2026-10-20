@@ -331,7 +331,7 @@ export const createImapDriver = (
     });
 
   return {
-    list({ folder, query, pageToken, limit }) {
+    list({ folder, query, pageToken, limit, withoutSnippets }) {
       return withClient(async client => {
         const empty: MailListResult = { messages: [], next_page_token: null };
         const before = pageToken ? Number(pageToken) : null;
@@ -369,7 +369,9 @@ export const createImapDriver = (
           )) {
             items.push(msg);
           }
-          const snippets = await fetchSnippets(client, items);
+          const snippets = withoutSnippets
+            ? new Map<number, string>()
+            : await fetchSnippets(client, items);
           items.sort((a, b) => b.uid - a.uid);
 
           return {

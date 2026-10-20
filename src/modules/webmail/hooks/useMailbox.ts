@@ -60,6 +60,10 @@ export const useMailbox = (
     getNextPageParam: last => (Object.keys(last.next).length ? last.next : undefined),
     enabled: !isPreview && ids.length > 0,
     staleTime: 30_000,
+    // Com o Webmail aberto, a lista vai-se atualizando sozinha (um email lido noutro sítio,
+    // ex. no Outlook, não gera aviso e não chegava ao ecrã) e também ao voltar à janela.
+    refetchInterval: search.trim() ? false : 30_000,
+    refetchOnWindowFocus: true,
     initialData: cached ? { pages: [cached.page], pageParams: [null] } : undefined,
     initialDataUpdatedAt: cached?.savedAt,
   });

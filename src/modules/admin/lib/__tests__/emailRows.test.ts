@@ -45,7 +45,10 @@ const source = {
     credential('d1', 'geral@dasprent.pt', 'Email Departamental'),
     credential('s1', 'root@server.pt', 'Servidor', 'rui'),
   ],
-  shares: new Map([['d1', ['rui', 'eva', 'ana']]]),
+  shares: new Map([
+    ['d1', ['rui', 'eva', 'ana']],
+    ['p1', ['lia']],
+  ]),
   mailboxes: new Map([
     [
       'd1',
@@ -67,7 +70,8 @@ describe('buildEmailRows', () => {
 
   it('only lists email accesses, with who should get each mailbox', () => {
     expect(rows.map(r => r.credential.id)).toEqual(['p1', 'p2', 'd1']);
-    expect(byId.p1).toMatchObject({ department: false, people: ['Ana'], state: 'pending' });
+    // Pessoal: o dono e quem mais tem acesso.
+    expect(byId.p1).toMatchObject({ department: false, people: ['Ana', 'Lia'], state: 'pending' });
     // Inativos e quem não tem conta não contam.
     expect(byId.p2).toMatchObject({ people: [], state: 'nobody' });
     expect(byId.d1).toMatchObject({ department: true, people: ['Ana', 'Rui'], state: 'linked' });

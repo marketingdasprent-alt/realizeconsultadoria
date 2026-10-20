@@ -77,7 +77,7 @@ export const categoryForKind = (
   if (kind === 'email_personal')
     return categories.find(c => isEmailCategory(c.name) && !isDepartmentCategory(c.name)) ?? null;
   if (kind === 'site') return categories.find(c => kindOfCategory(c.name) === 'site') ?? null;
-  return null;
+  return categories.find(c => lower(c.name) === 'outro') ?? null;
 };
 
 export const isEmailCredential = (credential: Credential) =>

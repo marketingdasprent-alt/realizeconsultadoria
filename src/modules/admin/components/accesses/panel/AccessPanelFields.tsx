@@ -9,7 +9,6 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { isEmailCategory } from '../../../lib/credentials';
 import type { CredentialsData } from '../../../services/credentialService';
 import { PasswordInput } from './PasswordInput';
 import { PeoplePicker } from './PeoplePicker';
@@ -50,9 +49,14 @@ export const AccessPanelFields: React.FC<AccessPanelFieldsProps> = ({
   isEmail,
   update,
 }) => {
-  const employees = data.employees.filter(
-    e => e.is_active && (!form.companyId || e.company_id === form.companyId)
-  );
+  // Todos os ativos (um email pode ser de outra empresa do grupo); os da empresa primeiro.
+  const employees = data.employees
+    .filter(e => e.is_active)
+    .sort(
+      (a, b) =>
+        Number(b.company_id === form.companyId) - Number(a.company_id === form.companyId) ||
+        a.name.localeCompare(b.name)
+    );
   const showSuffix = isEmail && !!domain && !form.local.includes('@');
   return (
     <div className="space-y-4">
@@ -76,26 +80,6 @@ export const AccessPanelFields: React.FC<AccessPanelFieldsProps> = ({
 
       {!isEmail && (
         <>
-          <Field id="acc-category" label="Categoria">
-            <Select
-              value={form.categoryId || NONE}
-              onValueChange={value => update({ categoryId: value === NONE ? '' : value })}
-            >
-              <SelectTrigger id="acc-category" className="h-10">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value={NONE}>Sem categoria</SelectItem>
-                {data.categories
-                  .filter(c => !isEmailCategory(c.name))
-                  .map(category => (
-                    <SelectItem key={category.id} value={category.id}>
-                      {category.name}
-                    </SelectItem>
-                  ))}
-              </SelectContent>
-            </Select>
-          </Field>
           <Field id="acc-title" label="Nome *" error={errors.title}>
             <Input
               id="acc-title"
@@ -151,6 +135,8 @@ export const AccessPanelFields: React.FC<AccessPanelFieldsProps> = ({
         <Field id="acc-people" label="Quem tem esta caixa no Webmail">
           <PeoplePicker
             employees={employees}
+            companies={data.companies}
+            preferCompanyId={form.companyId}
             value={form.people}
             onChange={people => update({ people })}
           />

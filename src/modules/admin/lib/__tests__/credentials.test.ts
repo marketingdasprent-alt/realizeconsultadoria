@@ -32,6 +32,9 @@ describe('tipos de acesso', () => {
     expect(categoryForKind('email_department', categories)?.id).toBe('c2');
     expect(categoryForKind('site', categories)?.id).toBe('c3');
     expect(categoryForKind('other', categories)).toBeNull();
+    expect(
+      categoryForKind('other', [...categories, { id: 'c5', name: 'Outro', icon: null }])?.id
+    ).toBe('c5');
   });
 });
 

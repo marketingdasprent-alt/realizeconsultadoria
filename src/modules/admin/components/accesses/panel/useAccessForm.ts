@@ -80,6 +80,8 @@ export const useAccessForm = (
   onSaved: () => void
 ) => {
   const [form, setForm] = useState<AccessForm>(() => initialForm(target, data));
+  // A categoria que o acesso já tinha (Base de Dados, Servidor…) fica enquanto não mudar o tipo.
+  const [originKind, setOriginKind] = useState<AccessKind>(form.kind);
   const [errors, setErrors] = useState<Partial<Record<keyof AccessForm, string>>>({});
   const [phase, setPhase] = useState<Phase>('form');
   const [outcome, setOutcome] = useState<Outcome>(null);
@@ -88,7 +90,9 @@ export const useAccessForm = (
 
   useEffect(() => {
     if (!open) return;
-    setForm(initialForm(target, data));
+    const initial = initialForm(target, data);
+    setForm(initial);
+    setOriginKind(initial.kind);
     setErrors({});
     setPhase('form');
     setOutcome(null);
@@ -123,7 +127,7 @@ export const useAccessForm = (
     if (Object.keys(found).length > 0) return setErrors(found);
 
     const category =
-      form.kind === 'other' || (form.kind === 'site' && form.categoryId)
+      form.categoryId && form.kind === originKind
         ? (data.categories.find(c => c.id === form.categoryId) ?? null)
         : categoryForKind(form.kind, data.categories);
     const title =

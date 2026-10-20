@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useToast } from '@/hooks/use-toast';
+import type { EmailPeopleValue } from '../components/accesses/EmailPeopleDialog';
 import type { Credential } from '../lib/credentials';
 import { credentialService } from '../services/credentialService';
 
@@ -51,13 +52,18 @@ export const useEmailActions = (refresh: () => Promise<unknown> | void) => {
     void refresh();
   };
 
-  const savePeople = async (credential: Credential, employeeIds: string[]) => {
-    const { ok } = await credentialService.setShares(credential.id, employeeIds);
-    if (!ok) {
+  const savePeople = async (credential: Credential, value: EmailPeopleValue) => {
+    // O dono só existe no email pessoal; no departamental vem sempre null.
+    const owner =
+      value.ownerId !== (credential.employee_id ?? null)
+        ? await credentialService.setOwner(credential.id, value.ownerId)
+        : { ok: true };
+    const { ok } = await credentialService.setShares(credential.id, value.people);
+    if (!ok || !owner.ok) {
       toast({ title: 'Erro ao guardar as pessoas', variant: 'destructive' });
       return;
     }
-    if (employeeIds.length === 0) {
+    if (value.people.length === 0 && !value.ownerId) {
       toast({ title: 'Pessoas guardadas', description: 'Ninguém tem esta caixa no Webmail.' });
       void refresh();
       return;

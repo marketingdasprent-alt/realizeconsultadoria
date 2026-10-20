@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import { useCredentials } from '../../hooks/useCredentials';
 import { useEmailActions } from '../../hooks/useEmailActions';
-import type { Credential } from '../../lib/credentials';
+import { isDepartmentCategory, type Credential } from '../../lib/credentials';
 import {
   buildEmailRows,
   countStates,
@@ -105,8 +105,10 @@ export const EmailsTab: React.FC<{ canManage: boolean }> = ({ canManage }) => {
       />
       <EmailPeopleDialog
         credential={peopleOf}
-        current={peopleOf ? (data.shares.get(peopleOf.id) ?? []) : []}
+        department={!!peopleOf && isDepartmentCategory(peopleOf.access_categories?.name)}
+        shares={peopleOf ? (data.shares.get(peopleOf.id) ?? []) : []}
         employees={data.employees}
+        companies={data.companies}
         onClose={() => setPeopleOf(null)}
         onSave={actions.savePeople}
       />

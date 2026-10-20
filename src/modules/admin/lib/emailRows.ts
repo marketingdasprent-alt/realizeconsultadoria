@@ -44,11 +44,13 @@ export const buildEmailRows = (source: Source): EmailRowData[] => {
     .filter(c => isEmailCategory(c.access_categories?.name))
     .map(credential => {
       const department = isDepartmentCategory(credential.access_categories?.name);
-      const people = (
-        department
-          ? (source.shares.get(credential.id) ?? []).map(canReceive)
-          : [canReceive(credential.employee_id)]
-      )
+      // Departamental: as pessoas da partilha; pessoal: o dono e quem mais tem acesso.
+      const ids = new Set([
+        ...(department ? [] : [credential.employee_id]),
+        ...(source.shares.get(credential.id) ?? []),
+      ]);
+      const people = [...ids]
+        .map(canReceive)
         .filter((e): e is CredentialEmployee => !!e)
         .map(e => e.name)
         .sort((a, b) => a.localeCompare(b));

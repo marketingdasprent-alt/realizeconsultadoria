@@ -117,17 +117,15 @@ export const EmailRow: React.FC<EmailRowProps> = ({
               {state === 'linked' ? 'Testar' : state === 'error' ? 'Reparar' : 'Ligar'}
             </button>
           )}
-          {department && (
-            <button
-              type="button"
-              onClick={onPeople}
-              className={ACTION}
-              aria-label="Pessoas"
-              title="Pessoas"
-            >
-              <Users className="h-4 w-4" />
-            </button>
-          )}
+          <button
+            type="button"
+            onClick={onPeople}
+            className={ACTION}
+            aria-label="Pessoas"
+            title="Pessoas"
+          >
+            <Users className="h-4 w-4" />
+          </button>
           <button
             type="button"
             onClick={onEdit}

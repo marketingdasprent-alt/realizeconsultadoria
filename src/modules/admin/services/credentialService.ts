@@ -108,7 +108,16 @@ export const credentialService = {
     return { ok: !error, error };
   },
 
-  /** Quem tem o email departamental (substitui a lista toda). */
+  /** O dono de um email pessoal (a BD acerta a caixa no Webmail). */
+  setOwner: async (accessId: string, employeeId: string | null) => {
+    const { error } = await supabase
+      .from('accesses')
+      .update({ employee_id: employeeId })
+      .eq('id', accessId);
+    return { ok: !error, error };
+  },
+
+  /** Com quem a caixa é partilhada (substitui a lista toda). */
   setShares: async (accessId: string, employeeIds: string[]) => {
     const { error: deleteError } = await supabase
       .from('employee_department_emails')

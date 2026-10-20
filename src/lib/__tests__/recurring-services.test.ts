@@ -3,6 +3,7 @@ import { addDays, format } from 'date-fns';
 
 import {
   advanceRenewalDate,
+  nextRenewalFrom,
   isCyclePaid,
   getCycleStatus,
   getFidelityStatus,
@@ -23,6 +24,21 @@ describe('advanceRenewalDate', () => {
   it('encosta ao último dia quando o mês seguinte é mais curto', () => {
     // 31/01 + 1 mês não existe; date-fns encosta a 28/02.
     expect(advanceRenewalDate('2026-01-31', 'monthly')).toBe('2026-02-28');
+  });
+});
+
+describe('ciclos e data de início', () => {
+  it('avança trimestres e semestres', () => {
+    expect(advanceRenewalDate('2026-09-11', 'quarterly')).toBe('2026-12-11');
+    expect(advanceRenewalDate('2026-09-11', 'semiannual')).toBe('2027-03-11');
+  });
+
+  it('calcula a próxima renovação a partir do início, sem escorregar o dia', () => {
+    expect(nextRenewalFrom('2026-01-31', 'monthly', today)).toBe('2026-09-30');
+    expect(nextRenewalFrom('2025-03-05', 'yearly', today)).toBe('2027-03-05');
+    expect(nextRenewalFrom('2026-09-11', 'monthly', today)).toBe('2026-09-11');
+    expect(nextRenewalFrom('2026-12-01', 'quarterly', today)).toBe('2026-12-01');
+    expect(nextRenewalFrom('2026-03-15', 'semiannual', today)).toBe('2026-09-15');
   });
 });
 

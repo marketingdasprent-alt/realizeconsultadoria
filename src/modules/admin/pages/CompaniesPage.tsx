@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Plus, Search, Edit, Trash2, MoreHorizontal, Loader2 } from 'lucide-react';
+import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -135,10 +136,7 @@ const CompaniesPage = () => {
       <div className="space-y-6">
         {/* Header */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <h1 className="font-display text-3xl font-semibold">Empresas</h1>
-            <p className="text-muted-foreground mt-1">Gerir empresas clientes</p>
-          </div>
+          <AdminPageTitle title="Empresas" description="Gerir empresas clientes" />
 
           <Dialog
             open={isDialogOpen}

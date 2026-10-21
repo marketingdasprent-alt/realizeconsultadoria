@@ -16,6 +16,7 @@ import { WorkdayProvider } from './modules/timeclock/context/WorkdayProvider';
 import WorkspaceLayout from './modules/workspace/components/WorkspaceLayout';
 import { ALL_MODULES } from './modules/workspace/lib/navigation';
 import MessengerPage from './modules/messenger/pages/MessengerPage';
+import RequestsRedirect from './modules/admin/pages/RequestsRedirect';
 
 const ComingSoonPage = lazy(() => import('./pages/ComingSoonPage'));
 const Index = lazy(() => import('./pages/Index'));
@@ -29,7 +30,7 @@ const EmployeesPage = lazy(() => import('./modules/admin/pages/EmployeesPage'));
 const EmployeeFormPage = lazy(() => import('./modules/admin/pages/EmployeeFormPage'));
 const CalendarPage = lazy(() => import('./modules/admin/pages/CalendarPage'));
 const SettingsPage = lazy(() => import('./modules/admin/pages/SettingsPage'));
-const AbsenceRequestsPage = lazy(() => import('./modules/admin/pages/AbsenceRequestsPage'));
+const FinancePage = lazy(() => import('./modules/admin/pages/FinancePage'));
 const SupportTicketsPage = lazy(() => import('./modules/admin/pages/SupportTicketsPage'));
 const AccessesPage = lazy(() => import('./modules/admin/pages/AccessesPage'));
 const LegalPage = lazy(() => import('./modules/admin/pages/LegalPage'));
@@ -40,7 +41,6 @@ const PersonalDocumentsPage = lazy(() => import('./modules/documents/pages/Perso
 const MyTimeClockPage = lazy(() => import('./modules/timeclock/pages/MyTimeClockPage'));
 const TimeClockNfcPage = lazy(() => import('./modules/timeclock/pages/TimeClockNfcPage'));
 const TimeClockAdminPage = lazy(() => import('./modules/timeclock/pages/TimeClockAdminPage'));
-const DocumentsAdminPage = lazy(() => import('./modules/documents/pages/DocumentsAdminPage'));
 const ModuleComingSoonPage = lazy(() => import('./modules/workspace/pages/ModuleComingSoonPage'));
 const ProfilePage = lazy(() => import('./modules/workspace/pages/ProfilePage'));
 const AccountSettingsPage = lazy(() => import('./modules/workspace/pages/SettingsPage'));
@@ -133,11 +133,17 @@ const App = () => (
                   <Route path="/admin/colaboradores/novo" element={<EmployeeFormPage />} />
                   <Route path="/admin/colaboradores/:id" element={<EmployeeFormPage />} />
                   <Route path="/admin/calendario" element={<CalendarPage />} />
-                  <Route path="/admin/pedidos" element={<AbsenceRequestsPage />} />
+                  {/* Pedidos passou para Férias e Ausências (aba Pedidos) */}
+                  <Route path="/admin/pedidos" element={<RequestsRedirect />} />
                   <Route path="/admin/suporte" element={<SupportTicketsPage />} />
                   <Route path="/admin/acessos" element={<AccessesPage />} />
                   <Route path="/admin/ponto" element={<TimeClockAdminPage />} />
-                  <Route path="/admin/documentos" element={<DocumentsAdminPage />} />
+                  {/* Documentos passou para Colaboradores (aprovar, importar recibos, validades) */}
+                  <Route
+                    path="/admin/documentos"
+                    element={<Navigate to="/admin/colaboradores" replace />}
+                  />
+                  <Route path="/admin/financeiro" element={<FinancePage />} />
                   <Route path="/admin/configuracoes" element={<SettingsPage />} />
                 </Route>
 

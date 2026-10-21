@@ -1,7 +1,8 @@
+import { useContext } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { CHAT_KEYS } from '@/modules/messenger/lib/cache';
 import { messengerService } from '@/modules/messenger/services/messengerService';
-import { useWorkspace } from '../context/workspaceContext';
+import { WorkspaceContext } from '../context/workspaceContext';
 import { avatarUrl } from '../lib/avatars';
 
 const fetchDirectory = async () => {
@@ -15,7 +16,8 @@ const fetchDirectory = async () => {
  * Messenger e dos Colaboradores: um só pedido para todos os avatares). null sem foto.
  */
 export const useAvatarUrl = (userId: string | null | undefined): string | null => {
-  const { isPreview } = useWorkspace();
+  // Fora da área do colaborador (ex.: admin) não há contexto: o avatar recebe a foto em src.
+  const isPreview = useContext(WorkspaceContext)?.isPreview ?? false;
   const { data } = useQuery({
     queryKey: CHAT_KEYS.directory,
     queryFn: fetchDirectory,

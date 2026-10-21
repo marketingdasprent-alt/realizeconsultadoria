@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { openPrintPreview } from '@/lib/print-preview';
 import { supabase } from '@/integrations/supabase/client';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -72,7 +73,7 @@ const AssignmentsTab = () => {
 
   // Fetch companies
   const { data: companies = [] } = useQuery({
-    queryKey: ['companies-list'],
+    queryKey: ['admin', 'companies-nif'],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('companies')
@@ -244,6 +245,8 @@ const AssignmentsTab = () => {
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
       queryClient.invalidateQueries({ queryKey: ['available-equipment-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['equipments'] });
+      queryClient.invalidateQueries({ queryKey: ['phones'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'equipment-drift'] });
       toast({ title: 'Atribuição criada com sucesso!' });
       resetDialogState();
     },
@@ -406,6 +409,8 @@ const AssignmentsTab = () => {
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
       queryClient.invalidateQueries({ queryKey: ['available-equipment-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['equipments'] });
+      queryClient.invalidateQueries({ queryKey: ['phones'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'equipment-drift'] });
       toast({ title: 'Atribuição atualizada com sucesso!' });
       resetDialogState();
     },
@@ -445,6 +450,8 @@ const AssignmentsTab = () => {
       queryClient.invalidateQueries({ queryKey: ['assignments'] });
       queryClient.invalidateQueries({ queryKey: ['available-equipment-assignments'] });
       queryClient.invalidateQueries({ queryKey: ['equipments'] });
+      queryClient.invalidateQueries({ queryKey: ['phones'] });
+      queryClient.invalidateQueries({ queryKey: ['admin', 'equipment-drift'] });
       toast({ title: 'Atribuição devolvida com sucesso!' });
     },
     onError: () => {
@@ -533,16 +540,6 @@ const AssignmentsTab = () => {
   // Print functions
   const handlePrint = async (assignment: any, isReturn = false) => {
     try {
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast({
-          title: 'Erro ao imprimir',
-          description: 'Verifique se pop-ups estão bloqueados.',
-          variant: 'destructive',
-        });
-        return;
-      }
-
       const logoBase64 = await getLogoBase64();
       const employee = assignment.employees;
       const company = assignment.companies;
@@ -557,9 +554,16 @@ const AssignmentsTab = () => {
       const tabletItems = items.filter(
         (i: any) => i.equipments?.equipment_categories?.name === 'Tablet'
       );
+      // Monitores e qualquer outra categoria (antes ficavam fora da declaração).
+      const MAIN_CATEGORIES = ['Telemóvel', 'Portátil', 'Tablet'];
       const monitorItems = items.filter(
-        (i: any) => i.equipments?.equipment_categories?.name === 'Monitor'
+        (i: any) => !MAIN_CATEGORIES.includes(i.equipments?.equipment_categories?.name)
       );
+      const otherTitle = monitorItems.every(
+        (i: any) => i.equipments?.equipment_categories?.name === 'Monitor'
+      )
+        ? 'Monitor'
+        : 'Outros equipamentos';
 
       const buildTable = (categoryItems: any[], category: string) => {
         if (categoryItems.length === 0) return '';
@@ -660,7 +664,7 @@ const AssignmentsTab = () => {
           ${buildTable(mobileItems, 'Telemóvel')}
           ${buildTable(laptopItems, 'Portátil')}
           ${buildTable(tabletItems, 'Tablet')}
-          ${buildTable(monitorItems, 'Monitor')}
+          ${buildTable(monitorItems, otherTitle)}
           ${
             assignment.keys_count && assignment.keys_count > 0
               ? `
@@ -685,8 +689,7 @@ const AssignmentsTab = () => {
           </script>
         </body></html>`;
 
-      printWindow.document.write(html);
-      printWindow.document.close();
+      openPrintPreview(html, isReturn ? 'Devolução de equipamentos' : 'Entrega de equipamentos');
     } catch (error) {
       console.error('Erro ao gerar impressão:', error);
       toast({ title: 'Erro ao imprimir', variant: 'destructive' });

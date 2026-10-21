@@ -1,6 +1,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Clock } from 'lucide-react';
+import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -56,14 +56,10 @@ const TimeClockAdminPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="font-display text-2xl lg:text-3xl font-semibold flex items-center gap-2">
-          <Clock className="h-6 w-6 text-gold" /> Controlo de Ponto
-        </h1>
-        <p className="text-muted-foreground mt-1">
-          Folha de ponto dos colaboradores, aprovações, locais e tags NFC.
-        </p>
-      </div>
+      <AdminPageTitle
+        title="Controlo de Ponto"
+        description="Folha de ponto dos colaboradores, aprovações, locais e tags NFC."
+      />
 
       <Tabs value={tab} onValueChange={changeTab}>
         <TabsList className="flex-wrap h-auto">

@@ -31,8 +31,8 @@ export const AdminForgotPasswordForm = ({ initialEmail }: AdminForgotPasswordFor
 
   return (
     <>
-      <h1 className="text-3xl font-bold mb-2">Recuperar Palavra-passe</h1>
-      <p className="text-muted-foreground mb-8">
+      <h1 className="mb-2 text-[28px] font-extrabold">Recuperar Palavra-passe</h1>
+      <p className="mb-8 text-[14.5px] text-rz-muted">
         Insira o seu email de administrador para receber um link de recuperação.
       </p>
 
@@ -56,7 +56,11 @@ export const AdminForgotPasswordForm = ({ initialEmail }: AdminForgotPasswordFor
             />
           </div>
 
-          <Button type="submit" className="w-full" disabled={forgotPasswordLoading}>
+          <Button
+            type="submit"
+            className="h-11 w-full rounded-xl text-[15px] font-semibold"
+            disabled={forgotPasswordLoading}
+          >
             {forgotPasswordLoading ? (
               <>
                 <Loader2 className="h-4 w-4 mr-2 animate-spin" />

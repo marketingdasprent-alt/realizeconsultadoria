@@ -20,9 +20,13 @@ vi.mock('@/modules/messenger/services/messengerService', () => ({
     }),
   },
 }));
-vi.mock('../../context/workspaceContext', () => ({
-  useWorkspace: () => ({ isPreview: false }),
-}));
+vi.mock('../../context/workspaceContext', async () => {
+  const { createContext } = await import('react');
+  return {
+    useWorkspace: () => ({ isPreview: false }),
+    WorkspaceContext: createContext({ isPreview: false }),
+  };
+});
 
 import { UserAvatar } from '../UserAvatar';
 

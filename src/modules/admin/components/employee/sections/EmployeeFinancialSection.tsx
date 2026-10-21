@@ -1,52 +1,56 @@
+import type { ReactNode } from 'react';
+import type { FieldErrors, UseFormRegister } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { formatIban } from '@/lib/utils';
-import { UseFormRegister } from 'react-hook-form';
+import { Field } from '../FormSection';
 
 interface EmployeeFinancialSectionProps {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   register: UseFormRegister<any>;
-  errors: any;
+  errors: FieldErrors;
+  /** Comprovativo de IBAN (ver / anexar), por baixo do IBAN. */
+  ibanDocument?: ReactNode;
 }
 
-export const EmployeeFinancialSection = ({ register, errors }: EmployeeFinancialSectionProps) => {
+/** IBAN (formatado ao escrever) e cartões. */
+export const EmployeeFinancialSection = ({
+  register,
+  errors,
+  ibanDocument,
+}: EmployeeFinancialSectionProps) => {
   const ibanField = register('iban');
 
   return (
-    <div className="space-y-4">
-      <div className="pt-4 border-t">
-        <h3 className="text-sm font-semibold text-muted-foreground">Dados Financeiros</h3>
-      </div>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-        <div className="md:col-span-2">
-          <label className="block text-sm font-medium mb-1">IBAN</label>
-          <Input
-            {...ibanField}
-            onChange={e => {
-              e.target.value = formatIban(e.target.value);
-              ibanField.onChange(e);
-            }}
-            onBlur={e => {
-              e.target.value = formatIban(e.target.value);
-              ibanField.onBlur(e);
-            }}
-            placeholder="PT50 0000 0000 0000 0000 0000 0"
-            maxLength={42}
-            autoCapitalize="characters"
-            spellCheck={false}
-          />
-          {errors.iban && <p className="text-red-500 text-xs mt-1">{errors.iban.message}</p>}
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Nº Cartão Dá</label>
-          <Input {...register('cartao_da')} />
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium mb-1">Cartão Refeição</label>
-          <Input {...register('cartao_refeicao')} />
-        </div>
-      </div>
+    <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+      <Field
+        label="IBAN"
+        error={errors.iban?.message as string | undefined}
+        className="md:col-span-2"
+      >
+        <Input
+          {...ibanField}
+          onChange={e => {
+            e.target.value = formatIban(e.target.value);
+            ibanField.onChange(e);
+          }}
+          onBlur={e => {
+            e.target.value = formatIban(e.target.value);
+            ibanField.onBlur(e);
+          }}
+          placeholder="PT50 0000 0000 0000 0000 0000 0"
+          maxLength={42}
+          autoCapitalize="characters"
+          spellCheck={false}
+          className="font-mono tracking-wide"
+        />
+      </Field>
+      {ibanDocument && <div className="md:col-span-2">{ibanDocument}</div>}
+      <Field label="Nº Cartão Dá">
+        <Input {...register('cartao_da')} />
+      </Field>
+      <Field label="Cartão Refeição">
+        <Input {...register('cartao_refeicao')} />
+      </Field>
     </div>
   );
 };

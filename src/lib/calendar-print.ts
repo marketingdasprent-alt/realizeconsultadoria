@@ -1,7 +1,7 @@
-import { format, endOfMonth, eachDayOfInterval, getDay, parseISO } from 'date-fns';
+import { format, endOfMonth, eachDayOfInterval, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { absenceTypeColors, defaultAbsenceTypeColor } from './absence-types';
-import { isHoliday, type Holiday } from './vacation-utils';
+import { countBusinessDays, isHoliday, isWeekend, type Holiday } from './vacation-utils';
 
 interface PrintPeriod {
   start_date: string;
@@ -39,17 +39,12 @@ interface Segment {
   end: Date;
   partial: boolean;
   businessDays: number | null;
+  startTime: string | null;
+  endTime: string | null;
 }
 
 const escapeHtml = (s: string) =>
   s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
-
-/** "João Silva" → "João S." · single-word names stay as-is. */
-const shortName = (full: string): string => {
-  const parts = full.trim().split(/\s+/).filter(Boolean);
-  if (parts.length <= 1) return parts[0] || '';
-  return `${parts[0]} ${parts[parts.length - 1][0]}.`;
-};
 
 /**
  * Approved date segments of an absence. When the absence has periods, only the
@@ -66,6 +61,8 @@ const approvedSegments = (a: PrintAbsence): Segment[] => {
         end: parseISO(p.end_date),
         partial: p.period_type === 'partial',
         businessDays: p.business_days != null ? Number(p.business_days) : null,
+        startTime: p.start_time ?? null,
+        endTime: p.end_time ?? null,
       }));
   }
   if (a.status === 'approved') {
@@ -75,93 +72,166 @@ const approvedSegments = (a: PrintAbsence): Segment[] => {
         end: parseISO(a.end_date),
         partial: false,
         businessDays: null,
+        startTime: null,
+        endTime: null,
       },
     ];
   }
   return [];
 };
 
-interface DayChip {
+/** "10" ou "0,5". */
+const fmtDays = (n: number): string =>
+  n % 1 === 0 ? String(n) : n.toFixed(2).replace(/0$/, '').replace('.', ',');
+
+/** "01/10 – 09/10", "15/10" ou "15/10 (09:00–13:00)". */
+const segmentLabel = (seg: Segment): string => {
+  const from = format(seg.start, 'dd/MM');
+  if (seg.partial) {
+    const hours =
+      seg.startTime && seg.endTime
+        ? `${seg.startTime.slice(0, 5)}–${seg.endTime.slice(0, 5)}`
+        : '½ dia';
+    return `${from} (${hours})`;
+  }
+  const to = format(seg.end, 'dd/MM');
+  return from === to ? from : `${from} – ${to}`;
+};
+
+type Cell = { kind: 'full' | 'half'; type: string } | null;
+
+export interface MapRow {
   name: string;
-  type: string;
-  half: boolean;
+  company: string;
+  /** Um registo por dia do mês (só dias úteis podem estar ocupados). */
+  cells: Cell[];
+  /** Dias úteis aprovados dentro do mês. */
+  total: number;
+  periods: string[];
 }
 
-const chipsForDay = (day: Date, absences: PrintAbsence[]): DayChip[] => {
-  // Um chip por colaborador por dia: se tiver mais do que uma ausência aprovada
-  // a cair no mesmo dia, o nome não pode sair repetido no mapa.
-  const byEmployee = new Map<string, DayChip>();
-
-  for (const a of absences) {
-    for (const seg of approvedSegments(a)) {
-      if (day >= seg.start && day <= seg.end) {
-        const key = a.employee_id || a.employees?.name || a.id;
-        if (!byEmployee.has(key)) {
-          byEmployee.set(key, {
-            name: shortName(a.employees?.name || ''),
-            type: a.absence_type,
-            half: seg.partial,
-          });
-        }
-        break; // one chip per absence per day
-      }
-    }
-  }
-
-  return Array.from(byEmployee.values());
-};
-
-const typeChip = (type: string, content: string, extraClass = ''): string => {
-  const c = absenceTypeColors[type] || defaultAbsenceTypeColor;
-  return `<span class="${extraClass}" style="background:${c.fill};color:${c.text};border-color:${c.border}">${content}</span>`;
-};
-
-const buildMonthSheet = (year: number, month: number, opts: CalendarPrintOptions): string => {
-  const { absences, holidays } = opts;
+/**
+ * Linhas do mapa de um mês: uma por colaborador com férias aprovadas nesse mês, com os dias
+ * ocupados, os períodos e o total de dias úteis.
+ */
+export const buildMapRows = (
+  year: number,
+  month: number,
+  absences: PrintAbsence[],
+  holidays: Holiday[]
+): { days: Date[]; rows: MapRow[] } => {
   const monthStart = new Date(year, month, 1);
   const monthEnd = endOfMonth(monthStart);
   const days = eachDayOfInterval({ start: monthStart, end: monthEnd });
-  const firstDow = (getDay(monthStart) + 6) % 7; // Monday-first (Mon=0)
+  const off = days.map(day => isWeekend(day) || !!isHoliday(day, holidays));
+  const rows = new Map<string, MapRow>();
 
-  const weekdays = ['Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb', 'Dom'];
-  let cells = weekdays.map((w, i) => `<div class="wd${i >= 5 ? ' we' : ''}">${w}</div>`).join('');
+  for (const absence of absences) {
+    const segments = approvedSegments(absence).filter(
+      seg => seg.start <= monthEnd && seg.end >= monthStart
+    );
+    if (segments.length === 0) continue;
 
-  // leading blanks
-  for (let i = 0; i < firstDow; i++) cells += '<div class="cell empty"></div>';
-
-  for (const day of days) {
-    const dow = (getDay(day) + 6) % 7;
-    const we = dow >= 5;
-    const holiday = isHoliday(day, holidays);
-    const dnum = format(day, 'd');
-
-    let inner = `<div class="dnum">${dnum}`;
-    if (holiday) {
-      const label = holiday.name.length > 12 ? holiday.name.slice(0, 11) + '…' : holiday.name;
-      inner += `<span class="hol-name">${escapeHtml(label)}</span>`;
+    const key = absence.employee_id || absence.employees?.name || absence.id;
+    let row = rows.get(key);
+    if (!row) {
+      row = {
+        name: absence.employees?.name || '—',
+        company: absence.employees?.companies?.name || '',
+        cells: days.map(() => null),
+        total: 0,
+        periods: [],
+      };
+      rows.set(key, row);
     }
-    inner += '</div>';
 
-    if (!we && !holiday) {
-      const chips = chipsForDay(day, absences);
-      if (chips.length > 0) {
-        inner += '<div class="chips">';
-        chips.forEach(ch => {
-          inner += typeChip(ch.type, escapeHtml(ch.name) + (ch.half ? ' ½' : ''), 'chip');
-        });
-        inner += '</div>';
+    for (const seg of segments) {
+      days.forEach((day, index) => {
+        if (off[index] || day < seg.start || day > seg.end || row.cells[index]?.kind === 'full')
+          return;
+        row.cells[index] = { kind: seg.partial ? 'half' : 'full', type: absence.absence_type };
+      });
+      if (seg.partial) {
+        const workday = !isWeekend(seg.start) && !isHoliday(seg.start, holidays);
+        if (workday && seg.start >= monthStart) row.total += seg.businessDays ?? 0.5;
+      } else {
+        const from = seg.start < monthStart ? monthStart : seg.start;
+        const to = seg.end > monthEnd ? monthEnd : seg.end;
+        row.total += countBusinessDays(from, to, holidays);
       }
+      row.periods.push(segmentLabel(seg));
     }
-
-    const cls = we ? 'cell we' : holiday ? 'cell hol' : 'cell';
-    cells += `<div class="${cls}">${inner}</div>`;
   }
 
-  // trailing blanks
-  const trail = (7 - ((firstDow + days.length) % 7)) % 7;
-  for (let i = 0; i < trail; i++) cells += '<div class="cell empty"></div>';
+  return {
+    days,
+    rows: [...rows.values()]
+      .filter(row => row.cells.some(Boolean))
+      .sort((a, b) => a.name.localeCompare(b.name, 'pt')),
+  };
+};
 
-  const monthLabel = format(monthStart, 'MMMM yyyy', { locale: pt });
+const buildMonthSheet = (year: number, month: number, opts: CalendarPrintOptions): string => {
+  const { days, rows } = buildMapRows(year, month, opts.absences, opts.holidays);
+  const holidays = days.map(day => isHoliday(day, opts.holidays));
+  const dayClass = (index: number) =>
+    holidays[index] ? 'hol' : isWeekend(days[index]) ? 'we' : '';
+  const manyCompanies = new Set(rows.map(row => row.company)).size > 1;
+
+  const head = days
+    .map(
+      (day, index) =>
+        `<th class="d ${dayClass(index)}"><span class="wd">${format(day, 'EEE', { locale: pt }).replace('.', '')}</span><span class="dn">${format(day, 'd')}</span></th>`
+    )
+    .join('');
+
+  const body = rows
+    .map(row => {
+      const cells = row.cells
+        .map((cell, index) => {
+          if (!cell) return `<td class="c ${dayClass(index)}"></td>`;
+          const color = absenceTypeColors[cell.type] || defaultAbsenceTypeColor;
+          const prev = row.cells[index - 1];
+          const next = row.cells[index + 1];
+          const classes = [
+            'bar',
+            cell.kind === 'half' ? 'h' : '',
+            !prev ? 's' : '',
+            !next ? 'e' : '',
+          ].join(' ');
+          return `<td class="c"><span class="${classes}" style="background:${color.border}"></span></td>`;
+        })
+        .join('');
+      const detail = [manyCompanies ? row.company : '', row.periods.join(' · ')]
+        .filter(Boolean)
+        .join(' · ');
+      return `<tr>
+        <td class="name"><div class="n">${escapeHtml(row.name)}</div><div class="per">${escapeHtml(detail)}</div></td>
+        ${cells}
+        <td class="tot">${fmtDays(row.total)}</td>
+      </tr>`;
+    })
+    .join('');
+
+  const perDay = days
+    .map((_, index) => {
+      const count = rows.filter(row => row.cells[index]).length;
+      return `<td class="${dayClass(index)}">${count || ''}</td>`;
+    })
+    .join('');
+
+  const holidayNotes = days
+    .map(
+      (day, index) =>
+        holidays[index] && `${format(day, 'd MMM', { locale: pt })} — ${holidays[index]!.name}`
+    )
+    .filter(Boolean)
+    .map(text => `<span>${escapeHtml(text as string)}</span>`)
+    .join('');
+
+  const totalDays = rows.reduce((sum, row) => sum + row.total, 0);
+  const monthLabel = format(new Date(year, month, 1), 'MMMM yyyy', { locale: pt });
+  const color = (absenceTypeColors.vacation || defaultAbsenceTypeColor).border;
 
   return `
     <section class="sheet">
@@ -172,14 +242,30 @@ const buildMonthSheet = (year: number, month: number, opts: CalendarPrintOptions
         </div>
         <div class="month-title">
           <div class="m">${escapeHtml(monthLabel)}</div>
-          <div class="sub">Férias aprovadas</div>
+          <div class="sub">Férias aprovadas · ${rows.length} ${rows.length === 1 ? 'colaborador' : 'colaboradores'} · ${fmtDays(totalDays)} dias úteis</div>
         </div>
         <div class="sheet-meta">
           Empresa<br><strong>${escapeHtml(opts.companyLabel)}</strong>
         </div>
       </div>
 
-      <div class="grid">${cells}</div>
+      ${
+        rows.length === 0
+          ? '<p class="empty">Sem férias aprovadas neste mês.</p>'
+          : `<table class="map">
+        <colgroup><col class="col-name" />${days.map(() => '<col />').join('')}<col class="col-tot" /></colgroup>
+        <thead><tr><th class="name">Colaborador</th>${head}<th class="tot">Dias</th></tr></thead>
+        <tbody>${body}</tbody>
+        <tfoot><tr><td class="name">Em férias por dia</td>${perDay}<td></td></tr></tfoot>
+      </table>`
+      }
+
+      <div class="notes">
+        <span><i class="key" style="background:${color}"></i>Férias</span>
+        <span><i class="key half" style="background:${color}"></i>Meio dia / horas</span>
+        <span><i class="key we"></i>Fim de semana</span>
+        ${holidayNotes ? `<span><i class="key hol"></i>Feriados:</span>${holidayNotes}` : ''}
+      </div>
 
       <div class="sheet-foot">
         <span>Realize Consultadoria · Documento interno</span>
@@ -190,8 +276,8 @@ const buildMonthSheet = (year: number, month: number, opts: CalendarPrintOptions
 
 /**
  * Builds a full, self-contained HTML document — the "Mapa de Férias" — with one
- * landscape A4 sheet per selected month. Meant to be written into a new window
- * and printed.
+ * sheet per selected month: one row per collaborator (full name, periods and
+ * total business days) across the days of the month.
  */
 export const generateCalendarPrintHtml = (opts: CalendarPrintOptions): string => {
   const months = [...opts.months].sort((a, b) => a.year - b.year || a.month - b.month);
@@ -201,6 +287,7 @@ export const generateCalendarPrintHtml = (opts: CalendarPrintOptions): string =>
   const landscape = opts.orientation === 'landscape';
   const pageSize = landscape ? 'A4 landscape' : 'A4 portrait';
   const sheetWidth = landscape ? '277mm' : '190mm';
+  const nameWidth = landscape ? '50mm' : '38mm';
 
   return `<!DOCTYPE html>
 <html lang="pt">
@@ -225,7 +312,6 @@ export const generateCalendarPrintHtml = (opts: CalendarPrintOptions): string =>
     font-weight: 600; font-size: 13px; font-family: inherit;
   }
   .toolbar button.primary { background: #b7933d; color: #fff; }
-  .toolbar button.primary:hover { background: #a07f2f; }
   .toolbar button.secondary { background: #fff; color: #444; border-color: #d4d4d8; }
   .toolbar .gen { color: #777; font-size: 12px; }
 
@@ -251,38 +337,53 @@ export const generateCalendarPrintHtml = (opts: CalendarPrintOptions): string =>
   .sheet-meta { text-align: right; font-size: 11px; color: #6b6b6b; line-height: 1.5; min-width: 110px; }
   .sheet-meta strong { color: #1a1a1a; }
 
-  .grid { display: grid; grid-template-columns: repeat(7, 1fr); border: 1px solid #cfc9bb; border-radius: 6px; overflow: hidden; }
-  .wd {
-    font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase;
-    color: #6b6b6b; padding: 5px 8px; background: #faf8f3;
-    border-bottom: 1px solid #cfc9bb; border-right: 1px solid #e4e0d6;
+  .map { width: 100%; table-layout: fixed; border-collapse: separate; border-spacing: 0; font-size: 10px; }
+  .map .col-name { width: ${nameWidth}; }
+  .map .col-tot { width: 11mm; }
+  .map th, .map td { border-bottom: 1px solid #ebe7de; padding: 0; }
+  .map thead th {
+    background: #faf8f3; border-bottom: 1px solid #cfc9bb; padding: 4px 0 3px;
+    text-align: center; font-weight: 700;
   }
-  .wd:nth-child(7n) { border-right: 0; }
-  .wd.we { color: #b0a894; }
-  .cell {
-    min-height: 60px; padding: 3px 5px 5px; background: #fff;
-    border-right: 1px solid #e4e0d6; border-bottom: 1px solid #e4e0d6;
-    display: flex; flex-direction: column; gap: 3px;
+  .map .wd { display: block; overflow: hidden; white-space: nowrap; font-size: 7px; font-weight: 600; text-transform: uppercase; color: #8a8170; }
+  .map .dn { display: block; font-size: 10px; font-variant-numeric: tabular-nums; }
+  .map .we { background: #f3f1ec; }
+  .map .hol { background: #fbf1da; }
+  .map thead .we .dn { color: #a89f8b; }
+  .map thead .hol .dn { color: #a07f2f; }
+  .map th.name, .map td.name { text-align: left; padding: 4px 8px 4px 2px; }
+  .map td.c { height: 24px; vertical-align: middle; }
+  .bar { display: block; height: 12px; }
+  .bar.h { height: 6px; }
+  .bar.s { margin-left: 2px; border-radius: 4px 0 0 4px; }
+  .bar.e { margin-right: 2px; border-radius: 0 4px 4px 0; }
+  .bar.s.e { border-radius: 4px; }
+  .n { font-weight: 700; font-size: 10.5px; line-height: 1.2; }
+  .per { font-size: 8.5px; color: #6b6b6b; margin-top: 1px; line-height: 1.25; }
+  .map .tot { text-align: center; font-weight: 800; font-size: 11px; font-variant-numeric: tabular-nums; }
+  .map tbody tr:nth-child(even) td.name, .map tbody tr:nth-child(even) td.tot { background: #fcfbf8; }
+  .map tfoot td {
+    background: #faf8f3; border-top: 1px solid #cfc9bb; border-bottom: 0;
+    font-size: 8.5px; font-weight: 700; color: #6b6b6b; text-align: center; padding: 4px 0;
   }
-  .cell:nth-child(7n) { border-right: 0; }
-  .cell.we { background: #f6f4ef; }
-  .cell.hol { background: #fbf6e9; }
-  .cell.empty { background: repeating-linear-gradient(135deg,#fbfaf6,#fbfaf6 6px,#f4f2ec 6px,#f4f2ec 12px); }
-  .dnum { font-size: 12px; font-weight: 700; color: #1a1a1a; font-variant-numeric: tabular-nums; line-height: 1.1; display: flex; align-items: baseline; gap: 5px; }
-  .cell.we .dnum { color: #a89f8b; font-weight: 600; }
-  .hol-name { font-size: 8.5px; font-weight: 600; color: #a07f2f; text-transform: none; letter-spacing: 0; }
-  .chips { display: flex; flex-direction: column; gap: 1.5px; }
-  .chip {
-    font-size: 9.5px; font-weight: 600; line-height: 1.2; padding: 1px 5px;
-    border-radius: 4px; border: 1px solid; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .sheet-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 12px; font-size: 10px; color: #999; border-top: 1px solid #e4e0d6; padding-top: 8px; }
+  .map tfoot td.name { text-align: left; font-weight: 600; }
+  .map thead { display: table-header-group; }
+  .map tr { page-break-inside: avoid; break-inside: avoid; }
+  .empty { text-align: center; color: #6b6b6b; font-size: 12px; padding: 30px 0; }
+
+  .notes { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 14px; margin-top: 8px; font-size: 9px; color: #6b6b6b; }
+  .notes span { display: inline-flex; align-items: center; gap: 5px; }
+  .key { display: inline-block; width: 14px; height: 8px; border-radius: 2px; }
+  .key.half { height: 4px; }
+  .key.we { background: #f3f1ec; border: 1px solid #e4e0d6; }
+  .key.hol { background: #fbf1da; border: 1px solid #ecdcb4; }
+  .sheet-foot { display: flex; justify-content: space-between; align-items: center; margin-top: 10px; font-size: 10px; color: #999; border-top: 1px solid #e4e0d6; padding-top: 8px; }
 
   @media print {
     body { background: #fff; }
     .toolbar { display: none !important; }
     .sheets { padding: 0; }
-    .sheet { box-shadow: none; border-radius: 0; margin: 0; padding: 8mm; width: auto; page-break-after: always; }
+    .sheet { box-shadow: none; border-radius: 0; margin: 0; padding: 0; width: auto; page-break-after: always; }
     .sheet:last-child { page-break-after: auto; }
     @page { size: ${pageSize}; margin: 8mm; }
   }

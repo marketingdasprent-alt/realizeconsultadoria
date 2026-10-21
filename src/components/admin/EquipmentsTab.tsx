@@ -229,8 +229,9 @@ const EquipmentsTab = ({
       const payload = {
         category_id: data.category_id || null,
         company_id: data.company_id,
-        employee_id: data.employee_id || null,
-        status: data.employee_id ? 'assigned' : 'available',
+        // Com quem está muda só pelas Entregas (declaração de entrega/devolução); um
+        // equipamento novo fica disponível.
+        ...(editingEquipment ? {} : { employee_id: null, status: 'available' }),
         brand: data.brand,
         model: data.model || null,
         serial_number: data.serial_number || null,
@@ -890,31 +891,11 @@ const EquipmentsTab = ({
                   </Select>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="employee_id">Colaborador (opcional)</Label>
-                  <Select
-                    value={formData.employee_id || 'none'}
-                    onValueChange={value =>
-                      setFormData({ ...formData, employee_id: value === 'none' ? '' : value })
-                    }
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Selecione um colaborador" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Nenhum (disponível)</SelectItem>
-                      {employees
-                        .filter(
-                          emp => !formData.company_id || emp.company_id === formData.company_id
-                        )
-                        .map(employee => (
-                          <SelectItem key={employee.id} value={employee.id}>
-                            {employee.name}
-                          </SelectItem>
-                        ))}
-                    </SelectContent>
-                  </Select>
-                </div>
+                <p className="rounded-xl bg-rz-canvas px-3 py-2 text-[13px] text-rz-muted">
+                  {editingEquipment?.employee_id
+                    ? `Com ${employees.find(e => e.id === editingEquipment.employee_id)?.name ?? 'um colaborador'}. Para devolver ou passar a outra pessoa, use Entregas.`
+                    : 'Fica disponível. Para o entregar a alguém, use Entregas (sai a declaração para assinar).'}
+                </p>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2 col-span-2 sm:col-span-1">

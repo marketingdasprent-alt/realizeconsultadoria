@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { FileText, Loader2, Upload } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -12,7 +12,7 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { useToast } from '@/hooks/use-toast';
-import { ADMIN_UPLOAD_CATEGORIES } from '@/lib/documents';
+import { ADMIN_UPLOAD_CATEGORIES, type DocumentCategory } from '@/lib/documents';
 import { getErrorMessage } from '@/lib/timeclock';
 import { toServiceFields, useDocumentMetadata } from '../../hooks/useDocumentMetadata';
 import { documentService } from '../../services/documentService';
@@ -23,6 +23,10 @@ interface AdminUploadDocumentDialogProps {
   onOpenChange: (open: boolean) => void;
   employeeId: string;
   onUploaded: () => void;
+  /** Tipos que se podem escolher (por omissão, todos os do BackOffice). */
+  categories?: DocumentCategory[];
+  /** Tipo já escolhido ao abrir (ex.: Comprovativo de IBAN). */
+  initialCategory?: string;
 }
 
 /** Upload pelo BackOffice: fica aprovado e passa a ser o documento atual do tipo. */
@@ -31,12 +35,23 @@ export const AdminUploadDocumentDialog: React.FC<AdminUploadDocumentDialogProps>
   onOpenChange,
   employeeId,
   onUploaded,
+  categories = ADMIN_UPLOAD_CATEGORIES,
+  initialCategory,
 }) => {
   const { toast } = useToast();
   const { metadata, update, reset } = useDocumentMetadata();
   const [description, setDescription] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [isSaving, setIsSaving] = useState(false);
+
+  // Cada abertura começa com o tipo pedido (ou o único possível).
+  useEffect(() => {
+    if (!open) return;
+    reset({ category: initialCategory ?? (categories.length === 1 ? categories[0].value : '') });
+    setDescription('');
+    setFile(null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, initialCategory]);
 
   const submit = async () => {
     if (!metadata.category || !file) {
@@ -72,7 +87,7 @@ export const AdminUploadDocumentDialog: React.FC<AdminUploadDocumentDialogProps>
         </DialogHeader>
         <div className="space-y-4">
           <DocumentMetadataFields
-            categories={ADMIN_UPLOAD_CATEGORIES}
+            categories={categories}
             value={metadata}
             onChange={update}
             showIssueDate

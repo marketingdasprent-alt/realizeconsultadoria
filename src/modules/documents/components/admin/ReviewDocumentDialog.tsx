@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Loader2 } from 'lucide-react';
+import { ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -14,9 +14,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { useToast } from '@/hooks/use-toast';
 import { DOCUMENT_CATEGORIES, PAYSLIP_CATEGORY } from '@/lib/documents';
 import { getErrorMessage } from '@/lib/timeclock';
+import { useDocumentDownload } from '../../hooks/useDocumentDownload';
 import { toServiceFields, useDocumentMetadata } from '../../hooks/useDocumentMetadata';
 import { documentService, type EmployeeDocumentWithEmployee } from '../../services/documentService';
 import { DocumentMetadataFields } from '../DocumentMetadataFields';
+import { REGISTRATION_CATEGORIES } from '../../lib/registration';
 
 interface ReviewDocumentDialogProps {
   doc: EmployeeDocumentWithEmployee;
@@ -39,6 +41,7 @@ export const ReviewDocumentDialog: React.FC<ReviewDocumentDialogProps> = ({
     periodMonth: doc.period_month?.slice(0, 7) ?? '',
   });
   const [notes, setNotes] = useState('');
+  const download = useDocumentDownload();
   const [isSaving, setIsSaving] = useState(false);
 
   const approve = async () => {
@@ -83,8 +86,23 @@ export const ReviewDocumentDialog: React.FC<ReviewDocumentDialogProps> = ({
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
+          {/* Ver o ficheiro antes de aprovar (confirmar que é real e ler o nº e a validade). */}
+          <Button
+            type="button"
+            variant="outline"
+            className="w-full"
+            onClick={() => download.open(doc)}
+            disabled={download.openingId === doc.id}
+          >
+            {download.openingId === doc.id ? (
+              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+            ) : (
+              <ExternalLink className="mr-2 h-4 w-4" />
+            )}
+            Abrir documento
+          </Button>
           <DocumentMetadataFields
-            categories={DOCUMENT_CATEGORIES}
+            categories={DOCUMENT_CATEGORIES.filter(c => REGISTRATION_CATEGORIES.includes(c.value))}
             value={metadata}
             onChange={update}
             showIssueDate

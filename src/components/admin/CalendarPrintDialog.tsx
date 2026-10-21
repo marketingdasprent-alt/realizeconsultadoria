@@ -17,6 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { openPrintPreview } from '@/lib/print-preview';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
@@ -173,17 +174,7 @@ const CalendarPrintDialog = ({
         orientation,
       });
 
-      const printWindow = window.open('', '_blank');
-      if (!printWindow) {
-        toast({
-          title: 'Não foi possível abrir a janela',
-          description: 'Verifique se os pop-ups estão bloqueados.',
-          variant: 'destructive',
-        });
-        return;
-      }
-      printWindow.document.write(html);
-      printWindow.document.close();
+      openPrintPreview(html, 'Mapa de Férias');
 
       onOpenChange(false);
     } catch (error: any) {

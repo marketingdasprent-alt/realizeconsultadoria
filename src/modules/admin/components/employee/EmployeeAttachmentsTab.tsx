@@ -1,392 +1,237 @@
-import { useState, useEffect, useRef } from 'react';
-import {
-  Upload,
-  Paperclip,
-  Trash2,
-  Download,
-  Loader2,
-  User,
-  Building2,
-  Calendar,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+import { useMemo, useRef, useState } from 'react';
+import { format, parseISO } from 'date-fns';
+import { absenceTypeLabels } from '@/lib/absence-types';
+import { Loader2, Paperclip, Share2 } from 'lucide-react';
+import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import { supabase } from '@/integrations/supabase/client';
-import { useToast } from '@/hooks/use-toast';
-import { sanitizeFileName } from '@/lib/utils';
-
-interface EmployeeAttachment {
-  id: string;
-  file_name: string;
-  file_path: string;
-  file_size: number;
-  mime_type: string;
-  source: string;
-  description: string | null;
-  created_at: string;
-}
+  ADMIN_UPLOAD_CATEGORIES,
+  formatFileSize,
+  getDocumentCategoryLabel,
+  PAYSLIP_CATEGORY,
+} from '@/lib/documents';
+import { AdminUploadDocumentDialog } from '@/modules/documents/components/admin/AdminUploadDocumentDialog';
+import { useDocumentDownload } from '@/modules/documents/hooks/useDocumentDownload';
+import { useEmployeeDocuments } from '@/modules/documents/hooks/useEmployeeDocuments';
+import { REGISTRATION_CATEGORIES } from '@/modules/documents/lib/registration';
+import { useDocumentRemoval } from '../../hooks/useDocumentRemoval';
+import { useEmployeeAttachments } from '../../hooks/useEmployeeAttachments';
+import { sharedDocuments } from '../../lib/registrationSlots';
+import type { EmployeeAttachment } from '../../services/attachmentService';
+import { FileRow, FileSection } from './files/FileRow';
 
 interface EmployeeAttachmentsTabProps {
   employeeId: string;
 }
 
+// Partilháveis aqui: tudo o que não é de registo (Documentos) nem recibo (Recibos).
+const SHARE_CATEGORIES = ADMIN_UPLOAD_CATEGORIES.filter(
+  c => !REGISTRATION_CATEGORIES.includes(c.value) && c.value !== PAYSLIP_CATEGORY
+);
+
+const day = (iso: string) => format(new Date(iso), 'dd/MM/yyyy');
+
+const short = (iso: string) => format(parseISO(iso), 'dd/MM/yyyy');
+
+/** "12/10/2026" ou "12/10/2026 – 16/10/2026". */
+const absencePeriod = (absence: { start_date: string; end_date: string }) =>
+  absence.start_date === absence.end_date
+    ? short(absence.start_date)
+    : `${short(absence.start_date)} – ${short(absence.end_date)}`;
+
+const STATUS: Record<string, { label: string; tone: string }> = {
+  approved: { label: 'Aprovado', tone: 'bg-emerald-100 text-emerald-700' },
+  partially_approved: { label: 'Aprovado em parte', tone: 'bg-emerald-100 text-emerald-700' },
+  pending: { label: 'Pedido pendente', tone: 'bg-amber-100 text-amber-700' },
+  rejected: { label: 'Pedido rejeitado', tone: 'bg-slate-100 text-slate-500' },
+};
+
+const AbsenceStatus = ({ status }: { status: string }) => {
+  const info = STATUS[status] ?? { label: status, tone: 'bg-slate-100 text-slate-500' };
+  return (
+    <span className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${info.tone}`}>
+      {info.label}
+    </span>
+  );
+};
+
+/**
+ * Anexos: o que não tem lugar nos outros separadores — documentos das ausências e baixas
+ * (enviados pelo colaborador no pedido), documentos partilhados (comunicados, contrato…) e
+ * outros ficheiros internos do admin.
+ */
 const EmployeeAttachmentsTab = ({ employeeId }: EmployeeAttachmentsTabProps) => {
-  const { toast } = useToast();
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [isLoading, setIsLoading] = useState(true);
-  const [isUploading, setIsUploading] = useState(false);
-  const [attachments, setAttachments] = useState<EmployeeAttachment[]>([]);
+  const files = useEmployeeAttachments(employeeId);
+  const docs = useEmployeeDocuments(employeeId);
+  const download = useDocumentDownload();
+  const removal = useDocumentRemoval(docs.refetch);
+  const [shareOpen, setShareOpen] = useState(false);
   const [description, setDescription] = useState('');
+  const [deleting, setDeleting] = useState<EmployeeAttachment | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const fileInput = useRef<HTMLInputElement>(null);
 
-  useEffect(() => {
-    fetchAttachments();
-  }, [employeeId]);
+  // Ausências: os documentos dos pedidos (com o tipo e os dias) e, dos anexos antigos de
+  // ausências, só os que não são cópia de um documento de pedido (ex.: baixas enviadas à parte).
+  const absenceNames = new Set(files.absenceFiles.map(f => f.file_name));
+  const absenceExtras = files.attachments.filter(
+    a => a.source === 'absence' && !absenceNames.has(a.file_name)
+  );
+  const absenceCount = files.absenceFiles.length + absenceExtras.length;
+  const internal = files.attachments.filter(a => a.source !== 'absence');
+  const shared = useMemo(() => sharedDocuments(docs.all), [docs.all]);
 
-  const fetchAttachments = async () => {
-    setIsLoading(true);
-    try {
-      const { data, error } = await supabase
-        .from('employee_attachments')
-        .select('*')
-        .eq('employee_id', employeeId)
-        .order('created_at', { ascending: false });
+  const attachmentRow = (attachment: EmployeeAttachment) => (
+    <FileRow
+      key={attachment.id}
+      title={attachment.description || attachment.file_name}
+      subtitle={[
+        attachment.description ? attachment.file_name : null,
+        formatFileSize(attachment.file_size),
+        day(attachment.created_at),
+      ]
+        .filter(Boolean)
+        .join(' · ')}
+      onOpen={() => files.open(attachment)}
+      isOpening={files.openingId === attachment.id}
+      onDelete={() => setDeleting(attachment)}
+    />
+  );
 
-      if (error) throw error;
-      setAttachments(data || []);
-    } catch (error) {
-      console.error('Error fetching attachments:', error);
-    } finally {
-      setIsLoading(false);
-    }
+  const upload = async (file: File | undefined) => {
+    if (fileInput.current) fileInput.current.value = '';
+    if (file && description.trim() && (await files.upload(file, description))) setDescription('');
   };
 
-  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    setIsUploading(true);
-    try {
-      const { data: userData } = await supabase.auth.getUser();
-      if (!userData.user) throw new Error('Utilizador não autenticado');
-
-      // Upload to storage with sanitized filename
-      const sanitizedName = sanitizeFileName(file.name);
-      const filePath = `${employeeId}/attachments/${Date.now()}_${sanitizedName}`;
-      const { error: uploadError } = await supabase.storage
-        .from('employee-files')
-        .upload(filePath, file);
-
-      if (uploadError) throw uploadError;
-
-      // Save metadata
-      const { error: dbError } = await supabase.from('employee_attachments').insert({
-        employee_id: employeeId,
-        file_name: file.name,
-        file_path: filePath,
-        file_size: file.size,
-        mime_type: file.type,
-        source: 'admin',
-        description: description || null,
-        uploaded_by: userData.user.id,
-      });
-
-      if (dbError) throw dbError;
-
-      toast({ title: 'Anexo carregado com sucesso!' });
-      setDescription('');
-      fetchAttachments();
-    } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message,
-        variant: 'destructive',
-      });
-    } finally {
-      setIsUploading(false);
-      if (fileInputRef.current) {
-        fileInputRef.current.value = '';
-      }
-    }
-  };
-
-  const handleDownload = async (attachment: EmployeeAttachment) => {
-    try {
-      const cleanPath = attachment.file_path.startsWith('/')
-        ? attachment.file_path.substring(1)
-        : attachment.file_path;
-      const buckets = [
-        'employee-files',
-        'absence-documents',
-        'equipment_invoices',
-        'legal_documents',
-        'employees',
-        'documents',
-      ];
-
-      let signedUrl = null;
-      let finalError = null;
-
-      for (const bucket of buckets) {
-        console.log(`A tentar bucket '${bucket}':`, cleanPath);
-
-        // Tentativa 1: URL Assinada (Privado)
-        const { data, error } = await supabase.storage.from(bucket).createSignedUrl(cleanPath, 60);
-
-        if (!error && data?.signedUrl) {
-          signedUrl = data.signedUrl;
-          console.log(`Ficheiro encontrado no bucket '${bucket}' (via URL assinada)`);
-          break;
-        }
-
-        // Tentativa 2: URL Pública (Caso o bucket seja público)
-        const { data: publicData } = supabase.storage.from(bucket).getPublicUrl(cleanPath);
-
-        if (publicData?.publicUrl) {
-          try {
-            const resp = await fetch(publicData.publicUrl, { method: 'HEAD' });
-            if (resp.ok) {
-              signedUrl = publicData.publicUrl;
-              console.log(`Ficheiro encontrado no bucket '${bucket}' (via URL pública)`);
-              break;
-            }
-          } catch (e) {
-            // Ignorar erro de fetch head
-          }
-        }
-
-        if (error) {
-          finalError = error;
-        }
-      }
-
-      if (!signedUrl) {
-        throw finalError || new Error('Ficheiro não encontrado em nenhum local de armazenamento.');
-      }
-
-      const a = document.createElement('a');
-      a.href = signedUrl;
-      a.download = attachment.file_name;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } catch (error: any) {
-      console.error('Erro crítico no download:', error);
-      toast({
-        title: 'Erro ao descarregar',
-        description: `Não foi possível encontrar o ficheiro. (Caminho: ${attachment.file_path})`,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const handleDelete = async (attachment: EmployeeAttachment) => {
-    try {
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from('employee-files')
-        .remove([attachment.file_path]);
-
-      if (storageError) throw storageError;
-
-      // Delete from database
-      const { error: dbError } = await supabase
-        .from('employee_attachments')
-        .delete()
-        .eq('id', attachment.id);
-
-      if (dbError) throw dbError;
-
-      toast({ title: 'Anexo eliminado!' });
-      fetchAttachments();
-    } catch (error: any) {
-      toast({
-        title: 'Erro ao eliminar',
-        description: error.message,
-        variant: 'destructive',
-      });
-    }
-  };
-
-  const formatFileSize = (bytes: number) => {
-    if (bytes < 1024) return `${bytes} B`;
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-  };
-
-  const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('pt-PT', {
-      day: '2-digit',
-      month: '2-digit',
-      year: 'numeric',
-    });
-  };
+  const loading = files.isLoading || docs.isLoading;
 
   return (
-    <div className="space-y-6">
-      {/* Upload Card */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-xl flex items-center gap-2">
-            <Upload className="h-5 w-5 text-gold" />
-            Adicionar Anexo
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <div className="sm:col-span-2">
-              <label className="block text-sm font-medium mb-1">Descrição</label>
-              <Input
-                value={description}
-                onChange={e => setDescription(e.target.value)}
-                placeholder="Descrição opcional..."
+    <div className="space-y-4">
+      <FileSection
+        title="Ausências e baixas"
+        description="Documentos enviados pelo colaborador nos pedidos de ausência (baixas, justificações)."
+        count={absenceCount}
+      >
+        {loading ? (
+          <div className="h-14 animate-pulse rounded-2xl bg-rz-canvas" />
+        ) : absenceCount === 0 ? (
+          <p className="px-1 py-3 text-[13px] text-rz-muted">Sem documentos de ausências.</p>
+        ) : (
+          <ul>
+            {files.absenceFiles.map(file => (
+              <FileRow
+                key={file.id}
+                title={`${absenceTypeLabels[file.absence.type] ?? 'Ausência'} · ${absencePeriod(file.absence)}`}
+                subtitle={`${file.file_name} · enviado a ${day(file.created_at)}`}
+                badges={<AbsenceStatus status={file.absence.status} />}
+                onOpen={() => files.open(file)}
+                isOpening={files.openingId === file.id}
               />
-            </div>
-            <div className="flex items-end">
-              <input
-                type="file"
-                ref={fileInputRef}
-                onChange={handleFileSelect}
-                className="hidden"
-              />
-              <Button
-                variant="gold"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={isUploading}
-                className="w-full"
-              >
-                {isUploading ? (
-                  <>
-                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />A carregar...
-                  </>
-                ) : (
-                  <>
-                    <Upload className="h-4 w-4 mr-2" />
-                    Selecionar
-                  </>
-                )}
-              </Button>
-            </div>
-          </div>
-        </CardContent>
-      </Card>
+            ))}
+            {absenceExtras.map(attachmentRow)}
+          </ul>
+        )}
+      </FileSection>
 
-      {/* Attachments List */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="font-display text-xl flex items-center gap-2">
-            <Paperclip className="h-5 w-5 text-gold" />
-            Anexos do Colaborador
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-0">
-          {isLoading ? (
-            <div className="flex items-center justify-center py-8">
-              <Loader2 className="h-6 w-6 animate-spin text-gold" />
-            </div>
-          ) : attachments.length === 0 ? (
-            <div className="text-center py-8 text-muted-foreground">
-              <Paperclip className="h-12 w-12 mx-auto mb-2 opacity-50" />
-              <p>Nenhum anexo encontrado</p>
-            </div>
-          ) : (
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Ficheiro</TableHead>
-                  <TableHead className="hidden sm:table-cell">Origem</TableHead>
-                  <TableHead className="hidden md:table-cell">Tamanho</TableHead>
-                  <TableHead className="hidden md:table-cell">Data</TableHead>
-                  <TableHead className="w-[100px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {attachments.map(attachment => (
-                  <TableRow key={attachment.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Paperclip className="h-4 w-4 text-muted-foreground" />
-                        <div>
-                          <p className="font-medium truncate max-w-[200px]">
-                            {attachment.file_name}
-                          </p>
-                          {attachment.description && (
-                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">
-                              {attachment.description}
-                            </p>
-                          )}
-                        </div>
-                      </div>
-                    </TableCell>
-                    <TableCell className="hidden sm:table-cell">
-                      <Badge
-                        variant={
-                          attachment.source === 'employee'
-                            ? 'default'
-                            : attachment.source === 'absence'
-                              ? 'outline'
-                              : 'secondary'
-                        }
-                      >
-                        {attachment.source === 'employee' ? (
-                          <>
-                            <User className="h-3 w-3 mr-1" />
-                            Colaborador
-                          </>
-                        ) : attachment.source === 'absence' ? (
-                          <>
-                            <Calendar className="h-3 w-3 mr-1" />
-                            Ausência
-                          </>
-                        ) : (
-                          <>
-                            <Building2 className="h-3 w-3 mr-1" />
-                            Admin
-                          </>
-                        )}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {formatFileSize(attachment.file_size)}
-                    </TableCell>
-                    <TableCell className="hidden md:table-cell">
-                      {formatDate(attachment.created_at)}
-                    </TableCell>
-                    <TableCell>
-                      <div className="flex items-center gap-1">
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDownload(attachment)}
-                        >
-                          <Download className="h-4 w-4" />
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          size="icon"
-                          onClick={() => handleDelete(attachment)}
-                          className="text-destructive hover:text-destructive"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          )}
-        </CardContent>
-      </Card>
+      <FileSection
+        title="Partilhados com o colaborador"
+        description="Comunicados, contrato e outros documentos que o colaborador vê na app."
+        count={shared.length}
+        action={
+          <button
+            type="button"
+            onClick={() => setShareOpen(true)}
+            className="flex h-9 items-center gap-1.5 rounded-full bg-rz-primary px-4 text-[13px] font-bold text-white"
+          >
+            <Share2 className="h-4 w-4" /> Partilhar
+          </button>
+        }
+      >
+        {loading ? (
+          <div className="h-14 animate-pulse rounded-2xl bg-rz-canvas" />
+        ) : shared.length === 0 ? (
+          <p className="px-1 py-3 text-[13px] text-rz-muted">Nada partilhado.</p>
+        ) : (
+          <ul>
+            {shared.map(doc => (
+              <FileRow
+                key={doc.id}
+                title={getDocumentCategoryLabel(doc.category)}
+                subtitle={[doc.file_name, day(doc.created_at)].join(' · ')}
+                onOpen={() => download.open(doc)}
+                isOpening={download.openingId === doc.id}
+                onDelete={() => removal.ask(doc)}
+              />
+            ))}
+          </ul>
+        )}
+      </FileSection>
+
+      <FileSection
+        title="Outros anexos"
+        description="Ficheiros internos: só os administradores os veem."
+        count={internal.length}
+      >
+        <div className="mb-2 flex flex-col gap-2 sm:flex-row">
+          <Input
+            value={description}
+            onChange={event => setDescription(event.target.value)}
+            placeholder="Título do documento (ex.: Declaração de IRS 2025)"
+          />
+          <button
+            type="button"
+            onClick={() => fileInput.current?.click()}
+            disabled={files.isUploading || !description.trim()}
+            title={description.trim() ? undefined : 'Escreva primeiro o título do documento'}
+            className="flex h-10 shrink-0 items-center justify-center gap-1.5 rounded-full px-4 text-[13.5px] font-semibold ring-1 ring-rz-line hover:bg-rz-canvas"
+          >
+            {files.isUploading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Paperclip className="h-4 w-4" />
+            )}
+            Carregar anexo
+          </button>
+          <input
+            ref={fileInput}
+            type="file"
+            className="hidden"
+            onChange={event => upload(event.target.files?.[0])}
+          />
+        </div>
+        {!loading && internal.length > 0 && <ul>{internal.map(attachmentRow)}</ul>}
+      </FileSection>
+
+      <AdminUploadDocumentDialog
+        open={shareOpen}
+        onOpenChange={setShareOpen}
+        employeeId={employeeId}
+        onUploaded={docs.refetch}
+        categories={SHARE_CATEGORIES}
+      />
+      <DeleteConfirmDialog
+        open={!!deleting}
+        onOpenChange={value => !value && setDeleting(null)}
+        title="Apagar anexo"
+        description="O ficheiro é apagado definitivamente."
+        itemName={deleting?.file_name}
+        onConfirm={async () => {
+          if (!deleting) return;
+          setIsDeleting(true);
+          if (await files.remove(deleting)) setDeleting(null);
+          setIsDeleting(false);
+        }}
+        isLoading={isDeleting}
+      />
+      <DeleteConfirmDialog
+        open={!!removal.target}
+        onOpenChange={value => !value && removal.cancel()}
+        title="Apagar documento"
+        description="O colaborador deixa de o ver na app."
+        itemName={removal.target?.file_name}
+        onConfirm={removal.confirm}
+        isLoading={removal.isRemoving}
+      />
     </div>
   );
 };

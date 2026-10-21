@@ -17,6 +17,8 @@ import {
   Image,
   Printer,
 } from 'lucide-react';
+import { openPrintPreview } from '@/lib/print-preview';
+import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -225,13 +227,7 @@ const SupportTicketsPage = () => {
       </body></html>
     `;
 
-    const printWindow = window.open('', '_blank');
-    if (printWindow) {
-      printWindow.document.write(html);
-      printWindow.document.close();
-      printWindow.focus();
-      setTimeout(() => printWindow.print(), 300);
-    }
+    openPrintPreview(html, 'Tickets de suporte');
   };
 
   const handlePrintSelected = () => {
@@ -381,21 +377,20 @@ const SupportTicketsPage = () => {
     <>
       <div className="space-y-6">
         {/* Header */}
-        <div>
-          <h1 className="font-display text-3xl font-semibold flex items-center gap-3">
-            <Headset className="h-8 w-8 text-gold" />
-            Tickets de Suporte
-          </h1>
-          <p className="text-muted-foreground mt-1">
-            Gerir pedidos de suporte dos colaboradores
-            {!isSuperAdmin && userDepartmentIds.length > 0 && (
-              <span className="ml-2 text-xs">
-                ({accessibleDepartments.length} departamento
-                {accessibleDepartments.length !== 1 ? 's' : ''})
-              </span>
-            )}
-          </p>
-        </div>
+        <AdminPageTitle
+          title="Tickets de Suporte"
+          description={
+            <>
+              Gerir pedidos de suporte dos colaboradores
+              {!isSuperAdmin && userDepartmentIds.length > 0 && (
+                <span className="ml-2 text-xs">
+                  ({accessibleDepartments.length} departamento
+                  {accessibleDepartments.length !== 1 ? 's' : ''})
+                </span>
+              )}
+            </>
+          }
+        />
 
         {/* Stats Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">

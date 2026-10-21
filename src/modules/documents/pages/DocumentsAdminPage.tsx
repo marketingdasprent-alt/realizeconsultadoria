@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FileCheck, Loader2 } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
+import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -34,14 +35,10 @@ const DocumentsAdminPage: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <div>
-        <h1 className="flex items-center gap-2 font-display text-2xl font-semibold lg:text-3xl">
-          <FileCheck className="h-6 w-6 text-gold" /> Documentos
-        </h1>
-        <p className="mt-1 text-muted-foreground">
-          Documentos enviados pelos colaboradores para aprovação, recibos de vencimento e validades.
-        </p>
-      </div>
+      <AdminPageTitle
+        title="Documentos"
+        description="Documentos enviados pelos colaboradores para aprovação, recibos de vencimento e validades."
+      />
 
       {error && <p className="text-sm text-destructive">{error}</p>}
 

@@ -102,6 +102,19 @@ export const employeeFinanceService = {
   },
 
   /**
+   * Os meses de um ano de um colaborador (histórico na ficha).
+   */
+  listForEmployee: async (employeeId: string, year: number) => {
+    const { data, error } = await supabase
+      .from('employee_monthly_finances')
+      .select('*')
+      .eq('employee_id', employeeId)
+      .eq('year', year)
+      .order('month');
+    return { data: (data ?? []) as EmployeeMonthlyFinance[], error };
+  },
+
+  /**
    * Cria ou actualiza um registo mensal (upsert por employee_id+year+month).
    */
   upsert: async (

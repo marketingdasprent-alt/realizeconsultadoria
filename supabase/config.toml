@@ -79,3 +79,6 @@ verify_jwt = false
 
 [functions.switch-account]
 verify_jwt = false
+
+[functions.broadcast-send]
+verify_jwt = false

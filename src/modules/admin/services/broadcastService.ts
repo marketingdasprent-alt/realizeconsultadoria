@@ -1,0 +1,120 @@
+import { supabase } from '@/integrations/supabase/client';
+import type { Database } from '@/integrations/supabase/types';
+import type { Audience, BroadcastDraft, BroadcastEmployee } from '../lib/broadcast';
+
+export type BroadcastHistoryRow = Database['public']['Tables']['marketing_emails']['Row'];
+
+export interface BroadcastAttachment {
+  name: string;
+  path: string;
+  type: string;
+  size: number;
+}
+
+export interface BroadcastResult {
+  ok: boolean;
+  sent: number;
+  failed: string[];
+  requested: number;
+  notices: number;
+  error?: string;
+}
+
+interface EmployeeRow {
+  id: string;
+  name: string;
+  email: string | null;
+  company_id: string;
+  department: string | null;
+  is_active: boolean;
+  user_id: string | null;
+  companies: { name: string } | null;
+}
+
+export const broadcastService = {
+  /** Colaboradores ativos (com empresa e departamento) para escolher a quem enviar. */
+  employees: async (): Promise<BroadcastEmployee[]> => {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('id, name, email, company_id, department, is_active, user_id, companies(name)')
+      .eq('is_active', true)
+      .order('name');
+    if (error) throw error;
+    return ((data ?? []) as unknown as EmployeeRow[]).map(row => ({
+      id: row.id,
+      name: row.name,
+      email: row.email ?? '',
+      company_id: row.company_id,
+      companyName: row.companies?.name ?? null,
+      department: row.department,
+      is_active: row.is_active,
+      user_id: row.user_id,
+    }));
+  },
+
+  /** Empresas ativas (para escolher a quem enviar). */
+  companies: async (): Promise<{ id: string; name: string }[]> => {
+    const { data, error } = await supabase
+      .from('companies')
+      .select('id, name')
+      .eq('is_active', true)
+      .order('name');
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  /** Últimos comunicados enviados. */
+  history: async (): Promise<BroadcastHistoryRow[]> => {
+    const { data, error } = await supabase
+      .from('marketing_emails')
+      .select('*')
+      .order('created_at', { ascending: false })
+      .limit(30);
+    if (error) throw error;
+    return data ?? [];
+  },
+
+  /** Guarda um anexo (bucket privado marketing-emails) antes de enviar. */
+  uploadAttachment: async (file: File): Promise<BroadcastAttachment | null> => {
+    const { data: session } = await supabase.auth.getSession();
+    const userId = session.session?.user.id;
+    if (!userId) return null;
+    const ext = file.name.includes('.') ? file.name.split('.').pop() : 'bin';
+    const path = `${userId}/${crypto.randomUUID()}.${ext}`;
+    const { error } = await supabase.storage.from('marketing-emails').upload(path, file);
+    if (error) return null;
+    return { name: file.name, path, type: file.type, size: file.size };
+  },
+
+  /** Envia (ou, com test, manda só ao próprio admin). A função relê quem recebe da BD. */
+  send: async (input: {
+    draft: BroadcastDraft;
+    employeeIds: string[];
+    audience: Audience & { label: string };
+    publishInApp: boolean;
+    attachments: BroadcastAttachment[];
+    test?: boolean;
+  }): Promise<BroadcastResult> => {
+    const { data, error } = await supabase.functions.invoke<BroadcastResult>('broadcast-send', {
+      body: {
+        ...input.draft,
+        employeeIds: input.employeeIds,
+        audience: input.audience,
+        publishInApp: input.publishInApp,
+        attachments: input.attachments,
+        test: input.test ?? false,
+      },
+    });
+    if (error || !data) {
+      return {
+        ok: false,
+        sent: 0,
+        failed: [],
+        requested: 0,
+        notices: 0,
+        error: 'Não foi possível enviar.',
+      };
+    }
+    return data;
+  },
+};

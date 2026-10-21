@@ -2035,6 +2035,57 @@ export type Database = {
         };
         Relationships: [];
       };
+      marketing_emails: {
+        Row: {
+          id: string;
+          subject: string;
+          message: string;
+          sender: string;
+          cc_emails: string[] | null;
+          recipients_count: number;
+          requested_count: number | null;
+          failed_emails: string[];
+          audience_label: string | null;
+          published_in_app: boolean;
+          attachments_metadata: Json | null;
+          company_id: string | null;
+          created_by: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          subject: string;
+          message: string;
+          sender: string;
+          cc_emails?: string[] | null;
+          recipients_count: number;
+          requested_count?: number | null;
+          failed_emails?: string[];
+          audience_label?: string | null;
+          published_in_app?: boolean;
+          attachments_metadata?: Json | null;
+          company_id?: string | null;
+          created_by: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          subject?: string;
+          message?: string;
+          sender?: string;
+          cc_emails?: string[] | null;
+          recipients_count?: number;
+          requested_count?: number | null;
+          failed_emails?: string[];
+          audience_label?: string | null;
+          published_in_app?: boolean;
+          attachments_metadata?: Json | null;
+          company_id?: string | null;
+          created_by?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
       notification_emails_absences: {
         Row: {
           created_at: string;

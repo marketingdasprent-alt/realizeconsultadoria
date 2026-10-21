@@ -9,14 +9,19 @@ const reply = (status: number, error: string, headers: Record<string, string>) =
     headers: { ...headers, 'Content-Type': 'application/json' },
   });
 
+export interface AdminCaller {
+  userId: string;
+  email: string | null;
+}
+
 /**
- * Sessão de administrador (papel admin ou grupo de admin ativo) ou uma resposta 401/403 para
- * devolver logo. `null` = pode continuar.
+ * Quem chama, se for administrador (papel admin ou grupo de admin ativo); senão a resposta
+ * 401/403 para devolver logo.
  */
-export const denyUnlessAdmin = async (
+export const adminCaller = async (
   req: Request,
   headers: Record<string, string>
-): Promise<Response | null> => {
+): Promise<AdminCaller | Response> => {
   const authHeader = req.headers.get('Authorization');
   if (!authHeader?.startsWith('Bearer ')) return reply(401, 'Sessão em falta', headers);
 
@@ -40,6 +45,18 @@ export const denyUnlessAdmin = async (
       .eq('admin_groups.is_active', true)
       .limit(1),
   ]);
-  if ((role.data?.length ?? 0) > 0 || (groups.data?.length ?? 0) > 0) return null;
+  if ((role.data?.length ?? 0) > 0 || (groups.data?.length ?? 0) > 0) {
+    const email = typeof data.claims.email === 'string' ? data.claims.email : null;
+    return { userId, email };
+  }
   return reply(403, 'Só um administrador pode fazer isto', headers);
+};
+
+/** Sessão de administrador ou uma resposta 401/403 para devolver logo. `null` = pode continuar. */
+export const denyUnlessAdmin = async (
+  req: Request,
+  headers: Record<string, string>
+): Promise<Response | null> => {
+  const caller = await adminCaller(req, headers);
+  return caller instanceof Response ? caller : null;
 };

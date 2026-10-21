@@ -1,10 +1,11 @@
 // Edge function push-send: envia uma notificação do Realize para o telemóvel/browser de quem a
-// recebe (Web Push com VAPID). Chamada pela base de dados (triggers em user_notifications e em
-// chat_messages, via pg_net) com o cabeçalho x-system-token; nunca pelo browser.
+// recebe (Web Push com VAPID). Chamada pela base de dados (triggers em user_notifications,
+// chat_messages e notifications, via pg_net) com o cabeçalho x-system-token; nunca pelo browser.
 //
 // POST { notification_id }  → aviso para uma pessoa
 // POST { chat_message_id }  → mensagem nova para os membros da conversa (menos quem a enviou e
 //                             quem silenciou a conversa)
+// POST { notice_id }        → aviso/comunicado da app (notifications) para quem o vê
 // → { ok, sent, removed }
 // Segredos: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto:…), MAIL_SYSTEM_TOKEN.
 // verify_jwt = false: a autenticação é o token do sistema.
@@ -46,6 +47,35 @@ const notificationPush = async (db: SupabaseClient, id: string): Promise<Push | 
       body: notification.body ?? '',
       url: `${APP_URL}${notification.link ?? '/colaborador'}`,
       tag: notification.kind,
+    },
+  };
+};
+
+/** Aviso da app (Feed → Comunicados): para todos, uma empresa ou uma pessoa. */
+const noticePush = async (db: SupabaseClient, id: string): Promise<Push | null> => {
+  const { data: notice } = await db
+    .from('notifications')
+    .select('id, title, message, company_id, employee_id, is_active')
+    .eq('id', id)
+    .maybeSingle();
+  if (!notice?.is_active) return null;
+  let people = db
+    .from('employees')
+    .select('user_id')
+    .eq('is_active', true)
+    .not('user_id', 'is', null);
+  if (notice.employee_id) people = people.eq('id', notice.employee_id);
+  else if (notice.company_id) people = people.eq('company_id', notice.company_id);
+  const { data: rows } = await people;
+  const userIds = [...new Set((rows ?? []).map(row => row.user_id as string))];
+  if (!userIds.length) return null;
+  return {
+    userIds,
+    payload: {
+      title: notice.title,
+      body: short(notice.message ?? ''),
+      url: `${APP_URL}/colaborador/feed?filtro=comunicados`,
+      tag: `notice-${notice.id}`,
     },
   };
 };
@@ -132,15 +162,18 @@ serve(async (req: Request) => {
   const body = (await req.json().catch(() => null)) as {
     notification_id?: string;
     chat_message_id?: string;
+    notice_id?: string;
   } | null;
-  if (!body?.notification_id && !body?.chat_message_id) {
+  if (!body?.notification_id && !body?.chat_message_id && !body?.notice_id) {
     return json({ ok: false, code: 'bad_request' }, 400);
   }
 
   const db = serviceClient();
   const push = body.chat_message_id
     ? await chatPush(db, body.chat_message_id)
-    : await notificationPush(db, body.notification_id as string);
+    : body.notice_id
+      ? await noticePush(db, body.notice_id)
+      : await notificationPush(db, body.notification_id as string);
   if (!push) return json({ ok: true, sent: 0, removed: 0 });
 
   const { data: subscriptions } = await db

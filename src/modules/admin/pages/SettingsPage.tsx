@@ -29,7 +29,6 @@ import ChangeAdminPasswordDialog from '@/components/admin/ChangeAdminPasswordDia
 import RepairMixedAccountDialog from '@/components/admin/RepairMixedAccountDialog';
 import AdminGroupsManager from '@/components/admin/AdminGroupsManager';
 import AdminGroupMembersManager from '@/components/admin/AdminGroupMembersManager';
-import MarketingEmailTab from '@/components/admin/MarketingEmailTab';
 import { NotificationEmailsManager } from '@/components/admin/NotificationEmailsManager';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -579,10 +578,6 @@ const SettingsPage = () => {
               <Users className="h-4 w-4" />
               Acessos
             </TabsTrigger>
-            <TabsTrigger value="email" className="gap-2">
-              <Bell className="h-4 w-4" />
-              E-mail
-            </TabsTrigger>
             <TabsTrigger value="groups" className="gap-2">
               <FolderKey className="h-4 w-4" />
               Grupos
@@ -910,10 +905,6 @@ const SettingsPage = () => {
                 onRefresh={fetchAdmins}
               />
             </div>
-          </TabsContent>
-
-          <TabsContent value="email">
-            <MarketingEmailTab />
           </TabsContent>
 
           <TabsContent value="groups">

@@ -57,6 +57,7 @@ export const ROUTES = {
     TIMECLOCK: '/admin/ponto',
     DOCUMENTS: '/admin/documentos',
     FINANCE: '/admin/financeiro',
+    BROADCASTS: '/admin/comunicados',
   },
   EMPLOYEE: {
     LOGIN: '/colaborador/login',

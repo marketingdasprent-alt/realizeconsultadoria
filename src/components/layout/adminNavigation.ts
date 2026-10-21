@@ -6,6 +6,7 @@ import {
   Headset,
   KeyRound,
   LayoutDashboard,
+  Megaphone,
   Palmtree,
   Scale,
   Settings,
@@ -76,6 +77,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         moduleKey: 'timeclock',
         tint: 'from-indigo-400 to-blue-600',
       },
+      {
+        href: ROUTES.ADMIN.BROADCASTS,
+        icon: Megaphone,
+        label: 'Comunicados',
+        moduleKey: 'marketing',
+        tint: 'from-amber-400 to-orange-500',
+      },
     ],
   },
   {
@@ -91,7 +99,7 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
       {
         href: ROUTES.ADMIN.ACCESSES,
         icon: KeyRound,
-        label: 'Acessos',
+        label: 'Acessos e Equipamentos',
         moduleKey: 'accesses',
         tint: 'from-teal-400 to-cyan-600',
       },

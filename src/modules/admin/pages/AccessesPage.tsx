@@ -70,7 +70,7 @@ const AccessesPage: React.FC = () => {
   return (
     <div className="space-y-6">
       <AdminPageTitle
-        title="Acessos"
+        title="Acessos e Equipamentos"
         description="Emails e Webmail, credenciais, equipamentos e serviços pagos"
       />
       <Tabs value={tab} onValueChange={changeTab} className="w-full">

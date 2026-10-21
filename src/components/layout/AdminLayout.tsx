@@ -51,9 +51,7 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
     [canView, isLoadingPermissions]
   );
   const settings =
-    !isLoadingPermissions && (isSuperAdmin || canView('settings') || canView('marketing'))
-      ? ADMIN_SETTINGS_ITEM
-      : null;
+    !isLoadingPermissions && (isSuperAdmin || canView('settings')) ? ADMIN_SETTINGS_ITEM : null;
 
   const userName = user?.email?.split('@')[0] || 'Admin';
   const userInitial = userName.charAt(0).toUpperCase();

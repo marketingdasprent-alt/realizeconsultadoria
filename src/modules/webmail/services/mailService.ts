@@ -24,7 +24,7 @@ export interface MailError {
 }
 
 export const MAIL_ERRORS: Record<string, string> = {
-  unavailable: 'O serviço de email ainda não está ativo. Fale com o administrador.',
+  unavailable: 'O servidor de email não respondeu. Tente de novo daqui a pouco.',
   not_configured: 'A ligação a este fornecedor ainda não foi configurada pelo administrador.',
   reauth: 'A autorização desta caixa expirou. Volte a ligá-la.',
   imap_login_failed: 'Não foi possível entrar com estes dados. Confirme o email e a palavra-passe.',
@@ -94,12 +94,22 @@ const toMessage = (accountId: string, row: Row): MailMessage => ({
     : [],
 });
 
-/** Chama uma edge function; respostas de negócio vêm como { ok, code, message, data }. */
+const READ_ACTIONS = new Set(['list', 'get', 'unread-counts', 'attachment', 'discover']);
+
+/**
+ * Chama uma edge function; respostas de negócio vêm como { ok, code, message, data }. Sem resposta
+ * (rede, ou a BD lenta a dar 500/503) tenta mais uma vez antes de mostrar o erro — só nas leituras:
+ * repetir um envio podia mandar o email duas vezes.
+ */
 const call = async <T>(
   fn: 'mail-api' | 'mail-oauth',
   body: Row
 ): Promise<{ data: T | null; error: MailError | null }> => {
-  const { data, error } = await supabase.functions.invoke(fn, { body });
+  let { data, error } = await supabase.functions.invoke(fn, { body });
+  if ((error || !data) && READ_ACTIONS.has(String(body.action))) {
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    ({ data, error } = await supabase.functions.invoke(fn, { body }));
+  }
   if (error || !data) return { data: null, error: { code: 'unavailable', message: '' } };
   const result = data as Row;
   if (!result.ok)

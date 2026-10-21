@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { ServiceUnavailableNotice } from '@/components/ServiceUnavailableNotice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -11,6 +13,7 @@ import logo from '@/assets/logo-realize.png';
 import { useDeviceDetect } from '@/hooks/useDeviceDetect';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
 import { getAppBaseUrl } from '@/lib/utils';
+import { ROUTES } from '@/lib/constants';
 
 const isStandalone = window.matchMedia('(display-mode: standalone)').matches;
 
@@ -42,117 +45,76 @@ const EmployeeLoginPage = () => {
   const [forgotPasswordSent, setForgotPasswordSent] = useState(false);
   const device = useDeviceDetect();
   const { isInstalled } = usePWAInstall();
+  const {
+    login,
+    logout,
+    role,
+    isAuthenticated,
+    isLoading: isAuthLoading,
+    isServiceUnavailable,
+  } = useAuth();
 
-  // Check session and redirect
-  const checkSessionAndRedirect = async () => {
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-    if (session?.user) {
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('user_id', session.user.id)
-        .maybeSingle();
-
-      if (employee) {
-        localStorage.setItem('auth_preference', 'employee');
-        navigate(redirectTo);
-        return true;
-      }
-    }
-    return false;
-  };
-
+  // Sessão de colaborador pronta (já existia, acabou de entrar, ou a BD voltou): segue para a
+  // área. O papel vem só do AuthContext, o mesmo que o ProtectedRoute usa. Antes esta página
+  // lia a BD por conta própria; quando discordava do contexto, mandavam uma para a outra em
+  // ciclo (~400 pedidos/min a `employees` depois da queda de 21/10).
   useEffect(() => {
-    // Check on initial load
-    checkSessionAndRedirect();
-
-    // Listen for auth state changes
-    const {
-      data: { subscription },
-    } = supabase.auth.onAuthStateChange((event, session) => {
-      if (event === 'SIGNED_IN' && session?.user) {
-        setTimeout(() => checkSessionAndRedirect(), 0);
-      }
-    });
-
-    // iOS PWA: Check session when app becomes visible again
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        checkSessionAndRedirect();
-      }
-    };
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-
-    return () => {
-      subscription.unsubscribe();
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [navigate, redirectTo]);
+    if (!isAuthLoading && isAuthenticated && role === 'employee') {
+      navigate(redirectTo, { replace: true });
+    }
+  }, [isAuthLoading, isAuthenticated, role, navigate, redirectTo]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
 
     try {
-      const { data, error } = await supabase.auth.signInWithPassword({
-        email: email.trim().toLowerCase(),
-        password: password,
-      });
+      const lookup = await login(email.trim().toLowerCase(), password);
 
-      if (error) {
-        console.error('Auth error details:', error);
-        let errorMessage = 'Email ou senha incorretos.';
-
-        if (error.message.includes('Invalid login credentials')) {
-          errorMessage = 'Email ou senha incorretos.';
-        } else if (error.message.includes('Email not confirmed')) {
-          errorMessage = 'Email não confirmado. Por favor, contacte o suporte.';
-        } else if (error.status === 400 || error.status === 422) {
-          // Show more detailed error for debugging if it's not a generic failure
-          errorMessage = `Erro: ${error.message}`;
-        }
-
+      if (lookup.unavailable) {
+        // Entrou, mas a BD não respondeu ao ler o papel: o AuthContext tenta de novo sozinho
+        // e o efeito acima segue para a área quando conseguir.
         toast({
-          title: 'Erro de autenticação',
-          description: errorMessage,
-          variant: 'destructive',
+          title: 'Serviço indisponível',
+          description: 'A tentar de novo… entra sozinho assim que o servidor responder.',
         });
-        setIsLoading(false);
         return;
       }
 
-      // Verify the user is an employee
-      const { data: employee } = await supabase
-        .from('employees')
-        .select('id')
-        .eq('user_id', data.user.id)
-        .maybeSingle();
-
-      if (!employee) {
-        await supabase.auth.signOut();
+      if (lookup.role === 'employee') {
         toast({
-          title: 'Acesso negado',
-          description: 'Esta conta não está associada a um colaborador.',
-          variant: 'destructive',
+          title: 'Bem-vindo!',
+          description: 'Login efetuado com sucesso.',
         });
-        setIsLoading(false);
+        return; // o efeito acima navega
+      }
+
+      if (lookup.role === 'admin') {
+        navigate(ROUTES.ADMIN.DASHBOARD);
         return;
       }
 
-      localStorage.setItem('auth_preference', 'employee');
+      await logout();
       toast({
-        title: 'Bem-vindo!',
-        description: 'Login efetuado com sucesso.',
+        title: 'Acesso negado',
+        description: 'Esta conta não está associada a um colaborador.',
+        variant: 'destructive',
       });
+    } catch (error: unknown) {
+      const message = error instanceof Error ? error.message : '';
+      let errorMessage = 'Não foi possível efetuar o login. Tente novamente.';
 
-      navigate(redirectTo);
-    } catch (error: any) {
-      console.error('Login error:', error);
+      if (message.includes('Invalid login credentials')) {
+        errorMessage = 'Email ou senha incorretos.';
+      } else if (message.includes('Email not confirmed')) {
+        errorMessage = 'Email não confirmado. Por favor, contacte o suporte.';
+      } else if (message) {
+        errorMessage = `Erro: ${message}`;
+      }
+
       toast({
-        title: 'Erro',
-        description: 'Não foi possível efetuar o login. Tente novamente.',
+        title: 'Erro de autenticação',
+        description: errorMessage,
         variant: 'destructive',
       });
     } finally {
@@ -300,6 +262,10 @@ const EmployeeLoginPage = () => {
               <p className="text-muted-foreground mb-8">
                 Insira as suas credenciais para aceder ao portal.
               </p>
+
+              {isServiceUnavailable && (
+                <ServiceUnavailableNotice className="mb-6 rounded-lg border border-border p-4" />
+              )}
 
               <form onSubmit={handleLogin} className="space-y-6">
                 <div className="space-y-2">

@@ -21,6 +21,7 @@ describe('ProtectedRoute', () => {
     mockUseAuth.mockReturnValue({
       isLoading: true,
       isAuthenticated: false,
+      isServiceUnavailable: false,
       role: null,
       user: null,
       login: vi.fn(),
@@ -45,6 +46,7 @@ describe('ProtectedRoute', () => {
     mockUseAuth.mockReturnValue({
       isLoading: false,
       isAuthenticated: true,
+      isServiceUnavailable: false,
       role: 'admin',
       user: { id: 'user-123', email: 'admin@example.com' } as any,
       login: vi.fn(),
@@ -76,6 +78,7 @@ describe('ProtectedRoute', () => {
     mockUseAuth.mockReturnValue({
       isLoading: false,
       isAuthenticated: false,
+      isServiceUnavailable: false,
       role: null,
       user: null,
       login: vi.fn(),
@@ -109,6 +112,7 @@ describe('ProtectedRoute', () => {
     mockUseAuth.mockReturnValue({
       isLoading: false,
       isAuthenticated: true,
+      isServiceUnavailable: false,
       role: 'employee',
       user: { id: 'user-123', email: 'employee@example.com' } as any,
       login: vi.fn(),
@@ -144,6 +148,7 @@ describe('ProtectedRoute', () => {
     mockUseAuth.mockReturnValue({
       isLoading: false,
       isAuthenticated: true,
+      isServiceUnavailable: false,
       role: 'employee',
       user: { id: 'user-123', email: 'employee@example.com' } as any,
       login: vi.fn(),
@@ -168,6 +173,7 @@ describe('ProtectedRoute', () => {
     mockUseAuth.mockReturnValue({
       isLoading: false,
       isAuthenticated: true,
+      isServiceUnavailable: false,
       role: 'admin',
       user: { id: 'user-123', email: 'admin@example.com' } as any,
       login: vi.fn(),
@@ -192,6 +198,7 @@ describe('ProtectedRoute', () => {
     mockUseAuth.mockReturnValue({
       isLoading: false,
       isAuthenticated: true,
+      isServiceUnavailable: false,
       role: 'company_admin',
       user: { id: 'user-123', email: 'company@example.com' } as any,
       login: vi.fn(),
@@ -216,6 +223,7 @@ describe('ProtectedRoute', () => {
     mockUseAuth.mockReturnValue({
       isLoading: false,
       isAuthenticated: true,
+      isServiceUnavailable: false,
       role: 'employee',
       user: { id: 'user-123', email: 'employee@example.com' } as any,
       login: vi.fn(),
@@ -240,6 +248,7 @@ describe('ProtectedRoute', () => {
     mockUseAuth.mockReturnValue({
       isLoading: false,
       isAuthenticated: false,
+      isServiceUnavailable: false,
       role: null,
       user: null,
       login: vi.fn(),
@@ -269,10 +278,71 @@ describe('ProtectedRoute', () => {
     expect(screen.queryByText('Protected')).not.toBeInTheDocument();
   });
 
+  it('BD indisponível sem sessão confirmada: avisa e não manda para o login', () => {
+    mockUseAuth.mockReturnValue({
+      isLoading: false,
+      isAuthenticated: false,
+      isServiceUnavailable: true,
+      role: null,
+      user: null,
+      login: vi.fn(),
+      logout: vi.fn(),
+      checkAuth: vi.fn(),
+      error: null,
+      clearError: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter initialEntries={['/colaborador']}>
+        <Routes>
+          <Route
+            path="/colaborador"
+            element={
+              <ProtectedRoute requiredRole="employee" fallbackPath="/colaborador/login">
+                <div>Employee Area</div>
+              </ProtectedRoute>
+            }
+          />
+          <Route path="/colaborador/login" element={<div>Login Page</div>} />
+        </Routes>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Serviço indisponível, a tentar de novo…')).toBeInTheDocument();
+    expect(screen.queryByText('Login Page')).not.toBeInTheDocument();
+    expect(screen.queryByText('Employee Area')).not.toBeInTheDocument();
+  });
+
+  it('BD indisponível com o papel guardado: continua a mostrar a área', () => {
+    mockUseAuth.mockReturnValue({
+      isLoading: false,
+      isAuthenticated: true,
+      isServiceUnavailable: true,
+      role: 'employee',
+      user: { id: 'user-123', email: 'employee@example.com' } as never,
+      login: vi.fn(),
+      logout: vi.fn(),
+      checkAuth: vi.fn(),
+      error: null,
+      clearError: vi.fn(),
+    });
+
+    render(
+      <MemoryRouter>
+        <ProtectedRoute requiredRole="employee">
+          <div>Employee Area</div>
+        </ProtectedRoute>
+      </MemoryRouter>
+    );
+
+    expect(screen.getByText('Employee Area')).toBeInTheDocument();
+  });
+
   it('should handle null role gracefully', () => {
     mockUseAuth.mockReturnValue({
       isLoading: false,
       isAuthenticated: true,
+      isServiceUnavailable: false,
       role: null,
       user: { id: 'user-123', email: 'user@example.com' } as any,
       login: vi.fn(),

@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { render, screen, waitFor, act } from '@testing-library/react';
 import { AuthProvider, useAuth } from '../AuthContext';
 
@@ -34,6 +34,7 @@ vi.mock('@/modules/admin/services/accessService', () => ({
   },
 }));
 
+import { supabase } from '@/integrations/supabase/client';
 import { authService } from '@/modules/auth/services/authService';
 import { accessService } from '@/modules/admin/services/accessService';
 
@@ -64,7 +65,7 @@ describe('AuthContext', () => {
     });
 
     vi.mocked(accessService.getUserRole).mockResolvedValue({
-      role: null,
+      data: null,
       error: null,
     });
 
@@ -84,7 +85,7 @@ describe('AuthContext', () => {
     });
 
     vi.mocked(accessService.getUserRole).mockResolvedValue({
-      role: null,
+      data: null,
       error: null,
     });
 
@@ -112,7 +113,7 @@ describe('AuthContext', () => {
     } as any);
 
     vi.mocked(accessService.getUserRole).mockResolvedValueOnce({
-      role: 'admin',
+      data: 'admin',
       error: null,
     } as any);
 
@@ -148,7 +149,7 @@ describe('AuthContext', () => {
     } as any);
 
     vi.mocked(accessService.getUserRole).mockResolvedValueOnce({
-      role: 'admin',
+      data: 'admin',
       error: null,
     } as any);
 
@@ -250,7 +251,7 @@ describe('AuthContext', () => {
     });
 
     vi.mocked(accessService.getUserRole).mockResolvedValue({
-      role: 'admin',
+      data: 'admin',
       error: null,
     } as any);
 
@@ -299,7 +300,7 @@ describe('AuthContext', () => {
     } as any);
 
     vi.mocked(accessService.getUserRole).mockResolvedValue({
-      role: 'employee',
+      data: 'employee',
       error: null,
     } as any);
 
@@ -420,6 +421,168 @@ describe('AuthContext', () => {
       expect(authContext).toHaveProperty('checkAuth');
       expect(authContext).toHaveProperty('error');
       expect(authContext).toHaveProperty('clearError');
+      expect(authContext).toHaveProperty('isServiceUnavailable');
     });
+  });
+});
+
+// Queda de 21/10: depois de reiniciar a BD, o PostgREST deu 503 (PGRST002) durante minutos e
+// os browsers abertos repetiam o pedido do papel sem pausa. Agora espera 2 s → 30 s.
+describe('AuthContext — BD indisponível', () => {
+  type AuthCallback = Parameters<typeof supabase.auth.onAuthStateChange>[0];
+
+  const session = { user: { id: 'user-503', email: 'colab@example.com' }, access_token: 't' };
+  const unavailable = {
+    data: null,
+    error: { code: 'PGRST002', message: 'Could not query the database for the schema cache.' },
+  };
+  let emitAuthEvent: AuthCallback | undefined;
+
+  const Probe = () => {
+    const { user, role, isServiceUnavailable, error } = useAuth();
+    return (
+      <div>
+        <div data-testid="user">{user ? `${user.email} (${role})` : 'Não autenticado'}</div>
+        <div data-testid="unavailable">{isServiceUnavailable ? 'sim' : 'não'}</div>
+        {error && <div data-testid="error">{error}</div>}
+      </div>
+    );
+  };
+
+  const renderProvider = () =>
+    render(
+      <AuthProvider>
+        <Probe />
+      </AuthProvider>
+    );
+  const advance = (ms: number) =>
+    act(async () => {
+      await vi.advanceTimersByTimeAsync(ms);
+    });
+  const lookups = () => vi.mocked(accessService.getUserRole).mock.calls.length;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    localStorage.clear();
+    vi.useFakeTimers();
+    vi.mocked(authService.getSession).mockResolvedValue({
+      data: { session },
+      error: null,
+    } as never);
+    vi.mocked(supabase.auth.onAuthStateChange).mockImplementation(callback => {
+      emitAuthEvent = callback;
+      return { data: { subscription: { unsubscribe: vi.fn() } } } as never;
+    });
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
+    emitAuthEvent = undefined;
+  });
+
+  it('um 503 não gera pedidos seguidos: espera 2 s, 4 s, 8 s, 16 s e depois 30 s', async () => {
+    vi.mocked(accessService.getUserRole).mockResolvedValue(unavailable);
+
+    renderProvider();
+    await advance(0);
+
+    expect(lookups()).toBe(1);
+    expect(screen.getByTestId('unavailable').textContent).toBe('sim');
+    expect(screen.getByTestId('user').textContent).toBe('Não autenticado');
+    expect(screen.queryByTestId('error')).toBeNull(); // não diz "conta não habilitada"
+
+    const waits = [2_000, 4_000, 8_000, 16_000, 30_000, 30_000];
+    for (const [index, wait] of waits.entries()) {
+      await advance(wait - 1);
+      expect(lookups()).toBe(index + 1); // nada antes de acabar a espera
+      await advance(1);
+      expect(lookups()).toBe(index + 2);
+    }
+
+    // 90 s de BD em baixo = 7 pedidos (antes eram centenas por minuto).
+    expect(lookups()).toBe(7);
+  });
+
+  it('quando a BD volta, lê o papel, guarda-o e tira o aviso', async () => {
+    vi.mocked(accessService.getUserRole)
+      .mockResolvedValueOnce(unavailable)
+      .mockResolvedValueOnce({ data: 'employee', error: null });
+
+    renderProvider();
+    await advance(0);
+    expect(screen.getByTestId('unavailable').textContent).toBe('sim');
+
+    await advance(2_000);
+
+    expect(screen.getByTestId('user').textContent).toBe('colab@example.com (employee)');
+    expect(screen.getByTestId('unavailable').textContent).toBe('não');
+    expect(localStorage.getItem('rz.role.user-503')).toBe('employee');
+
+    await advance(60_000);
+    expect(lookups()).toBe(2); // e não volta a pedir
+  });
+
+  it('com o papel guardado no aparelho, continua dentro da app e não o apaga', async () => {
+    localStorage.setItem('rz.role.user-503', 'employee');
+    vi.mocked(accessService.getUserRole).mockResolvedValue(unavailable);
+
+    renderProvider();
+    await advance(0);
+
+    expect(screen.getByTestId('user').textContent).toBe('colab@example.com (employee)');
+    expect(screen.getByTestId('unavailable').textContent).toBe('sim');
+    expect(localStorage.getItem('rz.role.user-503')).toBe('employee');
+
+    await advance(2_000);
+    expect(lookups()).toBe(2);
+    expect(screen.getByTestId('user').textContent).toBe('colab@example.com (employee)');
+  });
+
+  it('eventos do Supabase durante a espera não antecipam a tentativa', async () => {
+    vi.mocked(accessService.getUserRole).mockResolvedValue(unavailable);
+
+    renderProvider();
+    await advance(0);
+    expect(lookups()).toBe(1);
+
+    await act(async () => {
+      // O Supabase emite SIGNED_IN ao regressar à app e TOKEN_REFRESHED ao renovar o token.
+      emitAuthEvent?.('SIGNED_IN', session as never);
+      emitAuthEvent?.('TOKEN_REFRESHED', session as never);
+      emitAuthEvent?.('SIGNED_IN', session as never);
+    });
+    await advance(0);
+    expect(lookups()).toBe(1);
+
+    await advance(2_000);
+    expect(lookups()).toBe(2);
+  });
+
+  it('a sair da conta cancela a tentativa marcada', async () => {
+    vi.mocked(accessService.getUserRole).mockResolvedValue(unavailable);
+
+    renderProvider();
+    await advance(0);
+
+    await act(async () => {
+      emitAuthEvent?.('SIGNED_OUT', null);
+    });
+    await advance(60_000);
+
+    expect(lookups()).toBe(1);
+    expect(screen.getByTestId('unavailable').textContent).toBe('não');
+  });
+
+  it('conta sem papel continua a ser "sem papel", sem novas tentativas', async () => {
+    vi.mocked(accessService.getUserRole).mockResolvedValue({ data: null, error: null });
+
+    renderProvider();
+    await advance(0);
+
+    expect(screen.getByTestId('error').textContent).toMatch(/não está habilitada/);
+    expect(screen.getByTestId('unavailable').textContent).toBe('não');
+
+    await advance(60_000);
+    expect(lookups()).toBe(1);
   });
 });

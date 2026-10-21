@@ -5,6 +5,7 @@ import React from 'react';
 import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth, UserRole } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
+import { ServiceUnavailableNotice } from '@/components/ServiceUnavailableNotice';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -17,7 +18,7 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   requiredRole,
   fallbackPath = '/admin/login',
 }) => {
-  const { isLoading, isAuthenticated, role } = useAuth();
+  const { isLoading, isAuthenticated, isServiceUnavailable, role } = useAuth();
   const location = useLocation();
 
   // Enquanto está carregando, mostrar loading
@@ -28,6 +29,16 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
           <Loader2 className="w-8 h-8 animate-spin text-primary" />
           <p className="text-sm text-muted-foreground">Carregando...</p>
         </div>
+      </div>
+    );
+  }
+
+  // A BD não respondeu ao ler o papel: esperar aqui (o AuthContext tenta de novo) em vez de
+  // mandar para o login, que voltava a mandar para aqui e os dois entravam em ciclo.
+  if (!isAuthenticated && isServiceUnavailable) {
+    return (
+      <div className="min-h-screen flex items-center justify-center p-6">
+        <ServiceUnavailableNotice className="max-w-sm" />
       </div>
     );
   }

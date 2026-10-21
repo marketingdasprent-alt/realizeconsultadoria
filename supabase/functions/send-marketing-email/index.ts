@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { denyUnlessAdmin } from '../_shared/admin-caller.ts';
 
 const BATCH_SIZE = 10;
 
@@ -28,6 +29,10 @@ const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  // Envia em nome da empresa para qualquer endereço: só um administrador.
+  const denied = await denyUnlessAdmin(req, corsHeaders);
+  if (denied) return denied;
 
   try {
     const payload: MarketingEmailRequest = await req.json();

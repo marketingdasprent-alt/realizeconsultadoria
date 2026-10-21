@@ -5,9 +5,9 @@ import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { LoginAlias } from '@/components/LoginAlias';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { AppManifestSync } from '@/components/AppManifestSync';
-import { isAdminHost } from '@/lib/app-manifest';
 import { ROUTES } from '@/lib/constants';
 import { persistQueries, restoreQueries } from '@/lib/query-persist';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
@@ -18,12 +18,10 @@ import { ALL_MODULES } from './modules/workspace/lib/navigation';
 import MessengerPage from './modules/messenger/pages/MessengerPage';
 import RequestsRedirect from './modules/admin/pages/RequestsRedirect';
 
-const ComingSoonPage = lazy(() => import('./pages/ComingSoonPage'));
 const Index = lazy(() => import('./pages/Index'));
 const PrivacyPolicyPage = lazy(() => import('./pages/PrivacyPolicyPage'));
 const CookiesPolicyPage = lazy(() => import('./pages/CookiesPolicyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
-const AdminLoginPage = lazy(() => import('./modules/admin/pages/AdminLoginPage'));
 const AdminDashboard = lazy(() => import('./modules/admin/pages/AdminDashboard'));
 const CompaniesPage = lazy(() => import('./modules/admin/pages/CompaniesPage'));
 const EmployeesPage = lazy(() => import('./modules/admin/pages/EmployeesPage'));
@@ -35,7 +33,7 @@ const FinancePage = lazy(() => import('./modules/admin/pages/FinancePage'));
 const SupportTicketsPage = lazy(() => import('./modules/admin/pages/SupportTicketsPage'));
 const AccessesPage = lazy(() => import('./modules/admin/pages/AccessesPage'));
 const LegalPage = lazy(() => import('./modules/admin/pages/LegalPage'));
-const EmployeeLoginPage = lazy(() => import('./modules/employee/pages/EmployeeLoginPage'));
+const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const SupportPage = lazy(() => import('./modules/support/pages/SupportPage'));
 const MyDocumentsPage = lazy(() => import('./modules/documents/pages/MyDocumentsPage'));
 const PersonalDocumentsPage = lazy(() => import('./modules/documents/pages/PersonalDocumentsPage'));
@@ -95,17 +93,8 @@ const App = () => (
             <Suspense fallback={null}>
               <Routes>
                 {/* Public Routes */}
-                <Route
-                  path="/"
-                  element={
-                    // admin.realizeconsultadoria.pt abre logo o painel de administração.
-                    isAdminHost(window.location.hostname) ? (
-                      <Navigate to={ROUTES.ADMIN.DASHBOARD} replace />
-                    ) : (
-                      <ComingSoonPage />
-                    )
-                  }
-                />
+                {/* Login único: colaboradores e admins; cada conta vai para a sua área */}
+                <Route path={ROUTES.AUTH.LOGIN} element={<LoginPage />} />
                 <Route path="/site" element={<Index />} />
                 <Route path="/instalar" element={<InstallPage />} />
                 <Route path="/politica-privacidade" element={<PrivacyPolicyPage />} />
@@ -119,7 +108,7 @@ const App = () => (
                 <Route path={ROUTES.AUTH.SWITCH} element={<AccountSwitchPage />} />
 
                 {/* Admin Routes */}
-                <Route path="/admin/login" element={<AdminLoginPage />} />
+                <Route path="/admin/login" element={<LoginAlias />} />
                 <Route
                   element={
                     <ProtectedRoute requiredRole="admin">
@@ -150,10 +139,10 @@ const App = () => (
                 </Route>
 
                 {/* Employee Routes */}
-                <Route path="/colaborador/login" element={<EmployeeLoginPage />} />
+                <Route path="/colaborador/login" element={<LoginAlias />} />
                 <Route
                   element={
-                    <ProtectedRoute requiredRole="employee" fallbackPath="/colaborador/login">
+                    <ProtectedRoute requiredRole="employee">
                       {/* Realize 2.0: jornada (relógio da barra superior) partilhada por toda a
                         área; menu lateral + barra superior, as páginas renderizam no Outlet */}
                       <WorkdayProvider>
@@ -219,7 +208,7 @@ const App = () => (
                 <Route
                   path="/ponto/nfc"
                   element={
-                    <ProtectedRoute fallbackPath="/colaborador/login">
+                    <ProtectedRoute>
                       <WorkdayProvider>
                         <TimeClockNfcPage />
                       </WorkdayProvider>

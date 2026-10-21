@@ -6,6 +6,7 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth, UserRole } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { ServiceUnavailableNotice } from '@/components/ServiceUnavailableNotice';
+import { ROUTES } from '@/lib/constants';
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -16,7 +17,7 @@ interface ProtectedRouteProps {
 export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   children,
   requiredRole,
-  fallbackPath = '/admin/login',
+  fallbackPath = ROUTES.AUTH.LOGIN,
 }) => {
   const { isLoading, isAuthenticated, isServiceUnavailable, role } = useAuth();
   const location = useLocation();

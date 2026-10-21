@@ -34,13 +34,16 @@ export const ROUTES = {
     TERMS: '/termos-condicoes',
   },
   AUTH: {
+    /** Login único (colaboradores e admins): a página inicial. */
+    LOGIN: '/',
     CALLBACK: '/auth/callback',
     SET_PASSWORD: '/auth/set-password',
     /** Chegada do outro site já com a sessão (login único, botão "Ir para…"). */
     SWITCH: '/auth/trocar',
   },
   ADMIN: {
-    LOGIN: '/admin/login',
+    /** Login único (o antigo /admin/login reencaminha para aqui). */
+    LOGIN: '/',
     DASHBOARD: '/admin',
     LEGAL: '/admin/juridico',
     COMPANIES: '/admin/empresas',
@@ -60,7 +63,8 @@ export const ROUTES = {
     BROADCASTS: '/admin/comunicados',
   },
   EMPLOYEE: {
-    LOGIN: '/colaborador/login',
+    /** Login único (o antigo /colaborador/login reencaminha para aqui). */
+    LOGIN: '/',
     DASHBOARD: '/colaborador',
     REQUESTS: '/colaborador/pedidos',
     TICKETS: '/colaborador/tickets',

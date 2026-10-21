@@ -41,10 +41,12 @@ export const CopyText: React.FC<{ value: string; className?: string }> = ({ valu
  * Palavra-passe escondida, com mostrar e copiar. Está cifrada na BD: só se vai buscar (load)
  * ao clicar, e fica em memória enquanto a linha estiver aberta.
  */
-export const SecretText: React.FC<{ load: () => Promise<string | null>; className?: string }> = ({
-  load,
-  className,
-}) => {
+export const SecretText: React.FC<{
+  load: () => Promise<string | null>;
+  className?: string;
+  /** O que é (para os botões): palavra-passe, PIN, PUK. */
+  what?: string;
+}> = ({ load, className, what = 'palavra-passe' }) => {
   const [visible, setVisible] = useState(false);
   const [value, setValue] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -75,9 +77,7 @@ export const SecretText: React.FC<{ load: () => Promise<string | null>; classNam
     try {
       // Safari só deixa copiar no próprio clique: passa-se a promessa ao ClipboardItem.
       if (typeof ClipboardItem !== 'undefined' && navigator.clipboard.write) {
-        const text = fetchValue().then(
-          result => new Blob([result ?? ''], { type: 'text/plain' })
-        );
+        const text = fetchValue().then(result => new Blob([result ?? ''], { type: 'text/plain' }));
         await navigator.clipboard.write([new ClipboardItem({ 'text/plain': text })]);
       } else {
         await navigator.clipboard.writeText((await fetchValue()) ?? '');
@@ -98,7 +98,7 @@ export const SecretText: React.FC<{ load: () => Promise<string | null>; classNam
         type="button"
         onClick={toggle}
         className={ICON_BUTTON}
-        aria-label={visible ? 'Esconder palavra-passe' : 'Mostrar palavra-passe'}
+        aria-label={visible ? `Esconder ${what}` : `Mostrar ${what}`}
       >
         {busy ? (
           <Loader2 className="h-3.5 w-3.5 animate-spin" />
@@ -112,8 +112,8 @@ export const SecretText: React.FC<{ load: () => Promise<string | null>; classNam
         type="button"
         onClick={copy}
         className={ICON_BUTTON}
-        aria-label="Copiar palavra-passe"
-        title="Copiar palavra-passe"
+        aria-label={`Copiar ${what}`}
+        title={`Copiar ${what}`}
       >
         {copied ? (
           <Check className="h-3.5 w-3.5 text-emerald-600" />

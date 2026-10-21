@@ -317,6 +317,7 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
     phone[code] ? (
       <SecretText
         load={() => phoneCodeService.code(phone.id, code)}
+        what={code.toUpperCase()}
         className="w-[120px] shrink-0"
       />
     ) : (

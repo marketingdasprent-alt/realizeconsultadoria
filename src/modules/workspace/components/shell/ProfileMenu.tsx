@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ChevronRight, Download, KeyRound, LogOut, Settings, ShieldCheck } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { ROUTES } from '@/lib/constants';
+import { isStandalone } from '@/lib/pwa-install';
 import { useOptionalWorkday } from '@/modules/timeclock/context/useWorkday';
 import { WorkdayPanel } from '@/modules/timeclock/components/employee/WorkdayPanel';
 import { useWorkspace } from '../../context/workspaceContext';
@@ -57,13 +58,16 @@ export const ProfileMenu: React.FC = () => {
             </span>
           </Link>
           {workday?.employee && <WorkdayPanel showPageLink onNavigate={close} hideTimeline />}
-          <div className="grid grid-cols-2 gap-2">
+          <div className={isStandalone() ? 'grid gap-2' : 'grid grid-cols-2 gap-2'}>
             <button type="button" className={TILE} onClick={() => (close(), onChangePassword())}>
               <ShieldCheck className="h-5 w-5 text-rz-primary" /> Segurança
             </button>
-            <Link to={ROUTES.PUBLIC.INSTALL} onClick={close} className={TILE}>
-              <Download className="h-5 w-5 text-rz-primary" /> Instalar app
-            </Link>
+            {/* Já aberta como app instalada: não há nada para instalar. */}
+            {!isStandalone() && (
+              <Link to={ROUTES.PUBLIC.INSTALL} onClick={close} className={TILE}>
+                <Download className="h-5 w-5 text-rz-primary" /> Instalar app
+              </Link>
+            )}
           </div>
         </div>
         <div className="rounded-[22px] bg-white p-1.5 shadow-rz-soft">

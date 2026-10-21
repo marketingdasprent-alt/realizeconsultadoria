@@ -49,7 +49,8 @@ export default defineConfig(({ mode }) => ({
             purpose: 'any',
           },
           {
-            src: 'pwa-512x512.png',
+            // Com margem: o Android recorta o ícone em círculo/forma do tema.
+            src: 'pwa-maskable-512x512.png',
             sizes: '512x512',
             type: 'image/png',
             purpose: 'maskable',

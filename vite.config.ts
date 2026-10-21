@@ -23,14 +23,14 @@ export default defineConfig(({ mode }) => ({
         name: 'Realize - Portal de Gestão',
         short_name: 'Realize',
         description:
-          'Portal do colaborador da Realize Consultadoria: ponto, férias e ausências, documentos e recibos.',
+          'Realize Consultadoria: o Workspace do colaborador (ponto, férias, documentos e recibos) e o admin, na mesma app.',
         theme_color: '#B7933D',
         background_color: '#ffffff',
         display: 'standalone',
         orientation: 'portrait',
         lang: 'pt',
-        // App do colaborador. O do admin (/admin) tem o seu manifest em
-        // public/manifest-admin.webmanifest; src/lib/app-manifest.ts escolhe pelo endereço.
+        // App de app.realizeconsultadoria.pt (Workspace e admin). A do admin.realizeconsultadoria.pt
+        // tem o seu manifest em public/manifest-admin.webmanifest; src/lib/app-manifest.ts escolhe.
         id: '/colaborador',
         start_url: '/colaborador',
         scope: '/',

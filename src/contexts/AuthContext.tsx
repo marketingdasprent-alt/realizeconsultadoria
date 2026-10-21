@@ -6,7 +6,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { authService } from '@/modules/auth/services/authService';
 import { accessService } from '@/modules/admin/services/accessService';
-import { appKindFor } from '@/lib/app-manifest';
+import { areaFor } from '@/lib/account-switch';
 import { retryDelayMs } from '@/lib/retry';
 
 export type UserRole = 'admin' | 'company_admin' | 'employee';
@@ -48,11 +48,11 @@ const writeCachedRole = (userId: string, role: UserRole | null) => {
 
 /**
  * Na área do colaborador quem também é admin (na mesma conta) entra como colaborador; no
- * admin entra como admin. Cada endereço decide a sua área (login único).
+ * admin entra como admin. A área vem da página (/admin… ou /colaborador…) e, no login, do endereço.
  */
 const isWorkspaceArea = (): boolean =>
   typeof window !== 'undefined' &&
-  appKindFor(window.location.pathname, window.location.hostname) === 'colaborador';
+  areaFor(window.location.pathname, window.location.hostname) === 'workspace';
 
 export interface AuthUser extends User {
   role?: UserRole;

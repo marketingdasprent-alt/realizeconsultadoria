@@ -3,8 +3,13 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Download, Laptop, Monitor, Smartphone } from 'lucide-react';
 import { useDeviceDetect } from '@/hooks/useDeviceDetect';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
-import { isOtherSite } from '@/lib/account-switch';
-import { appKindFor, applyAppManifest, type AppKind } from '@/lib/app-manifest';
+import {
+  appKindFor,
+  applyAppManifest,
+  isAdminHost,
+  isAppHost,
+  type AppKind,
+} from '@/lib/app-manifest';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { InstallSteps } from '@/components/install/InstallSteps';
@@ -15,7 +20,7 @@ const APPS: Record<AppKind, { name: string; icon: string; what: string; login: s
   colaborador: {
     name: 'Realize',
     icon: '/pwa-192x192.png',
-    what: 'Mensagens, ponto, férias, documentos e recibos.',
+    what: 'Mensagens, ponto, férias, documentos e recibos — e o admin, para quem é administrador.',
     login: ROUTES.EMPLOYEE.LOGIN,
   },
   admin: {
@@ -34,19 +39,19 @@ const PLATFORM_ICONS: Record<InstallPlatform, typeof Smartphone> = {
 };
 
 /**
- * /instalar: instalar a app deste endereço (app. → Realize, admin. → Realize Admin) em qualquer
- * aparelho. Onde as duas estão no mesmo endereço (localhost) escolhe-se com ?app=admin.
+ * /instalar: instalar a app deste endereço (app. → Realize, com o Workspace e o admin; admin. →
+ * Realize Admin) em qualquer aparelho. Noutros endereços (localhost) escolhe-se com ?app=admin.
  */
 const InstallPage: React.FC = () => {
   useRzTheme();
   const [params] = useSearchParams();
   const asked = params.get('app');
-  const site = { hostname: window.location.hostname, origin: window.location.origin };
-  const sameSite = !isOtherSite('admin', site) && !isOtherSite('workspace', site);
+  const hostname = window.location.hostname;
+  const fixedApp = isAdminHost(hostname) || isAppHost(hostname);
   const kind: AppKind =
-    sameSite && (asked === 'admin' || asked === 'colaborador')
+    !fixedApp && (asked === 'admin' || asked === 'colaborador')
       ? asked
-      : appKindFor(ROUTES.PUBLIC.INSTALL, site.hostname);
+      : appKindFor(ROUTES.PUBLIC.INSTALL, hostname);
   const app = APPS[kind];
   // O browser instala o manifest da página: o desta app (no próprio endereço ganha sempre ele).
   useEffect(() => applyAppManifest(kind === 'admin' ? '/admin' : '/colaborador'), [kind]);

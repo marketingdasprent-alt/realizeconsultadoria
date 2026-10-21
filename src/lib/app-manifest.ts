@@ -1,6 +1,7 @@
-// Dois apps instaláveis no mesmo site: o do colaborador (/colaborador) e o do admin (/admin).
-// Cada um tem o seu manifest (nome, ícone, cor, início); a página aponta para o certo conforme
-// o endereço, e é esse que o browser instala ("Instalar app" / "Adicionar ao ecrã principal").
+// App instalável de cada endereço: app.realizeconsultadoria.pt é a "Realize" (Workspace e admin
+// na mesma app, troca-se pelo botão do topo); admin.realizeconsultadoria.pt é a "Realize Admin".
+// Noutros endereços (localhost, realize.dasprent.pt) escolhe-se pelo caminho: /admin… é o admin.
+// A página aponta para o manifest certo e é esse que o browser instala.
 
 export type AppKind = 'colaborador' | 'admin';
 
@@ -22,10 +23,14 @@ const APPS: Record<AppKind, { manifest: string; title: string; icon: string; the
 /** O endereço próprio do admin (admin.realizeconsultadoria.pt): aí tudo é o app do admin. */
 export const isAdminHost = (hostname: string): boolean => hostname.startsWith('admin.');
 
-export const appKindFor = (pathname: string, hostname = ''): AppKind =>
-  isAdminHost(hostname) || pathname === '/admin' || pathname.startsWith('/admin/')
-    ? 'admin'
-    : 'colaborador';
+/** O endereço da app (app.realizeconsultadoria.pt): uma app só, também com o admin. */
+export const isAppHost = (hostname: string): boolean => hostname.startsWith('app.');
+
+export const appKindFor = (pathname: string, hostname = ''): AppKind => {
+  if (isAdminHost(hostname)) return 'admin';
+  if (isAppHost(hostname)) return 'colaborador';
+  return pathname === '/admin' || pathname.startsWith('/admin/') ? 'admin' : 'colaborador';
+};
 
 const setAttribute = (selector: string, attribute: string, value: string) => {
   const element = document.querySelector(selector);

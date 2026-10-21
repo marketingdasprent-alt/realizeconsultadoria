@@ -16,6 +16,10 @@ describe('dois apps instaláveis', () => {
     expect(appKindFor('/', 'app.realizeconsultadoria.pt')).toBe('colaborador');
   });
 
+  it('no endereço da app, também o /admin é a mesma app (uma só, troca-se lá dentro)', () => {
+    expect(appKindFor('/admin/colaboradores', 'app.realizeconsultadoria.pt')).toBe('colaborador');
+  });
+
   it('troca o manifest, o ícone e o nome', () => {
     document.head.innerHTML =
       '<link rel="manifest" href="/manifest.webmanifest"><link rel="apple-touch-icon" href="/apple-touch-icon.png"><meta name="apple-mobile-web-app-title" content="Realize"><meta name="theme-color" content="#B7933D">';

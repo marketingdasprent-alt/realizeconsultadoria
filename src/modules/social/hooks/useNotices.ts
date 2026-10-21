@@ -2,6 +2,8 @@
 // Mesma segmentação de sempre: globais, da empresa e individuais.
 import { useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useToast } from '@/hooks/use-toast';
+import { retryDelayMs } from '@/lib/retry';
 import { employeeHomeService } from '@/modules/employee/services/employeeHomeService';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { DEMO_NOTICES } from '../lib/demoData';
@@ -11,6 +13,7 @@ import type { Notice } from '../types';
 export const useNotices = () => {
   const { isPreview, user } = useWorkspace();
   const qc = useQueryClient();
+  const { toast } = useToast();
   const [demo, setDemo] = useState<Notice[]>(DEMO_NOTICES);
 
   const live = useQuery({
@@ -41,12 +44,27 @@ export const useNotices = () => {
     if (isPreview) {
       return setDemo(list => list.map(n => (ids.includes(n.id) ? { ...n, read: true } : n)));
     }
-    // Confirmado na hora; o servidor grava em fundo.
-    qc.setQueryData<typeof live.data>(FEED_KEYS.notices, list =>
-      list?.map(n => (ids.includes(n.id) ? { ...n, read: true } : n))
-    );
-    await employeeHomeService.markNoticesRead(user.employeeId, ids);
-    void qc.invalidateQueries({ queryKey: FEED_KEYS.notices });
+    // Confirmado na hora; o servidor grava em fundo. Se a BD não responder (503 do PostgREST
+    // quando está lenta), tenta outra vez com espera crescente em vez de desfazer a confirmação.
+    const mark = (read: boolean) =>
+      qc.setQueryData<typeof live.data>(FEED_KEYS.notices, list =>
+        list?.map(n => (ids.includes(n.id) ? { ...n, read } : n))
+      );
+    mark(true);
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+      const { success } = await employeeHomeService.markNoticesRead(user.employeeId, ids);
+      if (success) {
+        void qc.invalidateQueries({ queryKey: FEED_KEYS.notices });
+        return;
+      }
+      await new Promise(resolve => setTimeout(resolve, retryDelayMs(attempt)));
+    }
+    mark(false);
+    toast({
+      title: 'A leitura não ficou confirmada',
+      description: 'O servidor não respondeu. Tente outra vez daqui a pouco.',
+      variant: 'destructive',
+    });
   };
 
   return {

@@ -13,6 +13,8 @@ import { AdminMobileHeader } from './AdminMobileHeader';
 import { AdminMobileSidebar } from './AdminMobileSidebar';
 import { PrintPreviewHost } from '@/components/admin/PrintPreviewHost';
 import { useAdminBadges } from '@/modules/admin/hooks/useAdminBadges';
+import { AccountSwitchButton } from '@/modules/auth/components/AccountSwitchButton';
+import { useAccountSwitch } from '@/modules/auth/hooks/useAccountSwitch';
 import { ADMIN_SETTINGS_ITEM, visibleAdminGroups } from './adminNavigation';
 import './admin-theme.css';
 
@@ -35,6 +37,8 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
   useRzTheme();
   const badges = useAdminBadges();
+  // Quem também é colaborador: "Ir para Workspace" no canto superior.
+  const { canSwitch } = useAccountSwitch('admin');
 
   // Retoques do admin (admin-theme.css) também nos diálogos e popovers, que abrem em portais.
   useEffect(() => {
@@ -107,11 +111,25 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
 
       <div
         className={cn(
-          'min-h-screen pt-14 transition-[padding] duration-300 ease-out lg:py-3 lg:pr-3 print:p-0',
+          'min-h-screen pt-14 transition-[padding] duration-300 ease-out lg:pb-3 lg:pr-3 print:p-0',
+          canSwitch ? 'lg:pt-0' : 'lg:pt-3',
           collapsed ? 'lg:pl-[76px]' : 'lg:pl-[260px]'
         )}
       >
-        <main className="min-h-[calc(100vh-3.5rem)] overflow-x-hidden rounded-t-[28px] bg-rz-canvas shadow-rz-panel lg:min-h-[calc(100vh-1.5rem)] lg:rounded-[28px] print:min-h-0 print:rounded-none print:bg-white print:shadow-none">
+        {canSwitch && (
+          <div className="hidden h-14 items-center justify-end lg:flex print:hidden">
+            <AccountSwitchButton
+              current="admin"
+              className="rz-glass text-white hover:bg-white/20"
+            />
+          </div>
+        )}
+        <main
+          className={cn(
+            'min-h-[calc(100vh-3.5rem)] overflow-x-hidden rounded-t-[28px] bg-rz-canvas shadow-rz-panel lg:rounded-[28px] print:min-h-0 print:rounded-none print:bg-white print:shadow-none',
+            canSwitch ? 'lg:min-h-[calc(100vh-4.25rem)]' : 'lg:min-h-[calc(100vh-1.5rem)]'
+          )}
+        >
           <div className="mx-auto max-w-[1600px] p-4 lg:p-8 print:max-w-none print:p-0">
             {children || (
               <Suspense

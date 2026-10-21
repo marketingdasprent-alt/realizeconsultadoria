@@ -16,6 +16,7 @@ import EmployeePayslipsTab from '../components/employee/EmployeePayslipsTab';
 import EmployeeFinanceHistoryTab from '../components/employee/EmployeeFinanceHistoryTab';
 import { EmployeeProfileHeader } from '../components/employee/EmployeeProfileHeader';
 import { EmployeeDocumentAlerts } from '../components/employee/EmployeeDocumentAlerts';
+import { EmployeeAdminAccountCard } from '../components/employee/EmployeeAdminAccountCard';
 import { useEmployeeDocuments } from '@/modules/documents/hooks/useEmployeeDocuments';
 import { useEmployeeAvatars } from '../hooks/useEmployeeAvatars';
 
@@ -154,6 +155,9 @@ const EmployeeFormPage = () => {
             onSaved={handleSaved}
             onCreated={newId => navigate(`${ROUTES.ADMIN.EMPLOYEES}/${newId}`)}
           />
+          {isEditMode && employee && canEdit && (
+            <EmployeeAdminAccountCard employee={employee} onChanged={fetchData} />
+          )}
         </TabsContent>
 
         {isEditMode && employee && canVacation && (

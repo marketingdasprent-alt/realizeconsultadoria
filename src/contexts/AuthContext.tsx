@@ -6,6 +6,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { authService } from '@/modules/auth/services/authService';
 import { accessService } from '@/modules/admin/services/accessService';
+import { appKindFor } from '@/lib/app-manifest';
 import { retryDelayMs } from '@/lib/retry';
 
 export type UserRole = 'admin' | 'company_admin' | 'employee';
@@ -44,6 +45,14 @@ const writeCachedRole = (userId: string, role: UserRole | null) => {
     // sem armazenamento (janela privada): só perde o arranque rápido
   }
 };
+
+/**
+ * Na área do colaborador quem também é admin (na mesma conta) entra como colaborador; no
+ * admin entra como admin. Cada endereço decide a sua área (login único).
+ */
+const isWorkspaceArea = (): boolean =>
+  typeof window !== 'undefined' &&
+  appKindFor(window.location.pathname, window.location.hostname) === 'colaborador';
 
 export interface AuthUser extends User {
   role?: UserRole;
@@ -105,7 +114,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       return { role: null, unavailable: false };
     }
 
-    const cached = readCachedRole(session.user.id);
+    // Na área do colaborador um "admin" guardado pode ser também colaborador: confirma-se.
+    const stored = readCachedRole(session.user.id);
+    const cached = stored === 'admin' && isWorkspaceArea() ? null : stored;
     if (cached) {
       resolvedUserIdRef.current = session.user.id;
       setUser({ ...session.user, role: cached } as AuthUser);
@@ -123,7 +134,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     generation: number,
     attempt = 0
   ): Promise<RoleLookup> => {
-    const { data: rawRole, error: lookupError } = await accessService.getUserRole(session.user.id);
+    const { data: rawRole, error: lookupError } = await accessService.getUserRole(session.user.id, {
+      preferEmployee: isWorkspaceArea(),
+    });
     const lookup: RoleLookup = { role: normalizeRole(rawRole), unavailable: !!lookupError };
     if (generation !== lookupGenerationRef.current) return lookup;
 

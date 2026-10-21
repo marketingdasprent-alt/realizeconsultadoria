@@ -82,3 +82,6 @@ verify_jwt = false
 
 [functions.company-files]
 verify_jwt = false
+
+[functions.switch-account]
+verify_jwt = false

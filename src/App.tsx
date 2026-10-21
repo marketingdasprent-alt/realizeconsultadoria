@@ -56,6 +56,7 @@ const ColleagueProfilePage = lazy(() => import('./modules/social/pages/Colleague
 const AppreciationsPage = lazy(() => import('./modules/social/pages/AppreciationsPage'));
 const AuthCallbackPage = lazy(() => import('./pages/auth/AuthCallbackPage'));
 const SetPasswordPage = lazy(() => import('./pages/auth/SetPasswordPage'));
+const AccountSwitchPage = lazy(() => import('./pages/auth/AccountSwitchPage'));
 const InstallPage = lazy(() => import('./pages/InstallPage'));
 const DeleteAccountPage = lazy(() => import('./pages/DeleteAccountPage'));
 const NotFound = lazy(() => import('./pages/NotFound'));
@@ -114,6 +115,7 @@ const App = () => (
                 {/* Auth Callback */}
                 <Route path="/auth/callback" element={<AuthCallbackPage />} />
                 <Route path="/auth/set-password" element={<SetPasswordPage />} />
+                <Route path={ROUTES.AUTH.SWITCH} element={<AccountSwitchPage />} />
 
                 {/* Admin Routes */}
                 <Route path="/admin/login" element={<AdminLoginPage />} />

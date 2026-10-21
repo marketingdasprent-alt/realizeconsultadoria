@@ -6,6 +6,12 @@ import { Navigate, useLocation } from 'react-router-dom';
 import { useAuth, UserRole } from '@/contexts/AuthContext';
 import { Loader2 } from 'lucide-react';
 import { ServiceUnavailableNotice } from '@/components/ServiceUnavailableNotice';
+import { OtherAreaRedirect } from '@/components/OtherAreaRedirect';
+import type { SwitchTarget } from '@/lib/account-switch';
+import { accountSwitchService } from '@/modules/auth/services/accountSwitchService';
+
+const areaOf = (roles: UserRole[]): SwitchTarget | null =>
+  roles.includes('admin') ? 'admin' : roles.includes('employee') ? 'workspace' : null;
 
 interface ProtectedRouteProps {
   children: React.ReactNode;
@@ -51,7 +57,12 @@ export const ProtectedRoute: React.FC<ProtectedRouteProps> = ({
   // Se requer um role específico e não tem, redirecionar para a área correta
   if (requiredRole) {
     const rolesArray = Array.isArray(requiredRole) ? requiredRole : [requiredRole];
-    if (!role || !rolesArray.includes(role)) {
+    // Login único: a área desta conta (ou desta página) pode estar no outro endereço
+    // (admin.realizeconsultadoria.pt ↔ app.realizeconsultadoria.pt) — leva-se a sessão.
+    const fits = !!role && rolesArray.includes(role);
+    const area = fits ? areaOf(rolesArray) : role ? areaOf([role]) : null;
+    if (area && accountSwitchService.needsSwitch(area)) return <OtherAreaRedirect to={area} />;
+    if (!fits) {
       // Redirecionar admin para /admin e employee para /colaborador
       const redirectTo =
         role === 'admin' ? '/admin' : role === 'employee' ? '/colaborador' : fallbackPath;

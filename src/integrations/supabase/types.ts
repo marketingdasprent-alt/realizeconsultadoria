@@ -1458,6 +1458,7 @@ export type Database = {
       };
       employees: {
         Row: {
+          admin_user_id: string | null;
           birth_date: string | null;
           cartao_da: string | null;
           cartao_refeicao: string | null;
@@ -1481,6 +1482,7 @@ export type Database = {
           user_id: string | null;
         };
         Insert: {
+          admin_user_id?: string | null;
           birth_date?: string | null;
           cartao_da?: string | null;
           cartao_refeicao?: string | null;
@@ -1504,6 +1506,7 @@ export type Database = {
           user_id?: string | null;
         };
         Update: {
+          admin_user_id?: string | null;
           birth_date?: string | null;
           cartao_da?: string | null;
           cartao_refeicao?: string | null;
@@ -3442,6 +3445,21 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      account_switch_targets: {
+        Args: never;
+        Returns: string[];
+      };
+      admin_link_candidates: {
+        Args: never;
+        Returns: {
+          email: string;
+          is_employee_account: boolean;
+          linked_employee_id: string | null;
+          linked_employee_name: string | null;
+          name: string;
+          user_id: string;
+        }[];
+      };
       ai_get_context: {
         Args: { _conversation_id: string; _limit?: number };
         Returns: Json;

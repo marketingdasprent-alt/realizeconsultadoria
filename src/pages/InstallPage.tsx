@@ -3,7 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 import { CheckCircle2, Download, Laptop, Monitor, Smartphone } from 'lucide-react';
 import { useDeviceDetect } from '@/hooks/useDeviceDetect';
 import { usePWAInstall } from '@/hooks/usePWAInstall';
-import { isOtherSite, targetOrigin } from '@/lib/account-switch';
+import { isOtherSite } from '@/lib/account-switch';
 import { appKindFor, applyAppManifest, type AppKind } from '@/lib/app-manifest';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
@@ -47,12 +47,7 @@ const InstallPage: React.FC = () => {
     sameSite && (asked === 'admin' || asked === 'colaborador')
       ? asked
       : appKindFor(ROUTES.PUBLIC.INSTALL, site.hostname);
-  const otherKind: AppKind = kind === 'admin' ? 'colaborador' : 'admin';
   const app = APPS[kind];
-  const other = APPS[otherKind];
-  const otherUrl = sameSite
-    ? `${ROUTES.PUBLIC.INSTALL}?app=${otherKind}`
-    : `${targetOrigin(otherKind === 'admin' ? 'admin' : 'workspace', site)}${ROUTES.PUBLIC.INSTALL}`;
   // O browser instala o manifest da página: o desta app (no próprio endereço ganha sempre ele).
   useEffect(() => applyAppManifest(kind === 'admin' ? '/admin' : '/colaborador'), [kind]);
 
@@ -121,14 +116,6 @@ const InstallPage: React.FC = () => {
             />
           </section>
         )}
-
-        <section className="rounded-[28px] bg-white/10 p-4 text-[13px] text-white/80 ring-1 ring-white/15">
-          Também é {kind === 'admin' ? 'colaborador' : 'administrador'}? Instale a{' '}
-          <a href={otherUrl} className="font-semibold text-white underline underline-offset-2">
-            {other.name}
-          </a>{' '}
-          — fica com um ícone para cada uma.
-        </section>
 
         <Link
           to={app.login}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { AdminInstallLink } from './AdminInstallLink';
 import { AdminNavGroups } from './AdminNavGroups';
 import { AdminNavLink } from './AdminNavLink';
 import { AdminUserCard } from './AdminUserCard';
@@ -39,6 +40,7 @@ export const AdminMobileSidebar: React.FC<AdminMobileSidebarProps> = ({
         </nav>
         <div className="space-y-2 px-3 pb-6 pt-2">
           {settings && <AdminNavLink item={settings} onNavigate={onClose} />}
+          <AdminInstallLink onNavigate={onClose} />
           <AdminUserCard userName={userName} userInitial={userInitial} onLogout={onLogout} />
         </div>
       </aside>

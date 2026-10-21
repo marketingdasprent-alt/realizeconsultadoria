@@ -4,6 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROUTES } from '@/lib/constants';
 import { BrandMark } from '@/modules/workspace/components/BrandMark';
+import { AdminInstallLink } from './AdminInstallLink';
 import { AdminNavGroups } from './AdminNavGroups';
 import { AdminNavLink } from './AdminNavLink';
 import { AdminUserCard } from './AdminUserCard';
@@ -52,6 +53,7 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
 
     <div className="space-y-2 px-3 pb-4 pt-2">
       {settings && <AdminNavLink item={settings} collapsed={collapsed} />}
+      <AdminInstallLink collapsed={collapsed} />
       <button
         type="button"
         onClick={onToggle}

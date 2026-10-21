@@ -324,7 +324,7 @@ describe('AuthContext', () => {
     });
 
     await waitFor(() => {
-      expect(accessService.getUserRole).toHaveBeenCalledWith('user-123');
+      expect(accessService.getUserRole).toHaveBeenCalledWith('user-123', expect.anything());
     });
   });
 

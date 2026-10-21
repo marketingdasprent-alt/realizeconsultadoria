@@ -53,15 +53,31 @@ export const accessService = {
   /**
    * Obtém a role principal do usuário.
    * Tenta primeiro na tabela user_roles, depois verifica se é admin pelos grupos,
-   * e finalmente verifica se é um colaborador.
+   * e finalmente verifica se é um colaborador. Com `preferEmployee` (área do colaborador)
+   * vê primeiro se é colaborador: quem é colaborador e admin na mesma conta entra como
+   * colaborador no Workspace e como admin no admin.
    *
    * - `{ data: role, error: null }` → papel encontrado;
    * - `{ data: null, error: null }` → a conta não tem papel;
    * - `{ data: null, error }` → a BD não respondeu (em baixo, a arrancar, sem rede): não se
    *   sabe o papel e quem chama deve tentar de novo mais tarde, não tratar como "sem papel".
    */
-  getUserRole: async (userId: string): Promise<{ data: string | null; error: unknown }> => {
+  getUserRole: async (
+    userId: string,
+    { preferEmployee = false }: { preferEmployee?: boolean } = {}
+  ): Promise<{ data: string | null; error: unknown }> => {
     try {
+      const findEmployee = () =>
+        supabase.from('employees').select('id').eq('user_id', userId).maybeSingle();
+
+      if (preferEmployee) {
+        const employee = await findEmployee();
+        if (isTransientQueryError(employee.status, employee.error)) {
+          return { data: null, error: employee.error };
+        }
+        if (employee.data) return { data: 'employee', error: null };
+      }
+
       // 1. Verificar na tabela user_roles (novo sistema)
       const roles = await supabase
         .from('user_roles')
@@ -88,12 +104,9 @@ export const accessService = {
         return { data: 'admin', error: null };
       }
 
-      // 3. Fallback: Verificar se é um colaborador
-      const employee = await supabase
-        .from('employees')
-        .select('id')
-        .eq('user_id', userId)
-        .maybeSingle();
+      // 3. Fallback: Verificar se é um colaborador (com preferEmployee já se viu)
+      if (preferEmployee) return { data: null, error: null };
+      const employee = await findEmployee();
 
       if (isTransientQueryError(employee.status, employee.error)) {
         return { data: null, error: employee.error };

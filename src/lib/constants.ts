@@ -36,6 +36,8 @@ export const ROUTES = {
   AUTH: {
     CALLBACK: '/auth/callback',
     SET_PASSWORD: '/auth/set-password',
+    /** Chegada do outro site já com a sessão (login único, botão "Ir para…"). */
+    SWITCH: '/auth/trocar',
   },
   ADMIN: {
     LOGIN: '/admin/login',

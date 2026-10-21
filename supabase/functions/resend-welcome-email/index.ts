@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.2';
+import { denyUnlessAdmin } from '../_shared/admin-caller.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -23,6 +24,9 @@ const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
+
+  const denied = await denyUnlessAdmin(req, corsHeaders);
+  if (denied) return denied;
 
   try {
     const { employee_id }: ResendWelcomeRequest = await req.json();
@@ -136,7 +140,7 @@ const handler = async (req: Request): Promise<Response> => {
           console.error('[resend-welcome-email] Brevo error:', emailError);
         }
       } catch (err) {
-        emailError = err.message;
+        emailError = err instanceof Error ? err.message : String(err);
         console.error('[resend-welcome-email] Mail error:', err);
       }
     }

@@ -1,5 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { AccountSwitchButton } from '@/modules/auth/components/AccountSwitchButton';
 import { useWorkspace } from '../../context/workspaceContext';
 import { BrandMark } from '../BrandMark';
 import { GlobalSearch } from './GlobalSearch';
@@ -7,7 +8,10 @@ import { NotificationsButton } from './NotificationsButton';
 import { ProfileMenu } from './ProfileMenu';
 import { WorkspaceClock } from './WorkspaceClock';
 
-/** Barra superior global (briefing §3A): pesquisa, notificações, relógio do ponto e perfil. */
+/**
+ * Barra superior global (briefing §3A): pesquisa, "Ir para admin" (quem também é admin),
+ * notificações, relógio do ponto e perfil.
+ */
 export const WorkspaceTopBar: React.FC = () => {
   const { basePath, isPreview } = useWorkspace();
   return (
@@ -28,6 +32,10 @@ export const WorkspaceTopBar: React.FC = () => {
         <div className="md:hidden">
           <GlobalSearch compact />
         </div>
+        <AccountSwitchButton
+          current="workspace"
+          className="rz-glass text-white hover:bg-white/20"
+        />
         <NotificationsButton />
         <WorkspaceClock />
         <ProfileMenu />

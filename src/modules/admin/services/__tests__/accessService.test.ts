@@ -76,6 +76,24 @@ describe('accessService.getUserRole', () => {
     expect(result).toEqual({ data: 'employee', error: null });
   });
 
+  it('na área do colaborador, quem é colaborador e admin entra como colaborador', async () => {
+    mockTables({ user_roles: ok({ role: 'admin' }), employees: ok({ id: 'emp-1' }) });
+
+    const result = await accessService.getUserRole('user-1', { preferEmployee: true });
+
+    expect(result).toEqual({ data: 'employee', error: null });
+    expect(tablesQueried()).toEqual(['employees']);
+  });
+
+  it('na área do colaborador, um admin sem ficha continua admin', async () => {
+    mockTables({ user_roles: ok({ role: 'admin' }), employees: ok(null) });
+
+    const result = await accessService.getUserRole('user-1', { preferEmployee: true });
+
+    expect(result).toEqual({ data: 'admin', error: null });
+    expect(tablesQueried()).toEqual(['employees', 'user_roles']);
+  });
+
   it('conta sem papel → data null e sem erro', async () => {
     mockTables({ user_roles: ok(null), employees: ok(null) });
     mockRpc(ok([]));

@@ -63,6 +63,7 @@ export const AccessPanel: React.FC<AccessPanelProps> = ({ target, data, onClose,
             data={data}
             domain={domain}
             isEmail={isEmail}
+            editing={editing}
             update={update}
           />
         </form>

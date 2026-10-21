@@ -10,6 +10,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { Credential, MailboxState, MailboxStatus } from '../../lib/credentials';
+import { credentialService } from '../../services/credentialService';
 import { CopyButton, SecretText } from './SecretText';
 
 interface EmailRowProps {
@@ -79,7 +80,10 @@ export const EmailRow: React.FC<EmailRowProps> = ({
         )}
       </span>
 
-      <SecretText value={credential.password} className="w-[150px] shrink-0" />
+      <SecretText
+        load={() => credentialService.revealPassword(credential.id)}
+        className="w-[150px] shrink-0"
+      />
 
       <span className="flex w-[150px] shrink-0 flex-col">
         <span

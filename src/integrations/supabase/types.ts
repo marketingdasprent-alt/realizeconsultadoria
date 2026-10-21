@@ -195,6 +195,7 @@ export type Database = {
           id: string;
           notes: string | null;
           password: string;
+          password_encrypted: string | null;
           title: string;
           updated_at: string;
           url: string | null;
@@ -208,6 +209,7 @@ export type Database = {
           id?: string;
           notes?: string | null;
           password: string;
+          password_encrypted?: string | null;
           title: string;
           updated_at?: string;
           url?: string | null;
@@ -221,6 +223,7 @@ export type Database = {
           id?: string;
           notes?: string | null;
           password?: string;
+          password_encrypted?: string | null;
           title?: string;
           updated_at?: string;
           url?: string | null;
@@ -3481,6 +3484,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      access_password: {
+        Args: { _access_id: string };
+        Returns: string;
+      };
       account_switch_targets: {
         Args: never;
         Returns: string[];

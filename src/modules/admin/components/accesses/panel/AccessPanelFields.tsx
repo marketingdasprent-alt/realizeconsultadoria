@@ -19,6 +19,8 @@ interface AccessPanelFieldsProps {
   data: CredentialsData;
   domain: string | null;
   isEmail: boolean;
+  /** A editar: a palavra-passe só muda se escrever uma nova. */
+  editing: boolean;
   update: (patch: Partial<AccessForm>) => void;
 }
 
@@ -44,6 +46,7 @@ export const AccessPanelFields: React.FC<AccessPanelFieldsProps> = ({
   data,
   domain,
   isEmail,
+  editing,
   update,
 }) => {
   const showSuffix = isEmail && !!domain && !form.local.includes('@');
@@ -112,11 +115,16 @@ export const AccessPanelFields: React.FC<AccessPanelFieldsProps> = ({
         </div>
       </Field>
 
-      <Field id="acc-password" label="Palavra-passe *" error={errors.password}>
+      <Field
+        id="acc-password"
+        label={editing ? 'Nova palavra-passe' : 'Palavra-passe *'}
+        error={errors.password}
+      >
         <PasswordInput
           id="acc-password"
           value={form.password}
           onChange={password => update({ password })}
+          placeholder={editing ? 'Deixe vazio para manter a atual' : undefined}
         />
       </Field>
 

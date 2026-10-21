@@ -50,7 +50,8 @@ const initialForm = (target: AccessPanelTarget | null, data: CredentialsData): A
       companyId: credential.company_id,
       categoryId: credential.category_id ?? '',
       local: isEmailKind(kind) ? localPart(credential.username, domain) : credential.username,
-      password: credential.password,
+      // Cifrada na BD: ao editar, vazio = fica a que está.
+      password: '',
       title: credential.title,
       url: credential.url ?? '',
       notes: credential.notes ?? '',
@@ -118,11 +119,12 @@ export const useAccessForm = (
 
   const save = async () => {
     const username = isEmail ? fullAddress(form.local, domain) : form.local.trim();
+    const editingId = target?.credential?.id ?? savedId ?? undefined;
     const found: typeof errors = {};
     if (!form.companyId) found.companyId = 'Escolha a empresa.';
     if (isEmail && !isValidEmail(username)) found.local = 'Endereço de email inválido.';
     if (!isEmail && !username) found.local = 'Indique o utilizador.';
-    if (!form.password) found.password = 'Indique a palavra-passe.';
+    if (!form.password && !editingId) found.password = 'Indique a palavra-passe.';
     if (!isEmail && !form.title.trim()) found.title = 'Dê um nome ao acesso.';
     if (Object.keys(found).length > 0) return setErrors(found);
 
@@ -135,7 +137,6 @@ export const useAccessForm = (
       (form.kind === 'email_personal' && employee ? `Email ${employee.name}` : username);
 
     setPhase('saving');
-    const editingId = target?.credential?.id ?? savedId ?? undefined;
     if (isEmail && (await credentialService.isDuplicateEmail(username, editingId))) {
       setPhase('form');
       return setErrors({ local: 'Este email já é a caixa de outro acesso de email.' });
@@ -144,7 +145,7 @@ export const useAccessForm = (
       {
         title,
         username,
-        password: form.password,
+        ...(form.password ? { password: form.password } : {}),
         url: form.url.trim() || null,
         notes: form.notes.trim() || null,
         company_id: form.companyId,

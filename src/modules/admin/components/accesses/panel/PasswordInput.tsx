@@ -8,10 +8,16 @@ interface PasswordInputProps {
   id: string;
   value: string;
   onChange: (value: string) => void;
+  placeholder?: string;
 }
 
 /** Palavra-passe com mostrar, gerar uma forte e copiar. */
-export const PasswordInput: React.FC<PasswordInputProps> = ({ id, value, onChange }) => {
+export const PasswordInput: React.FC<PasswordInputProps> = ({
+  id,
+  value,
+  onChange,
+  placeholder,
+}) => {
   const [visible, setVisible] = useState(false);
   return (
     <div className="flex items-center gap-1">
@@ -20,6 +26,7 @@ export const PasswordInput: React.FC<PasswordInputProps> = ({ id, value, onChang
         type={visible ? 'text' : 'password'}
         autoComplete="new-password"
         value={value}
+        placeholder={placeholder}
         onChange={event => onChange(event.target.value)}
         className="h-10 font-mono"
       />

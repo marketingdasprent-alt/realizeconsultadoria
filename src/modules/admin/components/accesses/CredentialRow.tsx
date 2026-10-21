@@ -1,6 +1,7 @@
 import React from 'react';
 import { ExternalLink, Pencil, Trash2, Users } from 'lucide-react';
 import type { Credential } from '../../lib/credentials';
+import { credentialService } from '../../services/credentialService';
 import { CopyText, SecretText } from './SecretText';
 
 interface CredentialRowProps {
@@ -38,7 +39,10 @@ export const CredentialRow: React.FC<CredentialRowProps> = ({
         {detail && <span className="block truncate text-[12.5px] text-rz-muted">{detail}</span>}
       </span>
       <CopyText value={credential.username} className="w-[230px] max-w-full shrink-0" />
-      <SecretText value={credential.password} className="w-[150px] shrink-0" />
+      <SecretText
+        load={() => credentialService.revealPassword(credential.id)}
+        className="w-[150px] shrink-0"
+      />
       <span className="flex shrink-0 items-center gap-0.5">
         {credential.url && (
           <a

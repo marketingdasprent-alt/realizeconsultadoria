@@ -27,7 +27,8 @@ export interface CredentialsData {
 export interface CredentialInput {
   title: string;
   username: string;
-  password: string;
+  /** Só quando muda (a BD cifra-a); sem ela fica a que estava. */
+  password?: string;
   url: string | null;
   notes: string | null;
   company_id: string;
@@ -95,11 +96,21 @@ export const credentialService = {
     );
   },
 
+  /** A palavra-passe em claro (está cifrada na BD): só ao mostrar ou copiar. */
+  revealPassword: async (id: string): Promise<string | null> => {
+    const { data, error } = await supabase.rpc('access_password', { _access_id: id });
+    return error ? null : (data ?? null);
+  },
+
   /** Cria ou atualiza o acesso; devolve o id. */
   save: async (input: CredentialInput, id?: string): Promise<ServiceResult<string>> => {
     const { data, error } = id
       ? await supabase.from('accesses').update(input).eq('id', id).select('id').single()
-      : await supabase.from('accesses').insert(input).select('id').single();
+      : await supabase
+          .from('accesses')
+          .insert({ ...input, password: input.password ?? '' })
+          .select('id')
+          .single();
     return { data: data?.id ?? null, error };
   },
 

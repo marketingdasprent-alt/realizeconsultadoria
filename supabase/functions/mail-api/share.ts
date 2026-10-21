@@ -159,7 +159,9 @@ export const shareAccessById = async (db: SupabaseClient, accessId: string) => {
     .maybeSingle();
   if (error) throw error;
   if (!access) throw mailError('not_found', 'Acesso não encontrado.');
-  const row = access as AccessRow;
+  // A palavra-passe está cifrada na BD (accesses.password só tem pontos): lê-se em claro aqui.
+  const { data: plain } = await db.rpc('access_password', { _access_id: accessId });
+  const row = { ...(access as AccessRow), ...(plain ? { password: plain as string } : {}) };
   const email = row.username.trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))
     throw mailError('bad_request', 'O utilizador deste acesso não é um endereço de email.');

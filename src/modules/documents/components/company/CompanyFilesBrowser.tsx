@@ -105,6 +105,13 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
         )}
       </div>
 
+      {/* Na raiz só há as pastas de cada um: criar e carregar faz-se dentro de uma delas. */}
+      {!path && (listing.data?.entries.length ?? 0) > 0 && (
+        <p className="rounded-2xl bg-rz-primary-soft px-4 py-2.5 text-[13px] font-medium text-rz-primary">
+          Abra uma pasta para criar documentos, carregar ficheiros ou criar subpastas.
+        </p>
+      )}
+
       <CompanyUploadList items={uploads.items} onDismiss={uploads.dismiss} />
 
       {listing.isLoading ? (

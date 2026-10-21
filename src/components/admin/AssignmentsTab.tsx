@@ -36,6 +36,7 @@ import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { getLogoBase64, getLogoHeaderHtml } from '@/lib/logo-utils';
 import { Plus, Search, FileText, Printer, CheckCircle, Edit, Key, X } from 'lucide-react';
+import { phoneCodeService } from '@/modules/admin/services/phoneCodeService';
 
 const AssignmentsTab = () => {
   const { toast } = useToast();
@@ -544,6 +545,10 @@ const AssignmentsTab = () => {
       const employee = assignment.employees;
       const company = assignment.companies;
       const items = assignment.assignment_items || [];
+      // PIN/PUK estão cifrados na BD: lêem-se só para a declaração.
+      const codes = await phoneCodeService.codes(
+        items.map((i: any) => i.phones?.id).filter((id: string | undefined): id is string => !!id)
+      );
 
       const mobileItems = items.filter(
         (i: any) => i.equipments?.equipment_categories?.name === 'Telemóvel'
@@ -572,7 +577,7 @@ const AssignmentsTab = () => {
           categoryItems
             .map((item: any) => {
               const equip = item.equipments;
-              const phone = item.phones;
+              const phone = item.phones ? { ...item.phones, ...codes.get(item.phones.id) } : null;
               if (category === 'Telemóvel') {
                 return `<table><tr>
               <td><strong>Marca:</strong> ${equip?.brand || ''} ${equip?.model || ''}</td>

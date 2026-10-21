@@ -2256,7 +2256,9 @@ export type Database = {
           operator: string | null;
           phone_number: string;
           pin: string | null;
+          pin_encrypted: string | null;
           puk: string | null;
+          puk_encrypted: string | null;
           updated_at: string;
         };
         Insert: {
@@ -2269,7 +2271,9 @@ export type Database = {
           operator?: string | null;
           phone_number: string;
           pin?: string | null;
+          pin_encrypted?: string | null;
           puk?: string | null;
+          puk_encrypted?: string | null;
           updated_at?: string;
         };
         Update: {
@@ -2282,7 +2286,9 @@ export type Database = {
           operator?: string | null;
           phone_number?: string;
           pin?: string | null;
+          pin_encrypted?: string | null;
           puk?: string | null;
+          puk_encrypted?: string | null;
           updated_at?: string;
         };
         Relationships: [
@@ -3661,6 +3667,10 @@ export type Database = {
         Returns: undefined;
       };
       my_equipment: { Args: never; Returns: Json };
+      phone_codes: {
+        Args: { _phone_ids: string[] };
+        Returns: { id: string; pin: string; puk: string }[];
+      };
       reschedule_vacation_period: {
         Args: {
           p_end_date: string;

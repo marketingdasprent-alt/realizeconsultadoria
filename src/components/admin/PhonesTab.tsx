@@ -12,6 +12,8 @@ import {
   User,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { SecretText } from '@/modules/admin/components/accesses/SecretText';
+import { phoneCodeService } from '@/modules/admin/services/phoneCodeService';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -310,27 +312,16 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
   );
 
   // Renderização de campo com copy
-  const renderCopyableField = (value: string | null, fieldId: string) => {
-    if (!value) return <span className="text-muted-foreground">-</span>;
-
-    return (
-      <div className="flex items-center gap-1">
-        <span className="text-sm bg-muted px-2 py-1 rounded font-mono">{value}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          className="h-7 w-7"
-          onClick={() => copyToClipboard(value, fieldId)}
-        >
-          {copiedField === fieldId ? (
-            <Check className="h-3.5 w-3.5 text-primary" />
-          ) : (
-            <Copy className="h-3.5 w-3.5" />
-          )}
-        </Button>
-      </div>
+  // PIN/PUK estão cifrados na BD: só se vão buscar ao mostrar ou copiar.
+  const renderCode = (phone: PhoneRecord, code: 'pin' | 'puk') =>
+    phone[code] ? (
+      <SecretText
+        load={() => phoneCodeService.code(phone.id, code)}
+        className="w-[120px] shrink-0"
+      />
+    ) : (
+      <span className="text-muted-foreground">-</span>
     );
-  };
 
   // Helper para badge de status
   const getStatusBadge = (phone: PhoneRecord) => {
@@ -382,8 +373,8 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
                   </Button>
                 </div>
               </TableCell>
-              <TableCell>{renderCopyableField(phone.pin, `pin-${phone.id}`)}</TableCell>
-              <TableCell>{renderCopyableField(phone.puk, `puk-${phone.id}`)}</TableCell>
+              <TableCell>{renderCode(phone, 'pin')}</TableCell>
+              <TableCell>{renderCode(phone, 'puk')}</TableCell>
               <TableCell>
                 {phone.operator ? (
                   <Badge variant="outline">{phone.operator}</Badge>
@@ -462,14 +453,14 @@ const PhonesTab = ({ canManage, companies, companyFilter, setCompanyFilter }: Ph
             {phone.pin && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground w-16">PIN:</span>
-                {renderCopyableField(phone.pin, `pin-${phone.id}`)}
+                {renderCode(phone, 'pin')}
               </div>
             )}
 
             {phone.puk && (
               <div className="flex items-center gap-2">
                 <span className="text-xs text-muted-foreground w-16">PUK:</span>
-                {renderCopyableField(phone.puk, `puk-${phone.id}`)}
+                {renderCode(phone, 'puk')}
               </div>
             )}
 

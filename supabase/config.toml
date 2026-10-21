@@ -53,12 +53,6 @@ verify_jwt = false
 [functions.send-domain-renewal-reminders]
 verify_jwt = false
 
-[functions.setup-juridico-group]
-verify_jwt = false
-
-[functions.update-db-rpc]
-verify_jwt = false
-
 [functions.send-service-renewal-reminders]
 verify_jwt = false
 

@@ -5,7 +5,8 @@
 // POST { notification_id }  → aviso para uma pessoa
 // POST { chat_message_id }  → mensagem nova para os membros da conversa (menos quem a enviou e
 //                             quem silenciou a conversa)
-// POST { notice_id }        → aviso/comunicado da app (notifications) para quem o vê
+// POST { notice_id, user_ids? } → aviso/comunicado da app (notifications) para quem o vê
+//                             (com user_ids, só para essas pessoas: lembrar quem não leu)
 // → { ok, sent, removed }
 // Segredos: VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto:…), MAIL_SYSTEM_TOKEN.
 // verify_jwt = false: a autenticação é o token do sistema.
@@ -52,7 +53,11 @@ const notificationPush = async (db: SupabaseClient, id: string): Promise<Push | 
 };
 
 /** Aviso da app (Feed → Comunicados): para todos, uma empresa ou uma pessoa. */
-const noticePush = async (db: SupabaseClient, id: string): Promise<Push | null> => {
+const noticePush = async (
+  db: SupabaseClient,
+  id: string,
+  onlyUserIds?: string[]
+): Promise<Push | null> => {
   const { data: notice } = await db
     .from('notifications')
     .select('id, title, message, company_id, employee_id, is_active')
@@ -67,7 +72,10 @@ const noticePush = async (db: SupabaseClient, id: string): Promise<Push | null> 
   if (notice.employee_id) people = people.eq('id', notice.employee_id);
   else if (notice.company_id) people = people.eq('company_id', notice.company_id);
   const { data: rows } = await people;
-  const userIds = [...new Set((rows ?? []).map(row => row.user_id as string))];
+  const wanted = onlyUserIds ? new Set(onlyUserIds) : null;
+  const userIds = [...new Set((rows ?? []).map(row => row.user_id as string))].filter(
+    userId => !wanted || wanted.has(userId)
+  );
   if (!userIds.length) return null;
   return {
     userIds,
@@ -163,6 +171,7 @@ serve(async (req: Request) => {
     notification_id?: string;
     chat_message_id?: string;
     notice_id?: string;
+    user_ids?: string[];
   } | null;
   if (!body?.notification_id && !body?.chat_message_id && !body?.notice_id) {
     return json({ ok: false, code: 'bad_request' }, 400);
@@ -172,7 +181,11 @@ serve(async (req: Request) => {
   const push = body.chat_message_id
     ? await chatPush(db, body.chat_message_id)
     : body.notice_id
-      ? await noticePush(db, body.notice_id)
+      ? await noticePush(
+          db,
+          body.notice_id,
+          Array.isArray(body.user_ids) ? body.user_ids : undefined
+        )
       : await notificationPush(db, body.notification_id as string);
   if (!push) return json({ ok: true, sent: 0, removed: 0 });
 

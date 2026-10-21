@@ -11,10 +11,13 @@
 //   test?: boolean                         // só para o próprio admin, sem histórico nem app
 // } → { ok, sent, failed: string[], requested, notices }
 //
+// POST { action: 'remind', noticeIds: string[], employeeIds: string[] } → volta a mandar a
+// notificação do comunicado a quem ainda não confirmou (só as pessoas indicadas) → { ok, sent }
+//
 // Só administradores com o módulo Comunicados (marketing → email, executar) ou super admins.
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { adminCaller } from '../_shared/admin-caller.ts';
 import { broadcastEmailHtml } from '../_shared/broadcast-email.ts';
 
@@ -42,6 +45,8 @@ interface Attachment {
 }
 
 interface BroadcastRequest {
+  action?: string;
+  noticeIds?: string[];
   subject?: string;
   message?: string;
   senderName?: string;
@@ -51,6 +56,34 @@ interface BroadcastRequest {
   attachments?: Attachment[];
   test?: boolean;
 }
+
+/** Lembrar quem falta: a notificação outra vez, só para essas pessoas (push-send). */
+const remind = async (db: SupabaseClient, body: BroadcastRequest) => {
+  const token = Deno.env.get('MAIL_SYSTEM_TOKEN');
+  const noticeIds = [...new Set(body.noticeIds ?? [])].slice(0, 500);
+  const employeeIds = [...new Set(body.employeeIds ?? [])].slice(0, 2000);
+  if (!token || !noticeIds.length || !employeeIds.length) {
+    return json({ ok: false, error: 'Nada para lembrar.' }, 400);
+  }
+  const { data: people } = await db
+    .from('employees')
+    .select('user_id')
+    .in('id', employeeIds)
+    .eq('is_active', true)
+    .not('user_id', 'is', null);
+  const userIds = (people ?? []).map(person => person.user_id as string);
+  let sent = 0;
+  for (const noticeId of noticeIds) {
+    const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/push-send`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'x-system-token': token },
+      body: JSON.stringify({ notice_id: noticeId, user_ids: userIds }),
+    });
+    const result = (await res.json().catch(() => null)) as { sent?: number } | null;
+    sent += result?.sent ?? 0;
+  }
+  return json({ ok: true, sent, people: userIds.length });
+};
 
 serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
@@ -78,6 +111,7 @@ serve(async (req: Request) => {
   if (!brevoKey) return json({ ok: false, error: 'Configuração de email em falta.' }, 500);
 
   const body = (await req.json().catch(() => null)) as BroadcastRequest | null;
+  if (body?.action === 'remind') return remind(db, body);
   const subject = body?.subject?.trim().slice(0, 200) ?? '';
   const message = body?.message?.trim().slice(0, 20000) ?? '';
   const senderName = body?.senderName?.trim().slice(0, 120) ?? '';

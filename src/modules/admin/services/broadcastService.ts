@@ -1,6 +1,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import type { Audience, BroadcastDraft, BroadcastEmployee } from '../lib/broadcast';
+import type { NoticeRead, SentNotice } from '../lib/broadcastReads';
 
 export type BroadcastHistoryRow = Database['public']['Tables']['marketing_emails']['Row'];
 
@@ -72,6 +73,41 @@ export const broadcastService = {
       .limit(30);
     if (error) throw error;
     return data ?? [];
+  },
+
+  /**
+   * Os avisos que um envio criou na app e as confirmações de leitura. Encontram-se pelo autor,
+   * assunto e hora (a função cria-os segundos antes de escrever o histórico).
+   */
+  reads: async (
+    row: BroadcastHistoryRow
+  ): Promise<{ notices: SentNotice[]; reads: NoticeRead[] }> => {
+    const sentAt = new Date(row.created_at).getTime();
+    const { data: notices, error } = await supabase
+      .from('notifications')
+      .select('id, company_id, employee_id')
+      .eq('created_by', row.created_by)
+      .eq('title', row.subject)
+      .gte('created_at', new Date(sentAt - 5 * 60_000).toISOString())
+      .lte('created_at', new Date(sentAt + 30_000).toISOString());
+    if (error) throw error;
+    const ids = (notices ?? []).map(n => n.id);
+    if (!ids.length) return { notices: [], reads: [] };
+    const { data: reads, error: readsError } = await supabase
+      .from('notification_reads')
+      .select('notification_id, employee_id, read_at')
+      .in('notification_id', ids);
+    if (readsError) throw readsError;
+    return { notices: notices ?? [], reads: reads ?? [] };
+  },
+
+  /** Volta a mandar a notificação a quem ainda não confirmou. */
+  remind: async (noticeIds: string[], employeeIds: string[]): Promise<number | null> => {
+    const { data, error } = await supabase.functions.invoke<{ ok: boolean; sent: number }>(
+      'broadcast-send',
+      { body: { action: 'remind', noticeIds, employeeIds } }
+    );
+    return error || !data?.ok ? null : data.sent;
   },
 
   /** Guarda um anexo (bucket privado marketing-emails) antes de enviar. */

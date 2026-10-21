@@ -1,19 +1,22 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
-import { Loader2, Send, TestTube2 } from 'lucide-react';
+import { History, PenLine } from 'lucide-react';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
-import { AudiencePicker } from '../components/broadcasts/AudiencePicker';
-import { BroadcastFields } from '../components/broadcasts/BroadcastFields';
-import { BroadcastHistory } from '../components/broadcasts/BroadcastHistory';
-import { BroadcastPreview } from '../components/broadcasts/BroadcastPreview';
-import { SendBroadcastDialog } from '../components/broadcasts/SendBroadcastDialog';
+import { cn } from '@/lib/utils';
+import { BroadcastComposeTab } from '../components/broadcasts/BroadcastComposeTab';
+import { BroadcastSentTab } from '../components/broadcasts/BroadcastSentTab';
 import { useBroadcasts } from '../hooks/useBroadcasts';
 import { broadcastService } from '../services/broadcastService';
 
-const CARD = 'space-y-4 rounded-[28px] bg-white p-5 shadow-rz-soft ring-1 ring-rz-line sm:p-6';
+const TABS = [
+  { value: 'novo', label: 'Novo', icon: PenLine },
+  { value: 'enviados', label: 'Enviados', icon: History },
+] as const;
+type Tab = (typeof TABS)[number]['value'];
 
-/** Pessoas → Comunicados: email aos colaboradores e, se escolhido, o mesmo aviso na app. */
+/** Pessoas → Comunicados: escrever (Novo) e o que já foi (Enviados, com as confirmações). */
 const BroadcastsPage: React.FC = () => {
   const { canExecuteTopic, isLoading: loadingPermissions } = useAdminPermissions();
   const canSend = canExecuteTopic('marketing', 'email');
@@ -24,107 +27,66 @@ const BroadcastsPage: React.FC = () => {
       staleTime: 5 * 60_000,
     }).data ?? [];
   const bc = useBroadcasts(companies);
-  const [confirming, setConfirming] = useState(false);
-  const reach = bc.recipients.length;
+  const [params, setParams] = useSearchParams();
+  const tab: Tab = params.get('tab') === 'enviados' ? 'enviados' : 'novo';
+  const change = (next: Tab) => setParams(next === 'novo' ? {} : { tab: next }, { replace: true });
 
   return (
     <div className="space-y-6">
-      <AdminPageTitle
-        title="Comunicados"
-        description="Um email para os colaboradores — e, se quiser, o mesmo aviso na app"
-      />
-
-      <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
-        <div className="space-y-5">
-          <section className={CARD}>
-            <div className="flex flex-wrap items-baseline justify-between gap-2">
-              <h2 className="text-[16px] font-extrabold">Para quem</h2>
-              <p className="text-[13px] text-rz-muted">
-                {bc.isLoading ? (
-                  'A carregar…'
-                ) : (
-                  <>
-                    <strong className="text-rz-ink">{reach}</strong> por email
-                    {bc.missingEmail > 0 && ` · ${bc.missingEmail} sem email`}
-                  </>
-                )}
-              </p>
-            </div>
-            <AudiencePicker
-              audience={bc.audience}
-              onChange={bc.updateAudience}
-              people={bc.people}
-              companies={companies}
-              error={bc.errors.audience}
-            />
-          </section>
-
-          <section className={CARD}>
-            <h2 className="text-[16px] font-extrabold">Mensagem</h2>
-            <BroadcastFields
-              draft={bc.draft}
-              errors={bc.errors}
-              onChange={bc.updateDraft}
-              attachments={bc.attachments}
-              uploading={bc.uploading}
-              onAddFiles={files => void bc.addFiles(files)}
-              onRemoveFile={bc.removeAttachment}
-              publishInApp={bc.publishInApp}
-              onPublishInApp={bc.setPublishInApp}
-            />
-          </section>
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <AdminPageTitle
+          title="Comunicados"
+          description="Um email para os colaboradores — e, se quiser, o mesmo aviso na app"
+        />
+        <div
+          role="tablist"
+          className="flex gap-1 rounded-full bg-white p-1 shadow-rz-soft ring-1 ring-rz-line"
+        >
+          {TABS.map(({ value, label, icon: Icon }) => (
+            <button
+              key={value}
+              type="button"
+              role="tab"
+              aria-selected={tab === value}
+              onClick={() => change(value)}
+              className={cn(
+                'flex h-9 items-center gap-2 rounded-full px-4 text-[13.5px] font-bold transition-colors',
+                tab === value ? 'bg-rz-primary text-white' : 'text-rz-muted hover:text-rz-ink'
+              )}
+            >
+              <Icon className="h-4 w-4" />
+              {label}
+              {value === 'enviados' && bc.history.length > 0 && (
+                <span
+                  className={cn(
+                    'rounded-full px-1.5 text-[11.5px]',
+                    tab === value ? 'bg-white/25 text-white' : 'bg-rz-canvas text-rz-muted'
+                  )}
+                >
+                  {bc.history.length}
+                </span>
+              )}
+            </button>
+          ))}
         </div>
-
-        <aside className="space-y-3 xl:sticky xl:top-4 xl:self-start">
-          <BroadcastPreview draft={bc.draft} attachments={bc.attachments} />
-          {!loadingPermissions && !canSend ? (
-            <p className="rounded-2xl bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
-              Pode ver, mas não tem permissão para enviar comunicados.
-            </p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              <button
-                type="button"
-                onClick={() => bc.check(true) && void bc.sendTest()}
-                disabled={!!bc.busy || bc.uploading}
-                className="inline-flex h-11 items-center gap-2 rounded-full bg-white px-5 text-[14px] font-semibold ring-1 ring-rz-line hover:bg-rz-primary-soft disabled:opacity-60"
-              >
-                {bc.busy === 'test' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <TestTube2 className="h-4 w-4 text-rz-primary" />
-                )}
-                Enviar teste para mim
-              </button>
-              <button
-                type="button"
-                onClick={() => bc.check() && setConfirming(true)}
-                disabled={!!bc.busy || bc.uploading || bc.isLoading}
-                className="inline-flex h-11 flex-1 items-center justify-center gap-2 rounded-full bg-rz-primary px-5 text-[14px] font-bold text-white shadow-rz-soft hover:bg-rz-primary/90 disabled:opacity-60"
-              >
-                {bc.busy === 'send' ? (
-                  <Loader2 className="h-4 w-4 animate-spin" />
-                ) : (
-                  <Send className="h-4 w-4" />
-                )}
-                Enviar a {reach} {reach === 1 ? 'pessoa' : 'pessoas'}
-              </button>
-            </div>
-          )}
-        </aside>
       </div>
 
-      <BroadcastHistory rows={bc.history} isLoading={bc.historyLoading} />
-
-      <SendBroadcastDialog
-        open={confirming}
-        onOpenChange={setConfirming}
-        subject={bc.draft.subject}
-        emails={reach}
-        appOnly={bc.missingEmail}
-        publishInApp={bc.publishInApp}
-        onConfirm={() => void bc.send()}
-      />
+      {tab === 'novo' ? (
+        <BroadcastComposeTab
+          bc={bc}
+          companies={companies}
+          canSend={canSend}
+          loadingPermissions={loadingPermissions}
+          onSent={() => change('enviados')}
+        />
+      ) : (
+        <BroadcastSentTab
+          rows={bc.history}
+          isLoading={bc.historyLoading}
+          people={bc.people}
+          canRemind={canSend}
+        />
+      )}
     </div>
   );
 };

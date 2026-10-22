@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
@@ -56,10 +56,36 @@ export const MailReader: React.FC<MailReaderProps> = ({
 }) => {
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(320);
+  // A altura acompanha o conteúdo (imagens que chegam depois, coluna mais estreita) e os emails
+  // mais largos do que a coluna (ex.: tabelas de 600 px) encolhem para caber, sem barras.
   const fit = () => {
-    const doc = frame.current?.contentDocument;
-    if (doc) setHeight(Math.max(160, doc.documentElement.scrollHeight + 8));
+    const iframe = frame.current;
+    const doc = iframe?.contentDocument;
+    if (!iframe || !doc?.body) return;
+    const body = doc.body as HTMLElement & { style: CSSStyleDeclaration & { zoom: string } };
+    body.style.zoom = '1';
+    const available = iframe.clientWidth;
+    const wide = doc.documentElement.scrollWidth;
+    body.style.zoom = String(wide > available + 2 ? Math.max(0.45, available / wide) : 1);
+    setHeight(Math.max(160, Math.ceil(doc.documentElement.scrollHeight) + 8));
   };
+  const onFrameLoad = () => {
+    fit();
+    const doc = frame.current?.contentDocument;
+    doc?.querySelectorAll('img').forEach(img => img.addEventListener('load', fit, { once: true }));
+  };
+  useEffect(() => {
+    const iframe = frame.current;
+    if (!iframe || typeof ResizeObserver === 'undefined') return;
+    let last = iframe.clientWidth;
+    const observer = new ResizeObserver(() => {
+      if (iframe.clientWidth === last) return;
+      last = iframe.clientWidth;
+      fit();
+    });
+    observer.observe(iframe);
+    return () => observer.disconnect();
+  }, [message]);
 
   return (
     <article className="flex min-h-0 min-w-0 flex-1 flex-col bg-white">
@@ -143,7 +169,7 @@ export const MailReader: React.FC<MailReaderProps> = ({
               // Sem allow-scripts: o HTML do email nunca corre código.
               sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
               srcDoc={readerDocument(message)}
-              onLoad={fit}
+              onLoad={onFrameLoad}
               style={{ height }}
               className="mt-5 w-full border-0"
             />

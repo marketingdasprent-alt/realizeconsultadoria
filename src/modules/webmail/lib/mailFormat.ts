@@ -144,7 +144,7 @@ export const readerDocument = (message: Pick<MailMessage, 'html' | 'text'>) => {
     ? message.html.replace(/<script[\s\S]*?<\/script>/gi, '')
     : `<pre>${escapeHtml(message.text ?? '')}</pre>`;
   return `<!doctype html><html><head><meta charset="utf-8"><base target="_blank">
-<style>body{margin:0;padding:4px 2px;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:14px;line-height:1.55;color:#1e1b2e;word-wrap:break-word}
+<style>html,body{overflow-y:hidden}body{margin:0;padding:4px 2px;overflow-x:auto;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:14px;line-height:1.55;color:#1e1b2e;word-wrap:break-word}
 img{max-width:100%;height:auto}pre{white-space:pre-wrap;font-family:inherit}a{color:#6d28d9}
 blockquote{margin:0 0 0 8px;padding-left:10px;border-left:3px solid #e2e8f0;color:#64748b}</style>
 </head><body>${body}</body></html>`;

@@ -11,6 +11,8 @@ import { PostCard } from '../components/feed/PostCard';
 import { PostComposer } from '../components/feed/PostComposer';
 import { useAppreciations } from '../hooks/useAppreciations';
 import { useFeedPosts } from '../hooks/useFeedPosts';
+import { useFeedUnread } from '../hooks/useFeedUnread';
+import { useProtectImages } from '../hooks/useProtectImages';
 import { useFeedRealtime } from '../hooks/useFeedRealtime';
 import { useNotices } from '../hooks/useNotices';
 import { buildTimeline, FEED_FILTERS, topHashtags, type FeedFilter } from '../lib/timeline';
@@ -19,6 +21,8 @@ import type { FeedPost } from '../types';
 /** Feed da organização (briefing §12): publicações, comunicados dos RH e reconhecimentos. */
 const FeedPage: React.FC = () => {
   const feed = useFeedPosts();
+  const { markSeen } = useFeedUnread();
+  useProtectImages();
   const { notices, confirmRead, isLoading: noticesLoading } = useNotices();
   const recognitions = useAppreciations('public');
   const realtime = useFeedRealtime();
@@ -44,6 +48,12 @@ const FeedPage: React.FC = () => {
       }),
     [feed.posts, notices, recognitions.items, filter, query, hashtag]
   );
+
+  // Está a ver o Feed: o que há de novo conta como visto.
+  useEffect(() => {
+    if (!feed.isLoading) markSeen();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando o Feed carrega ou muda
+  }, [feed.isLoading, feed.posts.length]);
 
   // Aberta a partir de uma notificação: leva até à publicação.
   useEffect(() => {

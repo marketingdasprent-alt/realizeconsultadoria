@@ -28,6 +28,18 @@ export const feedService = {
     return { data: data ?? [], error };
   },
 
+  /** Novidades desde a última visita ao Feed (publicações e reconhecimentos públicos). */
+  unreadCount: async () => {
+    const { data, error } = await supabase.rpc('feed_unread_count');
+    return { data: data ?? 0, error };
+  },
+
+  /** Marca o Feed como visto agora. */
+  markSeen: async () => {
+    const { error } = await supabase.rpc('feed_mark_seen');
+    return { error };
+  },
+
   /** Cria a publicação; os ficheiros são enviados depois para "<id>/…" e associados. */
   createPost: async (input: {
     companyId: string;

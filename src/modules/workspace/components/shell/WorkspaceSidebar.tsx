@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useOptionalMessenger } from '@/modules/messenger/context/useMessengerApi';
+import { useFeedUnread } from '@/modules/social/hooks/useFeedUnread';
 import { useNotices } from '@/modules/social/hooks/useNotices';
 import { SETTINGS_MODULE, WORKSPACE_GROUPS } from '../../lib/navigation';
 import { BrandMark } from '../BrandMark';
@@ -27,6 +28,8 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const unread = useOptionalMessenger()?.unreadTotal ?? 0;
   // Comunicados dos RH por confirmar (no Feed).
   const { unread: noticesUnread } = useNotices();
+  // Publicações e reconhecimentos novos desde a última visita ao Feed.
+  const { count: feedNew } = useFeedUnread();
   return (
     <aside
       className={cn(
@@ -64,7 +67,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                       module.key === 'messenger'
                         ? unread
                         : module.key === 'feed'
-                          ? noticesUnread
+                          ? noticesUnread + feedNew
                           : undefined
                     }
                   />

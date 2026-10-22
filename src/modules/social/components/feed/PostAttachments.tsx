@@ -22,16 +22,24 @@ const useFileUrl = (path: string) => {
 const ImageTile: React.FC<{ file: FeedAttachment; tall: boolean }> = ({ file, tall }) => {
   const url = useFileUrl(file.path);
   return (
-    <a
-      href={url ?? undefined}
-      target="_blank"
-      rel="noreferrer"
-      className={cn('block overflow-hidden rounded-2xl bg-rz-canvas', tall ? 'h-72' : 'h-40')}
+    // Só se vê no Feed: sem ligação para abrir a imagem noutro separador.
+    <div
+      data-protected-image
+      className={cn(
+        'block select-none overflow-hidden rounded-2xl bg-rz-canvas',
+        tall ? 'h-72' : 'h-40'
+      )}
     >
       {url && (
-        <img src={url} alt={file.name} loading="lazy" className="h-full w-full object-cover" />
+        <img
+          src={url}
+          alt={file.name}
+          loading="lazy"
+          draggable={false}
+          className="pointer-events-none h-full w-full object-cover [-webkit-touch-callout:none]"
+        />
       )}
-    </a>
+    </div>
   );
 };
 

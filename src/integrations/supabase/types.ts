@@ -3654,6 +3654,8 @@ export type Database = {
         Returns: boolean;
       };
       feed_is_author: { Args: { _post_id: string }; Returns: boolean };
+      feed_mark_seen: { Args: Record<PropertyKey, never>; Returns: undefined };
+      feed_unread_count: { Args: Record<PropertyKey, never>; Returns: number };
       feed_list_posts: {
         Args: { _before?: string; _limit?: number };
         Returns: {

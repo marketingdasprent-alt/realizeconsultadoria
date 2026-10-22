@@ -16,6 +16,7 @@ import type { FeedPost } from '../../types';
 import { RichText } from '../RichText';
 import { PostAttachments } from './PostAttachments';
 import { PostComments } from './PostComments';
+import { PostReactors } from './PostReactors';
 
 interface PostCardProps {
   post: FeedPost;
@@ -131,6 +132,7 @@ export const PostCard: React.FC<PostCardProps> = ({
             ))}
           </PopoverContent>
         </Popover>
+        {post.reactions.length > 0 && <PostReactors postId={post.id} />}
         <button
           type="button"
           onClick={() => setShowComments(open => !open)}

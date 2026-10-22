@@ -100,6 +100,16 @@ export const feedService = {
     return { error };
   },
 
+  /** Quem reagiu a uma publicação (a RLS limita a quem a pode ver). */
+  listReactors: async (postId: string) => {
+    const { data, error } = await supabase
+      .from('feed_reactions')
+      .select('user_id, emoji, created_at')
+      .eq('post_id', postId)
+      .order('created_at');
+    return { data: data ?? [], error };
+  },
+
   addReaction: async (postId: string, userId: string, emoji: string) => {
     const { error } = await supabase
       .from('feed_reactions')

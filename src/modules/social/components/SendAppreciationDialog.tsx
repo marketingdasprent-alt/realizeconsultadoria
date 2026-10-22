@@ -11,6 +11,12 @@ import { cn } from '@/lib/utils';
 import { ModuleIcon } from '@/modules/workspace/components/ModuleIcon';
 import { APPRECIATION_TYPES } from '@/modules/workspace/lib/appreciations';
 import { useDirectory } from '../hooks/useDirectory';
+import {
+  APPRECIATION_DAILY_LIMIT,
+  APPRECIATION_MAX_MESSAGE,
+  APPRECIATION_MIN_MESSAGE,
+  messageShortfall,
+} from '../lib/appreciationRules';
 import type { AppreciationKind, NewAppreciationInput } from '../types';
 
 interface SendAppreciationDialogProps {
@@ -21,7 +27,7 @@ interface SendAppreciationDialogProps {
   onSend: (input: NewAppreciationInput) => Promise<boolean>;
 }
 
-/** Enviar uma apreciação: colega, tipo, mensagem opcional e pública/privada. */
+/** Enviar uma apreciação: colega, tipo, motivo (obrigatório) e pública/privada. */
 export const SendAppreciationDialog: React.FC<SendAppreciationDialogProps> = ({
   open,
   onOpenChange,
@@ -44,8 +50,10 @@ export const SendAppreciationDialog: React.FC<SendAppreciationDialogProps> = ({
     }
   }, [open, recipientId]);
 
+  const shortfall = messageShortfall(message);
+
   const send = async () => {
-    if (!recipient || !kind) return;
+    if (!recipient || !kind || shortfall > 0) return;
     setIsSending(true);
     const ok = await onSend({ recipientId: recipient, kind, message, isPublic });
     setIsSending(false);
@@ -56,11 +64,12 @@ export const SendAppreciationDialog: React.FC<SendAppreciationDialogProps> = ({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[28px] sm:max-w-lg sm:rounded-[28px]">
         <DialogHeader className="text-left">
-          <DialogTitle className="text-xl font-extrabold">Enviar apreciação</DialogTitle>
+          <DialogTitle className="text-xl font-extrabold">Reconhecer trabalho</DialogTitle>
           <DialogDescription>
             {recipientId
-              ? `Reconheça o trabalho de ${byId.get(recipientId)?.name ?? 'um colega'}.`
-              : 'Reconheça o bom trabalho de um colega.'}
+              ? `Descreva o trabalho de ${byId.get(recipientId)?.name ?? 'um colega'} que quer reconhecer.`
+              : 'Descreva o trabalho de um colega que quer reconhecer.'}
+            {` Fica registado com o seu nome (máx. ${APPRECIATION_DAILY_LIMIT} por dia).`}
           </DialogDescription>
         </DialogHeader>
 
@@ -101,11 +110,18 @@ export const SendAppreciationDialog: React.FC<SendAppreciationDialogProps> = ({
 
         <textarea
           value={message}
-          onChange={event => setMessage(event.target.value.slice(0, 500))}
+          onChange={event => setMessage(event.target.value.slice(0, APPRECIATION_MAX_MESSAGE))}
           rows={3}
-          placeholder="Mensagem (opcional) — o que fez a diferença?"
+          required
+          aria-label="Motivo do reconhecimento"
+          placeholder="Que trabalho está a reconhecer? Diga o que fez a diferença."
           className="w-full resize-none rounded-2xl bg-rz-canvas px-4 py-3 text-sm outline-none ring-1 ring-transparent focus:bg-white focus:ring-rz-primary/40"
         />
+        <p className="-mt-2 px-1 text-[12px] text-rz-muted">
+          {shortfall > 0
+            ? `Obrigatório: explique o trabalho reconhecido (faltam ${shortfall} caracteres, mínimo ${APPRECIATION_MIN_MESSAGE}).`
+            : 'Motivo ok.'}
+        </p>
 
         <div className="flex rounded-full bg-rz-canvas p-1">
           {[true, false].map(value => {
@@ -129,10 +145,10 @@ export const SendAppreciationDialog: React.FC<SendAppreciationDialogProps> = ({
         <button
           type="button"
           onClick={send}
-          disabled={!recipient || !kind || isSending}
+          disabled={!recipient || !kind || shortfall > 0 || isSending}
           className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-rz-primary text-[15px] font-semibold text-white disabled:opacity-40"
         >
-          {isSending && <Loader2 className="h-4 w-4 animate-spin" />} Enviar apreciação
+          {isSending && <Loader2 className="h-4 w-4 animate-spin" />} Reconhecer
         </button>
       </DialogContent>
     </Dialog>

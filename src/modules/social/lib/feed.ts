@@ -71,6 +71,15 @@ export const toPost = (
 });
 
 /** Junta/retira a minha reação (para a pré-visualização e atualizações otimistas). */
+/** Agrupa quem reagiu por emoji, pela ordem em que cada emoji apareceu. */
+export const groupReactors = (
+  rows: { user_id: string; emoji: string }[]
+): { emoji: string; userIds: string[] }[] => {
+  const groups = new Map<string, string[]>();
+  for (const row of rows) groups.set(row.emoji, [...(groups.get(row.emoji) ?? []), row.user_id]);
+  return [...groups].map(([emoji, userIds]) => ({ emoji, userIds }));
+};
+
 export const toggleReactionIn = (reactions: FeedReaction[], emoji: string): FeedReaction[] => {
   const existing = reactions.find(r => r.emoji === emoji);
   if (!existing) return [...reactions, { emoji, count: 1, mine: true }];

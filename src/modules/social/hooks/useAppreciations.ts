@@ -4,6 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { DEMO_APPRECIATIONS } from '../lib/demoData';
+import { appreciationErrorText, messageShortfall } from '../lib/appreciationRules';
 import { FEED_KEYS } from '../lib/feed';
 import { appreciationService, type AppreciationRow } from '../services/appreciationService';
 import type { Appreciation, AppreciationKind, NewAppreciationInput } from '../types';
@@ -57,6 +58,14 @@ export const useAppreciations = (scope: { userId: string } | 'public') => {
   }, [isPreview, live.data, demo, key, scope, nameOf]);
 
   const send = async (input: NewAppreciationInput): Promise<boolean> => {
+    if (messageShortfall(input.message) > 0) {
+      toast({
+        title: 'Diga que trabalho está a reconhecer',
+        description: 'O motivo é obrigatório.',
+        variant: 'destructive',
+      });
+      return false;
+    }
     if (isPreview) {
       demoStore = [
         {
@@ -77,7 +86,7 @@ export const useAppreciations = (scope: { userId: string } | 'public') => {
     }
     const { error } = await appreciationService.send(user.companyId, user.userId, input);
     if (error) {
-      toast({ title: 'A apreciação não foi enviada', variant: 'destructive' });
+      toast({ title: appreciationErrorText(error), variant: 'destructive' });
       return false;
     }
     void qc.invalidateQueries({ queryKey: FEED_KEYS.appreciations });

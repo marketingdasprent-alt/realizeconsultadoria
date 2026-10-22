@@ -161,7 +161,8 @@ const WebmailPage: React.FC = () => {
       void (action === 'trash' ? actions.trash(selected) : actions.setRead(selected, false));
       return setActive(null);
     }
-    if (!message) return;
+    // Imprimir é tratado no próprio leitor.
+    if (!message || action === 'print') return;
     if (action === 'task' || action === 'event') return setConversion({ kind: action, message });
     setDraft(draftFrom(message, action, email));
   };

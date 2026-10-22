@@ -8,6 +8,7 @@ import {
   ListChecks,
   Loader2,
   MailOpen,
+  Printer,
   Reply,
   ReplyAll,
   Star,
@@ -17,11 +18,20 @@ import {
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { formatAddressList, nameOf, readerDocument } from '../lib/mailFormat';
+import { printMail } from '../lib/printMail';
 import type { MailAttachmentInfo, MailMessage, MailSummary } from '../types';
 import { AttachmentThumb } from './AttachmentThumb';
 
 export type ReaderAction =
-  'reply' | 'replyAll' | 'forward' | 'star' | 'trash' | 'unread' | 'task' | 'event';
+  | 'reply'
+  | 'replyAll'
+  | 'forward'
+  | 'star'
+  | 'trash'
+  | 'unread'
+  | 'task'
+  | 'event'
+  | 'print';
 
 const TOOLBAR: { action: ReaderAction; label: string; icon: LucideIcon }[] = [
   { action: 'reply', label: 'Responder', icon: Reply },
@@ -30,6 +40,7 @@ const TOOLBAR: { action: ReaderAction; label: string; icon: LucideIcon }[] = [
   { action: 'task', label: 'Criar tarefa', icon: ListChecks },
   { action: 'event', label: 'Criar evento', icon: CalendarPlus },
   { action: 'unread', label: 'Marcar como não lido', icon: MailOpen },
+  { action: 'print', label: 'Imprimir', icon: Printer },
   { action: 'trash', label: 'Lixo', icon: Trash2 },
 ];
 
@@ -103,7 +114,11 @@ export const MailReader: React.FC<MailReaderProps> = ({
             <button
               key={action}
               type="button"
-              onClick={() => onAction(action)}
+              onClick={() =>
+                // Imprimir trata-se aqui (só precisa do email aberto).
+                action === 'print' ? message && printMail(message) : onAction(action)
+              }
+              disabled={action === 'print' && !message}
               title={label}
               aria-label={label}
               className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"

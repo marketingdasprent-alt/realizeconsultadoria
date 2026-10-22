@@ -465,16 +465,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               ))}
             </ul>
           )}
-          <div className="flex items-center gap-3 border-t border-rz-line px-5 py-3">
-            <button
-              type="button"
-              disabled={busy || loadingFiles > 0 || size > MAX_BYTES || !accounts.length}
-              onClick={send}
-              className="inline-flex h-11 items-center gap-2 rounded-full bg-rz-primary px-6 text-[14px] font-bold text-white disabled:opacity-50"
-            >
-              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{' '}
-              Enviar
-            </button>
+          <div className="flex items-center gap-2 border-t border-rz-line px-5 py-3">
             <label
               className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas"
               aria-label="Anexar ficheiros"
@@ -487,12 +478,6 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 onChange={e => addFiles(Array.from(e.target.files ?? []))}
               />
             </label>
-            {size > MAX_BYTES && (
-              <span className="text-[12.5px] font-semibold text-rose-600">
-                Anexos acima de 10 MB.
-              </span>
-            )}
-            <span className="ml-auto truncate text-[12px] text-rz-muted">{savedLabel}</span>
             <button
               type="button"
               onClick={() => void saver.save()}
@@ -511,6 +496,21 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               className="flex h-10 w-10 items-center justify-center rounded-full text-rz-muted hover:bg-rose-50 hover:text-rose-600"
             >
               <Trash2 className="h-5 w-5" />
+            </button>
+            <span className="truncate text-[12px] text-rz-muted">{savedLabel}</span>
+            {size > MAX_BYTES && (
+              <span className="text-[12.5px] font-semibold text-rose-600">
+                Anexos acima de 10 MB.
+              </span>
+            )}
+            <button
+              type="button"
+              disabled={busy || loadingFiles > 0 || size > MAX_BYTES || !accounts.length}
+              onClick={send}
+              className="ml-auto inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-rz-primary px-6 text-[14px] font-bold text-white disabled:opacity-50"
+            >
+              {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}{' '}
+              Enviar
             </button>
           </div>
         </DialogContent>

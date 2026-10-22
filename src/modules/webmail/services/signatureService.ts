@@ -3,7 +3,7 @@ import { supabase } from '@/integrations/supabase/client';
 
 const BUCKET = 'mail-signatures';
 const TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
-export const SIGNATURE_IMAGE_MAX = 1024 * 1024;
+export const SIGNATURE_IMAGE_MAX = 5 * 1024 * 1024;
 
 /** Envia uma imagem e devolve o endereço público (o que vai no HTML da assinatura). */
 export const uploadSignatureImage = async (
@@ -11,7 +11,7 @@ export const uploadSignatureImage = async (
 ): Promise<{ url: string | null; error: string | null }> => {
   if (!TYPES.includes(file.type))
     return { url: null, error: 'Use uma imagem PNG, JPG, GIF ou WebP.' };
-  if (file.size > SIGNATURE_IMAGE_MAX) return { url: null, error: 'A imagem tem mais de 1 MB.' };
+  if (file.size > SIGNATURE_IMAGE_MAX) return { url: null, error: 'A imagem tem mais de 5 MB.' };
   const { data: auth } = await supabase.auth.getSession();
   const userId = auth.session?.user.id;
   if (!userId) return { url: null, error: 'A sessão terminou. Entre outra vez.' };

@@ -24,16 +24,14 @@ export const dragHasFiles = (transfer: DataTransfer | null): boolean =>
 export const imageFilesOf = (files: FileList | File[] | null | undefined): File[] =>
   Array.from(files ?? []).filter(file => file.type.startsWith('image/'));
 
-const MAX_BYTES = 1024 * 1024;
 const MAX_SIDE = 900;
 
 /**
- * As imagens da assinatura têm 1 MB de limite: as maiores são reduzidas (até 900 px de lado)
- * antes de enviar. GIFs animados ficam como estão.
+ * As imagens da assinatura têm 5 MB de limite; as acima de 400 KB são reduzidas (até 900 px)
+ * antes de enviar para o email não pesar. GIFs animados ficam como estão.
  */
 export const prepareSignatureImage = async (file: File): Promise<File> => {
-  if (file.type === 'image/gif' || (file.size <= MAX_BYTES / 2 && file.size < 400 * 1024))
-    return file;
+  if (file.type === 'image/gif' || file.size < 400 * 1024) return file;
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));

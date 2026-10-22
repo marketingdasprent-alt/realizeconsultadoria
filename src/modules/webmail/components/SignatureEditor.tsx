@@ -199,7 +199,7 @@ export const SignatureEditor: React.FC<SignatureEditorProps> = ({ initial, onCha
             onClick={event =>
               setImage(event.target instanceof HTMLImageElement ? event.target : null)
             }
-            className="max-h-[55vh] min-h-[220px] resize-y overflow-auto rounded-2xl bg-white px-4 py-3 text-[14px] leading-relaxed outline-none ring-1 ring-rz-line focus:ring-rz-primary/40 [&_a]:text-rz-primary [&_a]:underline [&_img]:inline-block [&_img]:cursor-pointer [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
+            className="min-h-[300px] resize-y overflow-auto rounded-2xl bg-white px-4 py-3 text-[14px] leading-relaxed outline-none ring-1 ring-rz-line focus:ring-rz-primary/40 [&_a]:text-rz-primary [&_a]:underline [&_img]:inline-block [&_img]:cursor-pointer [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
             aria-label="Assinatura"
           />
           {dragging && (

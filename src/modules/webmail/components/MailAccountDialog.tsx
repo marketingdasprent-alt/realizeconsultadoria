@@ -1,18 +1,13 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, BellRing, RefreshCw, Unplug, Users } from 'lucide-react';
-import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
+import { AlertTriangle, BellRing, PenLine, Plug, Settings2, type LucideIcon } from 'lucide-react';
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/modules/workspace/components/ConfirmDialog';
-import { ACCOUNT_DOTS } from '../lib/mailFormat';
 import { cleanSignatures } from '../lib/signatures';
 import { providerOf } from '../lib/providers';
-import type { MailAccount, MailAccountColor, MailSignature } from '../types';
+import type { MailAccount, MailSignature } from '../types';
+import { ConnectionTab, GeneralTab, NoticesTab, type AccountForm } from './AccountSettingsTabs';
 import { SignaturesManager } from './SignaturesManager';
-
-const FIELD =
-  'w-full rounded-2xl bg-rz-canvas px-4 text-sm outline-none ring-1 ring-transparent focus:bg-white focus:ring-rz-primary/40';
-const LABEL = 'mb-1.5 block text-[13px] font-bold';
-const COLORS = Object.keys(ACCOUNT_DOTS) as MailAccountColor[];
 
 interface MailAccountDialogProps {
   account: MailAccount | null;
@@ -26,9 +21,17 @@ interface MailAccountDialogProps {
   onDisconnect: (account: MailAccount) => Promise<void>;
 }
 
+type Tab = 'general' | 'signatures' | 'notices' | 'connection';
+const TABS: { key: Tab; label: string; icon: LucideIcon }[] = [
+  { key: 'general', label: 'Geral', icon: Settings2 },
+  { key: 'signatures', label: 'Assinaturas', icon: PenLine },
+  { key: 'notices', label: 'Avisos', icon: BellRing },
+  { key: 'connection', label: 'Ligação', icon: Plug },
+];
+
 /**
- * Definições de uma caixa: nome, assinatura, cor, avisos de email novo, predefinida, voltar a
- * ligar e desligar.
+ * Definições de uma caixa, em separadores, numa janela de tamanho fixo (não muda de tamanho ao
+ * trocar de separador nem ao escrever): geral, assinaturas, avisos e ligação.
  */
 export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
   account,
@@ -38,10 +41,11 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
   onReconnect,
   onDisconnect,
 }) => {
-  const [form, setForm] = useState({
+  const [tab, setTab] = useState<Tab>('general');
+  const [form, setForm] = useState<AccountForm>({
     displayName: '',
     label: '',
-    color: 'violet' as MailAccountColor,
+    color: 'violet',
     isDefault: false,
     notify: true,
   });
@@ -50,6 +54,7 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
 
   useEffect(() => {
     if (!account) return;
+    setTab('general');
     setForm({
       displayName: account.displayName ?? '',
       label: account.label ?? '',
@@ -81,144 +86,90 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
       <Dialog open onOpenChange={open => !open && onClose()}>
         <DialogContent
           onInteractOutside={event => event.preventDefault()}
-          className="max-h-[92vh] overflow-y-auto rounded-[28px] sm:max-w-xl sm:rounded-[28px]"
+          className="flex h-[min(90vh,820px)] w-[min(96vw,1040px)] max-w-none flex-col gap-0 overflow-hidden rounded-[28px] p-0 sm:max-w-none sm:rounded-[28px]"
         >
-          <div className="flex items-center gap-3">
-            <span className="flex h-12 w-12 shrink-0 items-center justify-center rounded-2xl bg-rz-canvas">
+          <header className="flex items-center gap-3 border-b border-rz-line px-6 py-4 pr-14">
+            <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-2xl bg-rz-canvas">
               <provider.Logo />
             </span>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <DialogTitle className="truncate text-[17px] font-extrabold">
-                {account.email}
+                {form.label.trim() || account.email}
               </DialogTitle>
-              <p className="text-[12.5px] text-rz-muted">{provider.name}</p>
+              <DialogDescription className="truncate text-[12.5px] text-rz-muted">
+                {account.email} · {provider.name}
+              </DialogDescription>
             </div>
-          </div>
-
-          {account.shared && (
-            <p className="flex gap-2 rounded-2xl bg-rz-primary-soft px-4 py-3 text-[13px]">
-              <Users className="mt-0.5 h-4 w-4 shrink-0 text-rz-primary" />
-              Caixa partilhada pela empresa: quem tem acesso e a ligação são geridos pelo
-              administrador. As assinaturas e a cor aqui são só suas.
-            </p>
-          )}
-
-          {account.status !== 'active' && (
-            <div className="flex items-start gap-2 rounded-2xl bg-amber-50 px-4 py-3 text-[13px] text-amber-900 ring-1 ring-amber-200">
-              <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
-              <span className="flex-1">
-                {account.status === 'reauth'
-                  ? 'A autorização expirou.'
-                  : (account.lastError ?? 'Houve um erro ao sincronizar.')}
-              </span>
-              {account.authMethod !== 'imap' && !account.shared && (
-                <button
-                  type="button"
-                  onClick={() => onReconnect(account)}
-                  className="flex items-center gap-1 font-bold"
-                >
-                  <RefreshCw className="h-3.5 w-3.5" /> Voltar a ligar
-                </button>
-              )}
-            </div>
-          )}
-
-          <div className="space-y-4">
-            <label className="block">
-              <span className={LABEL}>Nome da caixa</span>
-              <input
-                value={form.label}
-                onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
-                placeholder={account.email}
-                maxLength={60}
-                className={cn(FIELD, 'h-11')}
-              />
-              <span className="mt-1 block text-[12px] text-rz-muted">
-                Como aparece na sua barra lateral{account.shared ? ' (só para si)' : ''}. Deixe
-                vazio para mostrar o endereço.
-              </span>
-            </label>
-            {!account.shared && (
-              <label className="block">
-                <span className={LABEL}>Nome do remetente</span>
-                <input
-                  value={form.displayName}
-                  onChange={e => setForm(f => ({ ...f, displayName: e.target.value }))}
-                  className={cn(FIELD, 'h-11')}
-                />
-              </label>
-            )}
-            <div>
-              <span className={LABEL}>Assinaturas</span>
-              <SignaturesManager key={account.id} value={signatures} onChange={setSignatures} />
-            </div>
-            <div>
-              <span className={LABEL}>Cor</span>
-              <div className="flex gap-2">
-                {COLORS.map(color => (
-                  <button
-                    key={color}
-                    type="button"
-                    onClick={() => setForm(f => ({ ...f, color }))}
-                    className={cn(
-                      'h-8 w-8 rounded-full ring-offset-2',
-                      ACCOUNT_DOTS[color],
-                      form.color === color && 'ring-2 ring-rz-ink'
-                    )}
-                    aria-label={color}
-                  />
-                ))}
-              </div>
-            </div>
-            <label className="flex items-start gap-3 rounded-2xl bg-rz-canvas px-4 py-3">
-              <BellRing className="mt-0.5 h-4 w-4 shrink-0 text-rz-primary" />
-              <span className="flex-1">
-                <span className="block text-[14px] font-semibold">Avisar emails novos</span>
-                <span className="block text-[12.5px] text-rz-muted">
-                  Notificação no Realize e no telemóvel quando chega um email a esta caixa
-                  {account.shared ? ' (só para si)' : ''}.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                role="switch"
-                checked={form.notify}
-                onChange={e => setForm(f => ({ ...f, notify: e.target.checked }))}
-                className="mt-1 h-5 w-5 accent-violet-600"
-                aria-label="Avisar emails novos desta caixa"
-              />
-            </label>
-            {!account.shared && (
-              <label className="flex items-center gap-3 text-[14px] font-semibold">
-                <input
-                  type="checkbox"
-                  checked={form.isDefault}
-                  onChange={e => setForm(f => ({ ...f, isDefault: e.target.checked }))}
-                  className="h-5 w-5 accent-violet-600"
-                />
-                Caixa predefinida para escrever
-              </label>
-            )}
-          </div>
-
-          <div className="flex items-center gap-2">
-            {!account.shared && (
+            {account.status !== 'active' && (
               <button
                 type="button"
-                onClick={() => setConfirm(true)}
-                className="inline-flex h-11 items-center gap-2 rounded-full px-4 text-[13.5px] font-bold text-rose-600 hover:bg-rose-50"
+                onClick={() => setTab('connection')}
+                className="inline-flex items-center gap-1.5 rounded-full bg-amber-50 px-3 py-1.5 text-[12.5px] font-bold text-amber-800 ring-1 ring-amber-200"
               >
-                <Unplug className="h-4 w-4" /> Desligar
+                <AlertTriangle className="h-3.5 w-3.5" /> Ver ligação
               </button>
             )}
+          </header>
+
+          <div className="flex min-h-0 flex-1 flex-col md:flex-row">
+            <nav
+              className="flex shrink-0 gap-1 overflow-x-auto border-b border-rz-line p-2 md:w-52 md:flex-col md:border-b-0 md:border-r md:p-3"
+              aria-label="Secções"
+            >
+              {TABS.map(({ key, label, icon: Icon }) => (
+                <button
+                  key={key}
+                  type="button"
+                  onClick={() => setTab(key)}
+                  aria-current={tab === key ? 'page' : undefined}
+                  className={cn(
+                    'flex shrink-0 items-center gap-2.5 rounded-2xl px-3 py-2.5 text-left text-[14px] font-semibold',
+                    tab === key ? 'bg-rz-primary-soft text-rz-primary' : 'hover:bg-rz-canvas'
+                  )}
+                >
+                  <Icon className="h-4 w-4" />
+                  {label}
+                  {key === 'signatures' && signatures.length > 0 && (
+                    <span className="ml-auto text-[12px] font-normal text-rz-muted">
+                      {signatures.length}
+                    </span>
+                  )}
+                </button>
+              ))}
+            </nav>
+
+            <div className="rz-scroll min-h-0 flex-1 overflow-y-auto px-6 py-5">
+              {tab === 'general' && <GeneralTab account={account} form={form} setForm={setForm} />}
+              {tab === 'signatures' && (
+                <SignaturesManager key={account.id} value={signatures} onChange={setSignatures} />
+              )}
+              {tab === 'notices' && <NoticesTab account={account} form={form} setForm={setForm} />}
+              {tab === 'connection' && (
+                <ConnectionTab
+                  account={account}
+                  onReconnect={() => onReconnect(account)}
+                  onDisconnect={() => setConfirm(true)}
+                />
+              )}
+            </div>
+          </div>
+
+          <footer className="flex items-center justify-end gap-2 border-t border-rz-line px-6 py-4">
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex h-11 items-center rounded-full px-5 text-[14px] font-semibold text-rz-muted hover:bg-rz-canvas"
+            >
+              Cancelar
+            </button>
             <button
               type="button"
               onClick={save}
-              className="ml-auto inline-flex h-11 items-center gap-2 rounded-full bg-rz-primary px-6 text-[14px] font-bold text-white disabled:opacity-50"
+              className="inline-flex h-11 items-center rounded-full bg-rz-primary px-7 text-[14px] font-bold text-white"
             >
               Guardar
             </button>
-          </div>
+          </footer>
         </DialogContent>
       </Dialog>
       <ConfirmDialog

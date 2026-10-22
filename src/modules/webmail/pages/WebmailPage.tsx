@@ -77,12 +77,21 @@ const WebmailPage: React.FC = () => {
   const list = useKeptUnread(folder, current, query, box.messages);
   usePrefetchTop(list.messages);
   // Chegou email novo (o total de não lidos subiu): a lista atualiza-se logo, sem esperar.
+  // E se a lista da Entrada mostra mais por ler do que o fornecedor conta (lidos noutro sítio,
+  // ex. no Outlook ou no telemóvel), também se atualiza: as bolinhas não ficam presas.
   const lastTotal = useRef<number | null>(null);
   useEffect(() => {
-    if (lastTotal.current !== null && unread.total > lastTotal.current) void box.refetch();
+    const grew = lastTotal.current !== null && unread.total > lastTotal.current;
     lastTotal.current = unread.total;
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando o total muda
-  }, [unread.total]);
+    const stale =
+      folder === 'inbox' &&
+      Object.entries(unread.counts).some(
+        ([accountId, count]) =>
+          list.messages.filter(m => m.accountId === accountId && m.unread).length > count
+      );
+    if (grew || stale) void box.refetch();
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando os números chegam
+  }, [unread.counts]);
   const selected = active
     ? (list.messages.find(m => mailKey(m) === mailKey(active)) ?? active)
     : null;

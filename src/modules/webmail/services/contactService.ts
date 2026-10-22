@@ -45,20 +45,26 @@ export const contactService = {
     };
   },
 
-  /** Cria (sem id) ou atualiza uma lista. */
+  /** Cria (sem id) ou atualiza uma lista; devolve o id. */
   saveList: async (list: { id?: string; name: string; members: ContactEntry[] }) => {
     const { data: auth } = await supabase.auth.getSession();
     const userId = auth.session?.user.id;
-    if (!userId) return { error: new Error('Sessão terminada.') };
+    if (!userId) return { id: null, error: new Error('Sessão terminada.') };
     const row = {
       user_id: userId,
       name: list.name.trim(),
       members: list.members.map(({ email, name }) => ({ email, name })) as unknown as Json,
     };
-    const { error } = list.id
-      ? await supabase.from('mail_contact_lists').update(row).eq('id', list.id)
-      : await supabase.from('mail_contact_lists').insert(row);
-    return { error };
+    if (list.id) {
+      const { error } = await supabase.from('mail_contact_lists').update(row).eq('id', list.id);
+      return { id: list.id, error };
+    }
+    const { data, error } = await supabase
+      .from('mail_contact_lists')
+      .insert(row)
+      .select('id')
+      .single();
+    return { id: data?.id ?? null, error };
   },
 
   deleteList: async (id: string) => {

@@ -4,12 +4,10 @@ import { pt } from 'date-fns/locale';
 import {
   ArrowLeft,
   CalendarPlus,
-  Download,
   Forward,
   ListChecks,
   Loader2,
   MailOpen,
-  Paperclip,
   Reply,
   ReplyAll,
   Star,
@@ -20,6 +18,7 @@ import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { formatAddressList, nameOf, readerDocument } from '../lib/mailFormat';
 import type { MailAttachmentInfo, MailMessage, MailSummary } from '../types';
+import { AttachmentThumb } from './AttachmentThumb';
 
 export type ReaderAction =
   'reply' | 'replyAll' | 'forward' | 'star' | 'trash' | 'unread' | 'task' | 'event';
@@ -33,9 +32,6 @@ const TOOLBAR: { action: ReaderAction; label: string; icon: LucideIcon }[] = [
   { action: 'unread', label: 'Marcar como não lido', icon: MailOpen },
   { action: 'trash', label: 'Lixo', icon: Trash2 },
 ];
-
-const kb = (size: number) =>
-  size > 1_000_000 ? `${(size / 1_000_000).toFixed(1)} MB` : `${Math.ceil(size / 1000)} KB`;
 
 interface MailReaderProps {
   summary: MailSummary;
@@ -153,31 +149,16 @@ export const MailReader: React.FC<MailReaderProps> = ({
             />
             {message.attachments.length > 0 && (
               <ul className="mt-4 flex flex-wrap gap-2">
-                {message.attachments.map(attachment => (
+                {message.attachments.map((attachment, index) => (
                   <li key={attachment.id}>
-                    <span className="flex items-center rounded-2xl bg-rz-canvas text-[13px] font-semibold hover:bg-rz-primary-soft">
-                      <button
-                        type="button"
-                        onClick={() => onOpenAttachment(attachment)}
-                        title="Abrir"
-                        className="flex items-center gap-2 py-2 pl-3 pr-2 text-left"
-                      >
-                        <Paperclip className="h-4 w-4 text-rz-primary" />
-                        <span className="max-w-[220px] truncate">{attachment.filename}</span>
-                        <span className="text-[11.5px] font-normal text-rz-muted">
-                          {kb(attachment.size)}
-                        </span>
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => onDownload(attachment.id)}
-                        title="Descarregar"
-                        aria-label={`Descarregar ${attachment.filename}`}
-                        className="mr-1 flex h-7 w-7 items-center justify-center rounded-full text-rz-muted hover:bg-white hover:text-rz-primary"
-                      >
-                        <Download className="h-4 w-4" />
-                      </button>
-                    </span>
+                    <AttachmentThumb
+                      accountId={message.accountId}
+                      messageId={message.id}
+                      attachment={attachment}
+                      withPreview={index < 6}
+                      onOpen={() => onOpenAttachment(attachment)}
+                      onDownload={() => onDownload(attachment.id)}
+                    />
                   </li>
                 ))}
               </ul>

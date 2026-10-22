@@ -11,7 +11,8 @@ interface ContactListsDialogProps {
   lists: ContactList[];
   team: ContactEntry[];
   contacts: ContactEntry[];
-  onSave: (list: { id?: string; name: string; members: ContactEntry[] }) => Promise<boolean>;
+  /** Devolve o id da lista gravada (null se falhou). */
+  onSave: (list: { id?: string; name: string; members: ContactEntry[] }) => Promise<string | null>;
   onDelete: (id: string) => Promise<boolean>;
 }
 
@@ -42,7 +43,8 @@ export const ContactListsDialog: React.FC<ContactListsDialogProps> = ({
   useEffect(() => {
     setName(current?.name ?? '');
     setMembers(current ? current.members.map(member => member.email).join(', ') : '');
-  }, [current]);
+    // Também ao voltar a "Nova lista": o formulário fica limpo.
+  }, [current, selected]);
 
   const known = useMemo(() => {
     const map = new Map<string, string | null>();
@@ -60,13 +62,14 @@ export const ContactListsDialog: React.FC<ContactListsDialogProps> = ({
 
   const save = async () => {
     setBusy(true);
-    const ok = await onSave({
+    const savedId = await onSave({
       id: current?.id,
       name,
       members: emails.map(email => ({ email, name: known.get(email) ?? null })),
     });
     setBusy(false);
-    if (ok && !current) setSelected(NEW);
+    // A lista nova fica escolhida à esquerda (vê-se que foi criada).
+    if (savedId) setSelected(savedId);
   };
 
   const remove = async () => {

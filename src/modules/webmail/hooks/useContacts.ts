@@ -66,18 +66,24 @@ export const useContacts = (accounts: MailAccount[] = []) => {
     lists: (lists.data ?? []) as ContactList[],
     isLoading: !isPreview && lists.isLoading,
 
-    saveList: async (list: { id?: string; name: string; members: ContactEntry[] }) => {
-      const { error } = await contactService.saveList(list);
+    /** Devolve o id da lista gravada (null se falhou). */
+    saveList: async (list: {
+      id?: string;
+      name: string;
+      members: ContactEntry[];
+    }): Promise<string | null> => {
+      const { id, error } = await contactService.saveList(list);
       if (error) {
         const duplicate = String((error as { code?: string }).code) === '23505';
         toast({
           title: duplicate ? 'Já existe uma lista com esse nome' : 'A lista não foi guardada',
           variant: 'destructive',
         });
-        return false;
+        return null;
       }
       await refresh();
-      return true;
+      toast({ title: list.id ? 'Lista guardada' : `Lista «${list.name.trim()}» criada` });
+      return id;
     },
 
     deleteList: async (id: string) => {

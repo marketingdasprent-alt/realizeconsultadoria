@@ -1,32 +1,26 @@
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Download, FileText } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { fileTypeLabel, formatBytes } from '@/modules/messenger/lib/files';
-import { feedService } from '../../services/feedService';
+import { useFileUrl } from '../../hooks/useFileUrl';
 import type { FeedAttachment } from '../../types';
+import { ImageLightbox } from './ImageLightbox';
 
-/** URL temporário do ficheiro (na pré-visualização o caminho já é um URL local). */
-const useFileUrl = (path: string) => {
-  const [url, setUrl] = useState<string | null>(path.startsWith('blob:') ? path : null);
-  useEffect(() => {
-    if (path.startsWith('blob:')) return;
-    let alive = true;
-    feedService.getFileUrl(path).then(result => alive && setUrl(result.data));
-    return () => {
-      alive = false;
-    };
-  }, [path]);
-  return url;
-};
-
-const ImageTile: React.FC<{ file: FeedAttachment; tall: boolean }> = ({ file, tall }) => {
+const ImageTile: React.FC<{ file: FeedAttachment; tall: boolean; onOpen: () => void }> = ({
+  file,
+  tall,
+  onOpen,
+}) => {
   const url = useFileUrl(file.path);
   return (
-    // Só se vê no Feed: sem ligação para abrir a imagem noutro separador.
-    <div
+    // Abre a galeria (visor dentro do Realize), nunca um novo separador.
+    <button
+      type="button"
       data-protected-image
+      onClick={onOpen}
+      aria-label={`Ver ${file.name}`}
       className={cn(
-        'block select-none overflow-hidden rounded-2xl bg-rz-canvas',
+        'block w-full cursor-zoom-in select-none overflow-hidden rounded-2xl bg-rz-canvas',
         tall ? 'h-72' : 'h-40'
       )}
     >
@@ -39,7 +33,7 @@ const ImageTile: React.FC<{ file: FeedAttachment; tall: boolean }> = ({ file, ta
           className="pointer-events-none h-full w-full object-cover [-webkit-touch-callout:none]"
         />
       )}
-    </div>
+    </button>
   );
 };
 
@@ -71,16 +65,23 @@ const FileChip: React.FC<{ file: FeedAttachment }> = ({ file }) => {
 export const PostAttachments: React.FC<{ attachments: FeedAttachment[] }> = ({ attachments }) => {
   const images = attachments.filter(file => file.mime.startsWith('image/'));
   const files = attachments.filter(file => !file.mime.startsWith('image/'));
+  const [open, setOpen] = useState<number | null>(null);
   if (attachments.length === 0) return null;
   return (
     <div className="mt-3 space-y-2">
       {images.length > 0 && (
         <div className={cn('grid gap-2', images.length > 1 && 'grid-cols-2')}>
-          {images.map(file => (
-            <ImageTile key={file.path} file={file} tall={images.length === 1} />
+          {images.map((file, index) => (
+            <ImageTile
+              key={file.path}
+              file={file}
+              tall={images.length === 1}
+              onOpen={() => setOpen(index)}
+            />
           ))}
         </div>
       )}
+      <ImageLightbox images={images} index={open} onIndex={setOpen} />
       {files.map(file => (
         <FileChip key={file.path} file={file} />
       ))}

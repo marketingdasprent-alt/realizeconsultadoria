@@ -1,11 +1,12 @@
 import React, { useRef, useState } from 'react';
-import { Building2, ImagePlus, Loader2, Paperclip, Users, X } from 'lucide-react';
+import { Building2, ImagePlus, Loader2, Paperclip, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { MAX_POST_FILES, POST_FILE_TYPES } from '../../lib/feed';
+import { ComposerFiles } from './ComposerFiles';
 import type { NewPostInput } from '../../types';
 
 interface PostComposerProps {
@@ -67,26 +68,10 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPublish, isPublish
         />
       </div>
 
-      {files.length > 0 && (
-        <ul className="mt-3 flex flex-wrap gap-2 pl-14">
-          {files.map((file, index) => (
-            <li
-              key={`${file.name}-${index}`}
-              className="inline-flex max-w-[14rem] items-center gap-2 rounded-full bg-rz-primary-soft py-1 pl-3 pr-1 text-[12.5px] font-semibold text-rz-primary"
-            >
-              <span className="truncate">{file.name}</span>
-              <button
-                type="button"
-                onClick={() => setFiles(list => list.filter((_, i) => i !== index))}
-                className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-white"
-                aria-label={`Retirar ${file.name}`}
-              >
-                <X className="h-3.5 w-3.5" />
-              </button>
-            </li>
-          ))}
-        </ul>
-      )}
+      <ComposerFiles
+        files={files}
+        onRemove={index => setFiles(list => list.filter((_, i) => i !== index))}
+      />
 
       <div className="mt-3 flex flex-wrap items-center gap-1 md:pl-12">
         <button type="button" className={TOOL} onClick={() => imageRef.current?.click()}>

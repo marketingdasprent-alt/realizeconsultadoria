@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { Download, FileArchive, FileSpreadsheet, FileText, File as FileIcon } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { loadAttachment, previewKind } from '../lib/attachments';
+import { pdfFirstPage } from '../lib/pdfThumb';
 import type { MailAttachmentInfo } from '../types';
 
 interface AttachmentThumbProps {
@@ -44,8 +46,14 @@ export const AttachmentThumb: React.FC<AttachmentThumbProps> = ({
     let alive = true;
     let created: string | null = null;
     loadAttachment(accountId, messageId, attachment.id)
-      .then(loaded => {
+      .then(async loaded => {
         if (!alive) return;
+        // PDF: a primeira página desenhada numa imagem; imagem: o próprio ficheiro.
+        if (kind === 'pdf') {
+          const page = await pdfFirstPage(loaded.blob, 240);
+          if (alive) setUrl(page);
+          return;
+        }
         created = URL.createObjectURL(loaded.blob);
         setUrl(created);
       })
@@ -54,7 +62,7 @@ export const AttachmentThumb: React.FC<AttachmentThumbProps> = ({
       alive = false;
       if (created) URL.revokeObjectURL(created);
     };
-  }, [visual, accountId, messageId, attachment.id]);
+  }, [visual, kind, accountId, messageId, attachment.id]);
 
   const Icon = iconFor(attachment.filename);
   return (
@@ -66,15 +74,14 @@ export const AttachmentThumb: React.FC<AttachmentThumbProps> = ({
         className="block w-full text-left"
       >
         <span className="relative flex h-[80px] items-center justify-center overflow-hidden bg-white">
-          {url && kind === 'image' ? (
-            <img src={url} alt="" className="h-full w-full object-cover" />
-          ) : url && kind === 'pdf' ? (
-            // Primeira página, sem barra nem interação (o clique abre o anexo).
-            <iframe
-              title={attachment.filename}
-              src={`${url}#toolbar=0&navpanes=0&scrollbar=0&view=FitH`}
-              tabIndex={-1}
-              className="pointer-events-none h-[240px] w-[360px] origin-top-left scale-[0.334] border-0"
+          {url ? (
+            <img
+              src={url}
+              alt=""
+              className={cn(
+                'h-full w-full',
+                kind === 'pdf' ? 'object-cover object-top' : 'object-cover'
+              )}
             />
           ) : (
             <span className="flex flex-col items-center gap-1 text-rz-primary">

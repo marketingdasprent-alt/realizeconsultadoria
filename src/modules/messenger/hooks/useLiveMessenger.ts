@@ -116,6 +116,11 @@ export const useLiveMessenger = (user: LiveMessengerUser): MessengerApi => {
       refreshList();
     },
     onSettings: refreshList,
+    // O que chegou enquanto o tempo real esteve em baixo: a lista e a conversa aberta.
+    onResync: () => {
+      void qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
+      if (activeId) void qc.invalidateQueries({ queryKey: CHAT_KEYS.thread(activeId) });
+    },
   });
 
   const channel = useConversationChannel(activeId, user.userId, () =>

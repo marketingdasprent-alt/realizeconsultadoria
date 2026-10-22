@@ -21,6 +21,15 @@ const fold = (text: string) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toL
 
 const MAX_SUGGESTIONS = 8;
 
+/**
+ * Nome limpo de um contacto: sem aspas à volta e sem nomes que são o próprio email
+ * (alguns servidores devolvem 'ana@x.pt' como nome).
+ */
+export const cleanContactName = (name: string | null | undefined): string | null => {
+  const cleaned = (name ?? '').trim().replace(/^["'\s]+|["'\s]+$/g, '');
+  return cleaned && !cleaned.includes('@') ? cleaned : null;
+};
+
 /** Emails já no campo, em minúsculas e sem repetidos. */
 export const recipientEmails = (value: string): string[] => [
   ...new Set(parseRecipients(value).map(email => email.toLowerCase())),

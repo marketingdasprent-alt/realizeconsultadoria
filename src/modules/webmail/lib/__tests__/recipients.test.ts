@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   addRecipients,
+  cleanContactName,
   recipientEmails,
   removeRecipient,
   suggestRecipients,
@@ -85,5 +86,15 @@ describe('suggestRecipients', () => {
   it('keeps a person only once even if in the team and in contacts', () => {
     const result = suggestRecipients({ ...base, query: 'ferreira' });
     expect(result.filter(item => item.kind === 'person')).toHaveLength(1);
+  });
+});
+
+describe('cleanContactName', () => {
+  it('drops quotes and names that are just the email', () => {
+    expect(cleanContactName("'Ana Ferreira'")).toBe('Ana Ferreira');
+    expect(cleanContactName('"João Silva"')).toBe('João Silva');
+    expect(cleanContactName("'alberto@x.eu'")).toBeNull();
+    expect(cleanContactName('  ')).toBeNull();
+    expect(cleanContactName(null)).toBeNull();
   });
 });

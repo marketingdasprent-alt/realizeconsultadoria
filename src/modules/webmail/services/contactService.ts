@@ -1,7 +1,7 @@
 // Contactos do Webmail: quem a pessoa já escreveu (sugestões) e as suas listas de contactos.
 import { supabase } from '@/integrations/supabase/client';
 import type { Json } from '@/integrations/supabase/types';
-import type { ContactEntry, ContactList } from '../lib/recipients';
+import { cleanContactName, type ContactEntry, type ContactList } from '../lib/recipients';
 
 const MAX_CONTACTS = 400;
 
@@ -24,7 +24,10 @@ export const contactService = {
       .order('uses', { ascending: false })
       .order('last_used_at', { ascending: false })
       .limit(MAX_CONTACTS);
-    return { data: (data ?? []) as ContactEntry[], error };
+    return {
+      data: (data ?? []).map(row => ({ email: row.email, name: cleanContactName(row.name) })),
+      error,
+    };
   },
 
   listLists: async () => {

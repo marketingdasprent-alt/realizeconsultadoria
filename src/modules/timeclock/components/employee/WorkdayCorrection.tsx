@@ -17,7 +17,7 @@ interface WorkdayCorrectionProps {
 
 /**
  * Lápis ✎ (como no Bitrix24): esqueceu-se de registar → indica a hora e o motivo; o
- * botão escolhido a seguir regista com essa hora e os RH confirmam.
+ * botão escolhido a seguir regista com essa hora. Com motivo fica válido; sem motivo os RH aprovam.
  */
 export const WorkdayCorrection: React.FC<WorkdayCorrectionProps> = ({
   value,
@@ -59,7 +59,7 @@ export const WorkdayCorrection: React.FC<WorkdayCorrectionProps> = ({
       </p>
     ) : (
       <p className="text-xs text-muted-foreground">
-        Escolha o registo abaixo. Os RH confirmam as correções.
+        Escolha o registo abaixo. Com motivo fica registado logo; sem motivo os RH confirmam.
       </p>
     )}
   </div>

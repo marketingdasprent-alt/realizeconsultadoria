@@ -227,13 +227,11 @@ serve(async (req: Request) => {
   if (body.action !== undefined && !action) return json({ ok: false, code: 'bad_request' }, 400);
   const entryType = body.entry_type === 'in' || body.entry_type === 'out' ? body.entry_type : null;
   const note = typeof body.note === 'string' ? body.note.trim().slice(0, 300) : null;
-  // Registo esquecido: hora indicada (até 12 h para trás), só com ação e com motivo.
+  // Registo esquecido: hora indicada (até 12 h para trás), só com ação. Com motivo fica válido;
+  // sem motivo os RH aprovam.
   const manualAt = parseManualTime(body.at, Date.now());
   if (manualAt === 'invalid') return json({ ok: false, code: 'invalid_time' });
   if (manualAt !== null && !action) return json({ ok: false, code: 'bad_request' }, 400);
-  if (manualAt !== null && (note?.length ?? 0) < 3) {
-    return json({ ok: false, code: 'note_required' });
-  }
 
   const { data: employee } = await db
     .from('employees')
@@ -407,8 +405,9 @@ serve(async (req: Request) => {
   }
   const officeLocation =
     decision.presence === 'network' ? networkLocation : decision.presence ? location : null;
-  // Registo esquecido com hora indicada: os RH confirmam sempre.
-  const { status, flags } = manualAt !== null ? applyManualTime(decision) : decision;
+  // Registo esquecido com hora indicada: com motivo fica válido; sem motivo os RH aprovam.
+  const { status, flags } =
+    manualAt !== null ? applyManualTime(decision, (note?.length ?? 0) >= 3) : decision;
 
   // 4. Anti-replay NTAG 424: só avança se o contador ainda for maior (evita corridas).
   if (tag) {

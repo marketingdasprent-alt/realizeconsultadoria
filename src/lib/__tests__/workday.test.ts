@@ -186,9 +186,8 @@ describe('buildCorrection (✎ registo esquecido)', () => {
     expect(buildCorrection('12:30', 'motivo', lunch, now)).toEqual({
       error: 'Tem de ser depois do último registo (13:01).',
     });
-    expect(buildCorrection('14:00', '  ', lunch, now)).toEqual({
-      error: 'Escreva o motivo da correção.',
-    });
+    // O motivo é opcional (sem ele os RH aprovam).
+    expect('error' in buildCorrection('14:00', '  ', lunch, now)).toBe(false);
     expect('error' in buildCorrection('05:00', 'motivo', null, now)).toBe(true);
   });
 });

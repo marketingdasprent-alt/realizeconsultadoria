@@ -28,7 +28,7 @@ const renderAt = (role: string) => {
     <MemoryRouter initialEntries={['/ponto/nfc?t=abc123']}>
       <Routes>
         <Route path="/ponto/nfc" element={<TimeClockNfcPage />} />
-        <Route path="/colaborador/login" element={<LoginProbe />} />
+        <Route path="/" element={<LoginProbe />} />
       </Routes>
     </MemoryRouter>
   );

@@ -443,10 +443,14 @@ export const parseManualTime = (value: unknown, nowMs: number): number | null | 
   return ms;
 };
 
-/** Correção de hora: fica sempre a aguardar aprovação dos RH, com a flag manual_time. */
-export const applyManualTime = (decision: PunchDecision): PunchDecision => ({
+/**
+ * Correção de hora (✎): fica sempre com a flag manual_time (visível no histórico). Com motivo
+ * mantém o estado do registo (válido, ou em revisão se houver sinais suspeitos); só SEM motivo
+ * aguarda a aprovação dos RH — a aprovação é para o que é crítico, não para tudo.
+ */
+export const applyManualTime = (decision: PunchDecision, hasReason = false): PunchDecision => ({
   ...decision,
-  status: 'pending',
+  status: hasReason ? decision.status : 'pending',
   flags: decision.flags.includes('manual_time')
     ? decision.flags
     : [...decision.flags, 'manual_time'],

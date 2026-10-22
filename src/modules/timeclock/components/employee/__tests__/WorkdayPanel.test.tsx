@@ -215,10 +215,6 @@ describe('WorkdayPanel', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Registar com outra hora' }));
     fireEvent.change(screen.getByLabelText('Hora do registo'), { target: { value: '14:00' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Retomar dia' }));
-    expect(await screen.findByText('Escreva o motivo da correção.')).toBeInTheDocument();
-    expect(timeClockService.punch).not.toHaveBeenCalled();
-
     fireEvent.change(screen.getByLabelText('Motivo da correção'), {
       target: { value: 'Esqueci-me de registar o regresso do almoço' },
     });

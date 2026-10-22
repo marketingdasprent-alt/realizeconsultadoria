@@ -411,10 +411,19 @@ describe('correção de hora (✎)', () => {
       distanceM: 12,
       presence: 'location',
     } as const;
+    // Sem motivo: os RH aprovam (é o caso crítico).
     const result = applyManualTime({ ...valid, flags: [...valid.flags] });
     expect(result.status).toBe('pending');
     expect(result.flags).toEqual(['gps_only', 'manual_time']);
     expect(applyManualTime(result).flags).toEqual(['gps_only', 'manual_time']);
+    // Com motivo: fica válido (só com a flag manual_time no histórico).
+    const withReason = applyManualTime({ ...valid, flags: [...valid.flags] }, true);
+    expect(withReason.status).toBe('valid');
+    expect(withReason.flags).toEqual(['gps_only', 'manual_time']);
+    // Com motivo mas com sinais suspeitos: continua em revisão.
+    expect(
+      applyManualTime({ ...valid, status: 'flagged', flags: ['vpn_or_proxy'] }, true).status
+    ).toBe('flagged');
   });
 });
 

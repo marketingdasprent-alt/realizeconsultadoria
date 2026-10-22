@@ -114,6 +114,7 @@ export const MailList: React.FC<MailListProps> = props => {
             isSelected={selection.isSelected(mailKey(mail))}
             selecting={selection.count > 0}
             accountDot={props.showAccount ? colorOf.get(mail.accountId) : undefined}
+            accountName={props.showAccount ? emailOf.get(mail.accountId) : undefined}
             onOpen={props.onOpen}
             onSelect={(target, range) => selection.toggle(mailKey(target), range)}
             onToggleStar={props.onToggleStar}

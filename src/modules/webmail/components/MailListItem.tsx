@@ -13,6 +13,8 @@ interface MailListItemProps {
   selecting: boolean;
   /** Cor da caixa (só na vista unificada). */
   accountDot?: string;
+  /** Nome da caixa (ao passar o rato na marca de cor). */
+  accountName?: string;
   onOpen: (mail: MailSummary) => void;
   /** Marcar/desmarcar (`range`: Shift+clique, intervalo desde o último). */
   onSelect: (mail: MailSummary, range: boolean) => void;
@@ -86,7 +88,12 @@ export const MailListItem: React.FC<MailListItemProps> = ({ mail, ...props }) =>
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
             {props.accountDot && (
-              <span className={cn('h-2 w-2 shrink-0 rounded-full', props.accountDot)} />
+              // Barra (e não bolinha) para não se confundir com o sinal de "por ler".
+              <span
+                title={props.accountName}
+                aria-label={props.accountName ? `Caixa ${props.accountName}` : undefined}
+                className={cn('h-3.5 w-1 shrink-0 rounded-full', props.accountDot)}
+              />
             )}
             <span
               className={cn(

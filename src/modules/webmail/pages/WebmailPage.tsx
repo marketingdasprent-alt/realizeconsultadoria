@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ConnectMailDialog } from '../components/ConnectMailDialog';
+import { ContactListsDialog } from '../components/ContactListsDialog';
 import { AttachmentPreview, type PreviewTarget } from '../components/AttachmentPreview';
 import { MailAccountDialog } from '../components/MailAccountDialog';
 import { MailComposer } from '../components/MailComposer';
@@ -14,6 +15,7 @@ import { MailSidebar } from '../components/MailSidebar';
 import { SidebarResizer } from '../components/SidebarResizer';
 import { MailToTaskOrEvent, type MailConversion } from '../components/MailToTaskOrEvent';
 import { ProviderGrid } from '../components/ProviderGrid';
+import { useContacts } from '../hooks/useContacts';
 import { useMailAccounts } from '../hooks/useMailAccounts';
 import { useMailActions } from '../hooks/useMailActions';
 import type { MailChange } from '../hooks/useMailChanges';
@@ -58,11 +60,13 @@ const WebmailPage: React.FC = () => {
   const [settings, setSettings] = useState<MailAccount | null>(null);
   const [conversion, setConversion] = useState<MailConversion | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [listsOpen, setListsOpen] = useState(false);
   const [preview, setPreview] = useState<PreviewTarget | null>(null);
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
 
   const accounts = mail.accounts;
   const actions = useMailActions(folder);
+  const people = useContacts(accounts);
   const unread = useUnreadCounts(accounts);
   // Caixa escolhida que deixou de existir (ex.: acabou de ser desligada): volta ao normal.
   const chosen = scope === 'all' || accounts.some(a => a.id === scope) ? scope : null;
@@ -164,6 +168,10 @@ const WebmailPage: React.FC = () => {
       }}
       onConnect={() => setParams({ ligar: '1' })}
       onSettings={setSettings}
+      onLists={() => {
+        setMenuOpen(false);
+        setListsOpen(true);
+      }}
       className={className}
       style={style}
     />
@@ -235,6 +243,8 @@ const WebmailPage: React.FC = () => {
       <MailComposer
         draft={draft}
         accounts={accounts}
+        contacts={people.contacts}
+        lists={people.lists}
         onClose={() => setDraft(null)}
         minimized={composerMinimized}
         onMinimize={() => setComposerMinimized(true)}
@@ -256,6 +266,15 @@ const WebmailPage: React.FC = () => {
           return ok;
         }}
         toBase64={actions.toBase64}
+      />
+      <ContactListsDialog
+        open={listsOpen}
+        onClose={() => setListsOpen(false)}
+        lists={people.lists}
+        team={people.team}
+        contacts={people.contacts}
+        onSave={people.saveList}
+        onDelete={people.deleteList}
       />
       <MailAccountDialog
         account={settings}

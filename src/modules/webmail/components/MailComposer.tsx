@@ -1,4 +1,4 @@
-import React, { useEffect, useId, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Maximize2, Minus, Paperclip, Send, X } from 'lucide-react';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useDirectory } from '@/modules/social/hooks/useDirectory';
@@ -9,7 +9,9 @@ import { signatureToHtml } from '../lib/signature';
 import { pickSignature, type SignatureChoice } from '../lib/signatures';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
+import type { ContactEntry, ContactList } from '../lib/recipients';
 import type { ComposeDraft, ComposeInput, MailAccount } from '../types';
+import { RecipientField } from './RecipientField';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const FIELD = 'h-10 w-full bg-transparent text-[14px] outline-none placeholder:text-rz-muted';
@@ -17,6 +19,9 @@ const FIELD = 'h-10 w-full bg-transparent text-[14px] outline-none placeholder:t
 interface MailComposerProps {
   draft: ComposeDraft | null;
   accounts: MailAccount[];
+  /** Quem a pessoa já escreveu e as suas listas (sugestões ao digitar). */
+  contacts?: ContactEntry[];
+  lists?: ContactList[];
   onClose: () => void;
   /** Minimizada (como o Gmail): fica uma barra em baixo com o rascunho guardado. */
   minimized?: boolean;
@@ -25,6 +30,19 @@ interface MailComposerProps {
   onSend: (input: ComposeInput) => Promise<boolean>;
   toBase64: (file: File) => Promise<string>;
 }
+
+/** Linha dos destinatários: não é <label> (as etiquetas têm botões lá dentro). */
+const RecipientRow: React.FC<{ label: string; children: React.ReactNode }> = ({
+  label,
+  children,
+}) => (
+  <div className="flex items-start gap-3 border-b border-rz-line px-5">
+    <span className="w-12 shrink-0 pt-[18px] text-[13px] font-semibold leading-none text-rz-muted">
+      {label}
+    </span>
+    {children}
+  </div>
+);
 
 const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, children }) => (
   <label className="flex items-center gap-3 border-b border-rz-line px-5">
@@ -37,6 +55,8 @@ const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, ch
 export const MailComposer: React.FC<MailComposerProps> = ({
   draft,
   accounts,
+  contacts = [],
+  lists = [],
   onClose,
   minimized = false,
   onMinimize,
@@ -44,8 +64,15 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   onSend,
   toBase64,
 }) => {
-  const listId = useId();
   const { colleagues } = useDirectory();
+  // Colegas da empresa com email: também são sugeridos.
+  const team = useMemo<ContactEntry[]>(
+    () =>
+      colleagues
+        .filter(person => person.email)
+        .map(person => ({ email: person.email as string, name: person.name })),
+    [colleagues]
+  );
   const fallback = accounts.find(a => a.isDefault) ?? accounts[0];
   const [accountId, setAccountId] = useState('');
   const [fields, setFields] = useState({ to: '', cc: '', bcc: '', subject: '', body: '' });
@@ -216,12 +243,15 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               ))}
             </select>
           </Row>
-          <Row label="Para">
-            <input
+          <RecipientRow label="Para">
+            <RecipientField
               value={fields.to}
-              onChange={e => set('to', e.target.value)}
-              list={listId}
-              className={FIELD}
+              onChange={value => set('to', value)}
+              team={team}
+              contacts={contacts}
+              lists={lists}
+              label="Para"
+              placeholder="Nome, email ou lista"
               autoFocus
             />
             {!showCc && (
@@ -233,34 +263,31 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 Cc/Bcc
               </button>
             )}
-          </Row>
+          </RecipientRow>
           {showCc && (
             <>
-              <Row label="Cc">
-                <input
+              <RecipientRow label="Cc">
+                <RecipientField
                   value={fields.cc}
-                  onChange={e => set('cc', e.target.value)}
-                  list={listId}
-                  className={FIELD}
+                  onChange={value => set('cc', value)}
+                  team={team}
+                  contacts={contacts}
+                  lists={lists}
+                  label="Cc"
                 />
-              </Row>
-              <Row label="Bcc">
-                <input
+              </RecipientRow>
+              <RecipientRow label="Bcc">
+                <RecipientField
                   value={fields.bcc}
-                  onChange={e => set('bcc', e.target.value)}
-                  list={listId}
-                  className={FIELD}
+                  onChange={value => set('bcc', value)}
+                  team={team}
+                  contacts={contacts}
+                  lists={lists}
+                  label="Bcc"
                 />
-              </Row>
+              </RecipientRow>
             </>
           )}
-          <datalist id={listId}>
-            {colleagues
-              .filter(c => c.email)
-              .map(c => (
-                <option key={c.userId} value={`${c.name} <${c.email}>`} />
-              ))}
-          </datalist>
           <Row label="Assunto">
             <input
               value={fields.subject}

@@ -1880,6 +1880,54 @@ export type Database = {
           },
         ];
       };
+      mail_contacts: {
+        Row: {
+          email: string;
+          last_used_at: string;
+          name: string | null;
+          user_id: string;
+          uses: number;
+        };
+        Insert: {
+          email: string;
+          last_used_at?: string;
+          name?: string | null;
+          user_id: string;
+          uses?: number;
+        };
+        Update: {
+          email?: string;
+          last_used_at?: string;
+          name?: string | null;
+          user_id?: string;
+          uses?: number;
+        };
+        Relationships: [];
+      };
+      mail_contact_lists: {
+        Row: {
+          created_at: string;
+          id: string;
+          members: Json;
+          name: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          id?: string;
+          members?: Json;
+          name: string;
+          user_id: string;
+        };
+        Update: {
+          created_at?: string;
+          id?: string;
+          members?: Json;
+          name?: string;
+          user_id?: string;
+        };
+        Relationships: [];
+      };
       mail_signatures: {
         Row: {
           account_id: string;
@@ -3696,6 +3744,7 @@ export type Database = {
       };
       feed_is_author: { Args: { _post_id: string }; Returns: boolean };
       feed_mark_seen: { Args: Record<PropertyKey, never>; Returns: undefined };
+      mail_remember_contacts: { Args: { _items: Json }; Returns: undefined };
       feed_unread_count: { Args: Record<PropertyKey, never>; Returns: number };
       feed_list_posts: {
         Args: { _before?: string; _limit?: number };

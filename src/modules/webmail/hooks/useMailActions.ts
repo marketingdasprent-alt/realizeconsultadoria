@@ -5,6 +5,7 @@ import { loadAttachment } from '../lib/attachments';
 import { DEMO_MAIL_ACCOUNTS } from '../lib/demoData';
 import { setDemoMail } from '../lib/demoStore';
 import { composeWithSignature } from '../lib/signature';
+import { contactService } from '../services/contactService';
 import { mailErrorText, mailService, type MailError } from '../services/mailService';
 import type { ComposeInput, MailFolder, MailSummary } from '../types';
 import { useMailChanges, type MailChange } from './useMailChanges';
@@ -107,8 +108,11 @@ export const useMailActions = (folder?: MailFolder) => {
         return false;
       }
       toast({ title: 'Email enviado' });
-      // Sem esperar: as listas atualizam-se em segundo plano.
+      // Sem esperar: as listas atualizam-se em segundo plano e quem recebeu passa a ser sugerido.
       void qc.invalidateQueries({ queryKey: ['mail', 'list'] });
+      void contactService
+        .remember([...input.to, ...input.cc, ...input.bcc].map(email => ({ email })))
+        .then(() => qc.invalidateQueries({ queryKey: ['mail', 'contacts'] }));
       return true;
     },
 

@@ -9,6 +9,7 @@ import {
   Send,
   Star,
   Trash2,
+  Users,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -40,6 +41,7 @@ interface MailSidebarProps {
   onCompose: () => void;
   onConnect: () => void;
   onSettings: (account: MailAccount) => void;
+  onLists: () => void;
   onReorder: (ids: string[]) => void;
   className?: string;
   style?: React.CSSProperties;
@@ -98,6 +100,19 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
           </button>
         );
       })}
+    </section>
+
+    <section>
+      <p className="mb-1 px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-rz-muted">
+        Contactos
+      </p>
+      <button
+        type="button"
+        onClick={props.onLists}
+        className={cn(SIDEBAR_ROW, 'hover:bg-white/70')}
+      >
+        <Users className="h-4 w-4" /> <span className="flex-1 text-left">Listas de contactos</span>
+      </button>
     </section>
   </aside>
 );

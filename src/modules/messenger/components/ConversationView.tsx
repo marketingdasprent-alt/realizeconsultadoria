@@ -123,6 +123,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
 
       <div className="pb-24 md:pb-0">
         <MessageComposer
+          conversationId={conversation.id}
           onSend={input => {
             api.send(input);
             setReplyTo(null);

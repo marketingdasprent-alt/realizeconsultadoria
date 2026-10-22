@@ -20,6 +20,8 @@ interface MessageComposerProps {
   /** Sem envio (canal só de leitura). */
   disabled?: boolean;
   disabledHint?: string;
+  /** Conversa aberta: ao mudar, o cursor vai logo para a caixa de escrita. */
+  conversationId?: string;
 }
 
 const TOOL =
@@ -33,6 +35,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const recorder = useAudioRecorder();
   const canSend = !disabled && text.trim().length > 0;
+
+  // Ao abrir uma conversa, escreve-se logo (no telemóvel não, para o teclado não tapar a conversa).
+  useEffect(() => {
+    if (disabled || window.matchMedia?.('(pointer: coarse)').matches) return;
+    areaRef.current?.focus();
+  }, [props.conversationId, disabled]);
 
   // Ao editar, a caixa traz o texto original; ao responder, ganha o foco.
   useEffect(() => {

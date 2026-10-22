@@ -20,7 +20,7 @@ export interface OrgDepartment {
   name: string;
   /** Por nível (direção, chefias, restantes) e depois por nome. */
   people: DirectoryPerson[];
-  /** Direção (CEO, diretores): leva a coroa. Gestores e chefes não. */
+  /** Quem chefia o departamento (leva a coroa): a direção ou, sem diretor, a chefia (ex.: Chefe de Oficina). */
   leads: string[];
 }
 
@@ -36,6 +36,11 @@ export const rankOf = (position: string | null | undefined): number =>
 
 /** Cargo de chefia (direção ou chefia intermédia). */
 export const isLead = (person: Pick<DirectoryPerson, 'position'>) => rankOf(person.position) > 0;
+
+const topLeads = (people: DirectoryPerson[]): string[] => {
+  const top = Math.max(0, ...people.map(p => rankOf(p.position)));
+  return top ? people.filter(p => rankOf(p.position) === top).map(p => p.userId) : [];
+};
 
 const matches = (person: DirectoryPerson, term: string) =>
   matchesText(term, person.name, person.position, person.department);
@@ -64,8 +69,9 @@ export const buildOrgChart = (people: DirectoryPerson[], search = ''): OrgChart 
       people: [...visible].sort(
         (a, b) => rankOf(b.position) - rankOf(a.position) || compareText(a.name, b.name)
       ),
-      // Coroa só para a direção; os gestores (ex.: Gestor TVDE) aparecem por baixo do diretor.
-      leads: visible.filter(p => rankOf(p.position) === 2).map(p => p.userId),
+      // Coroa para o nível mais alto do departamento: com diretor, só ele (o Gestor TVDE fica
+      // por baixo, sem coroa); sem diretor, a chefia (Chefe de Oficina, Gestor de Frota).
+      leads: topLeads(visible),
     });
   }
   departments.sort((a, b) =>

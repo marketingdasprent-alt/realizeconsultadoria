@@ -35,7 +35,7 @@ describe('organograma', () => {
     expect(chart.total).toBe(5);
   });
 
-  it('coroa só para a direção; gestores por baixo do diretor', () => {
+  it('coroa para quem chefia: o diretor, ou a chefia quando não há diretor', () => {
     const tvde = buildOrgChart([
       person('Luiz', 'TVDE', 'Diretor TVDE'),
       person('Ana', 'TVDE', 'Gestor TVDE'),
@@ -45,7 +45,7 @@ describe('organograma', () => {
     const dept = tvde.find(d => d.name === 'TVDE');
     expect(dept?.people.map(p => p.name)).toEqual(['Luiz', 'Ana', 'Bruno']);
     expect(dept?.leads).toEqual(['Luiz']);
-    expect(tvde.find(d => d.name === 'Frota')?.leads).toEqual([]);
+    expect(tvde.find(d => d.name === 'Frota')?.leads).toEqual(['Rui']);
     expect(rankOf('CEO')).toBe(2);
     expect(rankOf('Chefe de Oficina')).toBe(1);
     expect(rankOf('Mecânico')).toBe(0);

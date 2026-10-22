@@ -68,10 +68,10 @@ export const MailReader: React.FC<MailReaderProps> = ({
   onOpenAttachment,
 }) => {
   const thread = useMailThread(summary);
-  // A conversa (mais antiga primeiro); sem outras mensagens, só o email aberto.
-  const conversation = thread.some(m => m.id === summary.id) ? thread : [];
+  // A conversa, a resposta mais recente em cima; sem outras mensagens, só o email aberto.
+  const conversation = thread.some(m => m.id === summary.id) ? [...thread].reverse() : [];
   const others = conversation.filter(m => m.id !== summary.id).length;
-  // Numa conversa longa, desce logo até ao email aberto (as anteriores ficam por cima).
+  // Se o email aberto não for o mais recente, a vista vai até ele.
   const currentRef = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (others > 0) currentRef.current?.scrollIntoView({ block: 'start' });

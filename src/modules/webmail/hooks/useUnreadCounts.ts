@@ -33,8 +33,9 @@ export const refreshUnreadSoon = (qc: QueryClient, delayMs = 3000) => {
 };
 
 /**
- * Emails por ler na Entrada de cada caixa (barra lateral) e o total. Atualiza a cada minuto
- * com a página aberta: um pedido leve por caixa, feito no servidor com poucos em simultâneo.
+ * Emails por ler na Entrada de cada caixa (barra lateral) e o total. Atualiza de 20 em 20 s
+ * com a página à vista: um pedido leve por caixa, feito no servidor com poucos em simultâneo.
+ * É o que avisa que chegou email novo (a lista atualiza-se logo que o total sobe).
  */
 export const useUnreadCounts = (accounts: MailAccount[]) => {
   const { isPreview } = useWorkspace();
@@ -47,8 +48,8 @@ export const useUnreadCounts = (accounts: MailAccount[]) => {
       return data?.counts ?? {};
     },
     enabled: !isPreview && accounts.length > 0,
-    refetchInterval: 60_000,
-    staleTime: 30_000,
+    refetchInterval: 20_000,
+    staleTime: 10_000,
   });
 
   const demoCounts = useMemo(() => {

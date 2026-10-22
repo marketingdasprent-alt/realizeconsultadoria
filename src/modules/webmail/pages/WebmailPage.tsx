@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, MailOpen } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -16,6 +16,7 @@ import { SidebarResizer } from '../components/SidebarResizer';
 import { MailToTaskOrEvent, type MailConversion } from '../components/MailToTaskOrEvent';
 import { ProviderGrid } from '../components/ProviderGrid';
 import { useContacts } from '../hooks/useContacts';
+import { useKeptUnread } from '../hooks/useKeptUnread';
 import { useMailAccounts } from '../hooks/useMailAccounts';
 import { useMailActions } from '../hooks/useMailActions';
 import type { MailChange } from '../hooks/useMailChanges';
@@ -72,9 +73,18 @@ const WebmailPage: React.FC = () => {
   const chosen = scope === 'all' || accounts.some(a => a.id === scope) ? scope : null;
   const current = chosen ?? (accounts.length > 1 ? 'all' : (accounts[0]?.id ?? 'all'));
   const box = useMailbox(accounts, current, folder, query);
-  usePrefetchTop(box.messages);
+  // Em "Não lidos" o email aberto fica na lista até se sair da pasta ou atualizar.
+  const list = useKeptUnread(folder, current, query, box.messages);
+  usePrefetchTop(list.messages);
+  // Chegou email novo (o total de não lidos subiu): a lista atualiza-se logo, sem esperar.
+  const lastTotal = useRef<number | null>(null);
+  useEffect(() => {
+    if (lastTotal.current !== null && unread.total > lastTotal.current) void box.refetch();
+    lastTotal.current = unread.total;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando o total muda
+  }, [unread.total]);
   const selected = active
-    ? (box.messages.find(m => mailKey(m) === mailKey(active)) ?? active)
+    ? (list.messages.find(m => mailKey(m) === mailKey(active)) ?? active)
     : null;
   const { message, isLoading: messageLoading } = useMailMessage(active);
 
@@ -101,6 +111,7 @@ const WebmailPage: React.FC = () => {
 
   const open = (summary: MailSummary) => {
     setActive(summary);
+    if (summary.unread) list.keep(summary);
     void actions.setRead(summary, true);
   };
   // Lixo pela lista (um ou vários): se o email aberto for um deles, o leitor fecha.
@@ -108,7 +119,10 @@ const WebmailPage: React.FC = () => {
     if (active && mails.some(m => mailKey(m) === mailKey(active))) setActive(null);
   };
   const bulk = (mails: MailSummary[], kind: MailChange) => {
-    if (kind === 'trash') closeIfAmong(mails);
+    if (kind === 'trash') {
+      closeIfAmong(mails);
+      list.drop(mails);
+    }
     void actions.bulk(mails, kind);
   };
   const choose = (next: () => void) => {
@@ -121,6 +135,7 @@ const WebmailPage: React.FC = () => {
     const email = accounts.find(a => a.id === selected.accountId)?.email ?? '';
     if (action === 'star') return void actions.toggleStar(selected);
     if (action === 'trash' || action === 'unread') {
+      if (action === 'trash') list.drop([selected]);
       void (action === 'trash' ? actions.trash(selected) : actions.setRead(selected, false));
       return setActive(null);
     }
@@ -183,7 +198,7 @@ const WebmailPage: React.FC = () => {
       <SidebarResizer width={sidebarWidth} onChange={setSidebarWidth} onCommit={saveSidebarWidth} />
       <MailList
         title={FOLDERS.find(f => f.key === folder)?.label ?? 'Email'}
-        messages={box.messages}
+        messages={list.messages}
         accounts={accounts}
         activeKey={active ? mailKey(active) : null}
         showAccount={current === 'all'}
@@ -198,7 +213,10 @@ const WebmailPage: React.FC = () => {
         }}
         onBulk={bulk}
         onHover={prefetch}
-        onRefresh={() => void box.refetch()}
+        onRefresh={() => {
+          list.clear();
+          void box.refetch();
+        }}
         onMenu={() => setMenuOpen(true)}
         isLoading={box.isLoading}
         isRefreshing={box.isRefreshing}

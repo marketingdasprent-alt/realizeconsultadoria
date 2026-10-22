@@ -42,6 +42,7 @@ interface MailSidebarProps {
   onSettings: (account: MailAccount) => void;
   onReorder: (ids: string[]) => void;
   className?: string;
+  style?: React.CSSProperties;
 }
 
 /** Caixas ligadas (e a caixa unificada) e as pastas. */
@@ -51,6 +52,7 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
       'rz-scroll flex flex-col gap-4 overflow-y-auto bg-rz-canvas/60 p-3',
       props.className
     )}
+    style={props.style}
   >
     <button
       type="button"

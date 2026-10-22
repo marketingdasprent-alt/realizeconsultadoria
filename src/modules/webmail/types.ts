@@ -13,6 +13,8 @@ export interface MailAccount {
   authMethod: 'oauth-google' | 'oauth-microsoft' | 'imap';
   email: string;
   displayName: string | null;
+  /** Nome que a própria pessoa deu à caixa na barra lateral (null = o endereço). */
+  label: string | null;
   signature: string | null;
   status: 'active' | 'error' | 'reauth';
   lastError: string | null;
@@ -75,6 +77,8 @@ export interface ComposeInput {
   text: string;
   /** Assinatura em HTML a juntar ao enviar (antes da citação). */
   signatureHtml?: string | null;
+  /** Reencaminhar: o email original em HTML (com cabeçalho), no lugar da citação em texto. */
+  quotedHtml?: string | null;
   inReplyTo?: string;
   attachments: OutgoingAttachment[];
 }
@@ -90,6 +94,13 @@ export interface ComposeDraft {
   inReplyTo?: string;
   /** Rascunho devolvido por um envio falhado: já tem a assinatura. */
   restored?: boolean;
+  /** Reencaminhar: o HTML original e os anexos a voltar a anexar. */
+  forward?: {
+    messageId: string;
+    accountId: string;
+    html: string;
+    attachments: MailAttachmentInfo[];
+  };
 }
 
 export interface ImapConnectInput {

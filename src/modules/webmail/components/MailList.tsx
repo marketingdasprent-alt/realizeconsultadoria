@@ -3,7 +3,7 @@ import { AlertTriangle, Loader2, Menu, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { MailChange } from '../hooks/useMailChanges';
 import { useMailSelection } from '../hooks/useMailSelection';
-import { ACCOUNT_DOTS, mailKey } from '../lib/mailFormat';
+import { ACCOUNT_DOTS, accountName, mailKey } from '../lib/mailFormat';
 import { mailErrorText, type MailError } from '../services/mailService';
 import type { MailAccount, MailSummary } from '../types';
 import { MailBulkBar } from './MailBulkBar';
@@ -39,7 +39,7 @@ interface MailListProps {
 /** Lista de emails (pesquisa, seleção, estrela, lixo e a cor da caixa na vista unificada). */
 export const MailList: React.FC<MailListProps> = props => {
   const colorOf = new Map(props.accounts.map(a => [a.id, ACCOUNT_DOTS[a.color]]));
-  const emailOf = new Map(props.accounts.map(a => [a.id, a.email]));
+  const emailOf = new Map(props.accounts.map(a => [a.id, accountName(a)]));
   const selection = useMailSelection(props.messages, props.selectionKey);
   const onBulk = (kind: MailChange) => {
     props.onBulk(selection.selected, kind);

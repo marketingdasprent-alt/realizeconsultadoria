@@ -19,7 +19,10 @@ interface MailAccountDialogProps {
   onClose: () => void;
   onSave: (
     id: string,
-    patch: Pick<MailAccount, 'displayName' | 'signature' | 'isDefault' | 'color' | 'notify'>
+    patch: Pick<
+      MailAccount,
+      'displayName' | 'label' | 'signature' | 'isDefault' | 'color' | 'notify'
+    >
   ) => Promise<boolean>;
   onReconnect: (account: MailAccount) => void;
   onDisconnect: (account: MailAccount) => Promise<void>;
@@ -38,6 +41,7 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
 }) => {
   const [form, setForm] = useState({
     displayName: '',
+    label: '',
     signature: '',
     color: 'violet' as MailAccountColor,
     isDefault: false,
@@ -49,6 +53,7 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
     if (!account) return;
     setForm({
       displayName: account.displayName ?? '',
+      label: account.label ?? '',
       signature: account.signature ?? '',
       color: account.color,
       isDefault: account.isDefault,
@@ -62,6 +67,7 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
   const save = () => {
     void onSave(account.id, {
       displayName: account.shared ? account.displayName : form.displayName.trim() || null,
+      label: form.label.trim().slice(0, 60) || null,
       signature: sanitizeSignatureHtml(form.signature) || null,
       color: form.color,
       isDefault: account.shared ? account.isDefault : form.isDefault,
@@ -118,6 +124,20 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
           )}
 
           <div className="space-y-4">
+            <label className="block">
+              <span className={LABEL}>Nome da caixa</span>
+              <input
+                value={form.label}
+                onChange={e => setForm(f => ({ ...f, label: e.target.value }))}
+                placeholder={account.email}
+                maxLength={60}
+                className={cn(FIELD, 'h-11')}
+              />
+              <span className="mt-1 block text-[12px] text-rz-muted">
+                Como aparece na sua barra lateral{account.shared ? ' (só para si)' : ''}. Deixe
+                vazio para mostrar o endereço.
+              </span>
+            </label>
             {!account.shared && (
               <label className="block">
                 <span className={LABEL}>Nome do remetente</span>

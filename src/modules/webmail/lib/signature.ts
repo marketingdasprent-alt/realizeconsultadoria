@@ -118,22 +118,28 @@ export const signatureToHtml = (signature: string | null): string => {
   return isHtmlSignature(value) ? sanitizeSignatureHtml(value) : textToHtml(value);
 };
 
-// Início da citação que o Realize põe ao responder/reencaminhar.
-const QUOTE_START = /\n\nEm [^\n]*escreveu:\n/;
+// Início da citação que o Realize põe ao responder (Em …, X escreveu:) ou reencaminhar.
+const QUOTE_START = /\n\n(?:Em [^\n]*escreveu:|---------- Mensagem reencaminhada ----------)\n/;
 
 /**
  * Email final: o texto escrito, depois a assinatura e, por fim, a citação (como no Gmail).
- * Devolve o HTML e a versão em texto (para quem não lê HTML).
+ * Devolve o HTML e a versão em texto (para quem não lê HTML). Ao reencaminhar, a citação vai
+ * em HTML (quotedHtml: o email original tal como veio) em vez do texto.
  */
-export const composeWithSignature = (text: string, signatureHtml: string | null) => {
-  if (!signatureHtml?.trim()) return { text, html: textToHtml(text) };
+export const composeWithSignature = (
+  text: string,
+  signatureHtml: string | null,
+  quotedHtml: string | null = null
+) => {
+  const signature = signatureHtml?.trim() ? signatureHtml : '';
+  if (!signature && !quotedHtml) return { text, html: textToHtml(text) };
   const match = QUOTE_START.exec(text);
   const written = match ? text.slice(0, match.index) : text;
   const quoted = match ? text.slice(match.index) : '';
   const html =
     textToHtml(written) +
-    `<div style="margin-top:16px">${signatureHtml}</div>` +
-    (quoted ? textToHtml(quoted) : '');
-  const plain = `${written}\n\n--\n${htmlToText(signatureHtml).trim()}${quoted}`;
+    (signature ? `<div style="margin-top:16px">${signature}</div>` : '') +
+    (quoted ? (quotedHtml ?? textToHtml(quoted)) : '');
+  const plain = signature ? `${written}\n\n--\n${htmlToText(signature).trim()}${quoted}` : text;
   return { text: plain, html };
 };

@@ -54,6 +54,7 @@ const toAccount = (row: Row): MailAccount => ({
   authMethod: row.auth_method as MailAccount['authMethod'],
   email: str(row.email),
   displayName: (row.display_name as string | null) ?? null,
+  label: null,
   signature: (row.signature as string | null) ?? null,
   status: row.status as MailAccount['status'],
   lastError: (row.last_error as string | null) ?? null,
@@ -132,12 +133,18 @@ export const mailService = {
         .select('account_id, signature, color, notify')
         .eq('user_id', userId),
       // Ordem escolhida pela pessoa na barra lateral (sem ela, fica a da ligação).
-      supabase.from('mail_account_order').select('account_id, position').eq('user_id', userId),
+      supabase
+        .from('mail_account_order')
+        .select('account_id, position, label')
+        .eq('user_id', userId),
     ]);
     const mine = new Map(((prefs.data ?? []) as Row[]).map(p => [str(p.account_id), p]));
     const positions = new Map((order.data ?? []).map(row => [row.account_id, row.position]));
-    const list = ((accounts.data ?? []) as Row[]).map(row => {
-      const account = toAccount(row);
+    const labels = new Map(
+      (order.data ?? []).map(row => [row.account_id, (row.label as string | null) ?? null])
+    );
+    const list = ((accounts.data ?? []) as Row[]).map(base => {
+      const account = { ...toAccount(base), label: labels.get(str(base.id)) ?? null };
       const pref = account.shared ? mine.get(account.id) : undefined;
       return pref
         ? {
@@ -166,6 +173,22 @@ export const mailService = {
       })),
       { onConflict: 'user_id,account_id' }
     );
+    return { error };
+  },
+
+  /**
+   * Nome da caixa só para esta pessoa. Grava primeiro a ordem atual de todas (senão a linha nova
+   * puxava esta caixa para o topo) e depois o nome.
+   */
+  saveAccountLabel: async (accountId: string, label: string | null, orderedIds: string[]) => {
+    const ordered = await mailService.saveAccountOrder(orderedIds);
+    if (ordered.error) return ordered;
+    const { data: auth } = await supabase.auth.getSession();
+    const { error } = await supabase
+      .from('mail_account_order')
+      .update({ label })
+      .eq('user_id', auth.session?.user.id ?? '')
+      .eq('account_id', accountId);
     return { error };
   },
 

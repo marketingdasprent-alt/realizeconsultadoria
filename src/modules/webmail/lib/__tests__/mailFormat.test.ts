@@ -57,6 +57,7 @@ describe('webmail', () => {
     const draft = draftFrom(message, 'forward', 'joana@exemplo.pt');
     expect(draft.to).toBeUndefined();
     expect(draft.subject).toBe('Fwd: Plano de férias');
+    expect(draft.forward?.messageId).toBe('m1');
   });
 
   it('assinatura antes da citação', () => {

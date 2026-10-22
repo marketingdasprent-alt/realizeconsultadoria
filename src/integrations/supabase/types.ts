@@ -1882,18 +1882,21 @@ export type Database = {
       };
       mail_account_order: {
         Row: {
+          label: string | null;
           account_id: string;
           position: number;
           updated_at: string;
           user_id: string;
         };
         Insert: {
+          label?: string | null;
           account_id: string;
           position: number;
           updated_at?: string;
           user_id: string;
         };
         Update: {
+          label?: string | null;
           account_id?: string;
           position?: number;
           updated_at?: string;

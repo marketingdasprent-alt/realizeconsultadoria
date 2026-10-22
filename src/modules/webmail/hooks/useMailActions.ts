@@ -1,6 +1,7 @@
 import { useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
+import { loadAttachment } from '../lib/attachments';
 import { DEMO_MAIL_ACCOUNTS } from '../lib/demoData';
 import { setDemoMail } from '../lib/demoStore';
 import { composeWithSignature } from '../lib/signature';
@@ -94,7 +95,11 @@ export const useMailActions = (folder?: MailFolder) => {
       }
       // O compositor já fechou: o aviso mostra o progresso e o resultado.
       const progress = toast({ title: 'A enviar…', description: input.subject || undefined });
-      const composed = composeWithSignature(input.text, input.signatureHtml ?? null);
+      const composed = composeWithSignature(
+        input.text,
+        input.signatureHtml ?? null,
+        input.quotedHtml ?? null
+      );
       const { error } = await mailService.send({ ...input, text: composed.text }, composed.html);
       progress.dismiss();
       if (error) {
@@ -112,13 +117,20 @@ export const useMailActions = (folder?: MailFolder) => {
         toast({ title: 'Pré-visualização', description: 'Os anexos de exemplo não existem.' });
         return;
       }
-      const { data, error } = await mailService.attachment(mail.accountId, mail.id, attachmentId);
-      if (error || !data) return fail(error, 'O anexo não foi descarregado.');
-      const bytes = Uint8Array.from(atob(data.base64), char => char.charCodeAt(0));
-      const url = URL.createObjectURL(new Blob([bytes], { type: data.mime }));
+      // O servidor lê o email inteiro para tirar o anexo (pode demorar): mostra que está a andar.
+      const progress = toast({ title: 'A descarregar o anexo…' });
+      let loaded;
+      try {
+        loaded = await loadAttachment(mail.accountId, mail.id, attachmentId);
+      } catch (error) {
+        progress.dismiss();
+        return fail(error as MailError, 'O anexo não foi descarregado. Tente outra vez.');
+      }
+      progress.dismiss();
+      const url = URL.createObjectURL(loaded.blob);
       const link = document.createElement('a');
       link.href = url;
-      link.download = data.filename;
+      link.download = loaded.filename;
       link.click();
       setTimeout(() => URL.revokeObjectURL(url), 10_000);
     },

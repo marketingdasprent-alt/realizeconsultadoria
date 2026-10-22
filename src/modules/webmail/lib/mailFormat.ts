@@ -1,6 +1,7 @@
 // Formatação do Webmail: nomes, datas, respostas, assinaturas e o HTML seguro do leitor.
 import { format, isSameYear, isToday } from 'date-fns';
 import { pt } from 'date-fns/locale';
+import { forwardedHtml, forwardedText } from './forward';
 import type { ComposeDraft, MailAddress, MailFolder, MailMessage, MailSummary } from '../types';
 
 export const FOLDERS: { key: MailFolder; label: string }[] = [
@@ -24,6 +25,10 @@ export const ACCOUNT_DOTS: Record<string, string> = {
 };
 
 /** Linha da barra lateral (caixas e pastas). */
+/** Como se chama a caixa para quem a vê: o nome que lhe deu, ou o endereço. */
+export const accountName = (account: { label?: string | null; email: string }): string =>
+  account.label?.trim() || account.email;
+
 export const SIDEBAR_ROW =
   'flex w-full items-center gap-2.5 rounded-2xl px-3 py-2 text-left text-[13.5px] font-semibold transition-colors';
 
@@ -77,7 +82,13 @@ export const draftFrom = (
     return {
       accountId: message.accountId,
       subject: prefixed('Fwd', message.subject),
-      body: quote(message),
+      body: forwardedText(message, message.text ?? htmlToText(message.html ?? '')),
+      forward: {
+        messageId: message.id,
+        accountId: message.accountId,
+        html: forwardedHtml(message),
+        attachments: message.attachments,
+      },
     };
   const replyTo = message.replyTo.length ? message.replyTo : message.from ? [message.from] : [];
   const others =

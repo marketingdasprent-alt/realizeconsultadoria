@@ -5,11 +5,13 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ConnectMailDialog } from '../components/ConnectMailDialog';
+import { AttachmentPreview, type PreviewTarget } from '../components/AttachmentPreview';
 import { MailAccountDialog } from '../components/MailAccountDialog';
 import { MailComposer } from '../components/MailComposer';
 import { MailList } from '../components/MailList';
 import { MailReader, type ReaderAction } from '../components/MailReader';
 import { MailSidebar } from '../components/MailSidebar';
+import { SidebarResizer } from '../components/SidebarResizer';
 import { MailToTaskOrEvent, type MailConversion } from '../components/MailToTaskOrEvent';
 import { ProviderGrid } from '../components/ProviderGrid';
 import { useMailAccounts } from '../hooks/useMailAccounts';
@@ -23,6 +25,7 @@ import {
   usePrefetchTop,
 } from '../hooks/useMailbox';
 import { FOLDERS, draftFrom, mailKey } from '../lib/mailFormat';
+import { readSidebarWidth, saveSidebarWidth } from '../lib/sidebarWidth';
 import { providerOf, type MailProvider } from '../lib/providers';
 import type { ComposeDraft, MailAccount, MailFolder, MailSummary } from '../types';
 
@@ -36,11 +39,27 @@ const WebmailPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<MailSummary | null>(null);
-  const [draft, setDraft] = useState<ComposeDraft | null>(null);
+  const [draft, setDraftState] = useState<ComposeDraft | null>(null);
+  const [composerMinimized, setComposerMinimized] = useState(false);
+  // Com uma mensagem já aberta (ou minimizada) não se abre outra por cima: volta-se a ela.
+  const setDraft = (next: ComposeDraft | null) => {
+    if (next && draft) {
+      setComposerMinimized(false);
+      toast({
+        title: 'Já tem uma mensagem aberta',
+        description: 'Envie-a ou descarte-a primeiro.',
+      });
+      return;
+    }
+    setComposerMinimized(false);
+    setDraftState(next);
+  };
   const [connect, setConnect] = useState<MailProvider | null>(null);
   const [settings, setSettings] = useState<MailAccount | null>(null);
   const [conversion, setConversion] = useState<MailConversion | null>(null);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [preview, setPreview] = useState<PreviewTarget | null>(null);
+  const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
 
   const accounts = mail.accounts;
   const actions = useMailActions(folder);
@@ -129,7 +148,7 @@ const WebmailPage: React.FC = () => {
       </>
     );
 
-  const sidebar = (className: string) => (
+  const sidebar = (className: string, style?: React.CSSProperties) => (
     <MailSidebar
       accounts={accounts}
       scope={current}
@@ -146,12 +165,14 @@ const WebmailPage: React.FC = () => {
       onConnect={() => setParams({ ligar: '1' })}
       onSettings={setSettings}
       className={className}
+      style={style}
     />
   );
 
   return (
     <div className="flex h-full">
-      {sidebar('hidden w-[250px] shrink-0 border-r border-rz-line lg:flex')}
+      {sidebar('hidden shrink-0 lg:flex', { width: sidebarWidth })}
+      <SidebarResizer width={sidebarWidth} onChange={setSidebarWidth} onCommit={saveSidebarWidth} />
       <MailList
         title={FOLDERS.find(f => f.key === folder)?.label ?? 'Email'}
         messages={box.messages}
@@ -191,6 +212,9 @@ const WebmailPage: React.FC = () => {
             onBack={() => setActive(null)}
             onAction={onAction}
             onDownload={id => void actions.download(selected, id)}
+            onOpenAttachment={attachment =>
+              setPreview({ accountId: selected.accountId, messageId: selected.id, attachment })
+            }
           />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-rz-muted">
@@ -212,11 +236,14 @@ const WebmailPage: React.FC = () => {
         draft={draft}
         accounts={accounts}
         onClose={() => setDraft(null)}
+        minimized={composerMinimized}
+        onMinimize={() => setComposerMinimized(true)}
+        onRestore={() => setComposerMinimized(false)}
         onSend={async input => {
           const ok = await actions.send(input);
           // Falhou: o rascunho volta a abrir como estava (os anexos têm de ser escolhidos outra vez).
           if (!ok)
-            setDraft({
+            setDraftState({
               accountId: input.accountId,
               to: input.to.join(', '),
               cc: input.cc.join(', '),
@@ -236,6 +263,16 @@ const WebmailPage: React.FC = () => {
         onSave={mail.update}
         onReconnect={account => mail.startOAuth(providerOf(account.provider).key)}
         onDisconnect={account => mail.disconnect(account.id)}
+      />
+      <AttachmentPreview
+        target={preview}
+        onClose={() => setPreview(null)}
+        onDownload={target =>
+          void actions.download(
+            { accountId: target.accountId, id: target.messageId } as MailSummary,
+            target.attachment.id
+          )
+        }
       />
       <MailToTaskOrEvent value={conversion} onClose={() => setConversion(null)} />
       {connectDialog}

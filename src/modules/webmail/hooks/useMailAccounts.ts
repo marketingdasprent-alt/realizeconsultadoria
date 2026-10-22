@@ -40,7 +40,9 @@ export const useMailAccounts = () => {
 
     update: async (
       id: string,
-      patch: Partial<Pick<MailAccount, 'displayName' | 'signature' | 'isDefault' | 'color'>>
+      patch: Partial<
+        Pick<MailAccount, 'displayName' | 'label' | 'signature' | 'isDefault' | 'color' | 'notify'>
+      >
     ) => {
       if (isPreview) {
         setDemoMail(s => ({
@@ -59,7 +61,18 @@ export const useMailAccounts = () => {
           a.id === id ? { ...a, ...patch } : patch.isDefault ? { ...a, isDefault: false } : a
         )
       );
-      const { error } = await mailService.updateAccount(id, patch, shared);
+      // O nome da caixa é só desta pessoa (outra tabela); o resto é da caixa ou da participação.
+      const { label, ...rest } = patch;
+      const orderedIds = (qc.getQueryData<MailAccount[]>(MAIL_ACCOUNTS_KEY) ?? []).map(a => a.id);
+      const [labelResult, restResult] = await Promise.all([
+        label !== undefined
+          ? mailService.saveAccountLabel(id, label, orderedIds)
+          : Promise.resolve({ error: null }),
+        Object.keys(rest).length
+          ? mailService.updateAccount(id, rest, shared)
+          : Promise.resolve({ error: null }),
+      ]);
+      const error = labelResult.error ?? restResult.error;
       if (error) {
         fail(null, 'As alterações não foram guardadas.');
         void qc.invalidateQueries({ queryKey: MAIL_ACCOUNTS_KEY });

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MailMessage } from '../../types';
-import { draftFromSaved, draftHasContent } from '../savedDraft';
+import { draftFromSaved, draftHasContent, stripSavedSignature } from '../savedDraft';
 
 const saved: MailMessage = {
   id: 'd1',
@@ -43,5 +43,31 @@ describe('rascunhos', () => {
     expect(draftHasContent(empty, 0)).toBe(false);
     expect(draftHasContent(empty, 1)).toBe(true);
     expect(draftHasContent({ ...empty, subject: 'Olá' }, 0)).toBe(true);
+  });
+});
+
+describe('stripSavedSignature', () => {
+  const signatures = [
+    {
+      id: 's1',
+      name: 'Marketing',
+      html: 'Com os melhores cumprimentos<br><b>THIAGO SOUSA</b><br><img src="https://x/logo.png">',
+      isDefault: true,
+    },
+  ];
+
+  it('takes the signature text out of a reopened draft and remembers which one it was', () => {
+    const result = stripSavedSignature(
+      'Olá David,\n\nsegue a proposta.\n\nCom os melhores cumprimentos\nTHIAGO SOUSA\n',
+      signatures
+    );
+    expect(result).toEqual({ body: 'Olá David,\n\nsegue a proposta.', signatureId: 's1' });
+  });
+
+  it('leaves the text alone when it has no known signature', () => {
+    expect(stripSavedSignature('Só texto', signatures)).toEqual({
+      body: 'Só texto',
+      signatureId: null,
+    });
   });
 });

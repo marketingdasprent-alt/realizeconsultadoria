@@ -13,7 +13,7 @@ import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import { useDraftSaver } from '../hooks/useDraftSaver';
 import type { ContactEntry, ContactList } from '../lib/recipients';
-import { draftHasContent } from '../lib/savedDraft';
+import { draftHasContent, stripSavedSignature } from '../lib/savedDraft';
 import type { ComposeDraft, ComposeInput, MailAccount } from '../types';
 import { AutoTextarea } from './AutoTextarea';
 import { RecipientField } from './RecipientField';
@@ -103,16 +103,29 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     const account =
       list.find(a => a.id === draft.accountId) ?? list.find(a => a.isDefault) ?? list[0];
     setAccountId(account?.id ?? '');
+    // Rascunho reaberto: a assinatura sai do texto e volta ao seletor (completa, com imagens).
+    let written = writtenPart(draft.body ?? '');
+    let choice: SignatureChoice = 'default';
+    if (draft.saved) {
+      const signatures = account?.signatures ?? [];
+      const found = stripSavedSignature(written, signatures);
+      written = found.body;
+      choice = !found.signatureId
+        ? 'none'
+        : signatures.find(sig => sig.id === found.signatureId)?.isDefault
+          ? 'default'
+          : found.signatureId;
+    }
     setFields({
       to: draft.to ?? '',
       cc: draft.cc ?? '',
       bcc: draft.bcc ?? '',
       subject: draft.subject ?? '',
-      body: writtenPart(draft.body ?? ''),
+      body: written,
     });
     setQuote((draft.body ?? '').slice(writtenPart(draft.body ?? '').length));
     setShowCc(!!draft.cc || !!draft.bcc);
-    setSigChoice(draft.saved ? 'none' : 'default');
+    setSigChoice(choice);
     setFiles([]);
     setMissingFiles([]);
     setBusy(false);

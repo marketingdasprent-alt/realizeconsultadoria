@@ -196,12 +196,11 @@ export const formatTimer = (ms: number): string => {
 
 /**
  * Registo esquecido (✎): a hora indicada ("14:00") tem de ser de hoje, antes de agora,
- * nas últimas 12 h e depois do último registo. O motivo é opcional: com ele o registo fica
- * válido; sem ele os RH aprovam.
+ * nas últimas 12 h e depois do último registo, e o motivo é obrigatório (como na BD).
  */
 export const buildCorrection = (
   time: string,
-  _reason: string,
+  reason: string,
   last: { punched_at: string } | null,
   now: Date = new Date()
 ): { at: string } | { error: string } => {
@@ -218,6 +217,7 @@ export const buildCorrection = (
       error: `Tem de ser depois do último registo (${format(new Date(last.punched_at), 'HH:mm')}).`,
     };
   }
+  if (reason.trim().length < 3) return { error: 'Escreva o motivo da correção.' };
   return { at: at.toISOString() };
 };
 

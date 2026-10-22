@@ -64,47 +64,52 @@ export const useDraftSaver = ({
     timer.current = null;
   };
 
-  const save = useCallback(async (): Promise<boolean> => {
-    cancel();
-    if (isPreview || !hasContent) return true;
-    if (snapshot === savedSnapshot.current && saved.current) return true;
-    // Um de cada vez: se já está a guardar, espera e volta a ver.
-    if (running.current) await running.current;
-    const job = (async () => {
-      setStatus('saving');
-      const input = await buildRef.current();
-      const composed = composeWithSignature(
-        input.text,
-        input.signatureHtml ?? null,
-        input.quotedHtml ?? null
-      );
-      // Mudou de caixa: o rascunho antigo sai da outra caixa.
-      const previous = saved.current;
-      const sameAccount = previous?.accountId === input.accountId;
-      if (previous && !sameAccount) void mailService.deleteDraft(previous.accountId, previous.id);
-      const { data, error } = await mailService.saveDraft(
-        { ...input, text: composed.text },
-        composed.html,
-        sameAccount ? (previous?.id ?? null) : null
-      );
-      if (error || !data) {
-        setStatus('error');
-        return false;
+  // `force`: o botão Guardar grava mesmo sem alterações (ex.: resposta só com o destinatário).
+  const save = useCallback(
+    async (force = false): Promise<boolean> => {
+      cancel();
+      if (isPreview || !hasContent) return true;
+      // Sem alterações desde que abriu (ou desde a última gravação): nada a guardar.
+      if (!force && snapshot === savedSnapshot.current) return true;
+      // Um de cada vez: se já está a guardar, espera e volta a ver.
+      if (running.current) await running.current;
+      const job = (async () => {
+        setStatus('saving');
+        const input = await buildRef.current();
+        const composed = composeWithSignature(
+          input.text,
+          input.signatureHtml ?? null,
+          input.quotedHtml ?? null
+        );
+        // Mudou de caixa: o rascunho antigo sai da outra caixa.
+        const previous = saved.current;
+        const sameAccount = previous?.accountId === input.accountId;
+        if (previous && !sameAccount) void mailService.deleteDraft(previous.accountId, previous.id);
+        const { data, error } = await mailService.saveDraft(
+          { ...input, text: composed.text },
+          composed.html,
+          sameAccount ? (previous?.id ?? null) : null
+        );
+        if (error || !data) {
+          setStatus('error');
+          return false;
+        }
+        saved.current = data.id ? { id: data.id, accountId: input.accountId } : null;
+        savedSnapshot.current = snapshot;
+        setStatus('saved');
+        setSavedAt(new Date());
+        void qc.invalidateQueries({ queryKey: ['mail', 'list'] });
+        return true;
+      })();
+      running.current = job;
+      try {
+        return await job;
+      } finally {
+        if (running.current === job) running.current = null;
       }
-      saved.current = data.id ? { id: data.id, accountId: input.accountId } : null;
-      savedSnapshot.current = snapshot;
-      setStatus('saved');
-      setSavedAt(new Date());
-      void qc.invalidateQueries({ queryKey: ['mail', 'list'] });
-      return true;
-    })();
-    running.current = job;
-    try {
-      return await job;
-    } finally {
-      if (running.current === job) running.current = null;
-    }
-  }, [isPreview, hasContent, snapshot, qc]);
+    },
+    [isPreview, hasContent, snapshot, qc]
+  );
 
   // Guarda sozinho alguns segundos depois da última alteração.
   useEffect(() => {
@@ -120,7 +125,11 @@ export const useDraftSaver = ({
     /** Rascunho guardado (para o apagar depois de enviar). */
     current: () => saved.current,
     /** Guarda já, se houver alterações por guardar. */
-    flush: save,
+    flush: () => save(),
+    /** Botão "Guardar rascunho": grava já, mesmo sem alterações. */
+    save: () => save(true),
+    /** Há alterações por guardar. */
+    isDirty: () => snapshot !== savedSnapshot.current,
     /** Deixa de guardar (enviado ou descartado). */
     stop: cancel,
     /** Descarta: apaga o rascunho guardado. */

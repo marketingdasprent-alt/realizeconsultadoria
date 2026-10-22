@@ -190,7 +190,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     build: buildInput,
   });
   const close = async () => {
-    if (!hasContent || loadingFiles > 0) return onClose();
+    // Fechar sem mexer em nada (ex.: abriu uma resposta e desistiu) não cria rascunho.
+    if (!hasContent || loadingFiles > 0 || !saver.isDirty()) return onClose();
     const ok = await saver.flush();
     onClose();
     toast(
@@ -481,7 +482,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
             <span className="ml-auto truncate text-[12px] text-rz-muted">{savedLabel}</span>
             <button
               type="button"
-              onClick={() => void saver.flush()}
+              onClick={() => void saver.save()}
               disabled={!hasContent || saver.status === 'saving' || loadingFiles > 0}
               title="Guardar rascunho"
               aria-label="Guardar rascunho"

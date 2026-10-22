@@ -121,6 +121,12 @@ export const signatureToHtml = (signature: string | null): string => {
 // Início da citação que o Realize põe ao responder (Em …, X escreveu:) ou reencaminhar.
 const QUOTE_START = /\n\n(?:Em [^\n]*escreveu:|---------- Mensagem reencaminhada ----------)\n/;
 
+/** Só o que a pessoa escreveu (sem a citação da resposta ou do reencaminhamento). */
+export const writtenPart = (text: string): string => {
+  const match = QUOTE_START.exec(text);
+  return match ? text.slice(0, match.index) : text;
+};
+
 /**
  * Email final: o texto escrito, depois a assinatura e, por fim, a citação (como no Gmail).
  * Devolve o HTML e a versão em texto (para quem não lê HTML). Ao reencaminhar, a citação vai

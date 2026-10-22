@@ -6,7 +6,8 @@ import { useDirectory } from '@/modules/social/hooks/useDirectory';
 import { attachmentFile } from '../lib/attachments';
 import { parseRecipients } from '../lib/mailFormat';
 import { FORWARD_MARKER } from '../lib/forward';
-import { signatureToHtml } from '../lib/signature';
+import { signatureToHtml, writtenPart } from '../lib/signature';
+import { checkBeforeSend, type SendCheck } from '../lib/sendCheck';
 import { pickSignature, type SignatureChoice } from '../lib/signatures';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
@@ -15,6 +16,7 @@ import type { ContactEntry, ContactList } from '../lib/recipients';
 import { draftHasContent } from '../lib/savedDraft';
 import type { ComposeDraft, ComposeInput, MailAccount } from '../types';
 import { RecipientField } from './RecipientField';
+import { SendCheckDialog } from './SendCheckDialog';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const FIELD = 'h-10 w-full bg-transparent text-[14px] outline-none placeholder:text-rz-muted';
@@ -209,7 +211,22 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           ? `Guardado às ${saver.savedAt.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}`
           : '';
 
-  const send = async () => {
+  // Antes de enviar: sem destinatário não segue; sem assunto/texto pergunta-se.
+  const [check, setCheck] = useState<SendCheck | null>(null);
+  const send = () => {
+    const result = checkBeforeSend({
+      to,
+      cc: parseRecipients(fields.cc),
+      bcc: parseRecipients(fields.bcc),
+      subject: fields.subject,
+      written: writtenPart(fields.body),
+      attachments: files.length,
+    });
+    if (result.blocked || result.missing.length) return setCheck(result);
+    void sendNow();
+  };
+
+  const sendNow = async () => {
     if (!draft) return;
     setBusy(true);
     saver.stop();
@@ -425,9 +442,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           <div className="flex items-center gap-3 border-t border-rz-line px-5 py-3">
             <button
               type="button"
-              disabled={
-                busy || loadingFiles > 0 || !to.length || size > MAX_BYTES || !accounts.length
-              }
+              disabled={busy || loadingFiles > 0 || size > MAX_BYTES || !accounts.length}
               onClick={send}
               className="inline-flex h-11 items-center gap-2 rounded-full bg-rz-primary px-6 text-[14px] font-bold text-white disabled:opacity-50"
             >
@@ -474,6 +489,14 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           </div>
         </DialogContent>
       </Dialog>
+      <SendCheckDialog
+        check={check}
+        onSend={() => {
+          setCheck(null);
+          void sendNow();
+        }}
+        onClose={() => setCheck(null)}
+      />
     </>
   );
 };

@@ -355,6 +355,25 @@ export const mailService = {
       attachments: input.attachments,
     }),
 
+  /** Guarda (ou substitui `draftId`) o rascunho na pasta Rascunhos; devolve o id novo. */
+  saveDraft: (input: ComposeInput, html: string, draftId: string | null) =>
+    call<{ id: string }>('mail-api', {
+      action: 'save-draft',
+      account_id: input.accountId,
+      draft_id: draftId ?? undefined,
+      to: input.to,
+      cc: input.cc,
+      bcc: input.bcc,
+      subject: input.subject,
+      text: input.text,
+      html,
+      in_reply_to: input.inReplyTo,
+      attachments: input.attachments,
+    }),
+
+  deleteDraft: (accountId: string, draftId: string) =>
+    call('mail-api', { action: 'delete-draft', account_id: accountId, message_id: draftId }),
+
   setRead: (accountId: string, messageId: string, read: boolean) =>
     call('mail-api', { action: 'set-read', account_id: accountId, message_id: messageId, read }),
 

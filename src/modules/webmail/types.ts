@@ -90,6 +90,8 @@ export interface ComposeInput {
   quotedHtml?: string | null;
   inReplyTo?: string;
   attachments: OutgoingAttachment[];
+  /** Rascunho guardado deste email (apaga-se depois de enviado). */
+  draft?: { id: string; accountId: string };
 }
 
 /** Rascunho inicial do compositor (responder, reencaminhar, novo). */
@@ -103,6 +105,12 @@ export interface ComposeDraft {
   inReplyTo?: string;
   /** Rascunho devolvido por um envio falhado: já tem a assinatura. */
   restored?: boolean;
+  /** Aberto da pasta Rascunhos: continua esse rascunho (e volta a juntar os anexos). */
+  saved?: {
+    messageId: string;
+    accountId: string;
+    attachments: MailAttachmentInfo[];
+  };
   /** Reencaminhar: o HTML original e os anexos a voltar a anexar. */
   forward?: {
     messageId: string;

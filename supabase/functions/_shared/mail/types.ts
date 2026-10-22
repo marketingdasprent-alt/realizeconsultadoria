@@ -105,6 +105,13 @@ export interface MailDriver {
   setRead(messageId: string, read: boolean): Promise<void>;
   setStarred(messageId: string, starred: boolean): Promise<void>;
   trash(messageId: string): Promise<void>;
+  /**
+   * Guarda o rascunho na pasta Rascunhos do fornecedor; com `draftId` substitui esse.
+   * Devolve o id (nosso) da mensagem guardada, que pode mudar a cada gravação.
+   */
+  saveDraft(params: MailSendParams, draftId: string | null): Promise<{ id: string }>;
+  /** Apaga um rascunho (depois de enviado ou descartado). Já apagado não é erro. */
+  deleteDraft(draftId: string): Promise<void>;
   /** Emails por ler na caixa de entrada (um pedido leve, sem listar mensagens). */
   unreadCount(): Promise<number>;
 }

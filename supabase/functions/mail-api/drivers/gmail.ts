@@ -68,6 +68,65 @@ export const createGmailDriver = (
     });
   };
 
+  /** Mensagem RFC 822 (e a conversa, numa resposta) para enviar ou guardar como rascunho. */
+  const compose = async (params: MailSendParams) => {
+    let threadId: string | null = null;
+    let inReplyTo: string | null = null;
+    let references: string | null = null;
+    if (params.inReplyTo) {
+      const res = await session.fetch(
+        `${GMAIL}/messages/${enc(params.inReplyTo)}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`
+      );
+      // Se o original já não existir, segue como mensagem nova.
+      if (res.ok) {
+        const original = (await res.json()) as GmailMessage;
+        threadId = original.threadId ?? null;
+        inReplyTo = gmailHeader(original.payload?.headers, 'Message-ID');
+        const previous = gmailHeader(original.payload?.headers, 'References');
+        references = inReplyTo ? [previous, inReplyTo].filter(Boolean).join(' ') : previous;
+      } else {
+        await res.body?.cancel();
+      }
+    }
+
+    const raw = buildRawMessage({
+      from: { name: account.display_name, email: account.email },
+      to: params.to,
+      cc: params.cc,
+      bcc: params.bcc,
+      // O Gmail lê o Bcc do cabeçalho e retira-o antes de entregar.
+      includeBcc: true,
+      subject: params.subject,
+      text: params.text,
+      html: params.html,
+      attachments: params.attachments.map((a, i) => ({
+        filename: a.filename,
+        mime: a.mime,
+        content: params.attachmentBytes[i],
+      })),
+      inReplyTo,
+      references,
+      messageId: generateMessageId(account.email),
+    });
+
+    return { raw, threadId };
+  };
+
+  /** O id do rascunho (drafts) que tem esta mensagem; null se já não existir. */
+  const draftIdOf = async (messageId: string): Promise<string | null> => {
+    let pageToken: string | undefined;
+    do {
+      const page = await session.json<{
+        drafts?: { id: string; message?: { id?: string } }[];
+        nextPageToken?: string;
+      }>(`${GMAIL}/drafts?maxResults=500${pageToken ? `&pageToken=${enc(pageToken)}` : ''}`);
+      const hit = page.drafts?.find(draft => draft.message?.id === messageId);
+      if (hit) return hit.id;
+      pageToken = page.nextPageToken;
+    } while (pageToken);
+    return null;
+  };
+
   return {
     async list({ folder, query, pageToken, limit }) {
       const { q, includeSpamTrash } = gmailListQuery(folder, query);
@@ -137,44 +196,7 @@ export const createGmailDriver = (
     },
 
     async send(params: MailSendParams) {
-      let threadId: string | null = null;
-      let inReplyTo: string | null = null;
-      let references: string | null = null;
-      if (params.inReplyTo) {
-        const res = await session.fetch(
-          `${GMAIL}/messages/${enc(params.inReplyTo)}?format=metadata&metadataHeaders=Message-ID&metadataHeaders=References`
-        );
-        // Se o original já não existir, segue como mensagem nova.
-        if (res.ok) {
-          const original = (await res.json()) as GmailMessage;
-          threadId = original.threadId ?? null;
-          inReplyTo = gmailHeader(original.payload?.headers, 'Message-ID');
-          const previous = gmailHeader(original.payload?.headers, 'References');
-          references = inReplyTo ? [previous, inReplyTo].filter(Boolean).join(' ') : previous;
-        } else {
-          await res.body?.cancel();
-        }
-      }
-
-      const raw = buildRawMessage({
-        from: { name: account.display_name, email: account.email },
-        to: params.to,
-        cc: params.cc,
-        bcc: params.bcc,
-        // O Gmail lê o Bcc do cabeçalho e retira-o antes de entregar.
-        includeBcc: true,
-        subject: params.subject,
-        text: params.text,
-        html: params.html,
-        attachments: params.attachments.map((a, i) => ({
-          filename: a.filename,
-          mime: a.mime,
-          content: params.attachmentBytes[i],
-        })),
-        inReplyTo,
-        references,
-        messageId: generateMessageId(account.email),
-      });
+      const { raw, threadId } = await compose(params);
 
       let sent: { id?: string };
       if (raw.length <= SIMPLE_SEND_MAX) {
@@ -207,6 +229,29 @@ export const createGmailDriver = (
         });
       }
       return { id: sent.id ?? null };
+    },
+
+    async saveDraft(params: MailSendParams, draftId: string | null) {
+      const { raw, threadId } = await compose(params);
+      const existing = draftId ? await draftIdOf(draftId) : null;
+      const message = threadId ? { raw: base64UrlEncode(raw), threadId } : { raw: base64UrlEncode(raw) };
+      const saved = await session.json<{ id: string; message?: { id?: string } }>(
+        existing ? `${GMAIL}/drafts/${enc(existing)}` : `${GMAIL}/drafts`,
+        {
+          method: existing ? 'PUT' : 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(existing ? { id: existing, message } : { message }),
+        }
+      );
+      return { id: saved.message?.id ?? '' };
+    },
+
+    async deleteDraft(messageId: string) {
+      const draft = await draftIdOf(messageId);
+      if (!draft) return;
+      const res = await session.fetch(`${GMAIL}/drafts/${enc(draft)}`, { method: 'DELETE' });
+      if (res.status !== 404) await session.ensureOk(res);
+      await res.body?.cancel();
     },
 
     async setRead(messageId, read) {

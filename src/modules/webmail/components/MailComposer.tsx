@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { Loader2, Maximize2, Minus, Paperclip, Send, X } from 'lucide-react';
+import { Loader2, Maximize2, Minus, Paperclip, Save, Send, Trash2, X } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useDirectory } from '@/modules/social/hooks/useDirectory';
 import { attachmentFile } from '../lib/attachments';
@@ -9,7 +10,9 @@ import { signatureToHtml } from '../lib/signature';
 import { pickSignature, type SignatureChoice } from '../lib/signatures';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
+import { useDraftSaver } from '../hooks/useDraftSaver';
 import type { ContactEntry, ContactList } from '../lib/recipients';
+import { draftHasContent } from '../lib/savedDraft';
 import type { ComposeDraft, ComposeInput, MailAccount } from '../types';
 import { RecipientField } from './RecipientField';
 
@@ -103,13 +106,13 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       body: draft.body ?? '',
     });
     setShowCc(!!draft.cc || !!draft.bcc);
-    setSigChoice('default');
+    setSigChoice(draft.saved ? 'none' : 'default');
     setFiles([]);
     setMissingFiles([]);
     setBusy(false);
 
     // Reencaminhar o email todo: os anexos do original voltam a anexar-se (um a um, em fundo).
-    const forward = draft.forward;
+    const forward = draft.forward ?? draft.saved;
     if (!forward?.attachments.length) {
       setLoadingFiles(0);
       return;
@@ -140,28 +143,78 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const signature = pickSignature(signatures, sigChoice);
   const signatureHtml = signatureToHtml(signature?.html ?? null);
 
+  const buildInput = async (): Promise<ComposeInput> => ({
+    accountId: accountId || fallback?.id || '',
+    to,
+    cc: parseRecipients(fields.cc),
+    bcc: parseRecipients(fields.bcc),
+    subject: fields.subject.trim(),
+    text: fields.body,
+    signatureHtml: signatureHtml || null,
+    // Só enquanto a citação do reencaminhamento ainda lá está (se a apagou, vai o que escreveu).
+    quotedHtml: draft?.forward && fields.body.includes(FORWARD_MARKER) ? draft?.forward.html : null,
+    inReplyTo: draft?.inReplyTo,
+    attachments: await Promise.all(
+      files.map(async file => ({
+        filename: file.name,
+        mime: file.type || 'application/octet-stream',
+        base64: await toBase64(file),
+      }))
+    ),
+  });
+
+  // Rascunho: guarda sozinho depois de cada alteração, e já ao fechar ou minimizar.
+  const hasContent = draftHasContent(fields, files.length);
+  const snapshot = JSON.stringify([
+    fields,
+    accountId,
+    sigChoice,
+    files.map(file => [file.name, file.size]),
+  ]);
+  const initialSaved = useMemo(
+    () => (draft?.saved ? { id: draft.saved.messageId, accountId: draft.saved.accountId } : null),
+    [draft?.saved]
+  );
+  const saver = useDraftSaver({
+    open: !!draft,
+    snapshot,
+    hasContent,
+    initial: initialSaved,
+    build: buildInput,
+  });
+  const close = async () => {
+    if (!hasContent || loadingFiles > 0) return onClose();
+    const ok = await saver.flush();
+    onClose();
+    toast(
+      ok
+        ? { title: 'Rascunho guardado', description: 'Está na pasta Rascunhos.' }
+        : { title: 'O rascunho não foi guardado', variant: 'destructive' }
+    );
+  };
+  const minimize = () => {
+    void saver.flush();
+    onMinimize?.();
+  };
+  const discard = async () => {
+    await saver.discard();
+    onClose();
+  };
+  const savedLabel =
+    saver.status === 'saving'
+      ? 'A guardar…'
+      : saver.status === 'error'
+        ? 'Rascunho não guardado'
+        : saver.savedAt
+          ? `Guardado às ${saver.savedAt.toLocaleTimeString('pt-PT', { hour: '2-digit', minute: '2-digit' })}`
+          : '';
+
   const send = async () => {
     if (!draft) return;
     setBusy(true);
-    const input: ComposeInput = {
-      accountId: accountId || fallback?.id || '',
-      to,
-      cc: parseRecipients(fields.cc),
-      bcc: parseRecipients(fields.bcc),
-      subject: fields.subject.trim(),
-      text: fields.body,
-      signatureHtml: signatureHtml || null,
-      // Só enquanto a citação do reencaminhamento ainda lá está (se a apagou, vai o que escreveu).
-      quotedHtml: draft.forward && fields.body.includes(FORWARD_MARKER) ? draft.forward.html : null,
-      inReplyTo: draft.inReplyTo,
-      attachments: await Promise.all(
-        files.map(async file => ({
-          filename: file.name,
-          mime: file.type || 'application/octet-stream',
-          base64: await toBase64(file),
-        }))
-      ),
-    };
+    saver.stop();
+    const saved = saver.current();
+    const input: ComposeInput = { ...(await buildInput()), draft: saved ?? undefined };
     setBusy(false);
     // Fecha logo; o envio continua em segundo plano (se falhar, o rascunho volta a abrir).
     onClose();
@@ -192,7 +245,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           </button>
           <button
             type="button"
-            onClick={onClose}
+            onClick={() => void close()}
             className="flex h-7 w-7 items-center justify-center rounded-full hover:bg-white/15"
             aria-label="Descartar a mensagem"
           >
@@ -200,7 +253,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           </button>
         </div>
       )}
-      <Dialog open={!!draft && !minimized} onOpenChange={open => !open && onClose()}>
+      <Dialog open={!!draft && !minimized} onOpenChange={open => !open && void close()}>
         <DialogContent
           onInteractOutside={event => event.preventDefault()}
           onPaste={event => {
@@ -216,7 +269,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           {onMinimize && (
             <button
               type="button"
-              onClick={onMinimize}
+              onClick={minimize}
               className="absolute right-12 top-4 flex h-7 w-7 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
               aria-label="Minimizar"
               title="Minimizar"
@@ -398,6 +451,26 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 Anexos acima de 10 MB.
               </span>
             )}
+            <span className="ml-auto truncate text-[12px] text-rz-muted">{savedLabel}</span>
+            <button
+              type="button"
+              onClick={() => void saver.flush()}
+              disabled={!hasContent || saver.status === 'saving' || loadingFiles > 0}
+              title="Guardar rascunho"
+              aria-label="Guardar rascunho"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-primary disabled:opacity-40"
+            >
+              <Save className="h-5 w-5" />
+            </button>
+            <button
+              type="button"
+              onClick={() => void discard()}
+              title="Descartar"
+              aria-label="Descartar a mensagem"
+              className="flex h-10 w-10 items-center justify-center rounded-full text-rz-muted hover:bg-rose-50 hover:text-rose-600"
+            >
+              <Trash2 className="h-5 w-5" />
+            </button>
           </div>
         </DialogContent>
       </Dialog>

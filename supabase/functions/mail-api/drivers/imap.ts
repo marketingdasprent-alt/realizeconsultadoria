@@ -75,7 +75,8 @@ interface ImapClient {
   messageFlagsAdd(range: string, flags: string[], options: UidOption): Promise<boolean>;
   messageFlagsRemove(range: string, flags: string[], options: UidOption): Promise<boolean>;
   messageMove(range: string, destination: string, options: UidOption): Promise<unknown>;
-  append(path: string, content: string, flags?: string[]): Promise<unknown>;
+  append(path: string, content: string, flags?: string[]): Promise<{ uid?: number } | false>;
+  messageDelete(range: string, options: UidOption): Promise<boolean>;
 }
 
 interface ParsedAttachmentWithContent extends ParsedAttachmentLike {
@@ -508,6 +509,52 @@ export const createImapDriver = (
         else await saveCopy;
       }
       return { id: null };
+    },
+
+    async saveDraft(params: MailSendParams, draftId: string | null) {
+      const raw = buildRawMessage({
+        from: { name: cfg.displayName, email: cfg.email },
+        to: params.to,
+        cc: params.cc,
+        bcc: params.bcc,
+        includeBcc: true,
+        subject: params.subject,
+        text: params.text,
+        html: params.html,
+        attachments: params.attachments.map((a, i) => ({
+          filename: a.filename,
+          mime: a.mime,
+          content: params.attachmentBytes[i],
+        })),
+        inReplyTo: null,
+        references: null,
+        messageId: generateMessageId(cfg.email),
+        date: new Date(),
+      });
+      return withClient(async client => {
+        const drafts = resolveImapFolder('drafts', await client.list());
+        if (!drafts) throw mailError('provider_error', 'A caixa não tem pasta de rascunhos.');
+        const appended = await client.append(drafts, raw, ['\\Draft', '\\Seen']);
+        // O anterior só sai depois de o novo estar guardado.
+        const previous = draftId ? decodeImapMessageId(draftId) : null;
+        if (previous) {
+          await withMailbox(client, previous.path, false, () =>
+            client.messageDelete(String(previous.uid), { uid: true })
+          ).catch(() => undefined);
+        }
+        const uid = appended && appended.uid;
+        return { id: uid ? encodeImapMessageId(drafts, uid) : '' };
+      });
+    },
+
+    async deleteDraft(messageId: string) {
+      const target = decodeImapMessageId(messageId);
+      if (!target) return;
+      await withClient(client =>
+        withMailbox(client, target.path, false, () =>
+          client.messageDelete(String(target.uid), { uid: true })
+        )
+      );
     },
 
     setRead(messageId, read) {

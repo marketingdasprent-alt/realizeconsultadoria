@@ -79,12 +79,17 @@ export type SendValidation =
   | { ok: false; code: 'bad_request' | 'invalid_recipient' | 'too_large' };
 
 /** Valida o pedido de envio: destinatários, anexos em base64 e limite total de 10 MB. */
-export const parseSendRequest = (body: Record<string, unknown>): SendValidation => {
+/** Com `draft`, aceita-se sem destinatários (um rascunho ainda a meio). */
+export const parseSendRequest = (
+  body: Record<string, unknown>,
+  options: { draft?: boolean } = {}
+): SendValidation => {
   const to = parseRecipients(body.to);
   const cc = parseRecipients(body.cc);
   const bcc = parseRecipients(body.bcc);
   if (!to || !cc || !bcc) return { ok: false, code: 'invalid_recipient' };
-  if (to.length + cc.length + bcc.length === 0) return { ok: false, code: 'invalid_recipient' };
+  if (!options.draft && to.length + cc.length + bcc.length === 0)
+    return { ok: false, code: 'invalid_recipient' };
   if (to.length + cc.length + bcc.length > 100) return { ok: false, code: 'bad_request' };
 
   const html = typeof body.html === 'string' ? body.html : '';

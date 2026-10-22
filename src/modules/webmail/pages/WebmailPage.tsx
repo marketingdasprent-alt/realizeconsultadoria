@@ -28,6 +28,8 @@ import {
   usePrefetchTop,
 } from '../hooks/useMailbox';
 import { FOLDERS, draftFrom, mailKey } from '../lib/mailFormat';
+import { draftFromSaved } from '../lib/savedDraft';
+import { mailService } from '../services/mailService';
 import { readSidebarWidth, saveSidebarWidth } from '../lib/sidebarWidth';
 import { providerOf, type MailProvider } from '../lib/providers';
 import type { ComposeDraft, MailAccount, MailFolder, MailSummary } from '../types';
@@ -118,7 +120,18 @@ const WebmailPage: React.FC = () => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao chegar com ?mail=
   }, [result]);
 
+  // Na pasta Rascunhos, abrir um email continua-o no compositor.
+  const openSavedDraft = async (summary: MailSummary) => {
+    const loading = toast({ title: 'A abrir o rascunho…' });
+    const { data, error } = await mailService.get(summary.accountId, summary.id);
+    loading.dismiss();
+    if (error || !data)
+      return void toast({ title: 'O rascunho não abriu', variant: 'destructive' });
+    setDraft(draftFromSaved(data));
+  };
+
   const open = (summary: MailSummary) => {
+    if (folder === 'drafts') return void openSavedDraft(summary);
     setActive(summary);
     if (summary.unread) list.keep(summary);
     void actions.setRead(summary, true);
@@ -289,6 +302,10 @@ const WebmailPage: React.FC = () => {
               body: input.text,
               inReplyTo: input.inReplyTo,
               restored: true,
+              // Continua o mesmo rascunho guardado (os anexos voltam a juntar-se).
+              saved: input.draft
+                ? { messageId: input.draft.id, accountId: input.draft.accountId, attachments: [] }
+                : undefined,
             });
           return ok;
         }}

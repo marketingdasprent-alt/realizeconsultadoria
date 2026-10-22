@@ -92,6 +92,8 @@ export const useMailActions = (folder?: MailFolder) => {
           ],
         }));
         toast({ title: 'Email enviado' });
+        // Enviado: o rascunho guardado já não faz falta.
+        if (input.draft) void mailService.deleteDraft(input.draft.accountId, input.draft.id);
         return true;
       }
       // O compositor já fechou: o aviso mostra o progresso e o resultado.

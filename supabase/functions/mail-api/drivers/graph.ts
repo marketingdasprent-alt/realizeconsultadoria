@@ -143,6 +143,44 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
     }
   };
 
+  /** Rascunho com o texto e os anexos (pequenos no pedido, grandes em upload por partes). */
+  const draftWithAttachments = async (params: MailSendParams): Promise<string> => {
+    const draftId = await createDraft(
+      buildGraphMessage({
+        subject: params.subject,
+        html: params.html,
+        text: params.text,
+        to: params.to,
+        cc: params.cc,
+        bcc: params.bcc,
+      }),
+      params.inReplyTo
+    );
+    for (let i = 0; i < params.attachments.length; i++) {
+      const attachment = params.attachments[i];
+      const bytes = params.attachmentBytes[i];
+      if (bytes.length < GRAPH_SMALL_ATTACHMENT_BYTES) {
+        await session.json(`${messageUrl(draftId)}/attachments`, {
+          method: 'POST',
+          headers: JSON_HEADERS,
+          body: JSON.stringify(toGraphAttachment(attachment)),
+        });
+      } else {
+        await uploadLargeAttachment(draftId, attachment.filename, attachment.mime, bytes);
+      }
+    }
+    return draftId;
+  };
+
+  /** Apaga de vez (não vai para os Itens Eliminados); já apagado não é erro. */
+  const removeDraft = async (messageId: string) => {
+    const res = await session.fetch(`${messageUrl(messageId)}/permanentDelete`, {
+      method: 'POST',
+    });
+    if (res.status !== 404) await session.ensureOk(res);
+    await res.body?.cancel();
+  };
+
   return {
     async list({ folder, query, pageToken, limit }) {
       let url: string;
@@ -273,23 +311,21 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
 
       // Anexos grandes (pedidos JSON do Graph têm limite de 4 MB): rascunho → anexos → enviar.
       // Se algo falhar a meio, o rascunho fica nos Rascunhos para o utilizador decidir.
-      const draftId = await createDraft(buildGraphMessage(outgoing), params.inReplyTo);
-
-      for (let i = 0; i < params.attachments.length; i++) {
-        const attachment = params.attachments[i];
-        const bytes = params.attachmentBytes[i];
-        if (bytes.length < GRAPH_SMALL_ATTACHMENT_BYTES) {
-          await session.json(`${messageUrl(draftId)}/attachments`, {
-            method: 'POST',
-            headers: JSON_HEADERS,
-            body: JSON.stringify(toGraphAttachment(attachment)),
-          });
-        } else {
-          await uploadLargeAttachment(draftId, attachment.filename, attachment.mime, bytes);
-        }
-      }
+      const draftId = await draftWithAttachments(params);
       await postAccepted(`${messageUrl(draftId)}/send`);
       return { id: null };
+    },
+
+    async saveDraft(params: MailSendParams, draftId: string | null) {
+      // Um rascunho novo com tudo (texto e anexos) e só depois sai o anterior: se falhar a meio,
+      // o que estava guardado continua lá.
+      const id = await draftWithAttachments(params);
+      if (draftId && draftId !== id) await removeDraft(draftId).catch(() => undefined);
+      return { id };
+    },
+
+    async deleteDraft(messageId: string) {
+      await removeDraft(messageId);
     },
 
     async setRead(messageId, read) {

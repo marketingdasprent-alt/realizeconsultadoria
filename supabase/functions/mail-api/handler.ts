@@ -193,6 +193,8 @@ const ACTIONS = [
   'set-read',
   'set-starred',
   'trash',
+  'save-draft',
+  'delete-draft',
   'disconnect',
   'discover',
   'share-access',
@@ -221,7 +223,14 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
   const account = await requireAccount(db, userId, body);
   if (action === 'disconnect') return disconnect(db, account);
 
-  const needsMessage: Action[] = ['get', 'attachment', 'set-read', 'set-starred', 'trash'];
+  const needsMessage: Action[] = [
+    'get',
+    'attachment',
+    'set-read',
+    'set-starred',
+    'trash',
+    'delete-draft',
+  ];
   const messageId = optionalString(body.message_id, 2000) ?? '';
   if (needsMessage.includes(action) && !messageId) return badRequest();
 
@@ -269,6 +278,20 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const driver = await createDriver(db, account, pendingSecret);
       return ok(await driver.send(parsed.value));
     }
+    case 'save-draft': {
+      const parsed = parseSendRequest(body, { draft: true });
+      if (!parsed.ok) {
+        return parsed.code === 'bad_request'
+          ? badRequest()
+          : json({ ok: false, code: parsed.code, message: MAIL_ERROR_MESSAGES[parsed.code] });
+      }
+      const draftId = optionalString(body.draft_id, 2000) ?? null;
+      const driver = await createDriver(db, account, pendingSecret);
+      return ok(await driver.saveDraft(parsed.value, draftId));
+    }
+    case 'delete-draft':
+      await (await createDriver(db, account, pendingSecret)).deleteDraft(messageId);
+      return ok();
     case 'set-read':
       if (typeof body.read !== 'boolean') return badRequest();
       await (await createDriver(db, account, pendingSecret)).setRead(messageId, body.read);

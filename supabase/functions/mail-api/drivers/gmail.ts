@@ -266,6 +266,20 @@ export const createGmailDriver = (
       await session.json(`${GMAIL}/messages/${enc(messageId)}/trash`, { method: 'POST' });
     },
 
+    async thread(threadId: string) {
+      const res = await session.fetch(`${GMAIL}/threads/${enc(threadId)}?${METADATA}`);
+      if (res.status === 404) {
+        await res.body?.cancel();
+        return [];
+      }
+      await session.ensureOk(res);
+      const thread = (await res.json()) as { messages?: GmailMessage[] };
+      return (thread.messages ?? [])
+        .filter(m => !(m.labelIds ?? []).some(label => label === 'DRAFT' || label === 'TRASH'))
+        .map(parseGmailSummary)
+        .sort((a, b) => a.date.localeCompare(b.date));
+    },
+
     async unreadCount() {
       const inbox = await session.json<{ messagesUnread?: number }>(`${GMAIL}/labels/INBOX`);
       return inbox.messagesUnread ?? 0;

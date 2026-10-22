@@ -13,7 +13,14 @@ import {
 } from '../components/MailLogos';
 
 export type MailProviderKey =
-  'gmail' | 'outlook' | 'icloud' | 'office365' | 'exchange' | 'yahoo' | 'aol' | 'imap';
+  | 'gmail'
+  | 'outlook'
+  | 'icloud'
+  | 'office365'
+  | 'exchange'
+  | 'yahoo'
+  | 'aol'
+  | 'imap';
 
 export interface MailProvider {
   key: MailProviderKey;

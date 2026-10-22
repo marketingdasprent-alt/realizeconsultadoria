@@ -194,6 +194,7 @@ const ACTIONS = [
   'set-starred',
   'trash',
   'save-draft',
+  'thread',
   'delete-draft',
   'disconnect',
   'discover',
@@ -288,6 +289,11 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const draftId = optionalString(body.draft_id, 2000) ?? null;
       const driver = await createDriver(db, account, pendingSecret);
       return ok(await driver.saveDraft(parsed.value, draftId));
+    }
+    case 'thread': {
+      const threadId = optionalString(body.thread_id, 2000);
+      if (!threadId) return badRequest();
+      return ok(await (await createDriver(db, account, pendingSecret)).thread(threadId));
     }
     case 'delete-draft':
       await (await createDriver(db, account, pendingSecret)).deleteDraft(messageId);

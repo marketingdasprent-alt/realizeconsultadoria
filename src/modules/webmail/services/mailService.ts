@@ -324,6 +324,16 @@ export const mailService = {
     };
   },
 
+  /** As mensagens da mesma conversa, mais antiga primeiro (vazio sem agrupamento). */
+  thread: async (accountId: string, threadId: string) => {
+    const { data, error } = await call<Row[]>('mail-api', {
+      action: 'thread',
+      account_id: accountId,
+      thread_id: threadId,
+    });
+    return { data: data ? data.map(row => toSummary(accountId, row)) : null, error };
+  },
+
   get: async (accountId: string, messageId: string) => {
     const { data, error } = await call<Row>('mail-api', {
       action: 'get',

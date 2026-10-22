@@ -577,6 +577,11 @@ export const createImapDriver = (
       });
     },
 
+    // Sem agrupamento de conversas no IMAP: o leitor mostra só o email aberto.
+    thread() {
+      return Promise.resolve([]);
+    },
+
     unreadCount() {
       // STATUS INBOX (UNSEEN): não abre a pasta nem lê mensagens.
       return withClient(

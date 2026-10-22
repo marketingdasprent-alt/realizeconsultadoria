@@ -213,3 +213,19 @@ export const usePrefetchTop = (messages: MailSummary[], count = 4) => {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- a assinatura resume a lista
   }, [signature, isPreview, qc]);
 };
+
+/** As outras mensagens da conversa do email aberto (Gmail e Microsoft 365). */
+export const useMailThread = (summary: MailSummary | null) => {
+  const { isPreview } = useWorkspace();
+  const query = useQuery({
+    queryKey: ['mail', 'thread', summary?.accountId, summary?.threadId] as const,
+    queryFn: async () => {
+      const { data, error } = await mailService.thread(summary!.accountId, summary!.threadId!);
+      if (error) throw error;
+      return data ?? [];
+    },
+    enabled: !isPreview && !!summary?.threadId,
+    staleTime: 60_000,
+  });
+  return query.data ?? [];
+};

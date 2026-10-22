@@ -260,9 +260,9 @@ const WebmailPage: React.FC = () => {
             isLoading={messageLoading}
             onBack={() => setActive(null)}
             onAction={onAction}
-            onDownload={id => void actions.download(selected, id)}
-            onOpenAttachment={attachment =>
-              setPreview({ accountId: selected.accountId, messageId: selected.id, attachment })
+            onDownload={(mail, id) => void actions.download(mail, id)}
+            onOpenAttachment={(mail, attachment) =>
+              setPreview({ accountId: mail.accountId, messageId: mail.id, attachment })
             }
           />
         ) : (

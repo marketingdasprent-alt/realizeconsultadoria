@@ -344,6 +344,18 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
       });
     },
 
+    async thread(threadId: string) {
+      // Todas as pastas (Entrada, Enviados…); ordena-se aqui (o Graph recusa ordenar com este filtro).
+      const filter = encodeURIComponent(`conversationId eq '${threadId.replace(/'/g, "''")}'`);
+      const data = await session.json<{ value?: GraphMessage[] }>(
+        `${ME}/messages?$filter=${filter}&$top=50&$select=${GRAPH_SUMMARY_FIELDS.join(',')}`
+      );
+      return (data.value ?? [])
+        .filter(m => !m.isDraft)
+        .map(parseGraphSummary)
+        .sort((a, b) => a.date.localeCompare(b.date));
+    },
+
     async unreadCount() {
       const inbox = await session.json<{ unreadItemCount?: number }>(
         `${ME}/mailFolders/inbox?$select=unreadItemCount`

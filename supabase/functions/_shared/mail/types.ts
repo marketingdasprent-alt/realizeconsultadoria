@@ -112,6 +112,11 @@ export interface MailDriver {
   saveDraft(params: MailSendParams, draftId: string | null): Promise<{ id: string }>;
   /** Apaga um rascunho (depois de enviado ou descartado). Já apagado não é erro. */
   deleteDraft(draftId: string): Promise<void>;
+  /**
+   * As mensagens da mesma conversa (mais antiga primeiro, sem rascunhos nem lixo). Sem
+   * agrupamento pelo fornecedor (IMAP), devolve vazio.
+   */
+  thread(threadId: string): Promise<MailSummary[]>;
   /** Emails por ler na caixa de entrada (um pedido leve, sem listar mensagens). */
   unreadCount(): Promise<number>;
 }

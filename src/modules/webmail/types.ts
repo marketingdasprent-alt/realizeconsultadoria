@@ -4,7 +4,14 @@ import type { MailProviderKey } from './lib/providers';
 
 /** 'unread' = os por ler da Entrada (um filtro, como 'starred'). */
 export type MailFolder =
-  'inbox' | 'unread' | 'starred' | 'sent' | 'drafts' | 'archive' | 'spam' | 'trash';
+  | 'inbox'
+  | 'unread'
+  | 'starred'
+  | 'sent'
+  | 'drafts'
+  | 'archive'
+  | 'spam'
+  | 'trash';
 export type MailAccountColor = 'violet' | 'sky' | 'emerald' | 'amber' | 'rose' | 'slate';
 
 /** Uma assinatura (HTML já limpo) com nome, como no Outlook. */

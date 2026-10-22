@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
@@ -71,6 +71,11 @@ export const MailReader: React.FC<MailReaderProps> = ({
   // A conversa (mais antiga primeiro); sem outras mensagens, só o email aberto.
   const conversation = thread.some(m => m.id === summary.id) ? thread : [];
   const others = conversation.filter(m => m.id !== summary.id).length;
+  // Numa conversa longa, desce logo até ao email aberto (as anteriores ficam por cima).
+  const currentRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (others > 0) currentRef.current?.scrollIntoView({ block: 'start' });
+  }, [summary.id, others]);
 
   const current = (
     <>
@@ -167,7 +172,11 @@ export const MailReader: React.FC<MailReaderProps> = ({
           <div className="mt-4 space-y-2">
             {conversation.map(mail =>
               mail.id === summary.id ? (
-                <div key={mail.id} className="rounded-2xl px-4 pb-4 pt-3 ring-2 ring-rz-primary/25">
+                <div
+                  key={mail.id}
+                  ref={currentRef}
+                  className="scroll-mt-4 rounded-2xl px-4 pb-4 pt-3 ring-2 ring-rz-primary/25"
+                >
                   {current}
                 </div>
               ) : (

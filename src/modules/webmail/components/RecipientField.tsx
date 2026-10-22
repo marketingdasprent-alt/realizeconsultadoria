@@ -62,6 +62,9 @@ export const RecipientField: React.FC<RecipientFieldProps> = ({
     [draft, team, contacts, lists, value, allowLists]
   );
 
+  // A lista só aparece quando se começa a escrever (sem texto não tapa o email).
+  const showList = open && draft.trim().length > 0 && suggestions.length > 0;
+
   /** Passa o que está escrito a etiquetas (só emails válidos). */
   const commitDraft = () => {
     const valid = parseRecipients(draft);
@@ -83,7 +86,7 @@ export const RecipientField: React.FC<RecipientFieldProps> = ({
   const onKeyDown = (event: React.KeyboardEvent<HTMLInputElement>) => {
     const picked = open ? suggestions[highlight] : undefined;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-      if (!suggestions.length) return;
+      if (!draft.trim() || !suggestions.length) return;
       event.preventDefault();
       setOpen(true);
       const step = event.key === 'ArrowDown' ? 1 : -1;
@@ -149,12 +152,12 @@ export const RecipientField: React.FC<RecipientFieldProps> = ({
         placeholder={emails.length ? undefined : placeholder}
         aria-label={label}
         role="combobox"
-        aria-expanded={open && suggestions.length > 0}
+        aria-expanded={showList}
         aria-autocomplete="list"
         autoComplete="off"
         className="h-8 min-w-[8rem] flex-1 bg-transparent text-[14px] outline-none placeholder:text-rz-muted"
       />
-      {open && suggestions.length > 0 && (
+      {showList && (
         <ul
           role="listbox"
           className="absolute left-0 top-full z-50 mt-1 max-h-64 w-full min-w-[16rem] overflow-y-auto rounded-2xl bg-white p-1.5 shadow-rz-pop ring-1 ring-rz-line"

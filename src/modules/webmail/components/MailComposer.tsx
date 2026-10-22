@@ -15,6 +15,7 @@ import { useDraftSaver } from '../hooks/useDraftSaver';
 import type { ContactEntry, ContactList } from '../lib/recipients';
 import { draftHasContent } from '../lib/savedDraft';
 import type { ComposeDraft, ComposeInput, MailAccount } from '../types';
+import { AutoTextarea } from './AutoTextarea';
 import { RecipientField } from './RecipientField';
 import { SendCheckDialog } from './SendCheckDialog';
 
@@ -81,6 +82,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const fallback = accounts.find(a => a.isDefault) ?? accounts[0];
   const [accountId, setAccountId] = useState('');
   const [fields, setFields] = useState({ to: '', cc: '', bcc: '', subject: '', body: '' });
+  // Resposta/reencaminhamento: a citação fica à parte, depois da assinatura (como sai no email).
+  const [quote, setQuote] = useState('');
   const [showCc, setShowCc] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const addFiles = (added: File[]) => setFiles(current => [...current, ...added]);
@@ -105,8 +108,9 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       cc: draft.cc ?? '',
       bcc: draft.bcc ?? '',
       subject: draft.subject ?? '',
-      body: draft.body ?? '',
+      body: writtenPart(draft.body ?? ''),
     });
+    setQuote((draft.body ?? '').slice(writtenPart(draft.body ?? '').length));
     setShowCc(!!draft.cc || !!draft.bcc);
     setSigChoice(draft.saved ? 'none' : 'default');
     setFiles([]);
@@ -151,10 +155,10 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     cc: parseRecipients(fields.cc),
     bcc: parseRecipients(fields.bcc),
     subject: fields.subject.trim(),
-    text: fields.body,
+    text: fields.body + quote,
     signatureHtml: signatureHtml || null,
     // Só enquanto a citação do reencaminhamento ainda lá está (se a apagou, vai o que escreveu).
-    quotedHtml: draft?.forward && fields.body.includes(FORWARD_MARKER) ? draft?.forward.html : null,
+    quotedHtml: draft?.forward && quote.includes(FORWARD_MARKER) ? draft?.forward.html : null,
     inReplyTo: draft?.inReplyTo,
     attachments: await Promise.all(
       files.map(async file => ({
@@ -169,6 +173,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const hasContent = draftHasContent(fields, files.length);
   const snapshot = JSON.stringify([
     fields,
+    quote,
     accountId,
     sigChoice,
     files.map(file => [file.name, file.size]),
@@ -312,6 +317,29 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 </option>
               ))}
             </select>
+            {signatures.length > 0 && (
+              <select
+                value={sigChoice}
+                onChange={e => setSigChoice(e.target.value)}
+                aria-label="Assinatura"
+                title="Assinatura"
+                className="h-8 max-w-[13rem] shrink-0 rounded-full bg-rz-canvas px-3 text-[12.5px] font-semibold text-rz-ink outline-none ring-1 ring-rz-line"
+              >
+                <option value="default">
+                  {signatures.find(sig => sig.isDefault)?.name
+                    ? `Assinatura: ${signatures.find(sig => sig.isDefault)?.name}`
+                    : 'Sem assinatura'}
+                </option>
+                {signatures
+                  .filter(sig => !sig.isDefault)
+                  .map(sig => (
+                    <option key={sig.id} value={sig.id}>
+                      Assinatura: {sig.name}
+                    </option>
+                  ))}
+                <option value="none">Sem assinatura</option>
+              </select>
+            )}
           </Row>
           <RecipientRow label="Para">
             <RecipientField
@@ -365,45 +393,29 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               className={FIELD}
             />
           </Row>
-          <textarea
-            value={fields.body}
-            onChange={e => set('body', e.target.value)}
-            className="min-h-[160px] flex-1 resize-none px-5 py-4 text-[14.5px] leading-relaxed outline-none"
-            placeholder="Escreva a sua mensagem…"
-          />
-          {signatures.length > 0 && (
-            <div className="border-t border-rz-line px-5 py-3">
-              <label className="mb-2 flex w-fit items-center gap-2 text-[12.5px] font-semibold text-rz-muted">
-                Assinatura
-                <select
-                  value={sigChoice}
-                  onChange={e => setSigChoice(e.target.value)}
-                  className="h-8 max-w-[14rem] rounded-full bg-rz-canvas px-3 text-[12.5px] font-semibold text-rz-ink outline-none ring-1 ring-rz-line"
-                >
-                  <option value="default">
-                    {signatures.find(sig => sig.isDefault)?.name
-                      ? `${signatures.find(sig => sig.isDefault)?.name} (predefinida)`
-                      : 'Sem assinatura (predefinida)'}
-                  </option>
-                  {signatures
-                    .filter(sig => !sig.isDefault)
-                    .map(sig => (
-                      <option key={sig.id} value={sig.id}>
-                        {sig.name}
-                      </option>
-                    ))}
-                  <option value="none">Sem assinatura</option>
-                </select>
-              </label>
-              {signatureHtml && (
-                // Já limpa (sem scripts nem eventos): é a assinatura da própria pessoa.
-                <div
-                  className="max-h-40 overflow-auto rounded-xl bg-rz-canvas/60 px-3 py-2 text-[13px] [&_img]:inline-block"
-                  dangerouslySetInnerHTML={{ __html: signatureHtml }}
-                />
-              )}
-            </div>
-          )}
+          <div className="rz-scroll min-h-[160px] flex-1 overflow-y-auto px-5 py-4 text-[14.5px] leading-relaxed">
+            <AutoTextarea
+              value={fields.body}
+              onChange={e => set('body', e.target.value)}
+              placeholder="Escreva a sua mensagem…"
+              className="min-h-[96px]"
+            />
+            {signatureHtml && (
+              // Já limpa (sem scripts nem eventos): é a assinatura da própria pessoa. Muda-se em cima.
+              <div
+                className="mt-3 text-[13.5px] [&_img]:inline-block"
+                dangerouslySetInnerHTML={{ __html: signatureHtml }}
+              />
+            )}
+            {quote && (
+              <AutoTextarea
+                value={quote.replace(/^\n+/, '')}
+                onChange={e => setQuote(`\n\n${e.target.value}`)}
+                aria-label="Mensagem original"
+                className="mt-4 border-l-2 border-rz-line pl-3 text-[13.5px] text-rz-muted"
+              />
+            )}
+          </div>
           {(loadingFiles > 0 || missingFiles.length > 0) && (
             <div className="px-5 pb-2 text-[12.5px] font-semibold">
               {loadingFiles > 0 && (

@@ -280,7 +280,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
             addFiles(pasted);
           }}
           {...dropProps}
-          className="flex max-h-[94vh] flex-col gap-0 overflow-hidden rounded-[28px] p-0 sm:max-w-2xl sm:rounded-[28px]"
+          className="flex h-[min(92vh,920px)] w-[min(96vw,1120px)] max-w-none flex-col gap-0 overflow-hidden rounded-[28px] p-0 sm:max-w-none sm:rounded-[28px]"
         >
           <DropOverlay visible={isDragging} />
           {onMinimize && (
@@ -368,7 +368,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           <textarea
             value={fields.body}
             onChange={e => set('body', e.target.value)}
-            className="min-h-[240px] flex-1 resize-none px-5 py-4 text-[14px] leading-relaxed outline-none"
+            className="min-h-[160px] flex-1 resize-none px-5 py-4 text-[14.5px] leading-relaxed outline-none"
             placeholder="Escreva a sua mensagem…"
           />
           {signatures.length > 0 && (

@@ -1,13 +1,14 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ChevronRight, Eye, FolderOpen, Loader2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import { useCompanyFolder } from '../../hooks/useCompanyFolder';
 import { useCompanyUploads } from '../../hooks/useCompanyUploads';
-import { breadcrumbsFor } from '../../lib/companyFiles';
+import { breadcrumbsFor, filterEntries } from '../../lib/companyFiles';
 import type { CompanyEntry } from '../../services/companyFilesService';
 import { CompanyFileGrid, ViewToggle, type FilesView } from './CompanyFileGrid';
 import { CompanyFileRow } from './CompanyFileRow';
+import { CompanyFilesSearch } from './CompanyFilesSearch';
 import { CompanyFolderActions } from './CompanyFolderActions';
 import { CompanyUploadList } from './CompanyUploadList';
 
@@ -51,6 +52,11 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
   const crumbs = breadcrumbsFor(path, folders);
   const canEdit = !!path && listing.data?.permission === 'edit';
   const uploads = useCompanyUploads(path);
+  const [query, setQuery] = useState('');
+  // Cada pasta começa sem pesquisa.
+  useEffect(() => setQuery(''), [path]);
+  const all = listing.data?.entries ?? [];
+  const shown = filterEntries(all, query);
   const [view, setView] = useState<FilesView>(readView);
   const changeView = (next: FilesView) => {
     setView(next);
@@ -94,6 +100,11 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
             </React.Fragment>
           ))}
         </nav>
+        <CompanyFilesSearch
+          value={query}
+          onChange={setQuery}
+          placeholder={path ? 'Pesquisar nesta pasta' : 'Pesquisar pastas'}
+        />
         <ViewToggle value={view} onChange={changeView} />
         {path && listing.data?.permission === 'read' && (
           <span className="inline-flex items-center gap-1 rounded-full bg-rz-canvas px-3 py-1 text-[12px] font-semibold text-rz-muted">
@@ -131,11 +142,15 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
               : 'Ainda não tem pastas da empresa atribuídas. Peça acesso ao administrador.'}
           </p>
         </div>
+      ) : shown.length === 0 ? (
+        <p className="px-3 py-10 text-center text-[14px] text-rz-muted">
+          Nada encontrado para “{query.trim()}”{path ? ' nesta pasta' : ''}.
+        </p>
       ) : view === 'grid' ? (
-        <CompanyFileGrid entries={listing.data.entries} onOpen={open} onDownload={onDownload} />
+        <CompanyFileGrid entries={shown} onOpen={open} onDownload={onDownload} />
       ) : (
         <ul className="space-y-0.5">
-          {listing.data.entries.map(entry => (
+          {shown.map(entry => (
             <CompanyFileRow key={entry.path} entry={entry} onOpen={open} onDownload={onDownload} />
           ))}
         </ul>

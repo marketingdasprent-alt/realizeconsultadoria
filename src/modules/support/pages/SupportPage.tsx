@@ -72,7 +72,7 @@ const SupportPage: React.FC = () => {
             ))}
           </div>
         </div>
-        <div className="rz-scroll min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-28 md:pb-3">
+        <div className="rz-scroll min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-28 pt-1 md:pb-3">
           {isLoading ? (
             <Loader2 className="mx-auto mt-10 h-6 w-6 animate-spin text-rz-primary" />
           ) : visible.length === 0 ? (

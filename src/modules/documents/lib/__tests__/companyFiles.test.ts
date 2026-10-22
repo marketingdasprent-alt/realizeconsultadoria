@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   breadcrumbsFor,
   fileKind,
+  filterEntries,
   opensInEditor,
   previewKind,
   sortEntries,
@@ -70,5 +71,26 @@ describe('visualização sem descarregar', () => {
     expect(previewKind(file('arquivo.zip'))).toBeNull();
     expect(previewKind(file('foto.heic'))).toBeNull();
     expect(previewKind({ name: 'Imagens', type: 'dir' })).toBeNull();
+  });
+});
+
+describe('filterEntries', () => {
+  const entries = [
+    { name: 'Faturação', type: 'dir' as const },
+    { name: 'DASP AUTO (VENDAS)', type: 'dir' as const },
+    { name: 'Relatório Faturação 2026.xlsx', type: 'file' as const },
+  ];
+
+  it('ignores accents and case, and needs every word', () => {
+    expect(filterEntries(entries, 'faturacao').map(e => e.name)).toEqual([
+      'Faturação',
+      'Relatório Faturação 2026.xlsx',
+    ]);
+    expect(filterEntries(entries, 'fatura 2026')).toHaveLength(1);
+    expect(filterEntries(entries, 'vendas')[0].name).toBe('DASP AUTO (VENDAS)');
+  });
+
+  it('returns everything for an empty search', () => {
+    expect(filterEntries(entries, '   ')).toBe(entries);
   });
 });

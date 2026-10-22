@@ -38,6 +38,25 @@ export const breadcrumbsFor = (
   return crumbs;
 };
 
+const fold = (text: string) =>
+  text
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase();
+
+/** Pesquisa por nome (sem acentos nem maiúsculas); todas as palavras têm de aparecer. */
+export const filterEntries = <T extends Pick<CompanyEntry, 'name'>>(
+  entries: T[],
+  query: string
+): T[] => {
+  const words = fold(query).split(/\s+/).filter(Boolean);
+  if (!words.length) return entries;
+  return entries.filter(entry => {
+    const name = fold(entry.name);
+    return words.every(word => name.includes(word));
+  });
+};
+
 /** Pastas primeiro, depois por nome (com números por ordem natural). */
 export const sortEntries = <T extends Pick<CompanyEntry, 'name' | 'type'>>(entries: T[]): T[] =>
   [...entries].sort((a, b) =>

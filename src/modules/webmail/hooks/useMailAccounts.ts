@@ -5,7 +5,7 @@ import { applyAccountOrder } from '../lib/accountOrder';
 import { setDemoMail, useDemoMail } from '../lib/demoStore';
 import type { MailProviderKey } from '../lib/providers';
 import { mailErrorText, mailService, type MailError } from '../services/mailService';
-import type { ImapConnectInput, MailAccount } from '../types';
+import type { ImapConnectInput, MailAccount, MailSignature } from '../types';
 
 export const MAIL_ACCOUNTS_KEY = ['mail', 'accounts'] as const;
 
@@ -40,9 +40,7 @@ export const useMailAccounts = () => {
 
     update: async (
       id: string,
-      patch: Partial<
-        Pick<MailAccount, 'displayName' | 'label' | 'signature' | 'isDefault' | 'color' | 'notify'>
-      >
+      patch: Partial<Pick<MailAccount, 'displayName' | 'label' | 'isDefault' | 'color' | 'notify'>>
     ) => {
       if (isPreview) {
         setDemoMail(s => ({
@@ -75,6 +73,27 @@ export const useMailAccounts = () => {
       const error = labelResult.error ?? restResult.error;
       if (error) {
         fail(null, 'As alterações não foram guardadas.');
+        void qc.invalidateQueries({ queryKey: MAIL_ACCOUNTS_KEY });
+        return false;
+      }
+      return true;
+    },
+
+    /** Assinaturas da caixa: já no ecrã; grava em fundo e volta atrás se falhar. */
+    saveSignatures: async (id: string, signatures: MailSignature[]) => {
+      if (isPreview) {
+        setDemoMail(s => ({
+          ...s,
+          accounts: s.accounts.map(a => (a.id === id ? { ...a, signatures } : a)),
+        }));
+        return true;
+      }
+      qc.setQueryData<MailAccount[]>(MAIL_ACCOUNTS_KEY, list =>
+        list?.map(a => (a.id === id ? { ...a, signatures } : a))
+      );
+      const { error } = await mailService.saveSignatures(id, signatures);
+      if (error) {
+        fail(null, 'As assinaturas não foram guardadas.');
         void qc.invalidateQueries({ queryKey: MAIL_ACCOUNTS_KEY });
         return false;
       }

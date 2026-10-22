@@ -6,6 +6,7 @@ import { attachmentFile } from '../lib/attachments';
 import { parseRecipients } from '../lib/mailFormat';
 import { FORWARD_MARKER } from '../lib/forward';
 import { signatureToHtml } from '../lib/signature';
+import { pickSignature, type SignatureChoice } from '../lib/signatures';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import type { ComposeDraft, ComposeInput, MailAccount } from '../types';
@@ -53,7 +54,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const addFiles = (added: File[]) => setFiles(current => [...current, ...added]);
   const { isDragging, dropProps } = useFileDrop(addFiles);
   const [busy, setBusy] = useState(false);
-  const [withSig, setWithSig] = useState(true);
+  // Assinatura escolhida: a predefinida da caixa, nenhuma, ou uma das outras.
+  const [sigChoice, setSigChoice] = useState<SignatureChoice>('default');
   // Reencaminhar: anexos do original a ser buscados (e os que não vieram).
   const [loadingFiles, setLoadingFiles] = useState(0);
   const [missingFiles, setMissingFiles] = useState<string[]>([]);
@@ -74,7 +76,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       body: draft.body ?? '',
     });
     setShowCc(!!draft.cc || !!draft.bcc);
-    setWithSig(true);
+    setSigChoice('default');
     setFiles([]);
     setMissingFiles([]);
     setBusy(false);
@@ -107,7 +109,9 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const size = files.reduce((total, file) => total + file.size, 0);
   const to = parseRecipients(fields.to);
   const sender = accounts.find(a => a.id === (accountId || fallback?.id));
-  const signatureHtml = signatureToHtml(sender?.signature ?? null);
+  const signatures = sender?.signatures ?? [];
+  const signature = pickSignature(signatures, sigChoice);
+  const signatureHtml = signatureToHtml(signature?.html ?? null);
 
   const send = async () => {
     if (!draft) return;
@@ -119,7 +123,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       bcc: parseRecipients(fields.bcc),
       subject: fields.subject.trim(),
       text: fields.body,
-      signatureHtml: withSig ? signatureHtml || null : null,
+      signatureHtml: signatureHtml || null,
       // Só enquanto a citação do reencaminhamento ainda lá está (se a apagou, vai o que escreveu).
       quotedHtml: draft.forward && fields.body.includes(FORWARD_MARKER) ? draft.forward.html : null,
       inReplyTo: draft.inReplyTo,
@@ -197,7 +201,10 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           <Row label="De">
             <select
               value={accountId}
-              onChange={e => setAccountId(e.target.value)}
+              onChange={e => {
+                setAccountId(e.target.value);
+                setSigChoice('default');
+              }}
               className={FIELD}
             >
               {accounts.map(account => (
@@ -267,18 +274,31 @@ export const MailComposer: React.FC<MailComposerProps> = ({
             className="min-h-[240px] flex-1 resize-none px-5 py-4 text-[14px] leading-relaxed outline-none"
             placeholder="Escreva a sua mensagem…"
           />
-          {signatureHtml && (
+          {signatures.length > 0 && (
             <div className="border-t border-rz-line px-5 py-3">
-              <label className="mb-2 flex w-fit cursor-pointer items-center gap-2 text-[12.5px] font-semibold text-rz-muted">
-                <input
-                  type="checkbox"
-                  checked={withSig}
-                  onChange={e => setWithSig(e.target.checked)}
-                  className="h-4 w-4 accent-violet-600"
-                />
-                Incluir assinatura
+              <label className="mb-2 flex w-fit items-center gap-2 text-[12.5px] font-semibold text-rz-muted">
+                Assinatura
+                <select
+                  value={sigChoice}
+                  onChange={e => setSigChoice(e.target.value)}
+                  className="h-8 max-w-[14rem] rounded-full bg-rz-canvas px-3 text-[12.5px] font-semibold text-rz-ink outline-none ring-1 ring-rz-line"
+                >
+                  <option value="default">
+                    {signatures.find(sig => sig.isDefault)?.name
+                      ? `${signatures.find(sig => sig.isDefault)?.name} (predefinida)`
+                      : 'Sem assinatura (predefinida)'}
+                  </option>
+                  {signatures
+                    .filter(sig => !sig.isDefault)
+                    .map(sig => (
+                      <option key={sig.id} value={sig.id}>
+                        {sig.name}
+                      </option>
+                    ))}
+                  <option value="none">Sem assinatura</option>
+                </select>
               </label>
-              {withSig && (
+              {signatureHtml && (
                 // Já limpa (sem scripts nem eventos): é a assinatura da própria pessoa.
                 <div
                   className="max-h-40 overflow-auto rounded-xl bg-rz-canvas/60 px-3 py-2 text-[13px] [&_img]:inline-block"

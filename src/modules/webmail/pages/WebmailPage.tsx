@@ -261,6 +261,7 @@ const WebmailPage: React.FC = () => {
         account={settings}
         onClose={() => setSettings(null)}
         onSave={mail.update}
+        onSaveSignatures={mail.saveSignatures}
         onReconnect={account => mail.startOAuth(providerOf(account.provider).key)}
         onDisconnect={account => mail.disconnect(account.id)}
       />

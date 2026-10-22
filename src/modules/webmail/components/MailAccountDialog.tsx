@@ -4,10 +4,10 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/modules/workspace/components/ConfirmDialog';
 import { ACCOUNT_DOTS } from '../lib/mailFormat';
-import { sanitizeSignatureHtml } from '../lib/signature';
+import { cleanSignatures } from '../lib/signatures';
 import { providerOf } from '../lib/providers';
-import type { MailAccount, MailAccountColor } from '../types';
-import { SignatureEditor } from './SignatureEditor';
+import type { MailAccount, MailAccountColor, MailSignature } from '../types';
+import { SignaturesManager } from './SignaturesManager';
 
 const FIELD =
   'w-full rounded-2xl bg-rz-canvas px-4 text-sm outline-none ring-1 ring-transparent focus:bg-white focus:ring-rz-primary/40';
@@ -19,11 +19,9 @@ interface MailAccountDialogProps {
   onClose: () => void;
   onSave: (
     id: string,
-    patch: Pick<
-      MailAccount,
-      'displayName' | 'label' | 'signature' | 'isDefault' | 'color' | 'notify'
-    >
+    patch: Pick<MailAccount, 'displayName' | 'label' | 'isDefault' | 'color' | 'notify'>
   ) => Promise<boolean>;
+  onSaveSignatures: (id: string, signatures: MailSignature[]) => Promise<boolean>;
   onReconnect: (account: MailAccount) => void;
   onDisconnect: (account: MailAccount) => Promise<void>;
 }
@@ -36,17 +34,18 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
   account,
   onClose,
   onSave,
+  onSaveSignatures,
   onReconnect,
   onDisconnect,
 }) => {
   const [form, setForm] = useState({
     displayName: '',
     label: '',
-    signature: '',
     color: 'violet' as MailAccountColor,
     isDefault: false,
     notify: true,
   });
+  const [signatures, setSignatures] = useState<MailSignature[]>([]);
   const [confirm, setConfirm] = useState(false);
 
   useEffect(() => {
@@ -54,12 +53,13 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
     setForm({
       displayName: account.displayName ?? '',
       label: account.label ?? '',
-      signature: account.signature ?? '',
       color: account.color,
       isDefault: account.isDefault,
       notify: account.notify,
     });
-  }, [account]);
+    setSignatures(account.signatures);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao abrir outra caixa
+  }, [account?.id]);
 
   if (!account) return null;
   const provider = providerOf(account.provider);
@@ -68,11 +68,11 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
     void onSave(account.id, {
       displayName: account.shared ? account.displayName : form.displayName.trim() || null,
       label: form.label.trim().slice(0, 60) || null,
-      signature: sanitizeSignatureHtml(form.signature) || null,
       color: form.color,
       isDefault: account.shared ? account.isDefault : form.isDefault,
       notify: form.notify,
     });
+    void onSaveSignatures(account.id, cleanSignatures(signatures));
     onClose();
   };
 
@@ -99,7 +99,7 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
             <p className="flex gap-2 rounded-2xl bg-rz-primary-soft px-4 py-3 text-[13px]">
               <Users className="mt-0.5 h-4 w-4 shrink-0 text-rz-primary" />
               Caixa partilhada pela empresa: quem tem acesso e a ligação são geridos pelo
-              administrador. A assinatura e a cor aqui são só suas.
+              administrador. As assinaturas e a cor aqui são só suas.
             </p>
           )}
 
@@ -149,12 +149,8 @@ export const MailAccountDialog: React.FC<MailAccountDialogProps> = ({
               </label>
             )}
             <div>
-              <span className={LABEL}>Assinatura</span>
-              <SignatureEditor
-                key={account.id}
-                initial={account.signature}
-                onChange={signature => setForm(f => ({ ...f, signature }))}
-              />
+              <span className={LABEL}>Assinaturas</span>
+              <SignaturesManager key={account.id} value={signatures} onChange={setSignatures} />
             </div>
             <div>
               <span className={LABEL}>Cor</span>

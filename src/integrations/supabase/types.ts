@@ -1880,6 +1880,47 @@ export type Database = {
           },
         ];
       };
+      mail_signatures: {
+        Row: {
+          account_id: string;
+          created_at: string;
+          html: string;
+          id: string;
+          is_default: boolean;
+          name: string;
+          position: number;
+          user_id: string;
+        };
+        Insert: {
+          account_id: string;
+          created_at?: string;
+          html: string;
+          id?: string;
+          is_default?: boolean;
+          name: string;
+          position?: number;
+          user_id: string;
+        };
+        Update: {
+          account_id?: string;
+          created_at?: string;
+          html?: string;
+          id?: string;
+          is_default?: boolean;
+          name?: string;
+          position?: number;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'mail_signatures_account_id_fkey';
+            columns: ['account_id'];
+            isOneToOne: false;
+            referencedRelation: 'mail_accounts';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       mail_account_order: {
         Row: {
           label: string | null;

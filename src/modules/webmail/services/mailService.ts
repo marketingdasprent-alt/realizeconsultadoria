@@ -11,12 +11,13 @@ import type {
   MailAddress,
   MailFolder,
   MailMessage,
+  MailSignature,
   MailSummary,
 } from '../types';
 
 /** Colunas que o colaborador pode ler (secret_id fica de fora por GRANT). */
 const ACCOUNT_COLUMNS =
-  'id, provider, auth_method, email, display_name, signature, status, last_error, last_sync_at, is_default, color, access_id, notify';
+  'id, provider, auth_method, email, display_name, status, last_error, last_sync_at, is_default, color, access_id, notify';
 
 export interface MailError {
   code: string;
@@ -55,7 +56,7 @@ const toAccount = (row: Row): MailAccount => ({
   email: str(row.email),
   displayName: (row.display_name as string | null) ?? null,
   label: null,
-  signature: (row.signature as string | null) ?? null,
+  signatures: [],
   status: row.status as MailAccount['status'],
   lastError: (row.last_error as string | null) ?? null,
   lastSyncAt: (row.last_sync_at as string | null) ?? null,
@@ -125,31 +126,47 @@ export const mailService = {
   listAccounts: async () => {
     const { data: auth } = await supabase.auth.getSession();
     const userId = auth.session?.user.id ?? '';
-    const [accounts, prefs, order] = await Promise.all([
+    const [accounts, prefs, order, sigs] = await Promise.all([
       supabase.from('mail_accounts').select(ACCOUNT_COLUMNS).order('created_at'),
-      // Nas caixas partilhadas, a assinatura e a cor são de cada pessoa.
+      // Nas caixas partilhadas, a cor e os avisos são de cada pessoa.
       supabase
         .from('mail_account_members')
-        .select('account_id, signature, color, notify')
+        .select('account_id, color, notify')
         .eq('user_id', userId),
       // Ordem escolhida pela pessoa na barra lateral (sem ela, fica a da ligação).
       supabase
         .from('mail_account_order')
         .select('account_id, position, label')
         .eq('user_id', userId),
+      // As assinaturas desta pessoa (várias por caixa).
+      supabase
+        .from('mail_signatures')
+        .select('id, account_id, name, html, is_default')
+        .eq('user_id', userId)
+        .order('position'),
     ]);
+    const signatures = new Map<string, MailSignature[]>();
+    for (const row of sigs.data ?? []) {
+      signatures.set(row.account_id, [
+        ...(signatures.get(row.account_id) ?? []),
+        { id: row.id, name: row.name, html: row.html, isDefault: row.is_default },
+      ]);
+    }
     const mine = new Map(((prefs.data ?? []) as Row[]).map(p => [str(p.account_id), p]));
     const positions = new Map((order.data ?? []).map(row => [row.account_id, row.position]));
     const labels = new Map(
       (order.data ?? []).map(row => [row.account_id, (row.label as string | null) ?? null])
     );
     const list = ((accounts.data ?? []) as Row[]).map(base => {
-      const account = { ...toAccount(base), label: labels.get(str(base.id)) ?? null };
+      const account = {
+        ...toAccount(base),
+        label: labels.get(str(base.id)) ?? null,
+        signatures: signatures.get(str(base.id)) ?? [],
+      };
       const pref = account.shared ? mine.get(account.id) : undefined;
       return pref
         ? {
             ...account,
-            signature: (pref.signature as string | null) ?? null,
             color: (pref.color as MailAccount['color'] | null) ?? account.color,
             notify: pref.notify !== false,
           }
@@ -192,6 +209,39 @@ export const mailService = {
     return { error };
   },
 
+  /**
+   * Grava as assinaturas desta pessoa numa caixa: o que saiu da lista apaga-se, a predefinida
+   * anterior deixa de o ser (há no máximo uma) e o resto grava-se pela ordem da lista.
+   */
+  saveSignatures: async (accountId: string, list: MailSignature[]) => {
+    const { data: auth } = await supabase.auth.getSession();
+    const userId = auth.session?.user.id;
+    if (!userId) return { error: new Error('Sessão terminada.') };
+    const mine = () =>
+      supabase.from('mail_signatures').delete().eq('user_id', userId).eq('account_id', accountId);
+    const removed = list.length
+      ? await mine().not('id', 'in', `(${list.map(s => s.id).join(',')})`)
+      : await mine();
+    if (removed.error) return removed;
+    const cleared = await supabase
+      .from('mail_signatures')
+      .update({ is_default: false })
+      .eq('user_id', userId)
+      .eq('account_id', accountId);
+    if (cleared.error || !list.length) return cleared;
+    return supabase.from('mail_signatures').upsert(
+      list.map((signature, position) => ({
+        id: signature.id,
+        user_id: userId,
+        account_id: accountId,
+        name: signature.name,
+        html: signature.html,
+        is_default: signature.isDefault,
+        position,
+      }))
+    );
+  },
+
   /** Emails por ler na Entrada de cada caixa (as que falharem ficam sem número). */
   unreadCounts: () =>
     call<{ counts: Record<string, number>; errors: Record<string, string> }>('mail-api', {
@@ -200,18 +250,15 @@ export const mailService = {
 
   updateAccount: async (
     id: string,
-    patch: Partial<
-      Pick<MailAccount, 'displayName' | 'signature' | 'isDefault' | 'color' | 'notify'>
-    >,
+    patch: Partial<Pick<MailAccount, 'displayName' | 'isDefault' | 'color' | 'notify'>>,
     shared = false
   ) => {
     if (shared) {
-      // Caixa partilhada: só as preferências da própria pessoa (assinatura e cor).
+      // Caixa partilhada: só as preferências da própria pessoa (cor e avisos).
       const { data: auth } = await supabase.auth.getSession();
       const { error } = await supabase
         .from('mail_account_members')
         .update({
-          ...(patch.signature !== undefined && { signature: patch.signature }),
           ...(patch.color !== undefined && { color: patch.color }),
           ...(patch.notify !== undefined && { notify: patch.notify }),
         })
@@ -223,7 +270,6 @@ export const mailService = {
       .from('mail_accounts')
       .update({
         ...(patch.displayName !== undefined && { display_name: patch.displayName }),
-        ...(patch.signature !== undefined && { signature: patch.signature }),
         ...(patch.isDefault !== undefined && { is_default: patch.isDefault }),
         ...(patch.color !== undefined && { color: patch.color }),
         ...(patch.notify !== undefined && { notify: patch.notify }),

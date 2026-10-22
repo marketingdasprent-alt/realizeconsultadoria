@@ -7,6 +7,14 @@ export type MailFolder =
   'inbox' | 'unread' | 'starred' | 'sent' | 'drafts' | 'archive' | 'spam' | 'trash';
 export type MailAccountColor = 'violet' | 'sky' | 'emerald' | 'amber' | 'rose' | 'slate';
 
+/** Uma assinatura (HTML já limpo) com nome, como no Outlook. */
+export interface MailSignature {
+  id: string;
+  name: string;
+  html: string;
+  isDefault: boolean;
+}
+
 export interface MailAccount {
   id: string;
   provider: MailProviderKey;
@@ -15,7 +23,8 @@ export interface MailAccount {
   displayName: string | null;
   /** Nome que a própria pessoa deu à caixa na barra lateral (null = o endereço). */
   label: string | null;
-  signature: string | null;
+  /** Assinaturas desta pessoa nesta caixa (a predefinida é usada ao escrever). */
+  signatures: MailSignature[];
   status: 'active' | 'error' | 'reauth';
   lastError: string | null;
   lastSyncAt: string | null;

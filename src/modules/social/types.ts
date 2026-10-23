@@ -71,6 +71,8 @@ export interface Appreciation {
   message: string | null;
   isPublic: boolean;
   createdAt: string;
+  /** Quem reagiu e com que emoji (por ordem). */
+  reactors?: { user_id: string; emoji: string }[];
 }
 
 export interface NewPostInput {

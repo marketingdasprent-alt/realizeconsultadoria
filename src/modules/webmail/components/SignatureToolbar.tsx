@@ -4,6 +4,7 @@ import {
   AlignLeft,
   AlignRight,
   Bold,
+  ChevronDown,
   Eraser,
   ImagePlus,
   Italic,
@@ -29,6 +30,8 @@ const SIZES = [
   { label: 'Grande', value: '5' },
   { label: 'Enorme', value: '6' },
 ];
+// Pré-visualização do tamanho no menu.
+const SIZE_PX: Record<string, string> = { '2': '12px', '3': '14px', '5': '18px', '6': '22px' };
 const COLORS = [
   '#111827',
   '#6b7280',
@@ -76,20 +79,34 @@ export const SignatureToolbar: React.FC<SignatureToolbarProps> = ({
       {button(Bold, 'Negrito', 'bold')}
       {button(Italic, 'Itálico', 'italic')}
       {button(Underline, 'Sublinhado', 'underline')}
-      <select
-        aria-label="Tamanho do texto"
-        title="Tamanho do texto"
-        value=""
-        onChange={event => event.target.value && onCommand('fontSize', event.target.value)}
-        className="h-8 rounded-full bg-transparent px-2 text-[12.5px] font-semibold text-rz-muted outline-none hover:bg-white"
-      >
-        <option value="">Tamanho</option>
-        {SIZES.map(size => (
-          <option key={size.value} value={size.value}>
-            {size.label}
-          </option>
-        ))}
-      </select>
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className={TOOL}
+            title="Tamanho do texto"
+            aria-label="Tamanho do texto"
+          >
+            Tamanho <ChevronDown className="h-3.5 w-3.5" />
+          </button>
+        </PopoverTrigger>
+        <PopoverContent
+          className="w-40 rounded-2xl p-1.5"
+          onOpenAutoFocus={event => event.preventDefault()}
+        >
+          {SIZES.map(size => (
+            <button
+              key={size.value}
+              type="button"
+              onMouseDown={event => (event.preventDefault(), onCommand('fontSize', size.value))}
+              className="flex w-full items-center rounded-xl px-2.5 py-2 text-left font-semibold hover:bg-rz-canvas"
+              style={{ fontSize: SIZE_PX[size.value] }}
+            >
+              {size.label}
+            </button>
+          ))}
+        </PopoverContent>
+      </Popover>
       <Popover>
         <PopoverTrigger asChild>
           <button type="button" className={TOOL} title="Cor do texto" aria-label="Cor do texto">

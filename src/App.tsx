@@ -35,6 +35,7 @@ const AccessesPage = lazy(() => import('./modules/admin/pages/AccessesPage'));
 const LegalPage = lazy(() => import('./modules/admin/pages/LegalPage'));
 const LoginPage = lazy(() => import('./pages/auth/LoginPage'));
 const SupportPage = lazy(() => import('./modules/support/pages/SupportPage'));
+const SupportDeskPage = lazy(() => import('./modules/support/pages/SupportDeskPage'));
 const MyDocumentsPage = lazy(() => import('./modules/documents/pages/MyDocumentsPage'));
 const PersonalDocumentsPage = lazy(() => import('./modules/documents/pages/PersonalDocumentsPage'));
 const MyTimeClockPage = lazy(() => import('./modules/timeclock/pages/MyTimeClockPage'));
@@ -157,6 +158,7 @@ const App = () => (
                   {/* Páginas atuais, sem alterações, até serem redesenhadas (Fase 3) */}
                   <Route path="/colaborador/pedidos" element={<AbsencesPage />} />
                   <Route path="/colaborador/tickets" element={<SupportPage />} />
+                  <Route path="/colaborador/suporte-equipa" element={<SupportDeskPage />} />
                   <Route path="/colaborador/documentos" element={<MyDocumentsPage />} />
                   <Route
                     path="/colaborador/definicoes/documentos"

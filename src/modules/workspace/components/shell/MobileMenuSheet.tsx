@@ -2,7 +2,8 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { useWorkspace } from '../../context/workspaceContext';
-import { SETTINGS_MODULE, WORKSPACE_GROUPS, modulePath } from '../../lib/navigation';
+import { useSupportDesk } from '@/modules/support/hooks/useSupportDesk';
+import { SETTINGS_MODULE, modulePath, visibleGroups } from '../../lib/navigation';
 import { ModuleIcon } from '../ModuleIcon';
 
 interface MobileMenuSheetProps {
@@ -13,7 +14,11 @@ interface MobileMenuSheetProps {
 /** Menu completo no telemóvel: todos os módulos em mosaicos, por grupo. */
 export const MobileMenuSheet: React.FC<MobileMenuSheetProps> = ({ open, onOpenChange }) => {
   const { basePath } = useWorkspace();
-  const groups = [...WORKSPACE_GROUPS, { label: 'Conta', modules: [SETTINGS_MODULE] }];
+  const { isAgent } = useSupportDesk();
+  const groups = [
+    ...visibleGroups({ supportDesk: isAgent }),
+    { label: 'Conta', modules: [SETTINGS_MODULE] },
+  ];
 
   return (
     <Sheet open={open} onOpenChange={onOpenChange}>

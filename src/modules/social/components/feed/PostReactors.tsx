@@ -8,28 +8,29 @@ import { useDirectory } from '../../hooks/useDirectory';
 import { groupReactors } from '../../lib/feed';
 import { feedService } from '../../services/feedService';
 
-interface PostReactorsProps {
-  postId: string;
+interface ReactorsPopoverProps {
+  rows: { user_id: string; emoji: string }[];
+  isLoading?: boolean;
+  isError?: boolean;
+  unavailable?: boolean;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
-/** "Quem reagiu": lista as pessoas por emoji (carrega só quando se abre). */
-export const PostReactors: React.FC<PostReactorsProps> = ({ postId }) => {
-  const { isPreview } = useWorkspace();
+/** "Quem reagiu": as pessoas agrupadas por emoji. */
+export const ReactorsPopover: React.FC<ReactorsPopoverProps> = ({
+  rows,
+  isLoading,
+  isError,
+  unavailable,
+  open,
+  onOpenChange,
+}) => {
   const { nameOf } = useDirectory();
-  const [open, setOpen] = useState(false);
-  const { data, isLoading, isError } = useQuery({
-    queryKey: ['feed', 'reactors', postId],
-    queryFn: async () => {
-      const { data: rows, error } = await feedService.listReactors(postId);
-      if (error) throw error;
-      return rows;
-    },
-    enabled: open && !isPreview,
-  });
-  const groups = groupReactors(data ?? []);
+  const groups = groupReactors(rows);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={onOpenChange}>
       <PopoverTrigger asChild>
         <button
           type="button"
@@ -39,7 +40,7 @@ export const PostReactors: React.FC<PostReactorsProps> = ({ postId }) => {
         </button>
       </PopoverTrigger>
       <PopoverContent side="top" align="start" className="w-72 rounded-2xl p-3 shadow-rz-pop">
-        {isPreview && (
+        {unavailable && (
           <p className="text-[13px] text-rz-muted">Indisponível na pré-visualização.</p>
         )}
         {isLoading && <Loader2 className="mx-auto h-5 w-5 animate-spin text-rz-primary" />}
@@ -63,5 +64,35 @@ export const PostReactors: React.FC<PostReactorsProps> = ({ postId }) => {
         </div>
       </PopoverContent>
     </Popover>
+  );
+};
+
+interface PostReactorsProps {
+  postId: string;
+}
+
+/** "Quem reagiu" numa publicação (carrega só quando se abre). */
+export const PostReactors: React.FC<PostReactorsProps> = ({ postId }) => {
+  const { isPreview } = useWorkspace();
+  const [open, setOpen] = useState(false);
+  const { data, isLoading, isError } = useQuery({
+    queryKey: ['feed', 'reactors', postId],
+    queryFn: async () => {
+      const { data: rows, error } = await feedService.listReactors(postId);
+      if (error) throw error;
+      return rows;
+    },
+    enabled: open && !isPreview,
+  });
+
+  return (
+    <ReactorsPopover
+      rows={data ?? []}
+      isLoading={open && !isPreview && isLoading}
+      isError={isError}
+      unavailable={isPreview}
+      open={open}
+      onOpenChange={setOpen}
+    />
   );
 };

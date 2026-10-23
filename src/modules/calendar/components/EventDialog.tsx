@@ -12,6 +12,7 @@ import type {
   EventRecurrence,
   EventVisibility,
 } from '../types';
+import { RzSelect } from '@/modules/workspace/components/RzSelect';
 
 interface EventDialogProps {
   open: boolean;
@@ -191,19 +192,19 @@ export const EventDialog: React.FC<EventDialogProps> = ({
           <div className="grid gap-3 sm:grid-cols-2">
             <label>
               <span className={LABEL}>Repetir</span>
-              <select
+              <RzSelect
                 value={form.recurrence ?? ''}
-                onChange={e =>
-                  set('recurrence', (e.target.value || null) as EventRecurrence | null)
-                }
+                onChange={value => set('recurrence', (value || null) as EventRecurrence | null)}
                 className={FIELD}
-              >
-                <option value="">Não repete</option>
-                <option value="daily">Todos os dias</option>
-                <option value="weekly">Todas as semanas</option>
-                <option value="monthly">Todos os meses</option>
-                <option value="yearly">Todos os anos</option>
-              </select>
+                ariaLabel="Repetir"
+                options={[
+                  { value: '', label: 'Não repete' },
+                  { value: 'daily', label: 'Todos os dias' },
+                  { value: 'weekly', label: 'Todas as semanas' },
+                  { value: 'monthly', label: 'Todos os meses' },
+                  { value: 'yearly', label: 'Todos os anos' },
+                ]}
+              />
             </label>
             {form.recurrence ? (
               <label>
@@ -218,37 +219,37 @@ export const EventDialog: React.FC<EventDialogProps> = ({
             ) : (
               <label>
                 <span className={LABEL}>Lembrete</span>
-                <select
-                  value={form.reminderMinutes ?? ''}
-                  onChange={e =>
-                    set('reminderMinutes', e.target.value === '' ? null : Number(e.target.value))
-                  }
+                <RzSelect
+                  value={form.reminderMinutes == null ? '' : String(form.reminderMinutes)}
+                  onChange={value => set('reminderMinutes', value === '' ? null : Number(value))}
                   className={FIELD}
-                >
-                  <option value="">Sem lembrete</option>
-                  <option value="0">Na hora</option>
-                  <option value="10">10 minutos antes</option>
-                  <option value="15">15 minutos antes</option>
-                  <option value="60">1 hora antes</option>
-                  <option value="1440">1 dia antes</option>
-                </select>
+                  ariaLabel="Lembrete"
+                  options={[
+                    { value: '', label: 'Sem lembrete' },
+                    { value: '0', label: 'Na hora' },
+                    { value: '10', label: '10 minutos antes' },
+                    { value: '15', label: '15 minutos antes' },
+                    { value: '60', label: '1 hora antes' },
+                    { value: '1440', label: '1 dia antes' },
+                  ]}
+                />
               </label>
             )}
           </div>
           <div className="grid gap-3 sm:grid-cols-2">
             <label>
               <span className={LABEL}>Quem vê</span>
-              <select
+              <RzSelect
                 value={form.visibility}
-                onChange={e => set('visibility', e.target.value as EventVisibility)}
+                onChange={value => set('visibility', value as EventVisibility)}
                 className={FIELD}
-              >
-                <option value="participants">Eu e os convidados</option>
-                <option value="company">Toda a empresa</option>
-                <option value="private" disabled={form.attendeeIds.length > 0}>
-                  Só eu
-                </option>
-              </select>
+                ariaLabel="Quem vê"
+                options={[
+                  { value: 'participants', label: 'Eu e os convidados' },
+                  { value: 'company', label: 'Toda a empresa' },
+                  { value: 'private', label: 'Só eu', disabled: form.attendeeIds.length > 0 },
+                ]}
+              />
             </label>
             <div>
               <span className={LABEL}>Cor</span>

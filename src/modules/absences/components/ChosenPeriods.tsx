@@ -6,6 +6,7 @@ import { AVAILABLE_HOURS, type DatePeriod, type Holiday } from '@/lib/vacation-u
 import { cn } from '@/lib/utils';
 import { formatDays } from '../lib/absenceRules';
 import { periodDays } from '../lib/newRequest';
+import { RzSelect } from '@/modules/workspace/components/RzSelect';
 
 interface ChosenPeriodsProps {
   periods: DatePeriod[];
@@ -87,10 +88,9 @@ export const ChosenPeriods: React.FC<ChosenPeriodsProps> = ({ periods, holidays,
                 </div>
                 {partial && (
                   <div className="flex items-center gap-2">
-                    <select
-                      value={period.startTime}
-                      onChange={e => {
-                        const start = e.target.value;
+                    <RzSelect
+                      value={period.startTime ?? ''}
+                      onChange={start => {
                         // A hora de fim tem de ser depois da de início.
                         const end =
                           (period.endTime ?? '') > start
@@ -99,23 +99,22 @@ export const ChosenPeriods: React.FC<ChosenPeriodsProps> = ({ periods, holidays,
                         update(index, { startTime: start, endTime: end });
                       }}
                       className={SELECT}
-                      aria-label="Das"
-                    >
-                      {AVAILABLE_HOURS.slice(0, -1).map(hour => (
-                        <option key={hour}>{hour}</option>
-                      ))}
-                    </select>
+                      ariaLabel="Das"
+                      options={AVAILABLE_HOURS.slice(0, -1).map(hour => ({
+                        value: hour,
+                        label: hour,
+                      }))}
+                    />
                     <span className="text-[12px] text-rz-muted">às</span>
-                    <select
-                      value={period.endTime}
-                      onChange={e => update(index, { endTime: e.target.value })}
+                    <RzSelect
+                      value={period.endTime ?? ''}
+                      onChange={endTime => update(index, { endTime })}
                       className={SELECT}
-                      aria-label="Às"
-                    >
-                      {AVAILABLE_HOURS.filter(hour => hour > (period.startTime ?? '')).map(hour => (
-                        <option key={hour}>{hour}</option>
-                      ))}
-                    </select>
+                      ariaLabel="Às"
+                      options={AVAILABLE_HOURS.filter(hour => hour > (period.startTime ?? '')).map(
+                        hour => ({ value: hour, label: hour })
+                      )}
+                    />
                   </div>
                 )}
               </div>

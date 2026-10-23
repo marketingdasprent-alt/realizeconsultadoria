@@ -18,6 +18,7 @@ import type { ComposeDraft, ComposeInput, MailAccount } from '../types';
 import { AutoTextarea } from './AutoTextarea';
 import { RecipientField } from './RecipientField';
 import { SendCheckDialog } from './SendCheckDialog';
+import { RzSelect } from '@/modules/workspace/components/RzSelect';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 const FIELD = 'h-10 w-full bg-transparent text-[14px] outline-none placeholder:text-rz-muted';
@@ -320,44 +321,42 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           )}
           <DialogTitle className="px-5 pb-3 pt-5 text-[18px] font-extrabold">{title}</DialogTitle>
           <Row label="De">
-            <select
+            <RzSelect
               value={accountId}
-              onChange={e => {
-                setAccountId(e.target.value);
+              onChange={value => {
+                setAccountId(value);
                 setSigChoice('default');
               }}
               className={FIELD}
-            >
-              {accounts.map(account => (
-                <option key={account.id} value={account.id}>
-                  {account.displayName
-                    ? `${account.displayName} <${account.email}>`
-                    : account.email}
-                </option>
-              ))}
-            </select>
+              ariaLabel="De"
+              options={accounts.map(account => ({
+                value: account.id,
+                label: account.displayName
+                  ? `${account.displayName} <${account.email}>`
+                  : account.email,
+              }))}
+            />
             {signatures.length > 0 && (
-              <select
+              <RzSelect
                 value={sigChoice}
-                onChange={e => setSigChoice(e.target.value)}
-                aria-label="Assinatura"
+                onChange={setSigChoice}
+                ariaLabel="Assinatura"
                 title="Assinatura"
-                className="h-8 max-w-[13rem] shrink-0 rounded-full bg-rz-canvas px-3 text-[12.5px] font-semibold text-rz-ink outline-none ring-1 ring-rz-line"
-              >
-                <option value="default">
-                  {signatures.find(sig => sig.isDefault)?.name
-                    ? `Assinatura: ${signatures.find(sig => sig.isDefault)?.name}`
-                    : 'Sem assinatura'}
-                </option>
-                {signatures
-                  .filter(sig => !sig.isDefault)
-                  .map(sig => (
-                    <option key={sig.id} value={sig.id}>
-                      Assinatura: {sig.name}
-                    </option>
-                  ))}
-                <option value="none">Sem assinatura</option>
-              </select>
+                align="end"
+                className="h-8 max-w-[13rem] shrink-0 rounded-full bg-rz-canvas px-3 text-[12.5px] font-semibold text-rz-ink ring-1 ring-rz-line"
+                options={[
+                  {
+                    value: 'default',
+                    label: signatures.find(sig => sig.isDefault)?.name
+                      ? `Assinatura: ${signatures.find(sig => sig.isDefault)?.name}`
+                      : 'Sem assinatura',
+                  },
+                  ...signatures
+                    .filter(sig => !sig.isDefault)
+                    .map(sig => ({ value: sig.id, label: `Assinatura: ${sig.name}` })),
+                  { value: 'none', label: 'Sem assinatura' },
+                ]}
+              />
             )}
           </Row>
           <RecipientRow label="Para">

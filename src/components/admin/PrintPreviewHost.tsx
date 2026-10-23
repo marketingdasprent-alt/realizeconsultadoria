@@ -41,6 +41,9 @@ export const PrintPreviewHost: React.FC = () => {
           ref={frame}
           title={preview.title}
           srcDoc={preview.html}
+          // Sem allow-scripts: o que vem dos utilizadores (ex.: texto de um ticket) nunca corre código.
+          // allow-same-origin deixa o botão Imprimir chamar print(); allow-modals abre a janela.
+          sandbox="allow-same-origin allow-modals"
           className="min-h-0 w-full flex-1 bg-[#f4f2ec]"
         />
       </DialogContent>

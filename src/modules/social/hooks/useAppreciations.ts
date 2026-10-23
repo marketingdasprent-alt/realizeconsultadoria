@@ -47,6 +47,9 @@ export const useAppreciations = (scope: { userId: string } | 'public') => {
     message: row.message,
     isPublic: row.is_public,
     createdAt: row.created_at,
+    reactors: [...(row.appreciation_reactions ?? [])].sort((a, b) =>
+      a.created_at.localeCompare(b.created_at)
+    ),
   });
 
   const items: Appreciation[] = useMemo(() => {
@@ -93,8 +96,37 @@ export const useAppreciations = (scope: { userId: string } | 'public') => {
     return true;
   };
 
+  /** Põe ou tira a reação (logo no ecrã; volta atrás se falhar). */
+  const react = async (item: Appreciation, emoji: string) => {
+    if (isPreview) return;
+    const mine = (item.reactors ?? []).some(r => r.user_id === user.userId && r.emoji === emoji);
+    qc.setQueriesData<AppreciationRow[]>({ queryKey: FEED_KEYS.appreciations }, rows =>
+      rows?.map(row =>
+        row.id !== item.id
+          ? row
+          : {
+              ...row,
+              appreciation_reactions: mine
+                ? row.appreciation_reactions.filter(
+                    r => !(r.user_id === user.userId && r.emoji === emoji)
+                  )
+                : [
+                    ...row.appreciation_reactions,
+                    { user_id: user.userId, emoji, created_at: new Date().toISOString() },
+                  ],
+            }
+      )
+    );
+    const { error } = mine
+      ? await appreciationService.removeReaction(item.id, user.userId, emoji)
+      : await appreciationService.addReaction(item.id, user.userId, emoji);
+    if (error) toast({ title: 'A reação não foi guardada', variant: 'destructive' });
+    void qc.invalidateQueries({ queryKey: FEED_KEYS.appreciations });
+  };
+
   return {
     items,
+    react,
     received: scope === 'public' ? [] : items.filter(a => a.recipientId === key),
     sent: scope === 'public' ? [] : items.filter(a => a.senderId === key),
     isLoading: !isPreview && live.isLoading,

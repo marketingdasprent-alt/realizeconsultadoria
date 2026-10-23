@@ -10,7 +10,7 @@ import { useTicketThread } from '../hooks/useMyTickets';
 import { useTicketFiles } from '../hooks/useTicketFiles';
 import { buildTimeline } from '../lib/ticketFiles';
 import { isTicketClosed, type SupportTicket, type TicketAttachment } from '../lib/ticketRules';
-import { TicketAttachmentChip } from './TicketAttachmentChip';
+import { TicketAttachments } from './TicketAttachments';
 import { TicketBadges } from './TicketBadges';
 import { TicketReplyBox } from './TicketReplyBox';
 
@@ -97,10 +97,8 @@ export const TicketThread: React.FC<TicketThreadProps> = ({ ticket, attachments,
                 <When at={item.at} mine={item.mine} />
               </div>
             ) : (
-              <div className="w-full max-w-sm space-y-1.5">
-                {item.files.map(file => (
-                  <TicketAttachmentChip key={file.id} attachment={file} />
-                ))}
+              <div className="w-full max-w-sm">
+                <TicketAttachments files={item.files} />
               </div>
             )}
           </Side>

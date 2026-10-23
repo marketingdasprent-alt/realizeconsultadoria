@@ -5,8 +5,9 @@ import { cn } from '@/lib/utils';
 import { useOptionalMessenger } from '@/modules/messenger/context/useMessengerApi';
 import { useFeedUnread } from '@/modules/social/hooks/useFeedUnread';
 import { useNotices } from '@/modules/social/hooks/useNotices';
+import { useSupportDesk } from '@/modules/support/hooks/useSupportDesk';
 import { useMailUnreadTotal } from '@/modules/webmail/hooks/useMailUnreadTotal';
-import { SETTINGS_MODULE, WORKSPACE_GROUPS } from '../../lib/navigation';
+import { SETTINGS_MODULE, visibleGroups } from '../../lib/navigation';
 import { BrandMark } from '../BrandMark';
 import { SidebarNavItem } from './SidebarNavItem';
 
@@ -33,6 +34,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const { count: feedNew } = useFeedUnread();
   // Emails por ler na Entrada de todas as caixas.
   const mailUnread = useMailUnreadTotal();
+  const { isAgent } = useSupportDesk();
   return (
     <aside
       className={cn(
@@ -50,7 +52,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       </Link>
 
       <nav className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-3 pb-3 pt-2">
-        {WORKSPACE_GROUPS.map(group => (
+        {visibleGroups({ supportDesk: isAgent }).map(group => (
           <div key={group.label}>
             {collapsed ? (
               <div className="mx-auto mb-2 h-px w-8 bg-white/15" aria-hidden />

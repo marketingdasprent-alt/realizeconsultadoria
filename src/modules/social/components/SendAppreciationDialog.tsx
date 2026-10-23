@@ -18,6 +18,7 @@ import {
   messageShortfall,
 } from '../lib/appreciationRules';
 import type { AppreciationKind, NewAppreciationInput } from '../types';
+import { ColleaguePicker } from './ColleaguePicker';
 
 interface SendAppreciationDialogProps {
   open: boolean;
@@ -74,36 +75,26 @@ export const SendAppreciationDialog: React.FC<SendAppreciationDialogProps> = ({
         </DialogHeader>
 
         {!recipientId && (
-          <select
-            value={recipient}
-            onChange={event => setRecipient(event.target.value)}
-            className="h-11 w-full rounded-2xl bg-rz-canvas px-3 text-sm outline-none ring-1 ring-transparent focus:ring-rz-primary/40"
-          >
-            <option value="">Escolha um colega…</option>
-            {colleagues.map(person => (
-              <option key={person.userId} value={person.userId}>
-                {person.name}
-                {person.department ? ` — ${person.department}` : ''}
-              </option>
-            ))}
-          </select>
+          <ColleaguePicker people={colleagues} value={recipient} onChange={setRecipient} />
         )}
 
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+        <div lang="pt" className="grid grid-cols-2 gap-2 sm:grid-cols-3">
           {APPRECIATION_TYPES.map(type => (
             <button
               key={type.key}
               type="button"
               onClick={() => setKind(type.key as AppreciationKind)}
               className={cn(
-                'flex items-center gap-2.5 rounded-2xl p-2.5 text-left text-[13px] font-semibold ring-1 transition-all',
+                'flex min-w-0 flex-col items-center gap-1.5 rounded-2xl px-2 py-2.5 text-center text-[12.5px] font-semibold ring-1 transition-all',
                 kind === type.key
                   ? 'bg-rz-primary-soft ring-2 ring-rz-primary'
                   : 'ring-rz-line hover:bg-rz-canvas'
               )}
             >
               <ModuleIcon module={type} size="sm" />
-              <span className="leading-tight">{type.label}</span>
+              <span className="w-full min-w-0 hyphens-auto break-words leading-tight">
+                {type.label}
+              </span>
             </button>
           ))}
         </div>

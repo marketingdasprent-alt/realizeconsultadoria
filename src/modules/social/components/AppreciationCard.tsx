@@ -8,17 +8,21 @@ import { ModuleIcon } from '@/modules/workspace/components/ModuleIcon';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { APPRECIATION_TYPES } from '@/modules/workspace/lib/appreciations';
 import type { Appreciation } from '../types';
+import { AppreciationReactions } from './AppreciationReactions';
 
 interface AppreciationCardProps {
   appreciation: Appreciation;
   /** No Feed: cartão maior, com fundo festivo. */
   variant?: 'feed' | 'list';
+  /** Sem isto não mostra emojis. */
+  onReact?: (appreciation: Appreciation, emoji: string) => void;
 }
 
 /** "Ana reconheceu Joana — Ajuda importante", com a mensagem opcional. */
 export const AppreciationCard: React.FC<AppreciationCardProps> = ({
   appreciation,
   variant = 'list',
+  onReact,
 }) => {
   const { basePath, user } = useWorkspace();
   const type = APPRECIATION_TYPES.find(t => t.key === appreciation.kind) ?? APPRECIATION_TYPES[0];
@@ -74,6 +78,12 @@ export const AppreciationCard: React.FC<AppreciationCardProps> = ({
             </span>
           )}
         </p>
+        {onReact && (
+          <AppreciationReactions
+            reactors={appreciation.reactors ?? []}
+            onReact={emoji => onReact(appreciation, emoji)}
+          />
+        )}
       </div>
     </article>
   );

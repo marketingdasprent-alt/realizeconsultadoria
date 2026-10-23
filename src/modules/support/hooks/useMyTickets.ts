@@ -67,7 +67,10 @@ export const useTicketThread = (ticket: SupportTicket | null) => {
           table: 'support_ticket_replies',
           filter: `ticket_id=eq.${ticketId}`,
         },
-        () => qc.invalidateQueries({ queryKey: ['support', 'replies', ticketId] })
+        () => {
+          void qc.invalidateQueries({ queryKey: ['support', 'replies', ticketId] });
+          void qc.invalidateQueries({ queryKey: TICKETS_KEY });
+        }
       )
       .subscribe();
     return () => {

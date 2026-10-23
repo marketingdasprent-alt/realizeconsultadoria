@@ -9,22 +9,32 @@ interface ImageLightboxProps {
   /** Imagem aberta (null = fechada). */
   index: number | null;
   onIndex: (index: number | null) => void;
+  /** De onde vem o URL de cada imagem (por omissão, os ficheiros do Feed). */
+  resolveUrl?: (path: string) => Promise<string | null>;
 }
 
 const ARROW =
   'absolute top-1/2 z-10 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur transition-colors hover:bg-white/30';
 
 /** Pré-carrega a vizinha para a passagem ser instantânea. */
-const Preload: React.FC<{ file?: FeedAttachment }> = ({ file }) => {
-  useFileUrl(file?.path ?? '');
+const Preload: React.FC<{
+  file?: FeedAttachment;
+  resolveUrl?: (path: string) => Promise<string | null>;
+}> = ({ file, resolveUrl }) => {
+  useFileUrl(file?.path ?? '', resolveUrl);
   return null;
 };
 
 /** Galeria: a imagem em ecrã cheio, com setas, teclado (← → Esc) e contador. */
-export const ImageLightbox: React.FC<ImageLightboxProps> = ({ images, index, onIndex }) => {
+export const ImageLightbox: React.FC<ImageLightboxProps> = ({
+  images,
+  index,
+  onIndex,
+  resolveUrl,
+}) => {
   const open = index !== null;
   const current = open ? images[index] : undefined;
-  const url = useFileUrl(current?.path ?? '');
+  const url = useFileUrl(current?.path ?? '', resolveUrl);
   const many = images.length > 1;
 
   useEffect(() => {
@@ -49,9 +59,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({ images, index, onI
           onClick={event => event.target === event.currentTarget && onIndex(null)}
         >
           <Dialog.Title className="sr-only">{current.name}</Dialog.Title>
-          <Dialog.Description className="sr-only">
-            Galeria de imagens da publicação
-          </Dialog.Description>
+          <Dialog.Description className="sr-only">Galeria de imagens</Dialog.Description>
           {url ? (
             <img
               src={url}
@@ -89,7 +97,7 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({ images, index, onI
               <span className="absolute bottom-4 left-1/2 -translate-x-1/2 rounded-full bg-white/15 px-3 py-1 text-[13px] font-semibold text-white backdrop-blur">
                 {index + 1} / {images.length}
               </span>
-              <Preload file={images[(index + 1) % images.length]} />
+              <Preload file={images[(index + 1) % images.length]} resolveUrl={resolveUrl} />
             </>
           )}
         </Dialog.Content>

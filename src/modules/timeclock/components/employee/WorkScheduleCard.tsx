@@ -10,6 +10,7 @@ import {
   scheduleService,
   type WorkSchedule,
 } from '../../services/scheduleService';
+import { RzSelect } from '@/modules/workspace/components/RzSelect';
 
 const DAYS = [
   [1, 'Seg'],
@@ -166,17 +167,16 @@ export const WorkScheduleCard: React.FC = () => {
           )}
           <label className="block">
             <span className={LABEL}>Avisar se não picar até</span>
-            <select
-              value={schedule.toleranceMin}
-              onChange={e => set({ toleranceMin: Number(e.target.value) })}
+            <RzSelect
+              value={String(schedule.toleranceMin)}
+              onChange={value => set({ toleranceMin: Number(value) })}
               className={TIME}
-            >
-              {[5, 10, 15, 30].map(min => (
-                <option key={min} value={min}>
-                  {min} minutos depois da hora
-                </option>
-              ))}
-            </select>
+              ariaLabel="Avisar se não picar até"
+              options={[5, 10, 15, 30].map(min => ({
+                value: String(min),
+                label: `${min} minutos depois da hora`,
+              }))}
+            />
           </label>
           {problem && <p className="text-[13px] font-semibold text-rose-600">{problem}</p>}
         </div>

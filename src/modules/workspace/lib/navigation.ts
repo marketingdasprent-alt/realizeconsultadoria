@@ -5,6 +5,7 @@ import {
   CalendarDays,
   Clock,
   FolderOpen,
+  Headset,
   LifeBuoy,
   ListChecks,
   Mail,
@@ -26,6 +27,7 @@ export type ModuleKey =
   | 'tasks'
   | 'documents'
   | 'tickets'
+  | 'support-desk'
   | 'timeclock'
   | 'absences'
   | 'people'
@@ -49,12 +51,21 @@ export interface WorkspaceModule {
   phase?: number;
   /** O que vai trazer (página "Em construção"). */
   planned?: string[];
+  /** Só aparece no menu para quem atende tickets (equipa de um departamento de suporte). */
+  onlyFor?: 'supportDesk';
 }
 
 export interface WorkspaceGroup {
   label: string;
   modules: WorkspaceModule[];
 }
+
+/** Grupos do menu sem os módulos que esta pessoa não usa. */
+export const visibleGroups = (access: { supportDesk: boolean }): WorkspaceGroup[] =>
+  WORKSPACE_GROUPS.map(group => ({
+    ...group,
+    modules: group.modules.filter(m => m.onlyFor !== 'supportDesk' || access.supportDesk),
+  }));
 
 export const WORKSPACE_GROUPS: WorkspaceGroup[] = [
   {
@@ -150,6 +161,16 @@ export const WORKSPACE_GROUPS: WorkspaceGroup[] = [
         tint: 'from-cyan-400 to-sky-600',
         ready: true,
         description: 'Pedidos de suporte aos Recursos Humanos.',
+      },
+      {
+        key: 'support-desk',
+        label: 'Suporte',
+        path: 'suporte-equipa',
+        icon: Headset,
+        tint: 'from-sky-500 to-indigo-600',
+        ready: true,
+        onlyFor: 'supportDesk',
+        description: 'Atender os tickets do seu departamento.',
       },
       {
         key: 'timeclock',

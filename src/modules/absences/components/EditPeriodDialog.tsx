@@ -18,6 +18,7 @@ import type { PeriodEdit } from '../hooks/useMyAbsences';
 import { formatDays, maxVacationDays, type VacationBalance } from '../lib/absenceRules';
 import type { PeriodItem } from '../lib/periodItems';
 import { periodDates } from './PeriodRow';
+import { RzSelect } from '@/modules/workspace/components/RzSelect';
 
 interface EditPeriodDialogProps {
   item: PeriodItem;
@@ -141,27 +142,24 @@ export const EditPeriodDialog: React.FC<EditPeriodDialogProps> = ({
             </div>
             {partial && (
               <div className="flex items-center gap-2">
-                <select
+                <RzSelect
                   value={startTime}
-                  onChange={e => setStartTime(e.target.value)}
+                  onChange={setStartTime}
                   className={cn(SELECT, 'flex-1')}
-                  aria-label="Das"
-                >
-                  {AVAILABLE_HOURS.slice(0, -1).map(hour => (
-                    <option key={hour}>{hour}</option>
-                  ))}
-                </select>
+                  ariaLabel="Das"
+                  options={AVAILABLE_HOURS.slice(0, -1).map(hour => ({ value: hour, label: hour }))}
+                />
                 <span className="text-sm text-rz-muted">às</span>
-                <select
+                <RzSelect
                   value={endTime}
-                  onChange={e => setEndTime(e.target.value)}
+                  onChange={setEndTime}
                   className={cn(SELECT, 'flex-1')}
-                  aria-label="Às"
-                >
-                  {AVAILABLE_HOURS.filter(hour => hour > startTime).map(hour => (
-                    <option key={hour}>{hour}</option>
-                  ))}
-                </select>
+                  ariaLabel="Às"
+                  options={AVAILABLE_HOURS.filter(hour => hour > startTime).map(hour => ({
+                    value: hour,
+                    label: hour,
+                  }))}
+                />
               </div>
             )}
           </div>

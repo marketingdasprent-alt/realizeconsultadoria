@@ -582,6 +582,35 @@ export type Database = {
         };
         Relationships: [];
       };
+      appreciation_reactions: {
+        Row: {
+          appreciation_id: string;
+          created_at: string;
+          emoji: string;
+          user_id: string;
+        };
+        Insert: {
+          appreciation_id: string;
+          created_at?: string;
+          emoji: string;
+          user_id: string;
+        };
+        Update: {
+          appreciation_id?: string;
+          created_at?: string;
+          emoji?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'appreciation_reactions_appreciation_id_fkey';
+            columns: ['appreciation_id'];
+            isOneToOne: false;
+            referencedRelation: 'appreciations';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       appreciations: {
         Row: {
           company_id: string;
@@ -2914,6 +2943,22 @@ export type Database = {
           },
         ];
       };
+      support_ticket_internal_notes: {
+        Row: { notes: string; ticket_id: string; updated_at: string; updated_by: string | null };
+        Insert: {
+          notes?: string;
+          ticket_id: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Update: {
+          notes?: string;
+          ticket_id?: string;
+          updated_at?: string;
+          updated_by?: string | null;
+        };
+        Relationships: [];
+      };
       support_ticket_replies: {
         Row: {
           created_at: string;
@@ -3840,6 +3885,14 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      rz_support_desk_departments: {
+        Args: never;
+        Returns: string[];
+      };
+      support_desk_tickets: {
+        Args: never;
+        Returns: Json;
+      };
       access_password: {
         Args: { _access_id: string };
         Returns: string;

@@ -7,6 +7,7 @@ import { PeoplePicker } from '@/modules/social/components/PeoplePicker';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { RECURRENCE_LABELS, TASK_PRIORITIES } from '../lib/taskRules';
 import type { Task, TaskInput, TaskPriority, TaskRecurrence } from '../types';
+import { RzSelect } from '@/modules/workspace/components/RzSelect';
 
 interface TaskFormDialogProps {
   open: boolean;
@@ -130,18 +131,19 @@ export const TaskFormDialog: React.FC<TaskFormDialogProps> = ({
             </label>
             <label>
               <span className={LABEL}>Repetir</span>
-              <select
+              <RzSelect
                 value={form.recurrence ?? ''}
-                onChange={e => set('recurrence', (e.target.value || null) as TaskRecurrence | null)}
+                onChange={value => set('recurrence', (value || null) as TaskRecurrence | null)}
                 className={FIELD}
-              >
-                <option value="">Não repete</option>
-                {Object.entries(RECURRENCE_LABELS).map(([key, label]) => (
-                  <option key={key} value={key}>
-                    {label}
-                  </option>
-                ))}
-              </select>
+                ariaLabel="Repetir"
+                options={[
+                  { value: '', label: 'Não repete' },
+                  ...Object.entries(RECURRENCE_LABELS).map(([key, label]) => ({
+                    value: key,
+                    label,
+                  })),
+                ]}
+              />
             </label>
           </div>
           <div>

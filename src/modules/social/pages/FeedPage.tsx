@@ -147,6 +147,7 @@ const FeedPage: React.FC = () => {
                   key={`a-${item.appreciation.id}`}
                   appreciation={item.appreciation}
                   variant="feed"
+                  onReact={recognitions.react}
                 />
               )
             )

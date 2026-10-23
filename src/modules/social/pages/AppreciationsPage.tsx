@@ -68,7 +68,13 @@ const AppreciationsPage: React.FC = () => {
               {tab === 'sent' ? 'Ainda não enviou apreciações.' : 'Ainda não há apreciações aqui.'}
             </p>
           ) : (
-            list.map(item => <AppreciationCard key={item.id} appreciation={item} />)
+            list.map(item => (
+              <AppreciationCard
+                key={item.id}
+                appreciation={item}
+                onReact={tab === 'company' ? company.react : mine.react}
+              />
+            ))
           )}
         </div>
         <div className="hidden lg:block">

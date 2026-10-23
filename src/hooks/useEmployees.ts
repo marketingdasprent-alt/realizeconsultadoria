@@ -39,7 +39,6 @@ export const useEmployees = (): UseEmployeesResult => {
     if (fetchError) {
       setError(fetchError instanceof Error ? fetchError.message : 'Erro ao carregar colaboradores');
     } else {
-      // @ts-expect-error - The service returns companies relation typed properly, we pass it down
       setEmployees(data ?? []);
     }
 

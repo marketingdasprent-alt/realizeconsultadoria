@@ -41,7 +41,12 @@ export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
     if (!target || !kind) return;
     let cancelled = false;
     let objectUrl: string | null = null;
-    loadAttachment(target.accountId, target.messageId, target.attachment.id)
+    loadAttachment(
+      target.accountId,
+      target.messageId,
+      target.attachment.id,
+      target.attachment.filename
+    )
       .then(async result => {
         if (cancelled) return;
         if (kind === 'text') setText((await result.blob.text()).slice(0, MAX_TEXT_CHARS));

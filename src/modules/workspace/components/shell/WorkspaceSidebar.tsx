@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useOptionalMessenger } from '@/modules/messenger/context/useMessengerApi';
 import { useFeedUnread } from '@/modules/social/hooks/useFeedUnread';
 import { useNotices } from '@/modules/social/hooks/useNotices';
+import { useMailUnreadTotal } from '@/modules/webmail/hooks/useMailUnreadTotal';
 import { SETTINGS_MODULE, WORKSPACE_GROUPS } from '../../lib/navigation';
 import { BrandMark } from '../BrandMark';
 import { SidebarNavItem } from './SidebarNavItem';
@@ -30,6 +31,8 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   const { unread: noticesUnread } = useNotices();
   // Publicações e reconhecimentos novos desde a última visita ao Feed.
   const { count: feedNew } = useFeedUnread();
+  // Emails por ler na Entrada de todas as caixas.
+  const mailUnread = useMailUnreadTotal();
   return (
     <aside
       className={cn(
@@ -68,7 +71,9 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
                         ? unread
                         : module.key === 'feed'
                           ? noticesUnread + feedNew
-                          : undefined
+                          : module.key === 'email'
+                            ? mailUnread
+                            : undefined
                     }
                   />
                 </li>

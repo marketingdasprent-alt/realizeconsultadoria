@@ -45,7 +45,6 @@ import { getLogoBase64, getLogoHeaderHtml } from '@/lib/logo-utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useSupportDepartments } from '@/hooks/useSupportDepartments';
-import TicketConversationDialog from '@/components/admin/TicketConversationDialog';
 import { useAdminTickets, type SupportTicket } from '@/hooks/useAdminTickets';
 
 const priorityLabels: Record<string, string> = {
@@ -703,8 +702,6 @@ const SupportTicketsPage = () => {
                             <Button variant="outline" onClick={() => openDetail(ticket)}>
                               Notas do Admin
                             </Button>
-
-                            <TicketConversationDialog ticketId={ticket.id} />
                           </div>
                         </div>
                       )}

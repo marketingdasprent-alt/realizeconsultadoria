@@ -11,6 +11,7 @@ import {
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { companyName, hasBirthdayIn } from '../../lib/employeeView';
+import { accessLabel, type AccessStatus } from '../../lib/accessStatus';
 import type { Employee } from '../../services/employeeService';
 import {
   EmployeeRowActions,
@@ -31,6 +32,8 @@ interface EmployeesTableProps extends EmployeeActionHandlers {
   resendingId: string | null;
   /** Documentos a expirar (ou expirados) e por aprovar de cada colaborador. */
   alertsOf: (employeeId: string) => { expiring: number; pending: number };
+  /** Última entrada na app (null enquanto não chega). */
+  accessOf?: (employeeId: string) => AccessStatus | null;
 }
 
 const COLUMNS: { field: SortField; label: string; className?: string }[] = [
@@ -171,6 +174,16 @@ export const EmployeesTable: React.FC<EmployeesTableProps> = props => {
                   >
                     {employee.is_active ? 'Ativo' : 'Inativo'}
                   </span>
+                  {employee.is_active &&
+                    (() => {
+                      const access = props.accessOf?.(employee.id);
+                      const label = access ? accessLabel(access) : null;
+                      return label ? (
+                        <p className="mt-1 whitespace-nowrap text-[11.5px] font-semibold text-orange-700">
+                          {label}
+                        </p>
+                      ) : null;
+                    })()}
                 </td>
                 <td className="hidden px-4 py-2.5 text-[13.5px] tabular-nums text-rz-muted xl:table-cell">
                   {employee.phone || '—'}

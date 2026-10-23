@@ -18,17 +18,20 @@ const decode = (base64: string): Uint8Array =>
 export const loadAttachment = (
   accountId: string,
   messageId: string,
-  attachmentId: string
+  attachmentId: string,
+  filename?: string
 ): Promise<LoadedAttachment> => {
   const key = `${accountId}|${messageId}|${attachmentId}`;
   const hit = cache.get(key);
   if (hit) return hit;
-  const pending = mailService.attachment(accountId, messageId, attachmentId).then(result => {
-    if (result.error || !result.data)
-      throw result.error ?? ({ code: 'unavailable', message: '' } as MailError);
-    const { filename, mime, base64 } = result.data;
-    return { filename, mime, blob: new Blob([decode(base64) as BlobPart], { type: mime }) };
-  });
+  const pending = mailService
+    .attachment(accountId, messageId, attachmentId, filename)
+    .then(result => {
+      if (result.error || !result.data)
+        throw result.error ?? ({ code: 'unavailable', message: '' } as MailError);
+      const { filename, mime, base64 } = result.data;
+      return { filename, mime, blob: new Blob([decode(base64) as BlobPart], { type: mime }) };
+    });
   cache.set(key, pending);
   // Falhou: não fica em cache (a próxima tentativa volta a pedir).
   pending.catch(() => cache.delete(key));
@@ -40,9 +43,10 @@ export const loadAttachment = (
 export const attachmentFile = async (
   accountId: string,
   messageId: string,
-  attachmentId: string
+  attachmentId: string,
+  filename?: string
 ): Promise<File> => {
-  const loaded = await loadAttachment(accountId, messageId, attachmentId);
+  const loaded = await loadAttachment(accountId, messageId, attachmentId, filename);
   return new File([loaded.blob], loaded.filename, { type: loaded.mime });
 };
 

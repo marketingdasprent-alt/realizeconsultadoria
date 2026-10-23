@@ -343,9 +343,11 @@ export const mailService = {
     return { data: data ? toMessage(accountId, data) : null, error };
   },
 
-  attachment: (accountId: string, messageId: string, attachmentId: string) =>
+  /** `filename` deixa as caixas IMAP descarregarem só esse anexo (muito mais rápido). */
+  attachment: (accountId: string, messageId: string, attachmentId: string, filename?: string) =>
     call<{ filename: string; mime: string; base64: string }>('mail-api', {
       action: 'attachment',
+      filename,
       account_id: accountId,
       message_id: messageId,
       attachment_id: attachmentId,

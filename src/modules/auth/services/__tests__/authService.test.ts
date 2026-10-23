@@ -127,7 +127,7 @@ describe('authService', () => {
 
     it('should return null session when not authenticated', async () => {
       vi.mocked(supabase.auth.getSession).mockResolvedValue({
-        data: { session: null, user: null },
+        data: { session: null },
         error: null,
       });
 

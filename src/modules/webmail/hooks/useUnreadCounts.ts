@@ -37,7 +37,8 @@ export const refreshUnreadSoon = (qc: QueryClient, delayMs = 3000) => {
  * com a página à vista: um pedido leve por caixa, feito no servidor com poucos em simultâneo.
  * É o que avisa que chegou email novo (a lista atualiza-se logo que o total sobe).
  */
-export const useUnreadCounts = (accounts: MailAccount[]) => {
+/** `refetchMs`: no Webmail 20 s; no menu (resto da app) mais espaçado. */
+export const useUnreadCounts = (accounts: MailAccount[], refetchMs = 20_000) => {
   const { isPreview } = useWorkspace();
   const demo = useDemoMail();
   const query = useQuery({
@@ -48,7 +49,7 @@ export const useUnreadCounts = (accounts: MailAccount[]) => {
       return data?.counts ?? {};
     },
     enabled: !isPreview && accounts.length > 0,
-    refetchInterval: 20_000,
+    refetchInterval: refetchMs,
     staleTime: 10_000,
   });
 

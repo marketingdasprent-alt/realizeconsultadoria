@@ -127,7 +127,14 @@ export const useMailActions = (folder?: MailFolder) => {
       const progress = toast({ title: 'A descarregar o anexo…' });
       let loaded;
       try {
-        loaded = await loadAttachment(mail.accountId, mail.id, attachmentId);
+        // Com o email aberto sabe-se o nome do ficheiro (as caixas IMAP descarregam só esse anexo).
+        const filename =
+          'attachments' in mail
+            ? (mail as { attachments: { id: string; filename: string }[] }).attachments.find(
+                a => a.id === attachmentId
+              )?.filename
+            : undefined;
+        loaded = await loadAttachment(mail.accountId, mail.id, attachmentId, filename);
       } catch (error) {
         progress.dismiss();
         return fail(error as MailError, 'O anexo não foi descarregado. Tente outra vez.');

@@ -9,7 +9,8 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/setupTests.ts'],
-    exclude: ['e2e/**', 'node_modules/**'],
+    // .claude/worktrees: cópias do projeto de outras sessões (não são testes deste).
+    exclude: ['e2e/**', '**/node_modules/**', '.claude/**', 'dist/**'],
     coverage: {
       provider: 'v8',
       reporter: ['text', 'json', 'html'],

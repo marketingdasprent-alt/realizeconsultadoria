@@ -16,6 +16,7 @@ import { EmployeesTable, type SortField } from '../components/employees/Employee
 import { PendingDocumentsDialog } from '../components/employees/PendingDocumentsDialog';
 import { useDocumentAlerts } from '../hooks/useDocumentAlerts';
 import { useEmployeeAvatars } from '../hooks/useEmployeeAvatars';
+import { useEmployeeLastSignIn } from '../hooks/useEmployeeLastSignIn';
 import { useEmployeeListActions } from '../hooks/useEmployeeListActions';
 import { companiesOf, companyName, hasBirthdayIn } from '../lib/employeeView';
 import type { Employee } from '../services/employeeService';
@@ -35,6 +36,7 @@ const EmployeesPage = () => {
   const { canExecuteTopic } = useAdminPermissions();
   const actions = useEmployeeListActions();
   const avatarOf = useEmployeeAvatars();
+  const { accessOf } = useEmployeeLastSignIn();
   const [params, setParams] = useSearchParams();
   const [pendingOpen, setPendingOpen] = useState(false);
   const documentAlerts = useDocumentAlerts();
@@ -47,6 +49,12 @@ const EmployeesPage = () => {
   ) as StatusFilter;
   const companyId = params.get('empresa') || 'all';
   const onlyBirthdays = params.get('aniversarios') === '1';
+  const onlyNotUsing = params.get('acesso') === '1';
+  /** Ativo que nunca entrou ou não entra há 7+ dias. */
+  const notUsing = (employee: Employee) => {
+    const access = accessOf(employee.id);
+    return employee.is_active && !!access && access.kind !== 'recent';
+  };
 
   /** Muda um filtro no endereço (o valor por omissão sai do endereço). */
   const setParam = (key: string, value: string, fallback: string) =>
@@ -88,8 +96,10 @@ const EmployeesPage = () => {
     return searched
       .filter(e => status === 'all' || e.is_active === (status === 'active'))
       .filter(e => !onlyBirthdays || hasBirthdayIn(e, thisMonth))
+      .filter(e => !onlyNotUsing || notUsing(e))
       .sort((a, b) => SORTERS[sortField](a, b) * direction);
-  }, [searched, status, onlyBirthdays, sortField, sortDirection]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- notUsing depende de accessOf
+  }, [searched, status, onlyBirthdays, onlyNotUsing, accessOf, sortField, sortDirection]);
 
   const sort = (field: SortField) => {
     setSortDirection(field === sortField && sortDirection === 'asc' ? 'desc' : 'asc');
@@ -123,6 +133,9 @@ const EmployeesPage = () => {
         onBirthdaysChange={value => setParam('aniversarios', value ? '1' : '0', '0')}
         pendingDocuments={documentAlerts.pending.length}
         onPendingDocuments={() => setPendingOpen(true)}
+        notUsing={searched.filter(notUsing).length}
+        onlyNotUsing={onlyNotUsing}
+        onNotUsingChange={value => setParam('acesso', value ? '1' : '0', '0')}
       />
 
       <section className="overflow-hidden rounded-[28px] bg-white shadow-rz-soft ring-1 ring-rz-line">
@@ -138,6 +151,7 @@ const EmployeesPage = () => {
         />
         <EmployeesTable
           employees={visible}
+          accessOf={accessOf}
           isLoading={actions.isLoading}
           avatarOf={avatarOf}
           sortField={sortField}

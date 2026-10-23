@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { BellRing, Loader2, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { Link } from 'react-router-dom';
+import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '../context/workspaceContext';
 import { enablePush, pushState, type PushState } from '../services/pushService';
@@ -19,7 +21,8 @@ const hiddenRecently = () => {
 
 /**
  * Convite para ativar as notificações neste dispositivo (mensagens, emails e avisos com a app
- * fechada). Só aparece enquanto estiverem desligadas e se a pessoa não o fechou há pouco.
+ * fechada), no topo da app. Desligadas: botão Ativar; iPhone sem a app instalada: como instalar;
+ * bloqueadas no navegador: como desbloquear. Fechado, volta passada uma semana.
  */
 export const PushPrompt: React.FC<{ className?: string }> = ({ className }) => {
   const { user, isPreview } = useWorkspace();
@@ -31,7 +34,8 @@ export const PushPrompt: React.FC<{ className?: string }> = ({ className }) => {
     if (!hidden && !isPreview) void pushState().then(setState);
   }, [hidden, isPreview]);
 
-  if (hidden || isPreview || state !== 'off') return null;
+  if (hidden || isPreview || (state !== 'off' && state !== 'ios-install' && state !== 'denied'))
+    return null;
 
   const hide = () => {
     try {
@@ -74,16 +78,31 @@ export const PushPrompt: React.FC<{ className?: string }> = ({ className }) => {
     >
       <BellRing className="h-5 w-5 shrink-0 text-amber-600" />
       <p className="min-w-0 flex-1 text-[12.5px] font-medium leading-snug text-amber-900">
-        Receba as mensagens e os emails novos mesmo com a app fechada.
+        {state === 'ios-install'
+          ? 'No iPhone, os avisos só chegam com a app instalada no ecrã principal.'
+          : state === 'denied'
+            ? 'Os avisos estão bloqueados neste navegador. Desbloqueie-os no cadeado da barra de endereço.'
+            : 'Receba as mensagens e os emails novos mesmo com a app fechada.'}
       </p>
-      <button
-        type="button"
-        onClick={enable}
-        disabled={busy}
-        className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-amber-500 px-3 text-[12.5px] font-bold text-white hover:bg-amber-600 disabled:opacity-60"
-      >
-        {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Ativar
-      </button>
+      {state === 'ios-install' ? (
+        <Link
+          to={ROUTES.PUBLIC.INSTALL}
+          className="inline-flex h-8 shrink-0 items-center rounded-full bg-amber-500 px-3 text-[12.5px] font-bold text-white hover:bg-amber-600"
+        >
+          Como instalar
+        </Link>
+      ) : (
+        state === 'off' && (
+          <button
+            type="button"
+            onClick={enable}
+            disabled={busy}
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-amber-500 px-3 text-[12.5px] font-bold text-white hover:bg-amber-600 disabled:opacity-60"
+          >
+            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Ativar
+          </button>
+        )
+      )}
       <button
         type="button"
         onClick={hide}

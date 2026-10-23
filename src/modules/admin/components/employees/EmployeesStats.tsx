@@ -1,5 +1,5 @@
 import React from 'react';
-import { Cake, FileClock, UserCheck, UserX, type LucideIcon } from 'lucide-react';
+import { Cake, FileClock, UserCheck, UserRoundX, UserX, type LucideIcon } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { StatusFilter } from './EmployeesToolbar';
 
@@ -14,6 +14,10 @@ interface EmployeesStatsProps {
   /** Documentos enviados pelos colaboradores à espera de aprovação. */
   pendingDocuments: number;
   onPendingDocuments: () => void;
+  /** Ativos que nunca entraram na app ou não entram há 7+ dias. */
+  notUsing: number;
+  onlyNotUsing: boolean;
+  onNotUsingChange: (value: boolean) => void;
 }
 
 interface TileProps {
@@ -60,16 +64,20 @@ export const EmployeesStats: React.FC<EmployeesStatsProps> = ({
   onBirthdaysChange,
   pendingDocuments,
   onPendingDocuments,
+  notUsing,
+  onlyNotUsing,
+  onNotUsingChange,
 }) => (
-  <div className="grid grid-cols-2 gap-2.5 md:grid-cols-4">
+  <div className="grid grid-cols-2 gap-2.5 md:grid-cols-3 xl:grid-cols-5">
     <Tile
       icon={UserCheck}
       tone="bg-emerald-100 text-emerald-700"
       label="Ativos"
       value={active}
-      selected={status === 'active' && !onlyBirthdays}
+      selected={status === 'active' && !onlyBirthdays && !onlyNotUsing}
       onClick={() => {
         onBirthdaysChange(false);
+        onNotUsingChange(false);
         onStatusChange('active');
       }}
     />
@@ -91,6 +99,14 @@ export const EmployeesStats: React.FC<EmployeesStatsProps> = ({
       value={birthdays}
       selected={onlyBirthdays}
       onClick={() => onBirthdaysChange(!onlyBirthdays)}
+    />
+    <Tile
+      icon={UserRoundX}
+      tone={notUsing > 0 ? 'bg-orange-100 text-orange-700' : 'bg-slate-100 text-slate-500'}
+      label="Não entram na app (7+ dias)"
+      value={notUsing}
+      selected={onlyNotUsing}
+      onClick={() => onNotUsingChange(!onlyNotUsing)}
     />
     <Tile
       icon={FileClock}

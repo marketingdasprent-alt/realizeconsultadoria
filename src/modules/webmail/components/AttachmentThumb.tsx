@@ -45,7 +45,7 @@ export const AttachmentThumb: React.FC<AttachmentThumbProps> = ({
     if (!visual) return;
     let alive = true;
     let created: string | null = null;
-    loadAttachment(accountId, messageId, attachment.id)
+    loadAttachment(accountId, messageId, attachment.id, attachment.filename)
       .then(async loaded => {
         if (!alive) return;
         // PDF: a primeira página desenhada numa imagem; imagem: o próprio ficheiro.
@@ -62,7 +62,7 @@ export const AttachmentThumb: React.FC<AttachmentThumbProps> = ({
       alive = false;
       if (created) URL.revokeObjectURL(created);
     };
-  }, [visual, kind, accountId, messageId, attachment.id]);
+  }, [visual, kind, accountId, messageId, attachment.id, attachment.filename]);
 
   const Icon = iconFor(attachment.filename);
   return (

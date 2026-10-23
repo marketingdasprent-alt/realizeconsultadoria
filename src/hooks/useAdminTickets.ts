@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import type { TablesUpdate } from '@/integrations/supabase/types';
 
 export interface SupportTicket {
   id: string;
@@ -85,7 +86,7 @@ export const useAdminTickets = () => {
     const ticket = tickets.find(t => t.id === ticketId);
     const oldStatus = ticket?.status;
 
-    const updateData: Record<string, any> = {
+    const updateData: TablesUpdate<'support_tickets'> = {
       status: newStatus,
     };
 

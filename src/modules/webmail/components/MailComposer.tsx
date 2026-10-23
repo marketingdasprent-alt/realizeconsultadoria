@@ -141,7 +141,12 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     void (async () => {
       for (const attachment of forward.attachments) {
         try {
-          const file = await attachmentFile(forward.accountId, forward.messageId, attachment.id);
+          const file = await attachmentFile(
+            forward.accountId,
+            forward.messageId,
+            attachment.id,
+            attachment.filename
+          );
           if (!cancelled) setFiles(current => [...current, file]);
         } catch {
           if (!cancelled) setMissingFiles(current => [...current, attachment.filename]);

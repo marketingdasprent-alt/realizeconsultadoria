@@ -1,7 +1,16 @@
 // src/utils/apiClient.ts
 // Cliente centralizado para requisições à API
 
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
+
+/**
+ * Este wrapper recebe nomes de tabelas/funções dinâmicos (string), que não podem ser
+ * verificados contra o schema gerado. Usa-se a vista sem schema do mesmo cliente.
+ */
+const untypedSupabase: SupabaseClient = supabase;
+
+type FilterOperator = 'eq' | 'neq' | 'gt' | 'gte' | 'lt' | 'lte' | 'like' | 'ilike' | 'is' | 'in';
 
 /**
  * Wrapper para chamadas ao Supabase com tratamento de erro centralizado
@@ -12,10 +21,10 @@ export const apiClient = {
    */
   async rpc<T>(
     functionName: string,
-    params: Record<string, any> = {}
+    params: Record<string, unknown> = {}
   ): Promise<{ data: T | null; error: Error | null }> {
     try {
-      const { data, error } = await supabase.rpc(functionName, params);
+      const { data, error } = await untypedSupabase.rpc(functionName, params);
 
       if (error) {
         console.error(`RPC Error [${functionName}]:`, error);
@@ -43,19 +52,50 @@ export const apiClient = {
     table: string,
     options: {
       select?: string;
-      filter?: { column: string; operator: string; value: any }[];
+      filter?: { column: string; operator: FilterOperator; value: unknown }[];
       order?: { column: string; ascending?: boolean };
       limit?: number;
       offset?: number;
     } = {}
   ): Promise<{ data: T[] | null; error: Error | null }> {
     try {
-      let query = supabase.from(table).select(options.select || '*');
+      let query = untypedSupabase.from(table).select(options.select || '*');
 
       // Aplicar filtros
       if (options.filter) {
         options.filter.forEach(({ column, operator, value }) => {
-          query = query[operator as any](column, value);
+          switch (operator) {
+            case 'in':
+              query = query.in(column, value as readonly unknown[]);
+              break;
+            case 'is':
+              query = query.is(column, value as boolean | null);
+              break;
+            case 'like':
+              query = query.like(column, String(value));
+              break;
+            case 'ilike':
+              query = query.ilike(column, String(value));
+              break;
+            case 'eq':
+              query = query.eq(column, value);
+              break;
+            case 'neq':
+              query = query.neq(column, value);
+              break;
+            case 'gt':
+              query = query.gt(column, value);
+              break;
+            case 'gte':
+              query = query.gte(column, value);
+              break;
+            case 'lt':
+              query = query.lt(column, value);
+              break;
+            case 'lte':
+              query = query.lte(column, value);
+              break;
+          }
         });
       }
 
@@ -98,9 +138,16 @@ export const apiClient = {
   /**
    * Inserir dados em uma tabela
    */
-  async insert<T>(table: string, data: any): Promise<{ data: T | null; error: Error | null }> {
+  async insert<T>(
+    table: string,
+    data: Record<string, unknown>
+  ): Promise<{ data: T | null; error: Error | null }> {
     try {
-      const { data: result, error } = await supabase.from(table).insert(data).select().single();
+      const { data: result, error } = await untypedSupabase
+        .from(table)
+        .insert(data)
+        .select()
+        .single();
 
       if (error) {
         console.error(`Insert Error [${table}]:`, error);
@@ -127,10 +174,10 @@ export const apiClient = {
   async update<T>(
     table: string,
     id: string,
-    data: any
+    data: Record<string, unknown>
   ): Promise<{ data: T | null; error: Error | null }> {
     try {
-      const { data: result, error } = await supabase
+      const { data: result, error } = await untypedSupabase
         .from(table)
         .update(data)
         .eq('id', id)
@@ -161,7 +208,7 @@ export const apiClient = {
    */
   async delete(table: string, id: string): Promise<{ success: boolean; error: Error | null }> {
     try {
-      const { error } = await supabase.from(table).delete().eq('id', id);
+      const { error } = await untypedSupabase.from(table).delete().eq('id', id);
 
       if (error) {
         console.error(`Delete Error [${table}]:`, error);

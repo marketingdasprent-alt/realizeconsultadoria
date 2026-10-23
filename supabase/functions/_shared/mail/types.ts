@@ -100,7 +100,12 @@ export interface MailSendParams {
 export interface MailDriver {
   list(params: MailListParams): Promise<MailListResult>;
   get(messageId: string): Promise<MailMessage>;
-  attachment(messageId: string, attachmentId: string): Promise<MailAttachmentContent>;
+  /** `filename` (opcional) deixa o IMAP descarregar só essa parte em vez do email todo. */
+  attachment(
+    messageId: string,
+    attachmentId: string,
+    filename?: string | null
+  ): Promise<MailAttachmentContent>;
   send(params: MailSendParams): Promise<{ id: string | null }>;
   setRead(messageId: string, read: boolean): Promise<void>;
   setStarred(messageId: string, starred: boolean): Promise<void>;

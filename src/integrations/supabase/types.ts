@@ -1590,6 +1590,7 @@ export type Database = {
           created_at: string | null;
           employee_id: string | null;
           id: string;
+          invoice_url: string | null;
           model: string | null;
           notes: string | null;
           pass_year: string | null;
@@ -1605,6 +1606,7 @@ export type Database = {
           created_at?: string | null;
           employee_id?: string | null;
           id?: string;
+          invoice_url?: string | null;
           model?: string | null;
           notes?: string | null;
           pass_year?: string | null;
@@ -1620,6 +1622,7 @@ export type Database = {
           created_at?: string | null;
           employee_id?: string | null;
           id?: string;
+          invoice_url?: string | null;
           model?: string | null;
           notes?: string | null;
           pass_year?: string | null;
@@ -1844,6 +1847,210 @@ export type Database = {
           name?: string;
         };
         Relationships: [];
+      };
+      legal_agenda_events: {
+        Row: {
+          created_at: string;
+          description: string | null;
+          event_date: string;
+          id: string;
+          title: string;
+        };
+        Insert: {
+          created_at?: string;
+          description?: string | null;
+          event_date: string;
+          id?: string;
+          title: string;
+        };
+        Update: {
+          created_at?: string;
+          description?: string | null;
+          event_date?: string;
+          id?: string;
+          title?: string;
+        };
+        Relationships: [];
+      };
+      legal_client_documents: {
+        Row: {
+          client_id: string | null;
+          content_type: string | null;
+          created_at: string;
+          file_name: string;
+          file_path: string;
+          file_size: number | null;
+          id: string;
+          invoice_date: string | null;
+        };
+        Insert: {
+          client_id?: string | null;
+          content_type?: string | null;
+          created_at?: string;
+          file_name: string;
+          file_path: string;
+          file_size?: number | null;
+          id?: string;
+          invoice_date?: string | null;
+        };
+        Update: {
+          client_id?: string | null;
+          content_type?: string | null;
+          created_at?: string;
+          file_name?: string;
+          file_path?: string;
+          file_size?: number | null;
+          id?: string;
+          invoice_date?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'legal_client_documents_client_id_fkey';
+            columns: ['client_id'];
+            isOneToOne: false;
+            referencedRelation: 'legal_clients';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      legal_clients: {
+        Row: {
+          address: string | null;
+          city: string | null;
+          client_type: string | null;
+          company_id: string;
+          created_at: string;
+          deadline_date: string | null;
+          description: string | null;
+          driver_license_categories: string | null;
+          driver_license_number: string | null;
+          driver_license_validity: string | null;
+          email: string | null;
+          iban: string | null;
+          id: string;
+          id_number: string | null;
+          id_type: string | null;
+          id_validity: string | null;
+          litigation_type: string | null;
+          litigation_value: number | null;
+          name: string;
+          nif: string | null;
+          phone: string | null;
+          postal_code: string | null;
+          status: string | null;
+          total_credits: number | null;
+          total_debits: number | null;
+          tvde_license_number: string | null;
+          tvde_license_validity: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          address?: string | null;
+          city?: string | null;
+          client_type?: string | null;
+          company_id: string;
+          created_at?: string;
+          deadline_date?: string | null;
+          description?: string | null;
+          driver_license_categories?: string | null;
+          driver_license_number?: string | null;
+          driver_license_validity?: string | null;
+          email?: string | null;
+          iban?: string | null;
+          id?: string;
+          id_number?: string | null;
+          id_type?: string | null;
+          id_validity?: string | null;
+          litigation_type?: string | null;
+          litigation_value?: number | null;
+          name: string;
+          nif?: string | null;
+          phone?: string | null;
+          postal_code?: string | null;
+          status?: string | null;
+          total_credits?: number | null;
+          total_debits?: number | null;
+          tvde_license_number?: string | null;
+          tvde_license_validity?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          address?: string | null;
+          city?: string | null;
+          client_type?: string | null;
+          company_id?: string;
+          created_at?: string;
+          deadline_date?: string | null;
+          description?: string | null;
+          driver_license_categories?: string | null;
+          driver_license_number?: string | null;
+          driver_license_validity?: string | null;
+          email?: string | null;
+          iban?: string | null;
+          id?: string;
+          id_number?: string | null;
+          id_type?: string | null;
+          id_validity?: string | null;
+          litigation_type?: string | null;
+          litigation_value?: number | null;
+          name?: string;
+          nif?: string | null;
+          phone?: string | null;
+          postal_code?: string | null;
+          status?: string | null;
+          total_credits?: number | null;
+          total_debits?: number | null;
+          tvde_license_number?: string | null;
+          tvde_license_validity?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'legal_clients_company_id_fkey';
+            columns: ['company_id'];
+            isOneToOne: false;
+            referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
+      legal_installments: {
+        Row: {
+          amount: number;
+          client_id: string | null;
+          created_at: string;
+          due_date: string;
+          id: string;
+          installment_number: number;
+          status: string | null;
+        };
+        Insert: {
+          amount?: number;
+          client_id?: string | null;
+          created_at?: string;
+          due_date: string;
+          id?: string;
+          installment_number: number;
+          status?: string | null;
+        };
+        Update: {
+          amount?: number;
+          client_id?: string | null;
+          created_at?: string;
+          due_date?: string;
+          id?: string;
+          installment_number?: number;
+          status?: string | null;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'legal_installments_client_id_fkey';
+            columns: ['client_id'];
+            isOneToOne: false;
+            referencedRelation: 'legal_clients';
+            referencedColumns: ['id'];
+          },
+        ];
       };
       mail_account_members: {
         Row: {
@@ -3744,6 +3951,10 @@ export type Database = {
       };
       feed_is_author: { Args: { _post_id: string }; Returns: boolean };
       feed_mark_seen: { Args: Record<PropertyKey, never>; Returns: undefined };
+      admin_employee_last_sign_in: {
+        Args: Record<PropertyKey, never>;
+        Returns: { employee_id: string; last_sign_in_at: string | null }[];
+      };
       mail_remember_contacts: { Args: { _items: Json }; Returns: undefined };
       feed_unread_count: { Args: Record<PropertyKey, never>; Returns: number };
       feed_list_posts: {
@@ -3936,12 +4147,12 @@ export type Tables<
   DefaultSchemaTableNameOrOptions extends
     | keyof (DefaultSchema['Tables'] & DefaultSchema['Views'])
     | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof (DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables'] &
         DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Views'])
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -3961,12 +4172,13 @@ export type Tables<
 
 export type TablesInsert<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    | keyof DefaultSchema['Tables']
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -3985,12 +4197,13 @@ export type TablesInsert<
 
 export type TablesUpdate<
   DefaultSchemaTableNameOrOptions extends
-    keyof DefaultSchema['Tables'] | { schema: keyof DatabaseWithoutInternals },
-  TableName extends (DefaultSchemaTableNameOrOptions extends {
+    | keyof DefaultSchema['Tables']
+    | { schema: keyof DatabaseWithoutInternals },
+  TableName extends DefaultSchemaTableNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaTableNameOrOptions['schema']]['Tables']
-    : never) = never,
+    : never = never,
 > = DefaultSchemaTableNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -4009,12 +4222,13 @@ export type TablesUpdate<
 
 export type Enums<
   DefaultSchemaEnumNameOrOptions extends
-    keyof DefaultSchema['Enums'] | { schema: keyof DatabaseWithoutInternals },
-  EnumName extends (DefaultSchemaEnumNameOrOptions extends {
+    | keyof DefaultSchema['Enums']
+    | { schema: keyof DatabaseWithoutInternals },
+  EnumName extends DefaultSchemaEnumNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[DefaultSchemaEnumNameOrOptions['schema']]['Enums']
-    : never) = never,
+    : never = never,
 > = DefaultSchemaEnumNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }
@@ -4025,12 +4239,13 @@ export type Enums<
 
 export type CompositeTypes<
   PublicCompositeTypeNameOrOptions extends
-    keyof DefaultSchema['CompositeTypes'] | { schema: keyof DatabaseWithoutInternals },
-  CompositeTypeName extends (PublicCompositeTypeNameOrOptions extends {
+    | keyof DefaultSchema['CompositeTypes']
+    | { schema: keyof DatabaseWithoutInternals },
+  CompositeTypeName extends PublicCompositeTypeNameOrOptions extends {
     schema: keyof DatabaseWithoutInternals;
   }
     ? keyof DatabaseWithoutInternals[PublicCompositeTypeNameOrOptions['schema']]['CompositeTypes']
-    : never) = never,
+    : never = never,
 > = PublicCompositeTypeNameOrOptions extends {
   schema: keyof DatabaseWithoutInternals;
 }

@@ -80,6 +80,7 @@ export interface LegalClient {
   client_number?: number;
   deadline_date: string | null;
   litigation_type: string;
+  legal_installments?: LegalInstallment[];
 }
 
 interface LegalDocument {

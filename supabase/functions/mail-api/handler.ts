@@ -266,7 +266,11 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const attachmentId = optionalString(body.attachment_id, 2000);
       if (!attachmentId) return badRequest();
       return ok(
-        await (await createDriver(db, account, pendingSecret)).attachment(messageId, attachmentId)
+        await (await createDriver(db, account, pendingSecret)).attachment(
+          messageId,
+          attachmentId,
+          optionalString(body.filename, 500) ?? null
+        )
       );
     }
     case 'send': {

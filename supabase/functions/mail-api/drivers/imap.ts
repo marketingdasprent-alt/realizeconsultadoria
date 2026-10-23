@@ -77,6 +77,20 @@ interface ImapClient {
   messageMove(range: string, destination: string, options: UidOption): Promise<unknown>;
   append(path: string, content: string, flags?: string[]): Promise<{ uid?: number } | false>;
   messageDelete(range: string, options: UidOption): Promise<boolean>;
+  download(
+    range: string,
+    part: string,
+    options: UidOption
+  ): Promise<{ content: AsyncIterable<Uint8Array> }>;
+}
+
+/** Nó da estrutura MIME (imapflow bodyStructure). */
+interface ImapBodyPart {
+  part?: string;
+  type?: string;
+  parameters?: Record<string, string>;
+  dispositionParameters?: Record<string, string>;
+  childNodes?: ImapBodyPart[];
 }
 
 interface ParsedAttachmentWithContent extends ParsedAttachmentLike {
@@ -322,6 +336,43 @@ export const createImapDriver = (
     });
   };
 
+  /**
+   * Só a parte do anexo (sem descarregar e ler o email inteiro): procura na estrutura a única
+   * parte com esse nome de ficheiro. Nome repetido, sem nome ou erro: null (usa-se o caminho
+   * completo, que nunca entrega o anexo errado).
+   */
+  const quickAttachment = (client: ImapClient, messageId: string, filename: string) => {
+    const { path, uid } = ref(messageId);
+    return withMailbox(client, path, true, async () => {
+      const msg = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
+      const leaves: ImapBodyPart[] = [];
+      const walk = (node?: ImapBodyPart) => {
+        if (!node) return;
+        if (node.childNodes?.length) node.childNodes.forEach(walk);
+        else leaves.push(node);
+      };
+      walk(msg ? (msg as ImapFetchMessage & { bodyStructure?: ImapBodyPart }).bodyStructure : undefined);
+      const named = leaves.filter(
+        node => (node.dispositionParameters?.filename ?? node.parameters?.name) === filename
+      );
+      if (named.length !== 1 || !named[0].part) return null;
+      const download = await client.download(String(uid), named[0].part, { uid: true });
+      const chunks: Uint8Array[] = [];
+      for await (const chunk of download.content) chunks.push(chunk);
+      const bytes = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
+      let offset = 0;
+      for (const chunk of chunks) {
+        bytes.set(chunk, offset);
+        offset += chunk.length;
+      }
+      return {
+        filename,
+        mime: (named[0].type ?? 'application/octet-stream').toLowerCase(),
+        base64: bytesToBase64(bytes),
+      };
+    });
+  };
+
   const setFlag = (messageId: string, flag: string, on: boolean) =>
     withClient(async client => {
       const { path, uid } = ref(messageId);
@@ -403,8 +454,15 @@ export const createImapDriver = (
       });
     },
 
-    attachment(messageId, attachmentId) {
+    attachment(messageId, attachmentId, filename) {
       return withClient(async client => {
+        if (filename) {
+          const quick = await quickAttachment(client, messageId, filename).catch(error => {
+            console.warn('mail-api imap: anexo por partes falhou', errorMessage(error));
+            return null;
+          });
+          if (quick) return quick;
+        }
         const { parsed } = await loadParsed(client, messageId);
         const attachment = parsed.attachments?.[Number(attachmentId)];
         if (!/^\d+$/.test(attachmentId) || !attachment?.content) {

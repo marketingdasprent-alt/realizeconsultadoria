@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import { Mic, Paperclip, SendHorizontal } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { EmojiSuggestions } from '@/modules/workspace/components/EmojiSuggestions';
+import { useEmojiAutocomplete } from '@/modules/workspace/hooks/useEmojiAutocomplete';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
 import { filesFromPaste } from '@/modules/workspace/hooks/useFileDrop';
 import { ACCEPT_ATTRIBUTE } from '../lib/files';
@@ -34,6 +36,8 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
   const fileRef = useRef<HTMLInputElement>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const recorder = useAudioRecorder();
+  // ":so" → lista de emojis, como no WhatsApp.
+  const emoji = useEmojiAutocomplete({ value: text, onChange: setText, fieldRef: areaRef });
   const canSend = !disabled && text.trim().length > 0;
 
   // Ao abrir uma conversa, escreve-se logo (no telemóvel não, para o teclado não tapar a conversa).
@@ -80,10 +84,17 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
     <div className="px-3 pb-3 pt-2 md:px-5 md:pb-5">
       <div
         className={cn(
-          'rounded-[24px] bg-white p-1.5 shadow-rz-soft ring-1 ring-rz-line transition-shadow focus-within:ring-rz-primary/40',
+          'relative rounded-[24px] bg-white p-1.5 shadow-rz-soft ring-1 ring-rz-line transition-shadow focus-within:ring-rz-primary/40',
           disabled && 'opacity-70'
         )}
       >
+        <EmojiSuggestions
+          suggestions={emoji.suggestions}
+          active={emoji.active}
+          onPick={emoji.pick}
+          onHover={emoji.setActive}
+          className="left-2"
+        />
         {(editing || replyTo) && (
           <ComposerBanner
             mode={editing ? 'edit' : 'reply'}
@@ -133,8 +144,11 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
                 value={text}
                 onChange={event => {
                   setText(event.target.value);
+                  emoji.update(event.target.value);
                   onTyping();
                 }}
+                onSelect={() => emoji.update()}
+                onBlur={emoji.close}
                 onPaste={event => {
                   // Ctrl+V de uma captura de ecrã ou de ficheiros copiados: envia-os.
                   const files = filesFromPaste(event);
@@ -143,6 +157,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
                   pickFiles(files);
                 }}
                 onKeyDown={event => {
+                  if (emoji.onKeyDown(event)) return;
                   if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault();
                     submit();

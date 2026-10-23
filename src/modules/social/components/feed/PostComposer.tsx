@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Building2, ImagePlus, Loader2, Paperclip, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { EmojiSuggestions } from '@/modules/workspace/components/EmojiSuggestions';
+import { useEmojiAutocomplete } from '@/modules/workspace/hooks/useEmojiAutocomplete';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
@@ -25,6 +27,13 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPublish, isPublish
   const [audience, setAudience] = useState<NewPostInput['audience']>('company');
   const imageRef = useRef<HTMLInputElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  const bodyRef = useRef<HTMLTextAreaElement>(null);
+  // ":so" → lista de emojis, como no WhatsApp.
+  const emoji = useEmojiAutocomplete({
+    value: body,
+    onChange: value => setBody(value.slice(0, 5000)),
+    fieldRef: bodyRef,
+  });
   const canPublish = (body.trim().length > 0 || files.length > 0) && !isPublishing;
 
   const addFiles = (list: FileList | File[] | null) =>
@@ -51,11 +60,25 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPublish, isPublish
         label="Largue para juntar à publicação"
         className="rounded-[28px]"
       />
-      <div className="flex gap-3">
+      <div className="relative flex gap-3">
         <UserAvatar name={user.name} userId={user.userId} size="md" />
+        <EmojiSuggestions
+          suggestions={emoji.suggestions}
+          active={emoji.active}
+          onPick={emoji.pick}
+          onHover={emoji.setActive}
+          className="left-14"
+        />
         <textarea
+          ref={bodyRef}
           value={body}
-          onChange={event => setBody(event.target.value.slice(0, 5000))}
+          onChange={event => {
+            setBody(event.target.value.slice(0, 5000));
+            emoji.update(event.target.value);
+          }}
+          onSelect={() => emoji.update()}
+          onBlur={emoji.close}
+          onKeyDown={event => void emoji.onKeyDown(event)}
           onPaste={event => {
             const pasted = Array.from(event.clipboardData.files);
             if (!pasted.length) return;

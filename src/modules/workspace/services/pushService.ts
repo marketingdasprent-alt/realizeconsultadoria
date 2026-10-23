@@ -46,6 +46,14 @@ export const enablePush = async (userId: string): Promise<PushState> => {
       userVisibleOnly: true,
       applicationServerKey: toKey(VAPID_PUBLIC_KEY),
     }));
+  // Uma subscrição por navegador: as antigas deste navegador (ex.: da app antiga "Realize Admin")
+  // saem, senão cada aviso chegava em duplicado.
+  await supabase
+    .from('push_subscriptions')
+    .delete()
+    .eq('user_id', userId)
+    .eq('user_agent', navigator.userAgent.slice(0, 300))
+    .neq('endpoint', sub.endpoint);
   const json = sub.toJSON();
   const { error } = await supabase.from('push_subscriptions').upsert(
     {

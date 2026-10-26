@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MailMessage } from '../../types';
-import { previewKind } from '../attachments';
+import { mimeFromName, previewKind } from '../attachments';
 import { FORWARD_MARKER, forwardedHtml, forwardedText, stripActiveHtml } from '../forward';
 import { draftFrom } from '../mailFormat';
 import { composeWithSignature } from '../signature';
@@ -72,5 +72,14 @@ describe('previewKind', () => {
     expect(previewKind('text/csv', 'a.csv')).toBe('text');
     expect(previewKind('image/svg+xml', 'a.svg')).toBeNull();
     expect(previewKind('application/zip', 'a.zip')).toBeNull();
+  });
+});
+
+describe('attachments sent as octet-stream', () => {
+  it('previews by extension and fixes the type', () => {
+    expect(previewKind('application/octet-stream', 'QR_893510.PNG')).toBe('image');
+    expect(mimeFromName('application/octet-stream', 'QR.png')).toBe('image/png');
+    expect(mimeFromName('application/octet-stream', 'dados.bin')).toBe('application/octet-stream');
+    expect(mimeFromName('image/jpeg', 'foto.png')).toBe('image/jpeg');
   });
 });

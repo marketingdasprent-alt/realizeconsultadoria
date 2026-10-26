@@ -12,6 +12,29 @@ export interface LoadedAttachment {
 const MAX_CACHED = 12;
 const cache = new Map<string, Promise<LoadedAttachment>>();
 
+// Tipo genérico ("octet-stream"): deduz pela extensão, para pré-visualizar e abrir bem.
+const BY_EXTENSION: Record<string, string> = {
+  png: 'image/png',
+  jpg: 'image/jpeg',
+  jpeg: 'image/jpeg',
+  gif: 'image/gif',
+  webp: 'image/webp',
+  bmp: 'image/bmp',
+  avif: 'image/avif',
+  pdf: 'application/pdf',
+  mp4: 'video/mp4',
+  webm: 'video/webm',
+  mov: 'video/quicktime',
+  mp3: 'audio/mpeg',
+  wav: 'audio/wav',
+  ogg: 'audio/ogg',
+  m4a: 'audio/mp4',
+};
+export const mimeFromName = (mime: string, filename: string) => {
+  const generic = !mime || mime === 'application/octet-stream' || mime === 'binary/octet-stream';
+  return generic ? (BY_EXTENSION[filename.split('.').pop()?.toLowerCase() ?? ''] ?? mime) : mime;
+};
+
 const decode = (base64: string): Uint8Array =>
   Uint8Array.from(atob(base64), char => char.charCodeAt(0));
 
@@ -29,7 +52,8 @@ export const loadAttachment = (
     .then(result => {
       if (result.error || !result.data)
         throw result.error ?? ({ code: 'unavailable', message: '' } as MailError);
-      const { filename, mime, base64 } = result.data;
+      const { filename, base64 } = result.data;
+      const mime = mimeFromName(result.data.mime, filename);
       return { filename, mime, blob: new Blob([decode(base64) as BlobPart], { type: mime }) };
     });
   cache.set(key, pending);
@@ -57,10 +81,11 @@ export const previewKind = (mime: string, filename: string): PreviewKind | null 
   const type = mime.toLowerCase();
   const name = filename.toLowerCase();
   if (type === 'image/svg+xml' || name.endsWith('.svg')) return null; // pode conter scripts
-  if (type.startsWith('image/')) return 'image';
+  // Muitos remetentes mandam "application/octet-stream": a extensão também conta.
+  if (type.startsWith('image/') || /\.(png|jpe?g|gif|webp|bmp|avif)$/.test(name)) return 'image';
   if (type === 'application/pdf' || name.endsWith('.pdf')) return 'pdf';
-  if (type.startsWith('video/')) return 'video';
-  if (type.startsWith('audio/')) return 'audio';
+  if (type.startsWith('video/') || /\.(mp4|webm|mov)$/.test(name)) return 'video';
+  if (type.startsWith('audio/') || /\.(mp3|wav|ogg|m4a)$/.test(name)) return 'audio';
   if (
     type.startsWith('text/') ||
     type === 'application/json' ||

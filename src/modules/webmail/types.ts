@@ -118,6 +118,12 @@ export interface ComposeDraft {
     accountId: string;
     attachments: MailAttachmentInfo[];
   };
+  /** Email novo já com anexos de outra mensagem ("Novo email com anexo"). */
+  attach?: {
+    messageId: string;
+    accountId: string;
+    attachments: MailAttachmentInfo[];
+  };
   /** Reencaminhar: o HTML original e os anexos a voltar a anexar. */
   forward?: {
     messageId: string;

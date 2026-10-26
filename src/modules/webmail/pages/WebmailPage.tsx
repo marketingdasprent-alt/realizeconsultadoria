@@ -332,6 +332,17 @@ const WebmailPage: React.FC = () => {
       <AttachmentPreview
         target={preview}
         onClose={() => setPreview(null)}
+        onNewEmail={target => {
+          setPreview(null);
+          setDraft({
+            accountId: target.accountId,
+            attach: {
+              accountId: target.accountId,
+              messageId: target.messageId,
+              attachments: [target.attachment],
+            },
+          });
+        }}
         onDownload={target =>
           void actions.download(
             { accountId: target.accountId, id: target.messageId } as MailSummary,

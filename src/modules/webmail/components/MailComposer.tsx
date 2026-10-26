@@ -3,6 +3,7 @@ import { Loader2, Maximize2, Minus, Paperclip, Save, Send, Trash2, X } from 'luc
 import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useDirectory } from '@/modules/social/hooks/useDirectory';
+import { attachmentClipboard, useCopiedAttachments } from '../lib/attachmentClipboard';
 import { attachmentFile } from '../lib/attachments';
 import { parseRecipients } from '../lib/mailFormat';
 import { FORWARD_MARKER } from '../lib/forward';
@@ -88,6 +89,12 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const [showCc, setShowCc] = useState(false);
   const [files, setFiles] = useState<File[]>([]);
   const addFiles = (added: File[]) => setFiles(current => [...current, ...added]);
+  // Anexo copiado noutro email ("Copiar" no visualizador): oferece-se para colar aqui.
+  const copied = useCopiedAttachments();
+  const pasteCopied = () => {
+    addFiles(attachmentClipboard.get());
+    attachmentClipboard.clear();
+  };
   const { isDragging, dropProps } = useFileDrop(addFiles);
   const [busy, setBusy] = useState(false);
   // Assinatura escolhida: a predefinida da caixa, nenhuma, ou uma das outras.
@@ -132,7 +139,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     setBusy(false);
 
     // Reencaminhar o email todo: os anexos do original voltam a anexar-se (um a um, em fundo).
-    const forward = draft.forward ?? draft.saved;
+    const forward = draft.forward ?? draft.saved ?? draft.attach;
     if (!forward?.attachments.length) {
       setLoadingFiles(0);
       return;
@@ -300,7 +307,14 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           onInteractOutside={event => event.preventDefault()}
           onPaste={event => {
             const pasted = filesFromPaste(event);
-            if (!pasted.length) return;
+            if (!pasted.length) {
+              // Ctrl+V sem ficheiros no sistema: cola o anexo copiado no Realize (se houver).
+              if (copied.length && !event.clipboardData.getData('text')) {
+                event.preventDefault();
+                pasteCopied();
+              }
+              return;
+            }
             event.preventDefault();
             addFiles(pasted);
           }}
@@ -447,6 +461,27 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                   Não foi possível juntar: {missingFiles.join(', ')}. Pode anexá-los à mão.
                 </p>
               )}
+            </div>
+          )}
+          {copied.length > 0 && (
+            <div className="mx-5 mb-2 flex items-center gap-2 rounded-2xl bg-rz-primary-soft px-3 py-2 text-[12.5px]">
+              <span className="min-w-0 flex-1 truncate">
+                📎 <b>{copied.map(file => file.name).join(', ')}</b> copiado
+              </span>
+              <button
+                type="button"
+                onClick={pasteCopied}
+                className="h-7 shrink-0 rounded-full bg-rz-primary px-3 text-[12px] font-bold text-white"
+              >
+                Colar
+              </button>
+              <button
+                type="button"
+                onClick={attachmentClipboard.clear}
+                className="h-7 shrink-0 rounded-full px-2 text-[12px] font-semibold text-rz-muted hover:bg-white"
+              >
+                Ignorar
+              </button>
             </div>
           )}
           {files.length > 0 && (

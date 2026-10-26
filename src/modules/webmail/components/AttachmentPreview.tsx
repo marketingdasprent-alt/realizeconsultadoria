@@ -1,7 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { Download, Loader2, RefreshCw } from 'lucide-react';
+import { Copy, Download, Loader2, MailPlus, RefreshCw } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
-import { loadAttachment, previewKind, type LoadedAttachment } from '../lib/attachments';
+import { attachmentClipboard } from '../lib/attachmentClipboard';
+import {
+  attachmentFile,
+  loadAttachment,
+  previewKind,
+  type LoadedAttachment,
+} from '../lib/attachments';
 import { mailErrorText, type MailError } from '../services/mailService';
 import type { MailAttachmentInfo } from '../types';
 
@@ -15,6 +22,8 @@ interface AttachmentPreviewProps {
   target: PreviewTarget | null;
   onClose: () => void;
   onDownload: (target: PreviewTarget) => void;
+  /** Abre um email novo já com este anexo. */
+  onNewEmail: (target: PreviewTarget) => void;
 }
 
 const MAX_TEXT_CHARS = 200_000;
@@ -24,6 +33,7 @@ export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
   target,
   onClose,
   onDownload,
+  onNewEmail,
 }) => {
   const [loaded, setLoaded] = useState<LoadedAttachment | null>(null);
   const [url, setUrl] = useState<string | null>(null);
@@ -69,6 +79,26 @@ export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
   if (!target) return null;
   const { attachment } = target;
 
+  const copy = async () => {
+    try {
+      const file = await attachmentFile(
+        target.accountId,
+        target.messageId,
+        attachment.id,
+        attachment.filename
+      );
+      attachmentClipboard.copy([file]);
+      toast({
+        title: 'Anexo copiado',
+        description: 'Num email que esteja a escrever, carregue em "Colar" ou Ctrl+V.',
+      });
+    } catch {
+      toast({ title: 'Não foi possível copiar o anexo', variant: 'destructive' });
+    }
+  };
+  const secondary =
+    'inline-flex h-9 shrink-0 items-center gap-1.5 rounded-full bg-white px-3.5 text-[13px] font-bold text-rz-ink ring-1 ring-rz-line hover:bg-rz-canvas';
+
   return (
     <Dialog open onOpenChange={open => !open && onClose()}>
       <DialogContent className="flex h-[min(86vh,820px)] flex-col gap-3 rounded-[28px] p-5 sm:max-w-4xl sm:rounded-[28px]">
@@ -76,6 +106,12 @@ export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
           <DialogTitle className="min-w-0 flex-1 truncate text-[16px] font-extrabold">
             {attachment.filename}
           </DialogTitle>
+          <button type="button" onClick={() => void copy()} className={secondary}>
+            <Copy className="h-4 w-4" /> Copiar
+          </button>
+          <button type="button" onClick={() => onNewEmail(target)} className={secondary}>
+            <MailPlus className="h-4 w-4" /> Novo email com anexo
+          </button>
           <button
             type="button"
             onClick={() => onDownload(target)}

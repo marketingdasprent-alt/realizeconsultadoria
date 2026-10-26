@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { MailMessage } from '../../types';
 import { mimeFromName, previewKind } from '../attachments';
 import { FORWARD_MARKER, forwardedHtml, forwardedText, stripActiveHtml } from '../forward';
-import { draftFrom } from '../mailFormat';
+import { draftFrom, readerDocument } from '../mailFormat';
 import { composeWithSignature } from '../signature';
 
 const message: MailMessage = {
@@ -81,5 +81,15 @@ describe('attachments sent as octet-stream', () => {
     expect(mimeFromName('application/octet-stream', 'QR.png')).toBe('image/png');
     expect(mimeFromName('application/octet-stream', 'dados.bin')).toBe('application/octet-stream');
     expect(mimeFromName('image/jpeg', 'foto.png')).toBe('image/jpeg');
+  });
+});
+
+describe('readerDocument', () => {
+  it('lets the email grow past its own height:100% (text was cut off)', () => {
+    const doc = readerDocument({
+      html: '<style>html,body{height:100%}</style><p>Olá</p>',
+      text: null,
+    });
+    expect(doc.lastIndexOf('height:auto!important')).toBeGreaterThan(doc.indexOf('<p>Olá</p>'));
   });
 });

@@ -139,6 +139,8 @@ export const textToHtml = (text: string) =>
  * Documento para o iframe do leitor: sem scripts (o iframe é "sandbox" sem allow-scripts),
  * ligações abrem num separador novo e o texto simples aparece com quebras de linha.
  */
+// O estilo do fim ganha ao do email: muitos trazem html,body{height:100%}, que prendia a altura
+// medida ao tamanho inicial do quadro e cortava o texto (ex.: email da eSIM da Vodafone).
 export const readerDocument = (message: Pick<MailMessage, 'html' | 'text'>) => {
   const body = message.html
     ? message.html.replace(/<script[\s\S]*?<\/script>/gi, '')
@@ -147,5 +149,5 @@ export const readerDocument = (message: Pick<MailMessage, 'html' | 'text'>) => {
 <style>html,body{overflow-y:hidden}body{margin:0;padding:4px 2px;overflow-x:auto;font-family:'Plus Jakarta Sans',Arial,sans-serif;font-size:14px;line-height:1.55;color:#1e1b2e;word-wrap:break-word}
 img{max-width:100%;height:auto}pre{white-space:pre-wrap;font-family:inherit}a{color:#6d28d9}
 blockquote{margin:0 0 0 8px;padding-left:10px;border-left:3px solid #e2e8f0;color:#64748b}</style>
-</head><body>${body}</body></html>`;
+</head><body>${body}<style>html,body{height:auto!important;min-height:0!important;max-height:none!important}</style></body></html>`;
 };

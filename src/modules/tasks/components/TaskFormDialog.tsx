@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { format } from 'date-fns';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Paperclip } from 'lucide-react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { cn } from '@/lib/utils';
 import { PeoplePicker } from '@/modules/social/components/PeoplePicker';
@@ -8,6 +8,9 @@ import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { RECURRENCE_LABELS, TASK_PRIORITIES } from '../lib/taskRules';
 import type { Task, TaskInput, TaskPriority, TaskRecurrence } from '../types';
 import { RzSelect } from '@/modules/workspace/components/RzSelect';
+import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
+import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
+import { TicketFileChips } from '@/modules/support/components/TicketFileChips';
 
 interface TaskFormDialogProps {
   open: boolean;
@@ -43,6 +46,11 @@ export const TaskFormDialog: React.FC<TaskFormDialogProps> = ({
     recurrence: null,
   });
   const [isSaving, setIsSaving] = useState(false);
+  // Anexos de uma tarefa nova (na tarefa já criada, estão na secção Anexos).
+  const [files, setFiles] = useState<File[]>([]);
+  const fileInput = useRef<HTMLInputElement>(null);
+  const addFiles = (added: File[]) => setFiles(current => [...current, ...added].slice(0, 10));
+  const { isDragging, dropProps } = useFileDrop(addFiles, open && !task);
   // Valores iniciais lidos só ao abrir (quem chama pode criar um objeto novo a cada render).
   const initialRef = useRef(initial);
   initialRef.current = initial;
@@ -62,6 +70,7 @@ export const TaskFormDialog: React.FC<TaskFormDialogProps> = ({
       sourceType: initial?.sourceType ?? null,
       sourceRef: initial?.sourceRef ?? null,
     });
+    setFiles([]);
   }, [open, task, user.userId]);
 
   const set = <K extends keyof TaskInput>(key: K, value: TaskInput[K]) =>
@@ -70,14 +79,25 @@ export const TaskFormDialog: React.FC<TaskFormDialogProps> = ({
   const save = async () => {
     if (!form.title.trim()) return;
     setIsSaving(true);
-    await onSave(form);
+    await onSave(task ? form : { ...form, files });
     setIsSaving(false);
     onOpenChange(false);
   };
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-h-[92dvh] overflow-y-auto rounded-[28px] sm:max-w-lg sm:rounded-[28px]">
+      <DialogContent
+        {...dropProps}
+        onPaste={event => {
+          if (task) return;
+          const pasted = filesFromPaste(event);
+          if (!pasted.length) return;
+          event.preventDefault();
+          addFiles(pasted);
+        }}
+        className="max-h-[92dvh] overflow-y-auto rounded-[28px] sm:max-w-lg sm:rounded-[28px]"
+      >
+        <DropOverlay visible={isDragging} label="Largue para anexar à tarefa" />
         <DialogHeader className="text-left">
           <DialogTitle className="text-xl font-extrabold">
             {title ?? (task ? 'Editar tarefa' : 'Nova tarefa')}
@@ -167,6 +187,35 @@ export const TaskFormDialog: React.FC<TaskFormDialogProps> = ({
             </div>
           </div>
         </div>
+        {!task && (
+          <div>
+            <span className={LABEL}>Anexos</span>
+            <div className="space-y-2">
+              <TicketFileChips
+                files={files}
+                onRemove={index => setFiles(current => current.filter((_, i) => i !== index))}
+              />
+              <button
+                type="button"
+                onClick={() => fileInput.current?.click()}
+                className="inline-flex h-9 items-center gap-1.5 rounded-full bg-rz-canvas px-3.5 text-[13px] font-semibold text-rz-muted hover:text-rz-primary"
+              >
+                <Paperclip className="h-4 w-4" /> Anexar ficheiros
+              </button>
+              <p className="text-[11.5px] text-rz-muted">Também pode arrastar ou colar (Ctrl+V).</p>
+            </div>
+            <input
+              ref={fileInput}
+              type="file"
+              multiple
+              className="hidden"
+              onChange={event => {
+                addFiles(Array.from(event.target.files ?? []));
+                event.target.value = '';
+              }}
+            />
+          </div>
+        )}
         <button
           type="button"
           onClick={save}

@@ -60,6 +60,8 @@ export interface TaskInput {
   parentId?: string | null;
   sourceType?: Task['sourceType'];
   sourceRef?: string | null;
+  /** Só ao criar: ficheiros a anexar logo à tarefa nova. */
+  files?: File[];
 }
 
 export type TaskScope = 'mine' | 'created' | 'all';

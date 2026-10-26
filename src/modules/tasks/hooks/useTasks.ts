@@ -129,7 +129,19 @@ export const useTasks = () => {
       fail('A tarefa não foi criada.');
       return null;
     }
-    toast({ title: 'Tarefa criada' });
+    // Anexos escolhidos no "Nova tarefa": sobem depois de a tarefa existir.
+    const failed: string[] = [];
+    for (const file of input.files ?? []) {
+      const { error: uploadError } = await taskService.uploadAttachment(data, user.userId, file);
+      if (uploadError) failed.push(file.name);
+    }
+    if (failed.length)
+      toast({
+        title: 'Tarefa criada, mas alguns anexos falharam',
+        description: failed.join(', '),
+        variant: 'destructive',
+      });
+    else toast({ title: 'Tarefa criada' });
     await refresh();
     return data;
   };

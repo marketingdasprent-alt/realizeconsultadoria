@@ -189,7 +189,7 @@ export type Database = {
       accesses: {
         Row: {
           category_id: string | null;
-          company_id: string;
+          company_id: string | null;
           created_at: string;
           employee_id: string | null;
           id: string;
@@ -203,7 +203,7 @@ export type Database = {
         };
         Insert: {
           category_id?: string | null;
-          company_id: string;
+          company_id?: string | null;
           created_at?: string;
           employee_id?: string | null;
           id?: string;
@@ -217,7 +217,7 @@ export type Database = {
         };
         Update: {
           category_id?: string | null;
-          company_id?: string;
+          company_id?: string | null;
           created_at?: string;
           employee_id?: string | null;
           id?: string;

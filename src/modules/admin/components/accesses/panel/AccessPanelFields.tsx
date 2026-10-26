@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { RzSelect } from '@/modules/workspace/components/RzSelect';
+import { NO_COMPANY } from '../../../lib/credentials';
 import type { CredentialsData } from '../../../services/credentialService';
 import { PasswordInput } from './PasswordInput';
 import type { AccessForm } from './useAccessForm';
@@ -69,6 +70,7 @@ export const AccessPanelFields: React.FC<AccessPanelFieldsProps> = ({
                 {company.name}
               </SelectItem>
             ))}
+            <SelectItem value={NO_COMPANY}>Outro (sem empresa · gmail, sapo…)</SelectItem>
           </SelectContent>
         </Select>
       </Field>

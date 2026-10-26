@@ -13,7 +13,7 @@ import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
 import { useCredentials } from '../../hooks/useCredentials';
 import { groupCredentials, withoutMainAccess } from '../../lib/credentialGroups';
-import { isEmailCategory, type Credential } from '../../lib/credentials';
+import { isEmailCategory, NO_COMPANY, type Credential } from '../../lib/credentials';
 import { credentialService } from '../../services/credentialService';
 import { CredentialRow } from './CredentialRow';
 import { EmailPeopleDialog } from './EmailPeopleDialog';
@@ -100,6 +100,7 @@ export const CredentialsTab: React.FC<{ canManage: boolean }> = ({ canManage }) 
                 {c.name}
               </SelectItem>
             ))}
+            <SelectItem value={NO_COMPANY}>Outro (sem empresa)</SelectItem>
           </SelectContent>
         </Select>
         <Select

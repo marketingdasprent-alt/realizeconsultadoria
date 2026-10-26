@@ -6,6 +6,7 @@ import {
   isValidEmail,
   kindOfCategory,
   localPart,
+  NO_COMPANY,
   type AccessKind,
   type Credential,
 } from '../../../lib/credentials';
@@ -46,10 +47,12 @@ const initialForm = (target: AccessPanelTarget | null, data: CredentialsData): A
   const credential = target?.credential;
   if (credential) {
     const kind = kindOfCategory(credential.access_categories?.name);
-    const domain = emailDomainFor(credential.company_id, data.companies, data.credentials);
+    const domain = credential.company_id
+      ? emailDomainFor(credential.company_id, data.companies, data.credentials)
+      : null;
     return {
       kind,
-      companyId: credential.company_id,
+      companyId: credential.company_id ?? NO_COMPANY,
       categoryId: credential.category_id ?? '',
       local: isEmailKind(kind) ? localPart(credential.username, domain) : credential.username,
       otherDomain:
@@ -119,9 +122,10 @@ export const useAccessForm = (
   };
 
   const isEmail = isEmailKind(form.kind);
-  const domain = form.companyId
-    ? emailDomainFor(form.companyId, data.companies, data.credentials)
-    : null;
+  const domain =
+    form.companyId && form.companyId !== NO_COMPANY
+      ? emailDomainFor(form.companyId, data.companies, data.credentials)
+      : null;
   const employee = data.employees.find(e => e.id === form.employeeId) ?? null;
 
   const save = async () => {
@@ -157,7 +161,7 @@ export const useAccessForm = (
         ...(form.password ? { password: form.password } : {}),
         url: form.url.trim() || null,
         notes: form.notes.trim() || null,
-        company_id: form.companyId,
+        company_id: form.companyId === NO_COMPANY ? null : form.companyId,
         category_id: category?.id ?? null,
         employee_id: form.kind === 'email_department' ? null : form.employeeId || null,
       },

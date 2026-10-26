@@ -31,7 +31,7 @@ export interface CredentialInput {
   password?: string;
   url: string | null;
   notes: string | null;
-  company_id: string;
+  company_id: string | null;
   category_id: string | null;
   employee_id: string | null;
 }

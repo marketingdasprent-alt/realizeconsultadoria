@@ -10,7 +10,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
-import type { CredentialCompany, MailboxState } from '../../lib/credentials';
+import { NO_COMPANY, type CredentialCompany, type MailboxState } from '../../lib/credentials';
 import type { EmailFilters } from '../../lib/emailRows';
 
 const STATES: { value: EmailFilters['state']; label: string }[] = [
@@ -134,6 +134,7 @@ export const EmailsToolbar: React.FC<EmailsToolbarProps> = ({
               {company.name}
             </SelectItem>
           ))}
+          <SelectItem value={NO_COMPANY}>Outro (sem empresa)</SelectItem>
         </SelectContent>
       </Select>
     </div>

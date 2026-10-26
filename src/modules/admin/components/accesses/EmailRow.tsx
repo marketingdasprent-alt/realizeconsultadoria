@@ -65,7 +65,7 @@ export const EmailRow: React.FC<EmailRowProps> = ({
           <CopyButton value={credential.username} label="Copiar endereço" />
         </span>
         <span className="block truncate text-[12.5px] text-rz-muted">
-          {department ? 'Departamental' : 'Pessoal'} · {credential.companies?.name ?? '—'}
+          {department ? 'Departamental' : 'Pessoal'} · {credential.companies?.name ?? 'Outro'}
         </span>
       </span>
 

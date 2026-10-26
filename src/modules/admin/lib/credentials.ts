@@ -9,7 +9,8 @@ export interface Credential {
   password: string;
   url: string | null;
   notes: string | null;
-  company_id: string;
+  /** null = "Outro" (sem empresa do grupo). */
+  company_id: string | null;
   category_id: string | null;
   employee_id: string | null;
   companies?: { name: string } | null;
@@ -114,13 +115,19 @@ export const mailboxState = (status: MailboxStatus | undefined, people: number):
   return people > 0 ? 'pending' : 'nobody';
 };
 
+/** Valor de "Outro" nos seletores de empresa (acesso sem empresa do grupo). */
+export const NO_COMPANY = 'none';
+
 export interface CredentialFilters {
   search: string;
   companyId: string;
 }
 
 export const matchesCredential = (credential: Credential, filters: CredentialFilters) =>
-  (filters.companyId === 'all' || credential.company_id === filters.companyId) &&
+  (filters.companyId === 'all' ||
+    (filters.companyId === NO_COMPANY
+      ? !credential.company_id
+      : credential.company_id === filters.companyId)) &&
   matchesSearch(
     [credential.title, credential.username, credential.companies?.name, credential.employees?.name]
       .filter(Boolean)

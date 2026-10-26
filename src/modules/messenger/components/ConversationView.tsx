@@ -44,14 +44,11 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
     if (search !== null) searchRef.current?.focus();
   }, [search]);
 
-  // Ficheiros largados na conversa: uma mensagem por ficheiro (a resposta vai no primeiro).
-  const sendFiles = (files: File[]) => {
-    files.forEach((file, index) =>
-      api.send({ file, replyToId: index === 0 ? replyTo?.id : undefined })
-    );
-    setReplyTo(null);
-  };
-  const { isDragging, dropProps } = useFileDrop(sendFiles, conversation.canPost && !editing);
+  // Ficheiros largados na conversa: vão para a bandeja da caixa de escrita (envio com Enter).
+  const [staged, setStaged] = useState<File[]>([]);
+  useEffect(() => setStaged([]), [conversation.id]);
+  const stageFiles = (files: File[]) => setStaged(current => [...current, ...files].slice(0, 10));
+  const { isDragging, dropProps } = useFileDrop(stageFiles, conversation.canPost && !editing);
 
   const copy = async (message: ChatMessage) => {
     try {
@@ -68,7 +65,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
       aria-label={conversation.title}
       {...dropProps}
     >
-      <DropOverlay visible={isDragging} label={`Largue para enviar a ${conversation.title}`} />
+      <DropOverlay visible={isDragging} label={`Largue para anexar · ${conversation.title}`} />
       <ConversationHeader
         conversation={conversation}
         typing={api.typing}
@@ -124,6 +121,8 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
       <div className="pb-24 md:pb-0">
         <MessageComposer
           conversationId={conversation.id}
+          staged={staged}
+          onStagedChange={setStaged}
           onSend={input => {
             api.send(input);
             setReplyTo(null);

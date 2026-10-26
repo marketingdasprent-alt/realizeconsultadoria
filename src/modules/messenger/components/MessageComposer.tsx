@@ -10,6 +10,7 @@ import { ACCEPT_ATTRIBUTE } from '../lib/files';
 import type { ChatMessage, SendInput } from '../types';
 import { ComposerBanner } from './composer/ComposerBanner';
 import { RecordingBar } from './composer/RecordingBar';
+import { StagedFiles } from './composer/StagedFiles';
 import { EmojiPicker } from './EmojiPicker';
 
 interface MessageComposerProps {
@@ -24,7 +25,12 @@ interface MessageComposerProps {
   disabledHint?: string;
   /** Conversa aberta: ao mudar, o cursor vai logo para a caixa de escrita. */
   conversationId?: string;
+  /** Anexos à espera de envio (clipe, colar ou largar na conversa). */
+  staged: File[];
+  onStagedChange: (files: File[]) => void;
 }
+
+const MAX_STAGED = 10;
 
 const TOOL =
   'flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-rz-muted transition-colors hover:bg-rz-canvas hover:text-rz-primary disabled:opacity-40';
@@ -32,13 +38,14 @@ const TOOL =
 /** Caixa de escrita: texto, emojis, anexos e voz (Enter envia, Shift+Enter muda de linha). */
 export const MessageComposer: React.FC<MessageComposerProps> = props => {
   const { onSend, onEdit, onTyping, replyTo, editing, onCancel, disabled = false } = props;
+  const { staged, onStagedChange } = props;
   const [text, setText] = useState('');
   const fileRef = useRef<HTMLInputElement>(null);
   const areaRef = useRef<HTMLTextAreaElement>(null);
   const recorder = useAudioRecorder();
   // ":so" → lista de emojis, como no WhatsApp.
   const emoji = useEmojiAutocomplete({ value: text, onChange: setText, fieldRef: areaRef });
-  const canSend = !disabled && text.trim().length > 0;
+  const canSend = !disabled && (text.trim().length > 0 || (staged.length > 0 && !editing));
 
   // Ao abrir uma conversa, escreve-se logo (no telemóvel não, para o teclado não tapar a conversa).
   useEffect(() => {
@@ -52,21 +59,29 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
     if (editing || replyTo) areaRef.current?.focus();
   }, [editing, replyTo]);
 
+  // Vários ficheiros de uma vez: o texto e a resposta vão com o primeiro (como no WhatsApp).
   const submit = () => {
     if (!canSend) return;
     if (editing) onEdit(editing, text.trim());
-    else onSend({ text: text.trim(), replyToId: replyTo?.id });
+    else if (staged.length) {
+      staged.forEach((file, index) =>
+        onSend(
+          index === 0 ? { file, text: text.trim() || undefined, replyToId: replyTo?.id } : { file }
+        )
+      );
+      onStagedChange([]);
+    } else onSend({ text: text.trim(), replyToId: replyTo?.id });
     setText('');
   };
 
-  // Vários ficheiros de uma vez: o texto e a resposta vão só com o primeiro.
+  // Os ficheiros ficam na bandeja até Enviar, para se poder escrever a mensagem junto.
   const pickFiles = (files: File[]) => {
-    files.forEach((file, index) =>
-      onSend(
-        index === 0 ? { file, text: text.trim() || undefined, replyToId: replyTo?.id } : { file }
-      )
-    );
-    if (files.length) setText('');
+    if (!files.length) return;
+    const next = [...staged, ...files];
+    if (next.length > MAX_STAGED)
+      toast({ title: `No máximo ${MAX_STAGED} ficheiros de cada vez.`, variant: 'destructive' });
+    onStagedChange(next.slice(0, MAX_STAGED));
+    areaRef.current?.focus();
   };
 
   const startRecording = async () => {
@@ -95,6 +110,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
           onHover={emoji.setActive}
           className="left-2"
         />
+        {!editing && (
+          <StagedFiles
+            files={staged}
+            onRemove={index => onStagedChange(staged.filter((_, i) => i !== index))}
+          />
+        )}
         {(editing || replyTo) && (
           <ComposerBanner
             mode={editing ? 'edit' : 'reply'}
@@ -125,17 +146,18 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
                 className={TOOL}
                 disabled={disabled || !!editing}
                 onClick={() => fileRef.current?.click()}
-                aria-label="Anexar ficheiro"
+                aria-label="Anexar ficheiros"
               >
                 <Paperclip className="h-5 w-5" />
               </button>
               <input
                 ref={fileRef}
                 type="file"
+                multiple
                 accept={ACCEPT_ATTRIBUTE}
                 className="hidden"
                 onChange={event => {
-                  pickFiles(Array.from(event.target.files ?? []).slice(0, 1));
+                  pickFiles(Array.from(event.target.files ?? []));
                   event.target.value = '';
                 }}
               />
@@ -150,7 +172,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
                 onSelect={() => emoji.update()}
                 onBlur={emoji.close}
                 onPaste={event => {
-                  // Ctrl+V de uma captura de ecrã ou de ficheiros copiados: envia-os.
+                  // Ctrl+V de uma captura de ecrã ou de ficheiros copiados: vão para a bandeja.
                   const files = filesFromPaste(event);
                   if (!files.length || disabled || editing) return;
                   event.preventDefault();

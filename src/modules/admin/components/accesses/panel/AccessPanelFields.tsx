@@ -9,6 +9,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { RzSelect } from '@/modules/workspace/components/RzSelect';
 import type { CredentialsData } from '../../../services/credentialService';
 import { PasswordInput } from './PasswordInput';
 import type { AccessForm } from './useAccessForm';
@@ -49,7 +50,9 @@ export const AccessPanelFields: React.FC<AccessPanelFieldsProps> = ({
   editing,
   update,
 }) => {
-  const showSuffix = isEmail && !!domain && !form.local.includes('@');
+  // Domínio da empresa por omissão; "Outro domínio" deixa escrever o endereço todo (gmail, sapo…).
+  const free = form.otherDomain || !domain;
+  const showDomain = isEmail && !!domain && !form.local.includes('@');
   return (
     <div className="space-y-4">
       <Field id="acc-company" label="Empresa *" error={errors.companyId}>
@@ -103,14 +106,29 @@ export const AccessPanelFields: React.FC<AccessPanelFieldsProps> = ({
             id="acc-user"
             value={form.local}
             onChange={e => update({ local: e.target.value })}
-            placeholder={isEmail ? 'nome' : 'utilizador ou email'}
+            placeholder={isEmail ? (free ? 'nome@gmail.com' : 'nome') : 'utilizador ou email'}
             autoComplete="off"
             className="h-10 min-w-0 flex-1 bg-transparent px-3 text-sm outline-none"
           />
-          {showSuffix && (
-            <span className="shrink-0 border-l bg-rz-canvas px-3 py-2.5 text-sm text-rz-muted">
-              @{domain}
-            </span>
+          {(showDomain || (isEmail && form.otherDomain)) && domain && (
+            <RzSelect
+              value={form.otherDomain ? 'other' : 'company'}
+              onChange={value => {
+                const otherDomain = value === 'other';
+                update({
+                  otherDomain,
+                  // Ao voltar ao domínio da empresa, fica só a parte antes do @.
+                  local: otherDomain ? form.local : form.local.split('@')[0],
+                });
+              }}
+              ariaLabel="Domínio do email"
+              align="end"
+              className="h-10 shrink-0 border-l bg-rz-canvas px-3 text-sm text-rz-muted"
+              options={[
+                { value: 'company', label: `@${domain}` },
+                { value: 'other', label: 'Outro (gmail, sapo…)' },
+              ]}
+            />
           )}
         </div>
       </Field>

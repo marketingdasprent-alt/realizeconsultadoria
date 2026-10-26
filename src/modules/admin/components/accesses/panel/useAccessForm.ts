@@ -27,6 +27,8 @@ export interface AccessForm {
   categoryId: string;
   /** Email: a parte antes do @ (ou o endereço todo); outros: o utilizador. */
   local: string;
+  /** Email noutro domínio (gmail, sapo…): escreve-se o endereço todo. */
+  otherDomain: boolean;
   password: string;
   title: string;
   url: string;
@@ -50,6 +52,10 @@ const initialForm = (target: AccessPanelTarget | null, data: CredentialsData): A
       companyId: credential.company_id,
       categoryId: credential.category_id ?? '',
       local: isEmailKind(kind) ? localPart(credential.username, domain) : credential.username,
+      otherDomain:
+        isEmailKind(kind) &&
+        !!domain &&
+        !credential.username.toLowerCase().endsWith(`@${domain.toLowerCase()}`),
       // Cifrada na BD: ao editar, vazio = fica a que está.
       password: '',
       title: credential.title,
@@ -64,6 +70,7 @@ const initialForm = (target: AccessPanelTarget | null, data: CredentialsData): A
     companyId: target?.companyId ?? '',
     categoryId: target?.categoryId ?? '',
     local: '',
+    otherDomain: false,
     password: '',
     title: target?.title ?? '',
     url: '',
@@ -118,7 +125,9 @@ export const useAccessForm = (
   const employee = data.employees.find(e => e.id === form.employeeId) ?? null;
 
   const save = async () => {
-    const username = isEmail ? fullAddress(form.local, domain) : form.local.trim();
+    const username = isEmail
+      ? fullAddress(form.local, form.otherDomain ? null : domain)
+      : form.local.trim();
     const editingId = target?.credential?.id ?? savedId ?? undefined;
     const found: typeof errors = {};
     if (!form.companyId) found.companyId = 'Escolha a empresa.';

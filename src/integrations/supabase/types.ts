@@ -944,6 +944,7 @@ export type Database = {
       };
       chat_conversations: {
         Row: {
+          avatar_path: string | null;
           company_id: string;
           created_at: string;
           created_by: string | null;
@@ -957,6 +958,7 @@ export type Database = {
           title: string | null;
         };
         Insert: {
+          avatar_path?: string | null;
           company_id: string;
           created_at?: string;
           created_by?: string | null;
@@ -970,6 +972,7 @@ export type Database = {
           title?: string | null;
         };
         Update: {
+          avatar_path?: string | null;
           company_id?: string;
           created_at?: string;
           created_by?: string | null;
@@ -3974,6 +3977,10 @@ export type Database = {
       };
       chat_mark_read: { Args: { _conversation_id: string }; Returns: undefined };
       chat_path_conversation: { Args: { _name: string }; Returns: string };
+      chat_set_group_avatar: {
+        Args: { _conversation_id: string; _path: string | null };
+        Returns: undefined;
+      };
       chat_rename_group: {
         Args: { _conversation_id: string; _title: string };
         Returns: undefined;

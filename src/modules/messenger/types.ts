@@ -35,6 +35,8 @@ export interface ConversationSummary {
   /** Conversa privada: o colega. */
   peerUserId?: string;
   memberCount?: number;
+  /** Foto do grupo (URL público). */
+  avatarUrl?: string;
   /** Pode escrever (nos anúncios só quem gere o canal). */
   canPost: boolean;
 }
@@ -118,6 +120,8 @@ export interface MessengerApi {
   createGroup: (title: string, userIds: string[]) => Promise<string | null>;
   /** Mudar o nome de um grupo (qualquer membro). */
   renameGroup: (conversationId: string, title: string) => Promise<void>;
+  /** Pôr (ou tirar, com null) a foto de um grupo (qualquer membro). */
+  setGroupAvatar: (conversationId: string, file: File | null) => Promise<void>;
   /** URL temporário de um anexo privado. */
   getFileUrl: (path: string) => Promise<string | null>;
   /** Reenvia uma mensagem (texto, imagem, ficheiro ou voz) para outras conversas. */

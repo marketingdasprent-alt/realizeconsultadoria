@@ -6,6 +6,7 @@ import type {
   MessageRow,
   ReactionRow,
 } from '../services/messengerService';
+import { messengerService } from '../services/messengerService';
 import type {
   ChatMessage,
   ConversationKind,
@@ -63,6 +64,7 @@ export const toConversation = (
     online: isDirect && !!row.peer_user_id && online.has(row.peer_user_id),
     peerUserId: row.peer_user_id ?? undefined,
     memberCount: row.member_count,
+    avatarUrl: row.avatar_path ? messengerService.groupAvatarUrl(row.avatar_path) : undefined,
     canPost: kind !== 'announcement' || row.my_role === 'owner' || row.my_role === 'admin',
   };
 };

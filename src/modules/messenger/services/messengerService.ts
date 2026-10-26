@@ -9,7 +9,10 @@ export type MessageRow = Tables['chat_messages']['Row'];
 export type MemberRow = Pick<Tables['chat_members']['Row'], 'user_id' | 'last_read_at' | 'role'>;
 export type ReactionRow = Pick<Tables['chat_reactions']['Row'], 'message_id' | 'user_id' | 'emoji'>;
 export type ConversationRow =
-  Database['public']['Functions']['chat_list_conversations']['Returns'][number];
+  Database['public']['Functions']['chat_list_conversations']['Returns'][number] & {
+    /** Foto do grupo (bucket público avatars). */
+    avatar_path?: string | null;
+  };
 export type DirectoryRow = Database['public']['Functions']['chat_directory']['Returns'][number];
 
 const BUCKET = 'chat-files';
@@ -30,6 +33,32 @@ const safeFileName = (name: string): string =>
     .replace(/[^a-zA-Z0-9._-]+/g, '_')
     .slice(-80) || 'ficheiro';
 
+/** Recorta ao centro e reduz a imagem a um quadrado JPEG (fotos de grupo leves). */
+const squareJpeg = async (file: File, size: number): Promise<Blob> => {
+  const bitmap = await createImageBitmap(file);
+  const side = Math.min(bitmap.width, bitmap.height);
+  const canvas = document.createElement('canvas');
+  canvas.width = size;
+  canvas.height = size;
+  canvas
+    .getContext('2d')
+    ?.drawImage(
+      bitmap,
+      (bitmap.width - side) / 2,
+      (bitmap.height - side) / 2,
+      side,
+      side,
+      0,
+      0,
+      size,
+      size
+    );
+  bitmap.close();
+  return new Promise((resolve, reject) =>
+    canvas.toBlob(blob => (blob ? resolve(blob) : reject(new Error('imagem'))), 'image/jpeg', 0.86)
+  );
+};
+
 export const messengerService = {
   /** Garante o canal "Geral" da empresa e a participação do utilizador. */
   bootstrap: async () => {
@@ -37,9 +66,21 @@ export const messengerService = {
     return { error };
   },
 
+  /** As conversas, com a foto dos grupos (a lista vem de uma função; a foto, da tabela). */
   listConversations: async () => {
     const { data, error } = await supabase.rpc('chat_list_conversations');
-    return { data: data ?? [], error };
+    const rows: ConversationRow[] = data ?? [];
+    const groupIds = rows.filter(row => row.kind === 'group').map(row => row.id);
+    if (!error && groupIds.length) {
+      const { data: photos } = await supabase
+        .from('chat_conversations')
+        .select('id, avatar_path')
+        .in('id', groupIds)
+        .not('avatar_path', 'is', null);
+      const byId = new Map((photos ?? []).map(photo => [photo.id, photo.avatar_path]));
+      for (const row of rows) row.avatar_path = byId.get(row.id) ?? null;
+    }
+    return { data: rows, error };
   },
 
   /** Colegas ativos da mesma empresa (só dados profissionais). */
@@ -175,6 +216,27 @@ export const messengerService = {
     });
     return { error };
   },
+
+  /** Foto do grupo: reduzida a 256 px, enviada para avatars/groups/<grupo>/ (null tira). */
+  setGroupAvatar: async (conversationId: string, file: File | null) => {
+    let path: string | null = null;
+    if (file) {
+      const blob = await squareJpeg(file, 256);
+      path = `groups/${conversationId}/${Date.now()}.jpg`;
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(path, blob, { contentType: 'image/jpeg' });
+      if (uploadError) return { error: uploadError };
+    }
+    const { error } = await supabase.rpc('chat_set_group_avatar', {
+      _conversation_id: conversationId,
+      _path: path,
+    });
+    return { error };
+  },
+
+  groupAvatarUrl: (path: string) =>
+    supabase.storage.from('avatars').getPublicUrl(path).data.publicUrl,
 
   /** URL temporário (1 h) de um anexo; reaproveitado enquanto for válido. */
   getFileUrl: async (path: string) => {

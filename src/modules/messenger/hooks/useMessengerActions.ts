@@ -34,6 +34,7 @@ type Actions = Pick<
   | 'startDirect'
   | 'createGroup'
   | 'renameGroup'
+  | 'setGroupAvatar'
   | 'getFileUrl'
   | 'forwardMessage'
   | 'retryMessage'
@@ -328,6 +329,15 @@ export const useMessengerActions = ({
     [qc]
   );
 
+  const setGroupAvatar = useCallback<Actions['setGroupAvatar']>(
+    async (conversationId, file) => {
+      const { error } = await messengerService.setGroupAvatar(conversationId, file);
+      if (error) fail(file ? 'A foto do grupo não foi alterada.' : 'A foto não foi removida.');
+      await qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations });
+    },
+    [qc]
+  );
+
   const getFileUrl = useCallback(
     async (path: string) => (await messengerService.getFileUrl(path)).data,
     []
@@ -342,6 +352,7 @@ export const useMessengerActions = ({
     startDirect,
     createGroup,
     renameGroup,
+    setGroupAvatar,
     getFileUrl,
     forwardMessage,
     retryMessage,

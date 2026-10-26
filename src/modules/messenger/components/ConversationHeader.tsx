@@ -51,17 +51,29 @@ export const ConversationHeader: React.FC<ConversationHeaderProps> = ({
     <button type="button" onClick={onBack} className={`${ACTION} md:hidden`} aria-label="Voltar">
       <ArrowLeft className="h-5 w-5" />
     </button>
-    <ConversationAvatar conversation={conversation} />
+    {onRename ? (
+      <button
+        type="button"
+        onClick={onRename}
+        className="shrink-0 rounded-2xl transition-opacity hover:opacity-80"
+        aria-label="Editar grupo"
+        title="Mudar o nome ou a foto do grupo"
+      >
+        <ConversationAvatar conversation={conversation} />
+      </button>
+    ) : (
+      <ConversationAvatar conversation={conversation} />
+    )}
     <div className="min-w-0 flex-1">
       {onRename ? (
         <button
           type="button"
           onClick={onRename}
           className="group/title flex max-w-full items-center gap-1.5 text-left"
-          title="Mudar o nome do grupo"
+          title="Mudar o nome ou a foto do grupo"
         >
           <span className="truncate text-[16px] font-bold">{conversation.title}</span>
-          <Pencil className="h-3.5 w-3.5 shrink-0 text-rz-muted opacity-0 transition-opacity group-hover/title:opacity-100" />
+          <Pencil className="h-3.5 w-3.5 shrink-0 text-rz-muted opacity-60 transition-opacity group-hover/title:opacity-100" />
         </button>
       ) : (
         <p className="truncate text-[16px] font-bold">{conversation.title}</p>
@@ -106,7 +118,7 @@ export const ConversationHeader: React.FC<ConversationHeaderProps> = ({
       <DropdownMenuContent align="end" className="w-56 rounded-2xl p-1.5">
         {onRename && (
           <DropdownMenuItem className="rounded-xl" onClick={onRename}>
-            <Pencil className="mr-2 h-4 w-4" /> Mudar o nome do grupo
+            <Pencil className="mr-2 h-4 w-4" /> Editar grupo (nome e foto)
           </DropdownMenuItem>
         )}
         <DropdownMenuItem

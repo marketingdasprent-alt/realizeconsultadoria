@@ -163,9 +163,10 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
       />
       <ForwardDialog message={toForward} onClose={() => setToForward(null)} />
       <RenameGroupDialog
-        current={renaming ? conversation.title : null}
+        group={renaming ? conversation : null}
         onClose={() => setRenaming(false)}
         onSave={title => api.renameGroup(conversation.id, title)}
+        onPhoto={file => api.setGroupAvatar(conversation.id, file)}
       />
       <DeleteMessageDialog
         message={toDelete}

@@ -83,6 +83,8 @@ export const useTasks = () => {
     const channel = supabase
       .channel(`tasks-${user.userId}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'tasks' }, refresh)
+      // A tarefa grava-se antes dos participantes: ser posto numa tarefa chega por aqui.
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'task_participants' }, refresh)
       .subscribe();
     return () => {
       supabase.removeChannel(channel);

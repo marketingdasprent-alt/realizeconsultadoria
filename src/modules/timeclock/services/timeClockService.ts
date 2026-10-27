@@ -113,6 +113,16 @@ export const timeClockService = {
   /**
    * Registos do colaborador autenticado num intervalo (RLS limita ao próprio).
    */
+  /** Corrigir a hora de um registo próprio (últimas 12 h); fica pendente para os RH. */
+  correctEntry: async (entryId: string, atIso: string, reason: string) => {
+    const { error } = await supabase.rpc('time_clock_correct_entry', {
+      _entry_id: entryId,
+      _at: atIso,
+      _reason: reason,
+    });
+    return { error };
+  },
+
   getMyEntries: async (employeeId: string, fromIso: string, toIso: string) => {
     const { data, error } = await supabase
       .from('time_clock_entries')

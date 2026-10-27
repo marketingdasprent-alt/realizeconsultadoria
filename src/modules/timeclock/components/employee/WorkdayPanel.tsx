@@ -11,6 +11,7 @@ import { LocationPermissionHint } from './LocationPermissionHint';
 import { WorkdayError } from './WorkdayError';
 import { WorkdayStatusLine } from './WorkdayStatusLine';
 import { WorkdayTimeline } from './WorkdayTimeline';
+import { timeClockService } from '../../services/timeClockService';
 
 interface WorkdayPanelProps {
   /** Leitura da tag NFC (página da tag): o primeiro registo usa-a. */
@@ -37,7 +38,8 @@ export const WorkdayPanel: React.FC<WorkdayPanelProps> = ({
   hideTimeline = false,
 }) => {
   const navigate = useNavigate();
-  const { employee, isLoading, entries, workday, phase, outcome, run, warmUp } = useWorkday();
+  const { employee, isLoading, entries, workday, phase, outcome, run, warmUp, refetch } =
+    useWorkday();
   const [pendingAction, setPendingAction] = useState<WorkdayAction | null>(null);
   const [isTagUsed, setIsTagUsed] = useState(false);
   const [correction, setCorrection] = useState<CorrectionValue | null>(null);
@@ -134,7 +136,17 @@ export const WorkdayPanel: React.FC<WorkdayPanelProps> = ({
         {outcome && !outcome.ok && phase === 'done' && <WorkdayError message={outcome.message} />}
         <LocationPermissionHint refreshKey={outcome} />
       </section>
-      {!hideTimeline && <WorkdayTimeline entries={workday.entries} />}
+      {!hideTimeline && (
+        <WorkdayTimeline
+          entries={workday.entries}
+          onCorrect={async (entry, atIso, reason) => {
+            const { error } = await timeClockService.correctEntry(entry.id, atIso, reason);
+            if (error) return error.message || 'Não foi possível corrigir a hora.';
+            await refetch();
+            return null;
+          }}
+        />
+      )}
     </div>
   );
 };

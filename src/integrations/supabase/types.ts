@@ -3888,6 +3888,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      time_clock_correct_entry: {
+        Args: { _entry_id: string; _at: string; _reason: string };
+        Returns: undefined;
+      };
       rz_support_desk_departments: {
         Args: never;
         Returns: string[];

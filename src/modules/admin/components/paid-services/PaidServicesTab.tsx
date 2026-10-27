@@ -13,6 +13,7 @@ import {
 import { paidServicesService } from '../../services/paidServicesService';
 import { PaidServiceDialog, type PaidDialogTarget } from './PaidServiceDialog';
 import { PAID_GRID, PaidServiceRow } from './PaidServiceRow';
+import { PaidServiceTaskDialog } from './PaidServiceTaskDialog';
 import { PaidServicesSummary } from './PaidServicesSummary';
 import { PaidServicesToolbar } from './PaidServicesToolbar';
 
@@ -34,6 +35,7 @@ export const PaidServicesTab: React.FC<PaidServicesTabProps> = ({ canManage, com
   });
   const [dialog, setDialog] = useState<PaidDialogTarget>(null);
   const [toDelete, setToDelete] = useState<PaidService | null>(null);
+  const [taskFor, setTaskFor] = useState<PaidService | null>(null);
 
   const list = useMemo(() => filterPaid(data.services, filters), [data.services, filters]);
   const summary = useMemo(() => summarizePaid(list), [list]);
@@ -103,12 +105,14 @@ export const PaidServicesTab: React.FC<PaidServicesTabProps> = ({ canManage, com
                 onTogglePaid={() => void togglePaid(service)}
                 onEdit={() => setDialog({ service })}
                 onDelete={() => setToDelete(service)}
+                onCreateTask={() => setTaskFor(service)}
               />
             ))}
           </ul>
         )}
       </section>
 
+      <PaidServiceTaskDialog service={taskFor} onClose={() => setTaskFor(null)} />
       <PaidServiceDialog
         target={dialog}
         companies={companies}

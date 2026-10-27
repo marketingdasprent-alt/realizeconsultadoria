@@ -1,7 +1,7 @@
 import React from 'react';
 import { format, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Check, Globe, Pencil, Repeat, Trash2, Wifi } from 'lucide-react';
+import { Check, Globe, ListPlus, Pencil, Repeat, Trash2, Wifi } from 'lucide-react';
 import { CYCLE_PER, getFidelityStatus } from '@/lib/recurring-services';
 import { cn } from '@/lib/utils';
 import {
@@ -20,7 +20,7 @@ const KIND_STYLES: Record<PaidKind, { icon: typeof Globe; className: string }> =
 
 /** Colunas da lista (o cabeçalho usa as mesmas, para alinhar). */
 export const PAID_GRID =
-  'xl:grid xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_120px_120px_150px_196px] xl:items-center xl:gap-4';
+  'xl:grid xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)_120px_120px_150px_232px] xl:items-center xl:gap-4';
 
 /**
  * Estado só pela data: atrasado, a vencer (7 dias) ou em dia. "Pago" não é um estado à parte
@@ -54,6 +54,8 @@ interface PaidServiceRowProps {
   onTogglePaid: () => void;
   onEdit: () => void;
   onDelete: () => void;
+  /** Criar uma tarefa para tratar deste serviço (responsável e participantes). */
+  onCreateTask: () => void;
 }
 
 /** Uma linha: o quê, de que empresa, quanto, quando renova, o estado e as ações. */
@@ -63,6 +65,7 @@ export const PaidServiceRow: React.FC<PaidServiceRowProps> = ({
   onTogglePaid,
   onEdit,
   onDelete,
+  onCreateTask,
 }) => {
   const kind = KIND_STYLES[service.kind];
   const Icon = kind.icon;
@@ -133,6 +136,15 @@ export const PaidServiceRow: React.FC<PaidServiceRowProps> = ({
       </span>
 
       <span className="flex items-center justify-end gap-1">
+        <button
+          type="button"
+          onClick={onCreateTask}
+          aria-label={`Criar tarefa para ${service.name}`}
+          title="Criar tarefa (responsável e participantes)"
+          className={ICON}
+        >
+          <ListPlus className="h-4 w-4" />
+        </button>
         {canManage && (
           <>
             <button

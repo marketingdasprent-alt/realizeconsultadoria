@@ -3,6 +3,7 @@ import { BellRing, Loader2, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Link } from 'react-router-dom';
 import { ROUTES } from '@/lib/constants';
+import { isNativeApp } from '@/lib/nativeApp';
 import { cn } from '@/lib/utils';
 import { useWorkspace } from '../context/workspaceContext';
 import { enablePush, pushState, type PushState } from '../services/pushService';
@@ -34,6 +35,8 @@ export const PushPrompt: React.FC<{ className?: string }> = ({ className }) => {
     if (!hidden && !isPreview) void pushState().then(setState);
   }, [hidden, isPreview]);
 
+  // Na app Android o push web não existe (as notificações nativas chegam numa próxima versão).
+  if (isNativeApp()) return null;
   if (hidden || isPreview || (state !== 'off' && state !== 'ios-install' && state !== 'denied'))
     return null;
 

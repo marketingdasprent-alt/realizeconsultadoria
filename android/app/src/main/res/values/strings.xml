@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Realize</string>
+    <string name="title_activity_main">Realize</string>
+    <string name="package_name">com.realizeconsultadoria.myapp</string>
+    <string name="custom_url_scheme">com.realizeconsultadoria.myapp</string>
+</resources>

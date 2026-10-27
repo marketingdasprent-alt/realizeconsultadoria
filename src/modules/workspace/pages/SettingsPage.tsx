@@ -24,6 +24,7 @@ import { MyEquipmentCard } from '../components/MyEquipmentCard';
 import { PushCard } from '../components/PushCard';
 import { WorkspacePage } from '../components/WorkspacePage';
 import { useWorkspace } from '../context/workspaceContext';
+import { isNativeApp } from '@/lib/nativeApp';
 
 const CARD = 'rounded-[28px] bg-white p-5 shadow-rz-soft ring-1 ring-rz-line md:p-6';
 const ROW =
@@ -164,11 +165,13 @@ const SettingsPage: React.FC = () => {
               <span className="flex-1">Alterar palavra-passe</span>
               <ChevronRight className="h-4 w-4 text-rz-muted" />
             </button>
-            <LinkRow
-              to={ROUTES.PUBLIC.INSTALL}
-              icon={Download}
-              label="Instalar a app no telemóvel ou computador"
-            />
+            {!isNativeApp() && (
+              <LinkRow
+                to={ROUTES.PUBLIC.INSTALL}
+                icon={Download}
+                label="Instalar a app no telemóvel ou computador"
+              />
+            )}
             <button type="button" onClick={onLogout} className={cn(ROW, 'text-rose-600')}>
               <LogOut className="h-5 w-5 text-rose-500" />
               <span className="flex-1">Terminar sessão</span>

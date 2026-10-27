@@ -1,3 +1,4 @@
+import { isNativeApp } from './nativeApp';
 // Pedido de instalação do browser (Chrome/Edge no Android, Windows e Mac). Chega uma vez,
 // logo ao abrir o site — muitas vezes antes de existir a página com o botão "Instalar" —, por
 // isso fica guardado aqui desde o arranque (startInstallCapture em main.tsx).
@@ -41,7 +42,8 @@ export interface InstallState {
 }
 
 export const getInstallState = (): InstallState => {
-  const isInstalled = installedNow || isStandalone();
+  // Na app Android já está "instalada".
+  const isInstalled = installedNow || isStandalone() || isNativeApp();
   return { canInstall: !!deferred && !isInstalled, isInstalled };
 };
 

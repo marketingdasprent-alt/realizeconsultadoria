@@ -124,6 +124,8 @@ export interface ComposeDraft {
     accountId: string;
     attachments: MailAttachmentInfo[];
   };
+  /** Responder: a citação do email original em HTML (vai no lugar dos "> " do texto). */
+  replyHtml?: string;
   /** Reencaminhar: o HTML original e os anexos a voltar a anexar. */
   forward?: {
     messageId: string;

@@ -37,6 +37,22 @@ export const forwardedText = (message: MailMessage, bodyText: string): string =>
     .map(line => `${line.label}: ${line.value}`)
     .join('\n')}\n\n${bodyText.trim()}`;
 
+/**
+ * HTML da citação numa resposta, como no Gmail e no Outlook: "Em …, X escreveu:" e o email
+ * original (HTML, com imagens) com uma barra ao lado — sem os "> " do texto simples.
+ */
+export const repliedHtml = (message: MailMessage): string => {
+  const when = format(new Date(message.date), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: pt });
+  const who = message.from?.name || message.from?.email || 'Desconhecido';
+  const body = message.html
+    ? stripActiveHtml(message.html)
+    : `<div style="white-space:pre-wrap">${escapeHtml(message.text ?? '')}</div>`;
+  return (
+    `<div style="margin-top:16px;color:#64748b">Em ${escapeHtml(when)}, ${escapeHtml(who)} escreveu:</div>` +
+    `<blockquote style="margin:6px 0 0 0;padding-left:12px;border-left:2px solid #cbd5e1">${body}</blockquote>`
+  );
+};
+
 /** HTML do reencaminhamento: o cabeçalho e o corpo original, como veio. */
 export const forwardedHtml = (message: MailMessage): string => {
   const header = headerLines(message)

@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { MailMessage } from '../../types';
 import { mimeFromName, previewKind } from '../attachments';
-import { FORWARD_MARKER, forwardedHtml, forwardedText, stripActiveHtml } from '../forward';
+import {
+  FORWARD_MARKER,
+  forwardedHtml,
+  forwardedText,
+  repliedHtml,
+  stripActiveHtml,
+} from '../forward';
 import { draftFrom, readerDocument } from '../mailFormat';
 import { composeWithSignature } from '../signature';
 
@@ -91,5 +97,20 @@ describe('readerDocument', () => {
       text: null,
     });
     expect(doc.lastIndexOf('height:auto!important')).toBeGreaterThan(doc.indexOf('<p>Olá</p>'));
+  });
+});
+
+describe('repliedHtml', () => {
+  it('quotes the original as HTML in a side bar, without "> "', () => {
+    const html = repliedHtml({
+      date: '2026-10-27T15:19:00Z',
+      from: { name: 'Thiago Sousa', email: 't@x.pt' },
+      html: '<p>Olá,</p><p>Teste</p>',
+      text: 'Olá, Teste',
+    } as unknown as MailMessage);
+    expect(html).toContain('Thiago Sousa escreveu:');
+    expect(html).toContain('<blockquote');
+    expect(html).toContain('<p>Olá,</p>');
+    expect(html).not.toContain('&gt; ');
   });
 });

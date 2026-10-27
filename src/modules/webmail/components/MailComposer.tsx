@@ -184,7 +184,13 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     text: fields.body + quote,
     signatureHtml: signatureHtml || null,
     // Só enquanto a citação do reencaminhamento ainda lá está (se a apagou, vai o que escreveu).
-    quotedHtml: draft?.forward && quote.includes(FORWARD_MARKER) ? draft?.forward.html : null,
+    quotedHtml:
+      draft?.forward && quote.includes(FORWARD_MARKER)
+        ? draft.forward.html
+        : // Resposta: o original em HTML, enquanto a citação lá estiver.
+          draft?.replyHtml && /escreveu:/.test(quote)
+          ? draft.replyHtml
+          : null,
     inReplyTo: draft?.inReplyTo,
     attachments: await Promise.all(
       files.map(async file => ({

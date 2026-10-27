@@ -1,7 +1,7 @@
 // Formatação do Webmail: nomes, datas, respostas, assinaturas e o HTML seguro do leitor.
 import { format, isSameYear, isToday } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { forwardedHtml, forwardedText } from './forward';
+import { forwardedHtml, forwardedText, repliedHtml } from './forward';
 import type { ComposeDraft, MailAddress, MailFolder, MailMessage, MailSummary } from '../types';
 
 export const FOLDERS: { key: MailFolder; label: string }[] = [
@@ -101,6 +101,7 @@ export const draftFrom = (
     cc: formatAddressList(others.filter(a => !replyTo.some(r => r.email === a.email))),
     subject: prefixed('Re', message.subject),
     body: quote(message),
+    replyHtml: repliedHtml(message),
     inReplyTo: message.id,
   };
 };

@@ -112,7 +112,11 @@ export const PaidServicesTab: React.FC<PaidServicesTabProps> = ({ canManage, com
         )}
       </section>
 
-      <PaidServiceTaskDialog service={taskFor} onClose={() => setTaskFor(null)} />
+      <PaidServiceTaskDialog
+        service={taskFor}
+        companies={companies}
+        onClose={() => setTaskFor(null)}
+      />
       <PaidServiceDialog
         target={dialog}
         companies={companies}

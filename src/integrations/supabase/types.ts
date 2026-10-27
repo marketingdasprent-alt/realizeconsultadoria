@@ -3888,6 +3888,22 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      admin_task_people: {
+        Args: { _company_id: string };
+        Returns: { user_id: string; name: string; department: string | null }[];
+      };
+      admin_create_task: {
+        Args: {
+          _company_id: string;
+          _title: string;
+          _description: string;
+          _assignee_id: string;
+          _participant_ids: string[];
+          _due_at: string | null;
+          _priority: string;
+        };
+        Returns: string;
+      };
       time_clock_correct_entry: {
         Args: { _entry_id: string; _at: string; _reason: string };
         Returns: undefined;

@@ -12,6 +12,8 @@ interface AdminWorkspaceBridgeProps {
   children: React.ReactNode;
   /** Quem está no admin não tem ficha de colaborador (sem ela não há tarefas nem colegas). */
   onMissing: () => void;
+  /** Mostrado em vez do aviso quando não há ficha (ex.: versão do admin do mesmo ecrã). */
+  fallback?: React.ReactNode;
 }
 
 /**
@@ -21,6 +23,7 @@ interface AdminWorkspaceBridgeProps {
 export const AdminWorkspaceBridge: React.FC<AdminWorkspaceBridgeProps> = ({
   children,
   onMissing,
+  fallback,
 }) => {
   const { data, isLoading } = useQuery({
     queryKey: ['admin', 'workspace-user'],
@@ -30,14 +33,14 @@ export const AdminWorkspaceBridge: React.FC<AdminWorkspaceBridgeProps> = ({
   const employee = data?.employee;
 
   useEffect(() => {
-    if (isLoading || employee?.user_id) return;
+    if (isLoading || employee?.user_id || fallback) return;
     toast({
       title: 'Sem ficha de colaborador',
       description: 'Para criar tarefas, a sua conta tem de estar ligada a um colaborador.',
       variant: 'destructive',
     });
     onMissing();
-  }, [isLoading, employee, onMissing]);
+  }, [isLoading, employee, onMissing, fallback]);
 
   if (isLoading)
     return (
@@ -45,7 +48,7 @@ export const AdminWorkspaceBridge: React.FC<AdminWorkspaceBridgeProps> = ({
         <Loader2 className="h-7 w-7 animate-spin text-white" />
       </div>
     );
-  if (!employee?.user_id) return null;
+  if (!employee?.user_id) return <>{fallback ?? null}</>;
 
   const value: WorkspaceContextValue = {
     user: {

@@ -14,8 +14,9 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FOLDERS, SIDEBAR_ROW } from '../lib/mailFormat';
-import type { MailAccount, MailFolder } from '../types';
+import type { MailAccount, MailCustomFolder, MailFolder } from '../types';
 import { MailAccountList } from './MailAccountList';
+import { MailCustomFolders, type CustomFolderRef } from './MailCustomFolders';
 import { UnreadCount } from './MailAccountRow';
 
 const FOLDER_ICONS: Record<MailFolder, LucideIcon> = {
@@ -38,6 +39,10 @@ interface MailSidebarProps {
   unreadTotal: number;
   onScope: (scope: string) => void;
   onFolder: (folder: MailFolder) => void;
+  /** Pastas criadas pela pessoa, por caixa, e a que está aberta (se for uma delas). */
+  customFolders: Record<string, MailCustomFolder[]>;
+  customFolder: CustomFolderRef | null;
+  onCustomFolder: (folder: CustomFolderRef) => void;
   onCompose: () => void;
   onConnect: () => void;
   onSettings: (account: MailAccount) => void;
@@ -88,7 +93,9 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
             onClick={() => props.onFolder(key)}
             className={cn(
               SIDEBAR_ROW,
-              props.folder === key ? 'bg-rz-primary-soft text-rz-primary' : 'hover:bg-white/70'
+              !props.customFolder && props.folder === key
+                ? 'bg-rz-primary-soft text-rz-primary'
+                : 'hover:bg-white/70'
             )}
           >
             <Icon className="h-4 w-4" /> <span className="flex-1 text-left">{label}</span>
@@ -101,6 +108,14 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
         );
       })}
     </section>
+
+    <MailCustomFolders
+      accounts={props.accounts}
+      scope={props.scope}
+      byAccount={props.customFolders}
+      selected={props.customFolder}
+      onPick={props.onCustomFolder}
+    />
 
     <section>
       <p className="mb-1 px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-rz-muted">

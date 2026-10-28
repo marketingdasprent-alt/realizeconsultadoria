@@ -11,6 +11,7 @@ import { MailAccountDialog } from '../components/MailAccountDialog';
 import { MailComposer } from '../components/MailComposer';
 import { MailList } from '../components/MailList';
 import { MailReader, type ReaderAction } from '../components/MailReader';
+import type { CustomFolderRef } from '../components/MailCustomFolders';
 import { MailSidebar } from '../components/MailSidebar';
 import { SidebarResizer } from '../components/SidebarResizer';
 import { MailToTaskOrEvent, type MailConversion } from '../components/MailToTaskOrEvent';
@@ -19,6 +20,7 @@ import { useContacts } from '../hooks/useContacts';
 import { useKeptUnread } from '../hooks/useKeptUnread';
 import { useMailAccounts } from '../hooks/useMailAccounts';
 import { useMailActions } from '../hooks/useMailActions';
+import { useMailFolders } from '../hooks/useMailFolders';
 import type { MailChange } from '../hooks/useMailChanges';
 import { useUnreadCounts } from '../hooks/useUnreadCounts';
 import {
@@ -41,6 +43,8 @@ const WebmailPage: React.FC = () => {
   const [params, setParams] = useSearchParams();
   const [scope, setScope] = useState<string | null>(null);
   const [folder, setFolder] = useState<MailFolder>('inbox');
+  // Pasta criada pela pessoa no Outlook/Gmail (em vez de uma das fixas).
+  const [custom, setCustom] = useState<CustomFolderRef | null>(null);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<MailSummary | null>(null);
@@ -68,13 +72,16 @@ const WebmailPage: React.FC = () => {
   const [sidebarWidth, setSidebarWidth] = useState(readSidebarWidth);
 
   const accounts = mail.accounts;
-  const actions = useMailActions(folder);
+  const customFolders = useMailFolders(accounts);
   const people = useContacts(accounts);
   const unread = useUnreadCounts(accounts);
   // Caixa escolhida que deixou de existir (ex.: acabou de ser desligada): volta ao normal.
   const chosen = scope === 'all' || accounts.some(a => a.id === scope) ? scope : null;
   const current = chosen ?? (accounts.length > 1 ? 'all' : (accounts[0]?.id ?? 'all'));
-  const box = useMailbox(accounts, current, folder, query);
+  const customOpen = custom && custom.accountId === current ? custom : null;
+  // Os "por ler" contam só a Entrada: numa pasta da pessoa não se acertam à mão.
+  const actions = useMailActions(customOpen ? undefined : folder);
+  const box = useMailbox(accounts, current, folder, query, customOpen?.id ?? null);
   // Em "Não lidos" o email aberto fica na lista até se sair da pasta ou atualizar.
   const list = useKeptUnread(folder, current, query, box.messages);
   usePrefetchTop(list.messages);
@@ -86,6 +93,7 @@ const WebmailPage: React.FC = () => {
     const grew = lastTotal.current !== null && unread.total > lastTotal.current;
     lastTotal.current = unread.total;
     const stale =
+      !customOpen &&
       folder === 'inbox' &&
       Object.entries(unread.counts).some(
         ([accountId, count]) =>
@@ -131,7 +139,7 @@ const WebmailPage: React.FC = () => {
   };
 
   const open = (summary: MailSummary) => {
-    if (folder === 'drafts') return void openSavedDraft(summary);
+    if (folder === 'drafts' && !customOpen) return void openSavedDraft(summary);
     setActive(summary);
     if (summary.unread) list.keep(summary);
     void actions.setRead(summary, true);
@@ -198,8 +206,27 @@ const WebmailPage: React.FC = () => {
       unread={unread.counts}
       unreadTotal={unread.total}
       onReorder={ids => void mail.reorder(ids)}
-      onScope={id => choose(() => setScope(id))}
-      onFolder={key => choose(() => setFolder(key))}
+      onScope={id =>
+        choose(() => {
+          setScope(id);
+          setCustom(null);
+        })
+      }
+      onFolder={key =>
+        choose(() => {
+          setFolder(key);
+          setCustom(null);
+        })
+      }
+      customFolders={customFolders.byAccount}
+      customFolder={customOpen}
+      onCustomFolder={picked =>
+        choose(() => {
+          setScope(picked.accountId);
+          setFolder('inbox');
+          setCustom(picked);
+        })
+      }
       onCompose={() => {
         setMenuOpen(false);
         setDraft({ accountId: current === 'all' ? undefined : current });
@@ -220,12 +247,12 @@ const WebmailPage: React.FC = () => {
       {sidebar('hidden shrink-0 lg:flex', { width: sidebarWidth })}
       <SidebarResizer width={sidebarWidth} onChange={setSidebarWidth} onCommit={saveSidebarWidth} />
       <MailList
-        title={FOLDERS.find(f => f.key === folder)?.label ?? 'Email'}
+        title={customOpen?.name ?? FOLDERS.find(f => f.key === folder)?.label ?? 'Email'}
         messages={list.messages}
         accounts={accounts}
         activeKey={active ? mailKey(active) : null}
         showAccount={current === 'all'}
-        selectionKey={`${current}|${folder}|${query}`}
+        selectionKey={`${current}|${customOpen?.id ?? folder}|${query}`}
         search={search}
         onSearch={setSearch}
         onOpen={open}

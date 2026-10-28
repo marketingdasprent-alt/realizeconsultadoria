@@ -17,6 +17,7 @@ import { isMailError, mailError, type MailError } from '../../_shared/mail/error
 import {
   decodeImapMessageId,
   encodeImapMessageId,
+  customImapFolders,
   resolveImapFolder,
   type ImapMailboxEntry,
 } from '../../_shared/mail/folders.ts';
@@ -344,14 +345,20 @@ export const createImapDriver = (
   const quickAttachment = (client: ImapClient, messageId: string, filename: string) => {
     const { path, uid } = ref(messageId);
     return withMailbox(client, path, true, async () => {
-      const msg = await client.fetchOne(String(uid), { uid: true, bodyStructure: true }, { uid: true });
+      const msg = await client.fetchOne(
+        String(uid),
+        { uid: true, bodyStructure: true },
+        { uid: true }
+      );
       const leaves: ImapBodyPart[] = [];
       const walk = (node?: ImapBodyPart) => {
         if (!node) return;
         if (node.childNodes?.length) node.childNodes.forEach(walk);
         else leaves.push(node);
       };
-      walk(msg ? (msg as ImapFetchMessage & { bodyStructure?: ImapBodyPart }).bodyStructure : undefined);
+      walk(
+        msg ? (msg as ImapFetchMessage & { bodyStructure?: ImapBodyPart }).bodyStructure : undefined
+      );
       const named = leaves.filter(
         node => (node.dispositionParameters?.filename ?? node.parameters?.name) === filename
       );
@@ -383,15 +390,18 @@ export const createImapDriver = (
     });
 
   return {
-    list({ folder, query, pageToken, limit, withoutSnippets }) {
+    list({ folder, query, pageToken, limit, withoutSnippets, folderId }) {
       return withClient(async client => {
         const empty: MailListResult = { messages: [], next_page_token: null };
         const before = pageToken ? Number(pageToken) : null;
         if (before !== null && (!Number.isInteger(before) || before <= 1)) return empty;
 
         // A Entrada é sempre "INBOX": poupa o LIST de todas as pastas (um pedido a menos).
-        let path =
-          folder === 'inbox' || folder === 'unread'
+        // Pasta da pessoa: o caminho vem do próprio servidor (lista de pastas).
+        if (folderId) folder = 'inbox';
+        let path = folderId
+          ? folderId
+          : folder === 'inbox' || folder === 'unread'
             ? 'INBOX'
             : resolveImapFolder(folder, await client.list());
         // Sem pasta \Flagged: marcadas = \Flagged na INBOX.
@@ -638,6 +648,10 @@ export const createImapDriver = (
     // Sem agrupamento de conversas no IMAP: o leitor mostra só o email aberto.
     thread() {
       return Promise.resolve([]);
+    },
+
+    folders() {
+      return withClient(async client => customImapFolders(await client.list()));
     },
 
     unreadCount() {

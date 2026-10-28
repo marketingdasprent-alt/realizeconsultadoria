@@ -12,6 +12,17 @@ export type MailFolder =
   | 'archive'
   | 'spam'
   | 'trash';
+/** Pasta criada pela pessoa no Outlook/Gmail/servidor (fora das fixas do Webmail). */
+export interface MailCustomFolder {
+  accountId: string;
+  id: string;
+  name: string;
+  /** Pasta-mãe (também da pessoa); null = no topo. */
+  parentId: string | null;
+  /** Por ler, quando o fornecedor o diz; null = sem número. */
+  unread: number | null;
+}
+
 export type MailAccountColor = 'violet' | 'sky' | 'emerald' | 'amber' | 'rose' | 'slate';
 
 /** Uma assinatura (HTML já limpo) com nome, como no Outlook. */

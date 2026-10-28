@@ -9,6 +9,7 @@ import type {
   ImapConnectInput,
   MailAccount,
   MailAddress,
+  MailCustomFolder,
   MailFolder,
   MailMessage,
   MailSignature,
@@ -96,7 +97,7 @@ const toMessage = (accountId: string, row: Row): MailMessage => ({
     : [],
 });
 
-const READ_ACTIONS = new Set(['list', 'get', 'unread-counts', 'attachment', 'discover']);
+const READ_ACTIONS = new Set(['list', 'get', 'unread-counts', 'attachment', 'discover', 'folders']);
 
 /**
  * Chama uma edge function; respostas de negócio vêm como { ok, code, message, data }. Sem resposta
@@ -308,10 +309,24 @@ export const mailService = {
   disconnect: (accountId: string) =>
     call('mail-api', { action: 'disconnect', account_id: accountId }),
 
-  list: async (accountId: string, folder: MailFolder, query: string, pageToken: string | null) => {
+  /** `folderId`: pasta criada pela pessoa (manda sobre `folder`). */
+  list: async (
+    accountId: string,
+    folder: MailFolder,
+    query: string,
+    pageToken: string | null,
+    folderId?: string | null
+  ) => {
     const { data, error } = await call<{ messages: Row[]; next_page_token: string | null }>(
       'mail-api',
-      { action: 'list', account_id: accountId, folder, query, page_token: pageToken ?? undefined }
+      {
+        action: 'list',
+        account_id: accountId,
+        folder,
+        folder_id: folderId ?? undefined,
+        query,
+        page_token: pageToken ?? undefined,
+      }
     );
     return {
       data: data
@@ -322,6 +337,22 @@ export const mailService = {
         : null,
       error,
     };
+  },
+
+  /** Pastas criadas pela pessoa nesta caixa (no Outlook, Gmail ou no servidor). */
+  folders: async (accountId: string) => {
+    const { data, error } = await call<Row[]>('mail-api', {
+      action: 'folders',
+      account_id: accountId,
+    });
+    const folders: MailCustomFolder[] = (data ?? []).map(row => ({
+      accountId,
+      id: str(row.id),
+      name: str(row.name),
+      parentId: row.parent_id ? str(row.parent_id) : null,
+      unread: typeof row.unread === 'number' ? row.unread : null,
+    }));
+    return { data: folders, error };
   },
 
   /** As mensagens da mesma conversa, mais antiga primeiro (vazio sem agrupamento). */

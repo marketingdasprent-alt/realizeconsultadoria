@@ -3,7 +3,14 @@
 
 /** 'unread' = os por ler da Entrada (como 'starred', é um filtro e não uma pasta). */
 export type MailFolder =
-  'inbox' | 'unread' | 'sent' | 'drafts' | 'trash' | 'archive' | 'spam' | 'starred';
+  | 'inbox'
+  | 'unread'
+  | 'sent'
+  | 'drafts'
+  | 'trash'
+  | 'archive'
+  | 'spam'
+  | 'starred';
 
 export type MailProviderKey =
   | 'gmail'
@@ -68,6 +75,21 @@ export interface MailListParams {
   limit: number;
   /** Sem o início do texto de cada email (mais rápido; os avisos de email novo não o usam). */
   withoutSnippets?: boolean;
+  /**
+   * Pasta criada pela pessoa (id do Graph, caminho IMAP ou id da etiqueta Gmail). Com ela,
+   * `folder` é ignorada (os emails dessa pasta, como numa pasta normal).
+   */
+  folderId?: string | null;
+}
+
+/** Pasta criada pela pessoa no Outlook/Gmail/servidor (as fixas do Webmail ficam de fora). */
+export interface MailFolderInfo {
+  id: string;
+  name: string;
+  /** Pasta-mãe (também da pessoa); null = no topo. */
+  parent_id: string | null;
+  /** Por ler, quando o fornecedor o diz sem custo extra; senão null. */
+  unread: number | null;
 }
 
 export interface MailListResult {
@@ -124,6 +146,8 @@ export interface MailDriver {
   thread(threadId: string): Promise<MailSummary[]>;
   /** Emails por ler na caixa de entrada (um pedido leve, sem listar mensagens). */
   unreadCount(): Promise<number>;
+  /** Pastas criadas pela pessoa (sem as fixas: Entrada, Enviados, Lixo…). */
+  folders(): Promise<MailFolderInfo[]>;
 }
 
 /** Segredo guardado no Vault para contas OAuth. */

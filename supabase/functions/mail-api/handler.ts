@@ -4,7 +4,9 @@
 // sempre HTTP 200 com { ok, code?, message?, data? } (snake_case).
 //   connect-imap { provider, email, password, imap_host, imap_port, smtp_host, smtp_port,
 //                  display_name? }                                   → { id }
-//   list   { account_id, folder, query?, page_token?, limit? }       → { messages, next_page_token }
+//   list   { account_id, folder, folder_id?, query?, page_token?, limit? } → { messages, next_page_token }
+//          (folder_id: pasta criada pela pessoa, da lista de "folders"; manda sobre folder)
+//   folders { account_id } → MailFolderInfo[] (pastas da pessoa, sem as fixas)
 //   get    { account_id, message_id }                                → MailMessage
 //   attachment { account_id, message_id, attachment_id }             → { filename, mime, base64 }
 //   send   { account_id, to[], cc?[], bcc?[], subject, html, text, in_reply_to?,
@@ -200,6 +202,7 @@ const ACTIONS = [
   'discover',
   'share-access',
   'unread-counts',
+  'folders',
 ] as const;
 type Action = (typeof ACTIONS)[number];
 
@@ -239,6 +242,8 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
     case 'list': {
       const folder = body.folder;
       if (!isMailFolder(folder)) return badRequest();
+      const folderId = optionalString(body.folder_id, 1000);
+      if (folderId && /[\r\n\0]/.test(folderId)) return badRequest();
       const driver = await createDriver(db, account, pendingSecret);
       try {
         const result = await driver.list({
@@ -246,6 +251,7 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
           query: optionalString(body.query, 200),
           pageToken: optionalString(body.page_token, 4000),
           limit: parseListLimit(body.limit),
+          folderId,
         });
         await updateAccountStatus(db, account.id, {
           status: 'active',
@@ -260,17 +266,17 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
         throw error;
       }
     }
+    case 'folders':
+      return ok(await (await createDriver(db, account, pendingSecret)).folders());
     case 'get':
       return ok(await (await createDriver(db, account, pendingSecret)).get(messageId));
     case 'attachment': {
       const attachmentId = optionalString(body.attachment_id, 2000);
       if (!attachmentId) return badRequest();
       return ok(
-        await (await createDriver(db, account, pendingSecret)).attachment(
-          messageId,
-          attachmentId,
-          optionalString(body.filename, 500) ?? null
-        )
+        await (
+          await createDriver(db, account, pendingSecret)
+        ).attachment(messageId, attachmentId, optionalString(body.filename, 500) ?? null)
       );
     }
     case 'send': {

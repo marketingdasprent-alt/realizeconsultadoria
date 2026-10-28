@@ -1,7 +1,7 @@
 // Pastas do Webmail → Gmail (pesquisa), Microsoft Graph (pastas conhecidas) e IMAP
 // (special-use RFC 6154 com nomes habituais como alternativa).
 
-import type { MailFolder } from './types.ts';
+import type { MailFolder, MailFolderInfo } from './types.ts';
 
 export const MAIL_FOLDERS: readonly MailFolder[] = [
   'inbox',
@@ -88,12 +88,15 @@ const graphSearchTerm = (query: string): string =>
  */
 export const buildGraphListUrl = (
   folder: MailFolder,
-  options: { query: string | null; limit: number; root?: string }
+  options: { query: string | null; limit: number; root?: string; folderId?: string | null }
 ): { url: string; postFilterFlagged: boolean; postFilterUnread: boolean } => {
   // A própria caixa (/me) ou, com a permissão da app, a de outra pessoa (/users/<email>).
   const root = options.root ?? `${GRAPH_BASE}/me`;
-  const base =
-    folder === 'starred'
+  // Pasta da pessoa: lista-se como uma pasta normal (sem os filtros de marcadas/por ler).
+  if (options.folderId) folder = 'inbox';
+  const base = options.folderId
+    ? `${root}/mailFolders/${encodeURIComponent(options.folderId)}/messages`
+    : folder === 'starred'
       ? `${root}/messages`
       : `${root}/mailFolders/${GRAPH_WELL_KNOWN_FOLDER[folder]}/messages`;
   const params = [`$top=${options.limit}`, `$select=${GRAPH_SUMMARY_FIELDS.join(',')}`];
@@ -122,6 +125,64 @@ export const buildGraphListUrl = (
   }
   params.push(`$orderby=${encodeURIComponent('receivedDateTime desc')}`);
   return { url: `${base}?${params.join('&')}`, postFilterFlagged: false, postFilterUnread: false };
+};
+
+/**
+ * Pastas de sistema do Outlook (nomes "well-known" do Graph). As da pessoa podem estar dentro
+ * da Entrada ou do Arquivo; dentro das outras (Itens Eliminados, Problemas de Sincronização…)
+ * não se mostram.
+ */
+export const GRAPH_SYSTEM_FOLDERS = [
+  'inbox',
+  'archive',
+  'sentitems',
+  'drafts',
+  'deleteditems',
+  'junkemail',
+  'outbox',
+  'conversationhistory',
+  'syncissues',
+  'clutter',
+  'scheduled',
+  'searchfolders',
+] as const;
+const GRAPH_OPEN_SYSTEM_FOLDERS = new Set(['inbox', 'archive']);
+
+export interface GraphFolderEntry {
+  id: string;
+  displayName?: string;
+  parentFolderId?: string;
+  unreadItemCount?: number;
+}
+
+/**
+ * Das pastas todas do Graph (já com as subpastas), só as da pessoa. `system`: id → nome
+ * "well-known" de cada pasta de sistema que a caixa tem. As de topo dentro da Entrada ou do
+ * Arquivo ficam sem mãe.
+ */
+export const graphCustomFolders = (
+  all: GraphFolderEntry[],
+  system: Map<string, string>
+): MailFolderInfo[] => {
+  const byId = new Map(all.map(f => [f.id, f]));
+  const visible = (folder: GraphFolderEntry): boolean => {
+    if (system.has(folder.id)) return false;
+    let parent = folder.parentFolderId ? byId.get(folder.parentFolderId) : undefined;
+    for (let depth = 0; parent && depth < 20; depth++) {
+      const name = system.get(parent.id);
+      if (name) return GRAPH_OPEN_SYSTEM_FOLDERS.has(name);
+      parent = parent.parentFolderId ? byId.get(parent.parentFolderId) : undefined;
+    }
+    return true;
+  };
+  const kept = all.filter(visible);
+  const keptIds = new Set(kept.map(f => f.id));
+  return kept.map(f => ({
+    id: f.id,
+    name: f.displayName?.trim() || '(sem nome)',
+    parent_id: f.parentFolderId && keptIds.has(f.parentFolderId) ? f.parentFolderId : null,
+    unread: typeof f.unreadItemCount === 'number' ? f.unreadItemCount : null,
+  }));
 };
 
 /** O page_token do Graph é o @odata.nextLink: só se aceita se for do próprio Graph. */
@@ -160,7 +221,34 @@ export interface ImapMailboxEntry {
   name?: string;
   specialUse?: string;
   delimiter?: string;
+  parentPath?: string;
+  /** Ex.: \Noselect (pasta que só agrupa outras; não tem emails). */
+  flags?: Set<string>;
 }
+
+/** Pastas IMAP da pessoa: sem a INBOX nem as que o Webmail já mostra (Enviados, Lixo…). */
+export const customImapFolders = (mailboxes: ImapMailboxEntry[]): MailFolderInfo[] => {
+  const fixed = new Set(
+    (Object.keys(IMAP_FALLBACK_NAMES) as MailFolder[])
+      .map(folder => resolveImapFolder(folder, mailboxes))
+      .filter((path): path is string => !!path)
+  );
+  const hidden = (m: ImapMailboxEntry) =>
+    m.path.toUpperCase() === 'INBOX' ||
+    fixed.has(m.path) ||
+    !!m.specialUse ||
+    m.flags?.has('\\NonExistent') === true;
+  const kept = mailboxes.filter(m => !hidden(m));
+  const keptPaths = new Set(kept.map(m => m.path));
+  return kept
+    .filter(m => !m.flags?.has('\\Noselect') || kept.some(c => c.parentPath === m.path))
+    .map(m => ({
+      id: m.path,
+      name: m.name ?? m.path.split(m.delimiter || '/').pop() ?? m.path,
+      parent_id: m.parentPath && keptPaths.has(m.parentPath) ? m.parentPath : null,
+      unread: null,
+    }));
+};
 
 /** Caminho da pasta IMAP para uma pasta do Webmail, ou null se não existir. */
 export const resolveImapFolder = (

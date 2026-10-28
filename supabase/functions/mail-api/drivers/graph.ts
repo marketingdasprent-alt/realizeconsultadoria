@@ -5,8 +5,11 @@ import { mailError } from '../../_shared/mail/errors.ts';
 import {
   GRAPH_BASE,
   GRAPH_SUMMARY_FIELDS,
+  GRAPH_SYSTEM_FOLDERS,
   buildGraphListUrl,
+  graphCustomFolders,
   isAllowedGraphNextLink,
+  type GraphFolderEntry,
 } from '../../_shared/mail/folders.ts';
 import {
   GRAPH_SMALL_ATTACHMENT_BYTES,
@@ -182,20 +185,21 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
   };
 
   return {
-    async list({ folder, query, pageToken, limit }) {
+    async list({ folder, query, pageToken, limit, folderId }) {
       let url: string;
       let postFilterFlagged = false;
       let postFilterUnread = false;
       if (pageToken) {
         if (!isAllowedGraphNextLink(pageToken)) throw mailError('bad_request');
         url = pageToken;
-        postFilterFlagged = folder === 'starred' && !!query;
-        postFilterUnread = folder === 'unread' && !!query;
+        postFilterFlagged = !folderId && folder === 'starred' && !!query;
+        postFilterUnread = !folderId && folder === 'unread' && !!query;
       } else {
         ({ url, postFilterFlagged, postFilterUnread } = buildGraphListUrl(folder, {
           query,
           limit,
           root: ME,
+          folderId,
         }));
       }
 
@@ -361,6 +365,51 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
         `${ME}/mailFolders/inbox?$select=unreadItemCount`
       );
       return inbox.unreadItemCount ?? 0;
+    },
+
+    async folders() {
+      // Os ids das pastas de sistema (num só pedido $batch) e a árvore toda, nível a nível.
+      const relative = ME.slice(GRAPH_BASE.length);
+      const batch = await session.json<{
+        responses?: { id: string; status: number; body?: { id?: string } }[];
+      }>(`${GRAPH_BASE}/$batch`, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          requests: GRAPH_SYSTEM_FOLDERS.map(name => ({
+            id: name,
+            method: 'GET',
+            url: `${relative}/mailFolders/${name}?$select=id`,
+          })),
+        }),
+      });
+      const system = new Map<string, string>();
+      for (const r of batch.responses ?? []) {
+        if (r.status === 200 && r.body?.id) system.set(r.body.id, r.id);
+      }
+
+      const select =
+        '$select=id,displayName,parentFolderId,unreadItemCount,childFolderCount&$top=250';
+      type Entry = GraphFolderEntry & { childFolderCount?: number };
+      const all: Entry[] = [];
+      let level =
+        (await session.json<{ value?: Entry[] }>(`${ME}/mailFolders?${select}`)).value ?? [];
+      for (let depth = 0; level.length && depth < 6 && all.length < 1000; depth++) {
+        all.push(...level);
+        const parents = level.filter(f => (f.childFolderCount ?? 0) > 0);
+        const children = await mapWithConcurrency(
+          parents,
+          6,
+          async parent =>
+            (
+              await session.json<{ value?: Entry[] }>(
+                `${ME}/mailFolders/${enc(parent.id)}/childFolders?${select}`
+              )
+            ).value ?? []
+        );
+        level = children.flat();
+      }
+      return graphCustomFolders(all, system);
     },
   };
 };

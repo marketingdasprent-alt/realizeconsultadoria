@@ -128,10 +128,18 @@ export const createGmailDriver = (
   };
 
   return {
-    async list({ folder, query, pageToken, limit }) {
+    async list({ folder, query, pageToken, limit, folderId }) {
       const { q, includeSpamTrash } = gmailListQuery(folder, query);
-      const params = new URLSearchParams({ q, maxResults: String(limit) });
-      if (includeSpamTrash) params.set('includeSpamTrash', 'true');
+      const params = new URLSearchParams({ maxResults: String(limit) });
+      // Etiqueta da pessoa: os emails com essa etiqueta (mais a pesquisa, se houver).
+      if (folderId) {
+        params.set('labelIds', folderId);
+        const extra = query?.replace(/[\r\n]+/g, ' ').trim();
+        if (extra) params.set('q', extra);
+      } else {
+        params.set('q', q);
+        if (includeSpamTrash) params.set('includeSpamTrash', 'true');
+      }
       if (pageToken) params.set('pageToken', pageToken);
       const list = await session.json<{ messages?: { id: string }[]; nextPageToken?: string }>(
         `${GMAIL}/messages?${params.toString()}`
@@ -234,7 +242,9 @@ export const createGmailDriver = (
     async saveDraft(params: MailSendParams, draftId: string | null) {
       const { raw, threadId } = await compose(params);
       const existing = draftId ? await draftIdOf(draftId) : null;
-      const message = threadId ? { raw: base64UrlEncode(raw), threadId } : { raw: base64UrlEncode(raw) };
+      const message = threadId
+        ? { raw: base64UrlEncode(raw), threadId }
+        : { raw: base64UrlEncode(raw) };
       const saved = await session.json<{ id: string; message?: { id?: string } }>(
         existing ? `${GMAIL}/drafts/${enc(existing)}` : `${GMAIL}/drafts`,
         {
@@ -283,6 +293,33 @@ export const createGmailDriver = (
     async unreadCount() {
       const inbox = await session.json<{ messagesUnread?: number }>(`${GMAIL}/labels/INBOX`);
       return inbox.messagesUnread ?? 0;
+    },
+
+    async folders() {
+      // Etiquetas da pessoa; "Clientes/Norte" é a subetiqueta "Norte" de "Clientes".
+      const list = await session.json<{ labels?: { id: string; name: string; type?: string }[] }>(
+        `${GMAIL}/labels`
+      );
+      const labels = (list.labels ?? []).filter(l => l.type === 'user').slice(0, 300);
+      const idByName = new Map(labels.map(l => [l.name, l.id]));
+      // O número de por ler só vem etiqueta a etiqueta (até 60, em paralelo).
+      const unread = await mapWithConcurrency(labels.slice(0, 60), 10, async label => {
+        const res = await session.fetch(`${GMAIL}/labels/${enc(label.id)}`);
+        if (!res.ok) {
+          await res.body?.cancel();
+          return null;
+        }
+        return ((await res.json()) as { messagesUnread?: number }).messagesUnread ?? null;
+      });
+      return labels.map((label, index) => {
+        const cut = label.name.lastIndexOf('/');
+        return {
+          id: label.id,
+          name: cut > 0 ? label.name.slice(cut + 1) : label.name,
+          parent_id: cut > 0 ? (idByName.get(label.name.slice(0, cut)) ?? null) : null,
+          unread: unread[index] ?? null,
+        };
+      });
     },
   };
 };

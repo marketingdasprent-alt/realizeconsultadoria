@@ -24,7 +24,9 @@ export const useMailbox = (
   accounts: MailAccount[],
   scope: string,
   folder: MailFolder,
-  search: string
+  search: string,
+  /** Pasta criada pela pessoa (manda sobre `folder`; só a caixa dessa pasta). */
+  folderId: string | null = null
 ) => {
   const { isPreview, user } = useWorkspace();
   const demo = useDemoMail();
@@ -34,23 +36,27 @@ export const useMailbox = (
 
   // A ordem das caixas não muda a lista (nem a chave da cache).
   const idsKey = [...ids].sort().join(',');
+  // Na cache do browser, cada pasta da pessoa tem a sua lista.
+  const cacheFolder = folderId ? `custom:${folderId}` : folder;
   // Última lista de cada caixa guardada no browser: aparece já, e a nova chega a seguir.
   const useCache = !search.trim() && !isPreview;
   const cached = useMemo(
     () =>
       useCache
-        ? readMailboxCache<MailSummary>(user.userId, idsKey.split(',').filter(Boolean), folder)
+        ? readMailboxCache<MailSummary>(user.userId, idsKey.split(',').filter(Boolean), cacheFolder)
         : null,
-    [useCache, user.userId, idsKey, folder]
+    [useCache, user.userId, idsKey, cacheFolder]
   );
 
   const query = useInfiniteQuery({
-    queryKey: ['mail', 'list', scope, folder, search.trim(), idsKey],
+    queryKey: ['mail', 'list', scope, cacheFolder, search.trim(), idsKey],
     initialPageParam: null as PageTokens,
     queryFn: async ({ pageParam }): Promise<MailboxPage> => {
       const targets = pageParam ? Object.keys(pageParam) : ids;
       const results = await Promise.all(
-        targets.map(id => mailService.list(id, folder, search.trim(), pageParam?.[id] ?? null))
+        targets.map(id =>
+          mailService.list(id, folder, search.trim(), pageParam?.[id] ?? null, folderId)
+        )
       );
       const page: MailboxPage = { messages: [], next: {}, errors: {} };
       results.forEach((result, index) => {
@@ -76,9 +82,9 @@ export const useMailbox = (
   const firstPage = query.data?.pages[0];
   useEffect(() => {
     if (!useCache || !firstPage || query.dataUpdatedAt <= (cached?.savedAt ?? 0)) return;
-    writeMailboxCache(user.userId, ids, folder, firstPage);
+    writeMailboxCache(user.userId, ids, cacheFolder, firstPage);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ids resume-se em idsKey
-  }, [useCache, firstPage, query.dataUpdatedAt, cached, user.userId, idsKey, folder]);
+  }, [useCache, firstPage, query.dataUpdatedAt, cached, user.userId, idsKey, cacheFolder]);
 
   const live = useMemo(() => {
     const seen = new Set<string>();

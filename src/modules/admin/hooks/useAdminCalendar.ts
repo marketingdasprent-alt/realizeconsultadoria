@@ -17,7 +17,12 @@ const EMPTY: CalendarMonthData = { absences: [], employees: [], companies: [], h
  * fora em cada um e os dias aprovados de cada pessoa. O mês anterior fica visível enquanto o
  * novo carrega, e voltar a um mês já visto é imediato.
  */
-export const useAdminCalendar = (month: Date, companyId: string) => {
+export const useAdminCalendar = (
+  month: Date,
+  companyId: string,
+  /** Tipos à vista (férias, baixas…); sem isto, todos. */
+  types?: ReadonlySet<string>
+) => {
   const monthStart = startOfMonth(month);
   const monthEnd = endOfMonth(month);
   const from = isoDay(monthStart);
@@ -46,7 +51,9 @@ export const useAdminCalendar = (month: Date, companyId: string) => {
     const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });
     const inCompany = (absence: CalendarAbsence) =>
       companyId === 'all' || absence.employees?.company_id === companyId;
-    const absences = data.absences.filter(inCompany);
+    const absences = data.absences.filter(
+      absence => inCompany(absence) && (!types || types.has(absence.absence_type))
+    );
     const employees = data.employees.filter(e => companyId === 'all' || e.companyId === companyId);
     const entriesByDay: DayEntry[][] = days.map(day => entriesForDay(absences, day, data.holidays));
     const approvedDays = approvedDaysInMonth(
@@ -57,7 +64,7 @@ export const useAdminCalendar = (month: Date, companyId: string) => {
     );
     return { days, absences, employees, entriesByDay, approvedDays };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [data, companyId, from]);
+  }, [data, companyId, from, types]);
 
   return {
     ...view,

@@ -13,6 +13,13 @@ export const absenceTypeLabels: Record<string, string> = {
   other: 'Outro',
 };
 
+/** Todos os tipos, pela ordem da legenda. */
+export const ABSENCE_TYPE_KEYS = Object.keys(absenceTypeLabels);
+
+/** Só férias → "Mapa de Férias"; com outros tipos → "Mapa de Ausências". */
+export const absenceMapTitle = (types: readonly string[]): string =>
+  types.length === 1 && types[0] === 'vacation' ? 'Mapa de Férias' : 'Mapa de Ausências';
+
 export const trainingModeLabels: Record<string, string> = {
   online: 'Online',
   in_person: 'Presencial',

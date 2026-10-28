@@ -1,20 +1,10 @@
 import React from 'react';
-import { absenceTypeLabels } from '@/lib/absence-types';
 import { entryStyle } from './entryStyle';
 
-/** Legenda numa linha: cores por tipo, pendente tracejado, feriado e fim de semana. */
+/** Legenda numa linha: pendente tracejado, horas, feriado e fim de semana (as cores dos tipos
+ * estão no filtro "Mostrar", por cima do calendário). */
 export const AbsenceLegend: React.FC = () => (
   <div className="flex flex-wrap items-center gap-x-4 gap-y-2 px-1 text-[12.5px] text-rz-muted">
-    {Object.entries(absenceTypeLabels).map(([type, label]) => (
-      <span key={type} className="inline-flex items-center gap-1.5">
-        <span
-          className="h-3 w-5 rounded"
-          style={entryStyle({ type, status: 'approved' })}
-          aria-hidden
-        />
-        {label}
-      </span>
-    ))}
     <span className="inline-flex items-center gap-1.5">
       <span
         className="h-3 w-5 rounded"

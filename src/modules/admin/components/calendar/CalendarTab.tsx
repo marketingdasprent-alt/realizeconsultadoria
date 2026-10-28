@@ -11,8 +11,24 @@ import { AdminMonthGrid } from './AdminMonthGrid';
 import { DayDetailsSheet } from './DayDetailsSheet';
 import { AbsenceLegend } from './AbsenceLegend';
 import { CalendarPrintReport } from './CalendarPrintReport';
+import { AbsenceTypeFilter } from './AbsenceTypeFilter';
+import { ABSENCE_TYPE_KEYS, absenceMapTitle } from '@/lib/absence-types';
 
 const VIEW_KEY = 'rz.admin.calendar.view';
+const TYPES_KEY = 'rz.admin.calendar.types';
+
+/** Tipos escolhidos da última vez (neste browser); de início, todos. */
+const readTypes = (): Set<string> => {
+  try {
+    const saved = JSON.parse(window.localStorage.getItem(TYPES_KEY) ?? 'null') as unknown;
+    const known = Array.isArray(saved)
+      ? saved.filter((t): t is string => ABSENCE_TYPE_KEYS.includes(String(t)))
+      : [];
+    return new Set(known.length ? known : ABSENCE_TYPE_KEYS);
+  } catch {
+    return new Set(ABSENCE_TYPE_KEYS);
+  }
+};
 
 const readView = (): CalendarView => {
   try {
@@ -33,8 +49,18 @@ export const CalendarTab: React.FC<{ tabs: React.ReactNode }> = ({ tabs }) => {
   const [onlyAbsent, setOnlyAbsent] = useState(true);
   const [openDay, setOpenDay] = useState<Date | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
+  const [types, setTypes] = useState<Set<string>>(readTypes);
 
-  const calendar = useAdminCalendar(month, companyId);
+  const calendar = useAdminCalendar(month, companyId, types);
+  const chosenTypes = ABSENCE_TYPE_KEYS.filter(type => types.has(type));
+  const changeTypes = (next: Set<string>) => {
+    setTypes(next);
+    try {
+      window.localStorage.setItem(TYPES_KEY, JSON.stringify([...next]));
+    } catch {
+      // Sem armazenamento: a escolha fica só nesta visita.
+    }
+  };
   const report = useVacationReport();
   const { days, entriesByDay, holidays } = calendar;
   const rows = useMemo(
@@ -76,7 +102,7 @@ export const CalendarTab: React.FC<{ tabs: React.ReactNode }> = ({ tabs }) => {
             </Button>
             <Button variant="outline" className="rounded-full" onClick={() => setPrintOpen(true)}>
               <Printer className="h-4 w-4" />
-              Mapa de Férias
+              {absenceMapTitle(chosenTypes)}
             </Button>
           </div>
         </div>
@@ -93,6 +119,11 @@ export const CalendarTab: React.FC<{ tabs: React.ReactNode }> = ({ tabs }) => {
             onlyAbsent={onlyAbsent}
             onOnlyAbsentChange={setOnlyAbsent}
             isFetching={calendar.isFetching}
+          />
+          <AbsenceTypeFilter
+            value={types}
+            onChange={changeTypes}
+            className="border-b border-rz-line px-3 py-2.5"
           />
 
           {calendar.isLoading ? (
@@ -115,7 +146,9 @@ export const CalendarTab: React.FC<{ tabs: React.ReactNode }> = ({ tabs }) => {
               </span>
               <p className="font-semibold">Ninguém ausente neste mês</p>
               <p className="text-[13px] text-rz-muted">
-                Desligue "Só com ausências" para ver toda a equipa.
+                {chosenTypes.length < ABSENCE_TYPE_KEYS.length
+                  ? 'Só está a ver alguns tipos (em "Mostrar"). Escolha "Todos" ou desligue "Só com ausências".'
+                  : 'Desligue "Só com ausências" para ver toda a equipa.'}
               </p>
             </div>
           ) : (
@@ -155,6 +188,7 @@ export const CalendarTab: React.FC<{ tabs: React.ReactNode }> = ({ tabs }) => {
         companies={calendar.companies}
         defaultCompany={companyId}
         defaultDate={month}
+        defaultTypes={chosenTypes}
       />
     </>
   );

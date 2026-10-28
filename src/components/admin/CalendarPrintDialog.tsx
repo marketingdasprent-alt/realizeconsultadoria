@@ -24,6 +24,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { getLogoBase64 } from '@/lib/logo-utils';
 import { generateCalendarPrintHtml, type PrintAbsence } from '@/lib/calendar-print';
+import { ABSENCE_TYPE_KEYS, absenceMapTitle } from '@/lib/absence-types';
+import { AbsenceTypeFilter } from '@/modules/admin/components/calendar/AbsenceTypeFilter';
 import type { Holiday } from '@/lib/vacation-utils';
 
 interface Company {
@@ -37,6 +39,8 @@ interface CalendarPrintDialogProps {
   companies: Company[];
   defaultCompany: string; // 'all' or company id
   defaultDate: Date; // currently viewed month
+  /** Tipos à vista no calendário (o mapa começa com os mesmos). */
+  defaultTypes?: string[];
 }
 
 const MONTH_LABELS = [
@@ -62,6 +66,7 @@ const CalendarPrintDialog = ({
   companies,
   defaultCompany,
   defaultDate,
+  defaultTypes,
 }: CalendarPrintDialogProps) => {
   const { toast } = useToast();
 
@@ -70,6 +75,9 @@ const CalendarPrintDialog = ({
   const [company, setCompany] = useState(defaultCompany);
   const [orientation, setOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [isGenerating, setIsGenerating] = useState(false);
+  const [types, setTypes] = useState<Set<string>>(new Set(['vacation']));
+  const typeList = ABSENCE_TYPE_KEYS.filter(type => types.has(type));
+  const title = absenceMapTitle(typeList);
 
   const now = new Date();
   const minYear = now.getFullYear() - 2;
@@ -82,7 +90,9 @@ const CalendarPrintDialog = ({
       setViewYear(defaultDate.getFullYear());
       setCompany(defaultCompany);
       setOrientation('portrait');
+      setTypes(new Set(defaultTypes?.length ? defaultTypes : ['vacation']));
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao abrir
   }, [open, defaultDate, defaultCompany]);
 
   const toggleMonth = (year: number, month: number) => {
@@ -141,7 +151,7 @@ const CalendarPrintDialog = ({
            employees!inner ( name, companies ( name ) ),
            absence_periods ( start_date, end_date, status, period_type, start_time, end_time, business_days )`
         )
-        .eq('absence_type', 'vacation')
+        .in('absence_type', typeList)
         .lte('start_date', format(rangeEnd, 'yyyy-MM-dd'))
         .gte('end_date', format(rangeStart, 'yyyy-MM-dd'))
         .in('status', ['approved', 'partially_approved']);
@@ -172,9 +182,10 @@ const CalendarPrintDialog = ({
         companyLabel,
         logoBase64,
         orientation,
+        types: typeList,
       });
 
-      openPrintPreview(html, 'Mapa de Férias');
+      openPrintPreview(html, title);
 
       onOpenChange(false);
     } catch (error: any) {
@@ -195,11 +206,11 @@ const CalendarPrintDialog = ({
         <DialogHeader>
           <DialogTitle className="text-xl flex items-center gap-2">
             <CalendarRange className="h-5 w-5" />
-            Imprimir Mapa de Férias
+            Imprimir {title}
           </DialogTitle>
           <DialogDescription>
             Clique nos meses que quer imprimir. Cada mês sai numa folha horizontal (A4) com as
-            férias aprovadas de cada colaborador no dia certo.
+            ausências aprovadas de cada colaborador no dia certo, nos tipos escolhidos.
           </DialogDescription>
         </DialogHeader>
 
@@ -220,6 +231,12 @@ const CalendarPrintDialog = ({
                 ))}
               </SelectContent>
             </Select>
+          </div>
+
+          {/* ── Tipos ── */}
+          <div>
+            <label className="block text-sm font-medium mb-2">O que imprimir</label>
+            <AbsenceTypeFilter value={types} onChange={setTypes} />
           </div>
 
           {/* ── Orientation ── */}

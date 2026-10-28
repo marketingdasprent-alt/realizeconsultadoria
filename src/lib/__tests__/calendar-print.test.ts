@@ -72,4 +72,22 @@ describe('generateCalendarPrintHtml', () => {
     expect(html).toContain('Arthur Lopes Murali');
     expect(html).toContain('Implantação');
   });
+
+  it('com outros tipos passa a Mapa de Ausências, com a legenda de cada tipo', () => {
+    const html = generateCalendarPrintHtml({
+      absences: [
+        vacation({}),
+        vacation({ id: 'a2', employee_id: 'e2', absence_type: 'sick_leave' }),
+      ],
+      holidays,
+      months: [{ year: 2026, month: 9 }],
+      companyLabel: 'Todas as Empresas',
+      logoBase64: '',
+      orientation: 'landscape',
+      types: ['vacation', 'sick_leave'],
+    });
+    expect(html).toContain('<title>Mapa de Ausências</title>');
+    expect(html).toContain('Baixa Médica');
+    expect(html).toContain('Ausentes por dia');
+  });
 });

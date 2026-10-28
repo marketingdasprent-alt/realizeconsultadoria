@@ -1,6 +1,11 @@
 import { format, endOfMonth, eachDayOfInterval, parseISO } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { absenceTypeColors, defaultAbsenceTypeColor } from './absence-types';
+import {
+  absenceMapTitle,
+  absenceTypeColors,
+  absenceTypeLabels,
+  defaultAbsenceTypeColor,
+} from './absence-types';
 import { countBusinessDays, isHoliday, isWeekend, type Holiday } from './vacation-utils';
 
 interface PrintPeriod {
@@ -32,7 +37,13 @@ export interface CalendarPrintOptions {
   companyLabel: string;
   logoBase64: string;
   orientation: 'portrait' | 'landscape';
+  /** Tipos impressos (férias, baixas…); sem isto, só férias. */
+  types?: string[];
 }
+
+const typesOf = (opts: CalendarPrintOptions) => (opts.types?.length ? opts.types : ['vacation']);
+const onlyVacation = (opts: CalendarPrintOptions) =>
+  absenceMapTitle(typesOf(opts)) === 'Mapa de Férias';
 
 interface Segment {
   start: Date;
@@ -232,17 +243,25 @@ const buildMonthSheet = (year: number, month: number, opts: CalendarPrintOptions
   const totalDays = rows.reduce((sum, row) => sum + row.total, 0);
   const monthLabel = format(new Date(year, month, 1), 'MMMM yyyy', { locale: pt });
   const color = (absenceTypeColors.vacation || defaultAbsenceTypeColor).border;
+  const vacationOnly = onlyVacation(opts);
+  const title = absenceMapTitle(typesOf(opts));
+  const typeKeys = typesOf(opts)
+    .map(type => {
+      const c = (absenceTypeColors[type] || defaultAbsenceTypeColor).border;
+      return `<span><i class="key" style="background:${c}"></i>${escapeHtml(absenceTypeLabels[type] ?? type)}</span>`;
+    })
+    .join('');
 
   return `
     <section class="sheet">
       <div class="sheet-head">
         <div class="brand">
           <img src="${opts.logoBase64}" alt="Realize" />
-          <small>Mapa de Férias</small>
+          <small>${title}</small>
         </div>
         <div class="month-title">
           <div class="m">${escapeHtml(monthLabel)}</div>
-          <div class="sub">Férias aprovadas · ${rows.length} ${rows.length === 1 ? 'colaborador' : 'colaboradores'} · ${fmtDays(totalDays)} dias úteis</div>
+          <div class="sub">${vacationOnly ? 'Férias aprovadas' : 'Ausências aprovadas'} · ${rows.length} ${rows.length === 1 ? 'colaborador' : 'colaboradores'} · ${fmtDays(totalDays)} dias úteis</div>
         </div>
         <div class="sheet-meta">
           Empresa<br><strong>${escapeHtml(opts.companyLabel)}</strong>
@@ -251,17 +270,17 @@ const buildMonthSheet = (year: number, month: number, opts: CalendarPrintOptions
 
       ${
         rows.length === 0
-          ? '<p class="empty">Sem férias aprovadas neste mês.</p>'
+          ? `<p class="empty">Sem ${vacationOnly ? 'férias aprovadas' : 'ausências aprovadas'} neste mês.</p>`
           : `<table class="map">
         <colgroup><col class="col-name" />${days.map(() => '<col />').join('')}<col class="col-tot" /></colgroup>
         <thead><tr><th class="name">Colaborador</th>${head}<th class="tot">Dias</th></tr></thead>
         <tbody>${body}</tbody>
-        <tfoot><tr><td class="name">Em férias por dia</td>${perDay}<td></td></tr></tfoot>
+        <tfoot><tr><td class="name">${vacationOnly ? 'Em férias por dia' : 'Ausentes por dia'}</td>${perDay}<td></td></tr></tfoot>
       </table>`
       }
 
       <div class="notes">
-        <span><i class="key" style="background:${color}"></i>Férias</span>
+        ${typeKeys}
         <span><i class="key half" style="background:${color}"></i>Meio dia / horas</span>
         <span><i class="key we"></i>Fim de semana</span>
         ${holidayNotes ? `<span><i class="key hol"></i>Feriados:</span>${holidayNotes}` : ''}
@@ -293,7 +312,7 @@ export const generateCalendarPrintHtml = (opts: CalendarPrintOptions): string =>
 <html lang="pt">
 <head>
 <meta charset="utf-8" />
-<title>Mapa de Férias</title>
+<title>${absenceMapTitle(typesOf(opts))}</title>
 <link rel="icon" href="/favicon.png" type="image/png" />
 <style>
   * { box-sizing: border-box; -webkit-print-color-adjust: exact; print-color-adjust: exact; }

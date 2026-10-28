@@ -1,4 +1,5 @@
 import React from 'react';
+import { richTextParts } from '../lib/richText';
 
 interface RichTextProps {
   text: string;
@@ -6,24 +7,35 @@ interface RichTextProps {
   className?: string;
 }
 
-const PARTS = /(#[\p{L}\p{N}_]{2,40})/gu;
-
-/** Texto com quebras de linha e #hashtags clicáveis. */
+/** Texto com quebras de linha, ligações clicáveis e #hashtags clicáveis. */
 export const RichText: React.FC<RichTextProps> = ({ text, onHashtag, className }) => (
   <p className={className ?? 'whitespace-pre-wrap break-words text-[15px] leading-relaxed'}>
-    {text.split(PARTS).map((part, index) =>
-      part.startsWith('#') && part.length > 2 ? (
-        <button
-          key={index}
-          type="button"
-          onClick={() => onHashtag?.(part.slice(1).toLowerCase())}
-          className="font-semibold text-rz-primary hover:underline"
-        >
-          {part}
-        </button>
-      ) : (
-        <React.Fragment key={index}>{part}</React.Fragment>
-      )
-    )}
+    {richTextParts(text).map((part, index) => {
+      if (part.kind === 'link')
+        return (
+          <a
+            key={index}
+            href={part.href}
+            target="_blank"
+            rel="noopener noreferrer"
+            onClick={event => event.stopPropagation()}
+            className="break-all font-semibold text-rz-primary underline decoration-rz-primary/40 underline-offset-2 hover:decoration-rz-primary"
+          >
+            {part.value}
+          </a>
+        );
+      if (part.kind === 'hashtag' && onHashtag)
+        return (
+          <button
+            key={index}
+            type="button"
+            onClick={() => onHashtag(part.tag)}
+            className="font-semibold text-rz-primary hover:underline"
+          >
+            {part.value}
+          </button>
+        );
+      return <React.Fragment key={index}>{part.value}</React.Fragment>;
+    })}
   </p>
 );

@@ -2,6 +2,7 @@
 import type { DirectoryPerson } from '@/modules/messenger/types';
 import type { FeedPostRow } from '../services/feedService';
 import type { FeedAttachment, FeedPost, FeedReaction } from '../types';
+import { richTextParts } from './richText';
 
 export const FEED_KEYS = {
   posts: ['feed', 'posts'] as const,
@@ -43,7 +44,7 @@ export const validatePostFiles = (files: File[]): string | null => {
 
 /** Hashtags de um texto (#equipa → "equipa"). */
 export const extractHashtags = (text: string | null): string[] =>
-  [...(text ?? '').matchAll(/#([\p{L}\p{N}_]{2,40})/gu)].map(match => match[1].toLowerCase());
+  richTextParts(text ?? '').flatMap(part => (part.kind === 'hashtag' ? [part.tag] : []));
 
 const roleOf = (person: DirectoryPerson | undefined): string | null =>
   person ? [person.position, person.department].filter(Boolean).join(' · ') || null : null;

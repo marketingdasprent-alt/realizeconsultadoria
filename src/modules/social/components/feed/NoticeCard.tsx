@@ -3,6 +3,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CheckCircle2, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { RichText } from '../RichText';
 import type { Notice } from '../../types';
 
 interface NoticeCardProps {
@@ -34,9 +35,10 @@ export const NoticeCard: React.FC<NoticeCardProps> = ({ notice, onConfirm }) => 
       </div>
     </header>
     <h3 className="mt-3 text-[17px] font-bold">{notice.title}</h3>
-    <p className="mt-1 whitespace-pre-wrap text-[15px] leading-relaxed text-rz-ink/90">
-      {notice.message}
-    </p>
+    <RichText
+      text={notice.message}
+      className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-rz-ink/90"
+    />
     <div className="mt-4">
       {notice.read ? (
         <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-emerald-600">

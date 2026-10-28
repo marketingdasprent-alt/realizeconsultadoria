@@ -4,6 +4,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { insertAtCursor } from '@/lib/insertAtCursor';
+import { EmojiPicker } from '@/modules/messenger/components/EmojiPicker';
 import type { BroadcastDraft, BroadcastErrors } from '../../lib/broadcast';
 import type { BroadcastAttachment } from '../../services/broadcastService';
 
@@ -50,6 +52,7 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
   onPublishInApp,
 }) => {
   const fileInput = useRef<HTMLInputElement>(null);
+  const messageRef = useRef<HTMLTextAreaElement>(null);
   return (
     <div className="space-y-4">
       <Field id="bc-subject" label="Assunto" error={errors.subject}>
@@ -63,13 +66,22 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
         />
       </Field>
       <Field id="bc-message" label="Mensagem" error={errors.message}>
-        <Textarea
-          id="bc-message"
-          value={draft.message}
-          onChange={event => onChange({ message: event.target.value })}
-          placeholder="Escreva aqui. Uma linha em branco começa um parágrafo novo; endereços (https://…) ficam ligações."
-          className="min-h-[220px] text-[14px] leading-relaxed"
-        />
+        <div className="relative">
+          <Textarea
+            id="bc-message"
+            ref={messageRef}
+            value={draft.message}
+            onChange={event => onChange({ message: event.target.value })}
+            placeholder="Escreva aqui. Uma linha em branco começa um parágrafo novo; endereços (https://…) ficam ligações."
+            className="min-h-[220px] pb-11 text-[14px] leading-relaxed"
+          />
+          <EmojiPicker
+            triggerClassName="absolute bottom-2 left-2 flex h-8 w-8 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-primary"
+            onPick={picked =>
+              onChange({ message: insertAtCursor(messageRef.current, draft.message, picked) })
+            }
+          />
+        </div>
       </Field>
       <Field id="bc-sender" label="Quem assina" error={errors.senderName}>
         <Input

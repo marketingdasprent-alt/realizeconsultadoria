@@ -5,6 +5,7 @@ import { formatDistanceToNowStrict } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { Loader2, SendHorizontal, Trash2 } from 'lucide-react';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
+import { RichText } from '../RichText';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useFeedComments } from '../../hooks/useFeedComments';
 
@@ -38,7 +39,10 @@ export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
           <div className="min-w-0 flex-1">
             <div className="inline-block max-w-full rounded-2xl bg-rz-canvas px-3.5 py-2">
               <p className="text-[13px] font-bold">{comment.authorName}</p>
-              <p className="whitespace-pre-wrap break-words text-[14px]">{comment.body}</p>
+              <RichText
+                text={comment.body}
+                className="whitespace-pre-wrap break-words text-[14px]"
+              />
             </div>
             <div className="ml-2 mt-0.5 flex items-center gap-3 text-[11.5px] text-rz-muted">
               <span>{formatDistanceToNowStrict(new Date(comment.createdAt), { locale: pt })}</span>

@@ -1,6 +1,8 @@
 import React, { useRef, useState } from 'react';
 import { Building2, ImagePlus, Loader2, Paperclip, Users } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { insertAtCursor } from '@/lib/insertAtCursor';
+import { EmojiPicker } from '@/modules/messenger/components/EmojiPicker';
 import { EmojiSuggestions } from '@/modules/workspace/components/EmojiSuggestions';
 import { useEmojiAutocomplete } from '@/modules/workspace/hooks/useEmojiAutocomplete';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
@@ -97,6 +99,12 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPublish, isPublish
       />
 
       <div className="mt-3 flex flex-wrap items-center gap-1 md:pl-12">
+        <EmojiPicker
+          triggerClassName={TOOL}
+          onPick={picked =>
+            setBody(current => insertAtCursor(bodyRef.current, current, picked).slice(0, 5000))
+          }
+        />
         <button type="button" className={TOOL} onClick={() => imageRef.current?.click()}>
           <ImagePlus className="h-4 w-4" /> Fotografia
         </button>

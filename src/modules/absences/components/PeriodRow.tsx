@@ -65,7 +65,6 @@ export const PeriodRow: React.FC<PeriodRowProps> = ({ item, highlighted, onHover
     item.siblings > 1 && item.requestedAt
       ? `pedido de ${short(item.requestedAt.slice(0, 10), 'd MMM')}`
       : null;
-  const hasMenu = item.canCancel || item.group !== 'history';
 
   return (
     <li
@@ -123,38 +122,37 @@ export const PeriodRow: React.FC<PeriodRowProps> = ({ item, highlighted, onHover
               {item.status === 'approved' ? 'Remarcar' : 'Editar'}
             </button>
           )}
-          {hasMenu && (
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className="flex h-9 w-9 items-center justify-center rounded-full text-rz-muted hover:bg-white"
-                  aria-label="Mais ações"
-                >
-                  <MoreHorizontal className="h-4 w-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="rounded-2xl">
-                <DropdownMenuItem onClick={() => actions.onAttach(item)}>
-                  <Upload className="mr-2 h-4 w-4" /> Anexar documento
+          {/* Também nos períodos já passados: a justificação (ex.: atestado) chega depois. */}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
+                className="flex h-9 w-9 items-center justify-center rounded-full text-rz-muted hover:bg-white"
+                aria-label="Mais ações"
+              >
+                <MoreHorizontal className="h-4 w-4" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="rounded-2xl">
+              <DropdownMenuItem onClick={() => actions.onAttach(item)}>
+                <Upload className="mr-2 h-4 w-4" /> Anexar documento
+              </DropdownMenuItem>
+              {item.documentCount > 0 && (
+                <DropdownMenuItem onClick={() => actions.onViewDocuments(item)}>
+                  <Paperclip className="mr-2 h-4 w-4" /> Ver anexos ({item.documentCount})
                 </DropdownMenuItem>
-                {item.documentCount > 0 && (
-                  <DropdownMenuItem onClick={() => actions.onViewDocuments(item)}>
-                    <Paperclip className="mr-2 h-4 w-4" /> Ver anexos ({item.documentCount})
-                  </DropdownMenuItem>
-                )}
-                {item.canCancel && (
-                  <DropdownMenuItem
-                    onClick={() => actions.onCancel(item)}
-                    className="text-rose-600 focus:text-rose-600"
-                  >
-                    <Trash2 className="mr-2 h-4 w-4" />{' '}
-                    {item.status === 'rejected' ? 'Remover' : 'Cancelar período'}
-                  </DropdownMenuItem>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          )}
+              )}
+              {item.canCancel && (
+                <DropdownMenuItem
+                  onClick={() => actions.onCancel(item)}
+                  className="text-rose-600 focus:text-rose-600"
+                >
+                  <Trash2 className="mr-2 h-4 w-4" />{' '}
+                  {item.status === 'rejected' ? 'Remover' : 'Cancelar período'}
+                </DropdownMenuItem>
+              )}
+            </DropdownMenuContent>
+          </DropdownMenu>
         </div>
       </div>
       {item.rejectionReason && (

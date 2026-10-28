@@ -12,16 +12,19 @@ interface RenameGroupDialogProps {
   onSave: (title: string) => void;
   /** Nova foto (ou null para tirar); grava logo. */
   onPhoto: (file: File | null) => Promise<void>;
+  /** Quem está no grupo (pôr e tirar pessoas), por baixo do nome. */
+  members?: React.ReactNode;
 }
 
 const PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
-/** Editar um grupo: foto e nome (qualquer membro). */
+/** Editar um grupo: foto, nome e pessoas (qualquer membro; tirar pessoas, só o dono). */
 export const RenameGroupDialog: React.FC<RenameGroupDialogProps> = ({
   group,
   onClose,
   onSave,
   onPhoto,
+  members,
 }) => {
   const [title, setTitle] = useState('');
   const [busy, setBusy] = useState(false);
@@ -41,7 +44,7 @@ export const RenameGroupDialog: React.FC<RenameGroupDialogProps> = ({
 
   return (
     <Dialog open={group !== null} onOpenChange={open => !open && onClose()}>
-      <DialogContent className="rounded-[28px] sm:max-w-sm sm:rounded-[28px]">
+      <DialogContent className="max-h-[92dvh] overflow-y-auto rounded-[28px] sm:max-w-sm sm:rounded-[28px]">
         <DialogTitle className="flex items-center gap-2 text-[18px] font-extrabold">
           <Users className="h-5 w-5 text-rz-primary" /> Editar grupo
         </DialogTitle>
@@ -131,6 +134,7 @@ export const RenameGroupDialog: React.FC<RenameGroupDialogProps> = ({
             </button>
           </div>
         </form>
+        {members}
       </DialogContent>
     </Dialog>
   );

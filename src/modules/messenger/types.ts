@@ -118,6 +118,12 @@ export interface MessengerApi {
   setFlag: (conversationId: string, flag: MemberFlag, value: boolean) => Promise<void>;
   startDirect: (userId: string) => Promise<string | null>;
   createGroup: (title: string, userIds: string[]) => Promise<string | null>;
+  /** Membros da conversa aberta (o dono do grupo tem role 'owner'). */
+  members: { userId: string; role: string }[];
+  /** Pôr colegas num grupo (qualquer membro). */
+  addMembers: (conversationId: string, userIds: string[]) => Promise<void>;
+  /** Tirar alguém (só o dono) ou, com o próprio id, sair do grupo. */
+  removeMember: (conversationId: string, userId: string) => Promise<void>;
   /** Mudar o nome de um grupo (qualquer membro). */
   renameGroup: (conversationId: string, title: string) => Promise<void>;
   /** Pôr (ou tirar, com null) a foto de um grupo (qualquer membro). */

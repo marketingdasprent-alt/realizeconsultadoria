@@ -9,6 +9,7 @@ import { useTasks } from '@/modules/tasks/hooks/useTasks';
 import { DeleteMessageDialog } from './DeleteMessageDialog';
 import { ForwardDialog } from './ForwardDialog';
 import { RenameGroupDialog } from './RenameGroupDialog';
+import { GroupMembersSection } from './GroupMembersSection';
 import { MessageComposer } from './MessageComposer';
 import { MessageList } from './MessageList';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
@@ -167,6 +168,17 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
         onClose={() => setRenaming(false)}
         onSave={title => api.renameGroup(conversation.id, title)}
         onPhoto={file => api.setGroupAvatar(conversation.id, file)}
+        members={
+          <GroupMembersSection
+            conversationId={conversation.id}
+            members={api.members}
+            directory={api.directory}
+            me={api.me}
+            onAdd={ids => api.addMembers(conversation.id, ids)}
+            onRemove={userId => api.removeMember(conversation.id, userId)}
+            onLeft={() => setRenaming(false)}
+          />
+        }
       />
       <DeleteMessageDialog
         message={toDelete}

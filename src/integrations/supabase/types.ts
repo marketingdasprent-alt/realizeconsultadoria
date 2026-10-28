@@ -3888,6 +3888,14 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      chat_add_members: {
+        Args: { _conversation_id: string; _user_ids: string[] };
+        Returns: number;
+      };
+      chat_remove_member: {
+        Args: { _conversation_id: string; _user_id: string };
+        Returns: undefined;
+      };
       admin_task_people: {
         Args: { _company_id: string };
         Returns: { user_id: string; name: string; department: string | null }[];

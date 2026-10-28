@@ -209,6 +209,24 @@ export const messengerService = {
     return { data: data ?? null, error };
   },
 
+  /** Pôr colegas num grupo (qualquer membro); devolve quantos entraram. */
+  addMembers: async (conversationId: string, userIds: string[]) => {
+    const { data, error } = await supabase.rpc('chat_add_members', {
+      _conversation_id: conversationId,
+      _user_ids: userIds,
+    });
+    return { data: data ?? 0, error };
+  },
+
+  /** Tirar alguém do grupo (só o dono) ou sair (o próprio). */
+  removeMember: async (conversationId: string, userId: string) => {
+    const { error } = await supabase.rpc('chat_remove_member', {
+      _conversation_id: conversationId,
+      _user_id: userId,
+    });
+    return { error };
+  },
+
   renameGroup: async (conversationId: string, title: string) => {
     const { error } = await supabase.rpc('chat_rename_group', {
       _conversation_id: conversationId,

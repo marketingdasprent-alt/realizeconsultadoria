@@ -189,6 +189,14 @@ export const useDemoMessenger = (): MessengerApi => {
     startDirect,
     createGroup,
     renameGroup: async (id, title) => patchConversation(id, { title }),
+    // Na pré-visualização não há membros reais para mexer.
+    members: [],
+    addMembers: async () => {
+      toast({ title: 'Pré-visualização: pessoas não adicionadas.' });
+    },
+    removeMember: async () => {
+      toast({ title: 'Pré-visualização: ninguém foi tirado.' });
+    },
     setGroupAvatar: async (id, file) =>
       patchConversation(id, { avatarUrl: file ? URL.createObjectURL(file) : undefined }),
     // Na pré-visualização o "caminho" de um ficheiro enviado já é um URL local.

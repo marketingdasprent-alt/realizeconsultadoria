@@ -34,6 +34,8 @@ type Actions = Pick<
   | 'startDirect'
   | 'createGroup'
   | 'renameGroup'
+  | 'addMembers'
+  | 'removeMember'
   | 'setGroupAvatar'
   | 'getFileUrl'
   | 'forwardMessage'
@@ -329,6 +331,43 @@ export const useMessengerActions = ({
     [qc]
   );
 
+  const addMembers = useCallback<Actions['addMembers']>(
+    async (conversationId, userIds) => {
+      const { data, error } = await messengerService.addMembers(conversationId, userIds);
+      if (error) fail('As pessoas não foram adicionadas ao grupo.');
+      else
+        toast({
+          title: data === 1 ? 'Pessoa adicionada ao grupo' : `${data} pessoas adicionadas ao grupo`,
+        });
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: CHAT_KEYS.members(conversationId) }),
+        qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations }),
+      ]);
+    },
+    [qc]
+  );
+
+  const removeMember = useCallback<Actions['removeMember']>(
+    async (conversationId, userId) => {
+      const { error } = await messengerService.removeMember(conversationId, userId);
+      const leaving = userId === user.userId;
+      if (error) {
+        fail(leaving ? 'Não saiu do grupo.' : 'A pessoa não foi tirada do grupo.');
+        return;
+      }
+      // Quem sai deixa de ver o grupo: fecha-o.
+      if (leaving) {
+        setActive(null);
+        toast({ title: 'Saiu do grupo' });
+      }
+      await Promise.all([
+        qc.invalidateQueries({ queryKey: CHAT_KEYS.members(conversationId) }),
+        qc.invalidateQueries({ queryKey: CHAT_KEYS.conversations }),
+      ]);
+    },
+    [qc, user.userId, setActive]
+  );
+
   const setGroupAvatar = useCallback<Actions['setGroupAvatar']>(
     async (conversationId, file) => {
       const { error } = await messengerService.setGroupAvatar(conversationId, file);
@@ -352,6 +391,8 @@ export const useMessengerActions = ({
     startDirect,
     createGroup,
     renameGroup,
+    addMembers,
+    removeMember,
     setGroupAvatar,
     getFileUrl,
     forwardMessage,

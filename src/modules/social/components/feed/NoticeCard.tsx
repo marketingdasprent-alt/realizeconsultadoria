@@ -4,15 +4,24 @@ import { pt } from 'date-fns/locale';
 import { CheckCircle2, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { RichText } from '../RichText';
+import { NoticeReactions } from './NoticeReactions';
+import type { NoticeReaction } from '../../lib/noticeReactions';
 import type { Notice } from '../../types';
 
 interface NoticeCardProps {
   notice: Notice;
   onConfirm: (notice: Notice) => void;
+  reactions: NoticeReaction[];
+  onReact: (emoji: string) => void;
 }
 
-/** Comunicado dos RH no Feed, com confirmação de leitura (briefing §12). */
-export const NoticeCard: React.FC<NoticeCardProps> = ({ notice, onConfirm }) => (
+/** Comunicado dos RH no Feed, com reações e confirmação de leitura (briefing §12). */
+export const NoticeCard: React.FC<NoticeCardProps> = ({
+  notice,
+  onConfirm,
+  reactions,
+  onReact,
+}) => (
   <article
     className={cn(
       'rz-rise relative overflow-hidden rounded-[28px] p-5 ring-1',
@@ -39,6 +48,7 @@ export const NoticeCard: React.FC<NoticeCardProps> = ({ notice, onConfirm }) => 
       text={notice.message}
       className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-rz-ink/90"
     />
+    <NoticeReactions reactions={reactions} onReact={onReact} />
     <div className="mt-4">
       {notice.read ? (
         <span className="inline-flex items-center gap-1.5 text-[13px] font-semibold text-emerald-600">

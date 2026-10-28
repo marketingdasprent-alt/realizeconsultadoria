@@ -15,6 +15,7 @@ import { useFeedUnread } from '../hooks/useFeedUnread';
 import { useProtectImages } from '../hooks/useProtectImages';
 import { useFeedRealtime } from '../hooks/useFeedRealtime';
 import { useNotices } from '../hooks/useNotices';
+import { useNoticeReactions } from '../hooks/useNoticeReactions';
 import { buildTimeline, FEED_FILTERS, topHashtags, type FeedFilter } from '../lib/timeline';
 import type { FeedPost } from '../types';
 
@@ -24,6 +25,7 @@ const FeedPage: React.FC = () => {
   const { markSeen } = useFeedUnread();
   useProtectImages();
   const { notices, confirmRead, isLoading: noticesLoading } = useNotices();
+  const noticeReactions = useNoticeReactions(notices);
   const recognitions = useAppreciations('public');
   const realtime = useFeedRealtime();
   const [params] = useSearchParams();
@@ -141,6 +143,8 @@ const FeedPage: React.FC = () => {
                   key={`n-${item.notice.id}`}
                   notice={item.notice}
                   onConfirm={n => confirmRead([n.id])}
+                  reactions={noticeReactions.reactionsFor(item.notice.id)}
+                  onReact={emoji => void noticeReactions.react(item.notice.id, emoji)}
                 />
               ) : (
                 <AppreciationCard

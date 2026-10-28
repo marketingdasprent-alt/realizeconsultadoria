@@ -7,6 +7,7 @@ import { useBroadcastReads } from '../../hooks/useBroadcastReads';
 import type { BroadcastEmployee } from '../../lib/broadcast';
 import type { BroadcastHistoryRow } from '../../services/broadcastService';
 import { BroadcastConfirmations } from './BroadcastConfirmations';
+import { BroadcastReactions } from './BroadcastReactions';
 
 interface BroadcastDetailSheetProps {
   row: BroadcastHistoryRow | null;
@@ -74,6 +75,10 @@ export const BroadcastDetailSheet: React.FC<BroadcastDetailSheetProps> = ({
                 <p className="rounded-2xl bg-rose-50 px-3 py-2 text-[12.5px] text-rose-700">
                   Não chegou a: {failed.join(', ')}
                 </p>
+              )}
+
+              {row.published_in_app && !reads.isLoading && (
+                <BroadcastReactions reactions={reads.reactions} people={people} />
               )}
 
               {row.published_in_app ? (

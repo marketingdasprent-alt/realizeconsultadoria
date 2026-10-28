@@ -2,6 +2,9 @@ import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import type { Audience, BroadcastDraft, BroadcastEmployee } from '../lib/broadcast';
 import type { NoticeRead, SentNotice } from '../lib/broadcastReads';
+import type { NoticeReactionRow } from '@/modules/social/lib/noticeReactions';
+
+type SentReaction = Omit<NoticeReactionRow, 'notification_id'>;
 
 export type BroadcastHistoryRow = Database['public']['Tables']['marketing_emails']['Row'];
 
@@ -81,7 +84,7 @@ export const broadcastService = {
    */
   reads: async (
     row: BroadcastHistoryRow
-  ): Promise<{ notices: SentNotice[]; reads: NoticeRead[] }> => {
+  ): Promise<{ notices: SentNotice[]; reads: NoticeRead[]; reactions: SentReaction[] }> => {
     const sentAt = new Date(row.created_at).getTime();
     const { data: notices, error } = await supabase
       .from('notifications')
@@ -92,13 +95,21 @@ export const broadcastService = {
       .lte('created_at', new Date(sentAt + 30_000).toISOString());
     if (error) throw error;
     const ids = (notices ?? []).map(n => n.id);
-    if (!ids.length) return { notices: [], reads: [] };
-    const { data: reads, error: readsError } = await supabase
-      .from('notification_reads')
-      .select('notification_id, employee_id, read_at')
-      .in('notification_id', ids);
-    if (readsError) throw readsError;
-    return { notices: notices ?? [], reads: reads ?? [] };
+    if (!ids.length) return { notices: [], reads: [], reactions: [] };
+    const [readsRes, reactionsRes] = await Promise.all([
+      supabase
+        .from('notification_reads')
+        .select('notification_id, employee_id, read_at')
+        .in('notification_id', ids),
+      supabase.from('notice_reactions').select('user_id, emoji').in('notification_id', ids),
+    ]);
+    if (readsRes.error) throw readsRes.error;
+    if (reactionsRes.error) throw reactionsRes.error;
+    return {
+      notices: notices ?? [],
+      reads: readsRes.data ?? [],
+      reactions: reactionsRes.data ?? [],
+    };
   },
 
   /** Volta a mandar a notificação a quem ainda não confirmou. */

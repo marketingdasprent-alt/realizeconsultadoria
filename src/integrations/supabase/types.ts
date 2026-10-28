@@ -2500,6 +2500,35 @@ export type Database = {
           },
         ];
       };
+      notice_reactions: {
+        Row: {
+          created_at: string;
+          emoji: string;
+          notification_id: string;
+          user_id: string;
+        };
+        Insert: {
+          created_at?: string;
+          emoji: string;
+          notification_id: string;
+          user_id?: string;
+        };
+        Update: {
+          created_at?: string;
+          emoji?: string;
+          notification_id?: string;
+          user_id?: string;
+        };
+        Relationships: [
+          {
+            foreignKeyName: 'notice_reactions_notification_id_fkey';
+            columns: ['notification_id'];
+            isOneToOne: false;
+            referencedRelation: 'notifications';
+            referencedColumns: ['id'];
+          },
+        ];
+      };
       notification_reads: {
         Row: {
           employee_id: string;

@@ -48,6 +48,7 @@ export const useBroadcastReads = (row: BroadcastHistoryRow | null, people: Broad
     isLoading: query.isLoading,
     isError: query.isError,
     confirmations,
+    reactions: query.data?.reactions ?? [],
     reach: confirmations.confirmed.length + confirmations.pending.length,
     reminding,
     remind,

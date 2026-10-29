@@ -32,11 +32,11 @@ export const SIGNATURE_MAX_WIDTH = 600;
 const MAX_SIDE = SIGNATURE_MAX_WIDTH * 2;
 
 /**
- * Largura a que a imagem aparece ao entrar na assinatura. As grandes (feitas com mais pontos
- * para ficarem nítidas) mostram-se a metade, até 600 px; as pequenas ficam como são.
+ * Largura a que a imagem aparece ao entrar na assinatura: a "Largura do email" (600 px),
+ * o tamanho que fica bem nas assinaturas em imagem. As mais pequenas que isso ficam como são.
  */
 export const defaultSignatureWidth = (naturalWidth: number): number =>
-  Math.round(Math.min(SIGNATURE_MAX_WIDTH, naturalWidth >= 400 ? naturalWidth / 2 : naturalWidth));
+  Math.round(Math.min(SIGNATURE_MAX_WIDTH, naturalWidth));
 
 /**
  * Põe a largura na imagem de forma que todos os programas de email respeitem: o atributo

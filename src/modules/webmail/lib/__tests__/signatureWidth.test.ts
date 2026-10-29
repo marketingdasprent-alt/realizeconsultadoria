@@ -3,9 +3,9 @@ import { applySignatureWidth, defaultSignatureWidth } from '../signatureEditing'
 import { sanitizeSignatureHtml } from '../signature';
 
 describe('largura das imagens da assinatura', () => {
-  it('imagens grandes aparecem a metade (nítidas), até à largura do email', () => {
+  it('por omissão ficam à largura do email; as pequenas ficam como são', () => {
     expect(defaultSignatureWidth(2400)).toBe(600);
-    expect(defaultSignatureWidth(1000)).toBe(500);
+    expect(defaultSignatureWidth(1000)).toBe(600);
     expect(defaultSignatureWidth(300)).toBe(300);
   });
 

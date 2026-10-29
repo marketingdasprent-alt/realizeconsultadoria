@@ -10,6 +10,7 @@ import { FORWARD_MARKER } from '../lib/forward';
 import { signatureToHtml, writtenPart } from '../lib/signature';
 import { checkBeforeSend, type SendCheck } from '../lib/sendCheck';
 import { pickSignature, type SignatureChoice } from '../lib/signatures';
+import { AiRewriteBar } from './AiRewriteBar';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import { useDraftSaver } from '../hooks/useDraftSaver';
@@ -437,6 +438,12 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               onChange={e => set('body', e.target.value)}
               placeholder="Escreva a sua mensagem…"
               className="min-h-[96px]"
+            />
+            <AiRewriteBar
+              text={fields.body}
+              subject={fields.subject}
+              context={quote}
+              onChange={value => set('body', value)}
             />
             {signatureHtml && (
               // Já limpa (sem scripts nem eventos): é a assinatura da própria pessoa. Muda-se em cima.

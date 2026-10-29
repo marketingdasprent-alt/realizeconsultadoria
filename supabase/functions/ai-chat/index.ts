@@ -6,6 +6,8 @@
 //        → { ok: true, reply, proposals: [{ id, tool, title, lines, args }] }
 //   { action: 'execute', tool: 'event' | 'task' | 'reminder', args }
 //        → { ok, message, link? }          (grava uma proposta confirmada)
+//   { action: 'rewrite', text, mode: 'complete' | 'formal' | 'short' | 'fix', subject?, context? }
+//        → { ok: true, text }              ("Usar IA" no Webmail: reescreve o email)
 //   erros: { ok: false, code, message }
 //
 // O modelo é qualquer servidor compatível com a API da OpenAI (Ollama, OpenAI, DeepSeek, ...).
@@ -14,11 +16,21 @@
 //   AI_MODEL      ex.: qwen2.5:7b
 //   AI_API_KEY    a chave do servidor (ou OLLAMA_API_KEY; opcional se o servidor não a exigir)
 //   AI_TOOLS_MODEL (opcional) modelo para este assistente, se for outro que o de AI_MODEL
+//   AI_WRITE_MODEL (opcional) modelo para reescrever emails (por omissão, o das ferramentas)
 // verify_jwt = false: o JWT é validado aqui (auth.getUser).
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { describeInstant, fold } from '../_shared/ai/time.ts';
+import {
+  cleanRewrite,
+  MAX_REWRITE_CONTEXT,
+  MAX_REWRITE_TEXT,
+  REWRITE_MODES,
+  rewritePrompt,
+  rewriteUserMessage,
+  type RewriteMode,
+} from '../_shared/ai/rewrite.ts';
 import type { Person } from '../_shared/ai/time.ts';
 import {
   authenticatedUserId,
@@ -101,7 +113,8 @@ const callModel = async (
   apiKey: string | undefined,
   messages: ModelMessage[],
   withTools: boolean,
-  timeoutMs = 90_000
+  timeoutMs = 90_000,
+  maxTokens = 700
 ): Promise<{ message?: ModelMessage; status: number }> => {
   const response = await fetchWithTimeout(
     `${baseUrl}/chat/completions`,
@@ -114,7 +127,7 @@ const callModel = async (
       body: JSON.stringify({
         model,
         stream: false,
-        max_tokens: 700,
+        max_tokens: maxTokens,
         temperature: 0.3,
         messages,
         ...(withTools
@@ -252,8 +265,14 @@ serve(async (req: Request) => {
     return json(result);
   }
 
-  const history = parseMessages(body.messages);
-  if (!history) return json({ ok: false, code: 'bad_request' }, 400);
+  const rewrite = body.action === 'rewrite';
+  const history = rewrite ? null : parseMessages(body.messages);
+  const text = typeof body.text === 'string' ? body.text.trim() : '';
+  const mode = (REWRITE_MODES as readonly unknown[]).includes(body.mode)
+    ? (body.mode as RewriteMode)
+    : 'complete';
+  if (rewrite ? !text || text.length > MAX_REWRITE_TEXT : !history)
+    return json({ ok: false, code: 'bad_request' }, 400);
 
   // Limite de pedidos por pessoa (o modelo é nosso e partilhado).
   const minuteAgo = new Date(Date.now() - 60_000).toISOString();
@@ -278,6 +297,38 @@ serve(async (req: Request) => {
 
   // Sem espaços nem quebras de linha à volta (vêm da área de transferência).
   const apiKey = (Deno.env.get('AI_API_KEY') ?? Deno.env.get('OLLAMA_API_KEY'))?.trim();
+
+  if (rewrite) {
+    const writeModel = Deno.env.get('AI_WRITE_MODEL') || toolsModel;
+    const subject = typeof body.subject === 'string' ? body.subject.slice(0, 300) : '';
+    const context =
+      typeof body.context === 'string' ? body.context.trim().slice(0, MAX_REWRITE_CONTEXT) : '';
+    try {
+      const { message, status } = await callModel(
+        baseUrl,
+        writeModel,
+        apiKey,
+        [
+          { role: 'system', content: rewritePrompt(mode, employee.name.split(' ')[0]) },
+          { role: 'user', content: rewriteUserMessage(text, subject, context) },
+        ],
+        false,
+        TIME_BUDGET_MS,
+        1500
+      );
+      if (status === 401 || status === 403)
+        return fail('not_configured', 'A chave da IA não é válida. Fale com a administração.');
+      const result = cleanRewrite(typeof message?.content === 'string' ? message.content : '');
+      if (!result) return fail('unavailable', UNAVAILABLE);
+      return json({ ok: true, text: result });
+    } catch (error) {
+      const timedOut = error instanceof DOMException && error.name === 'AbortError';
+      console.error('ai-chat: reescrever falhou', timedOut ? 'tempo esgotado' : error);
+      return fail('unavailable', timedOut ? SLOW : UNAVAILABLE);
+    }
+  }
+  if (!history) return json({ ok: false, code: 'bad_request' }, 400);
+
   const lastUser = history[history.length - 1].content;
   const withTools = ACTION_HINT.test(fold(lastUser));
   const model = withTools ? toolsModel : chatModel;

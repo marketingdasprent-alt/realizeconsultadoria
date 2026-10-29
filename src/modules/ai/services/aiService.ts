@@ -61,7 +61,8 @@ const callFunction = async <T>(payload: unknown, signal?: AbortSignal): Promise<
   });
 
   const body = (await response.json().catch(() => null)) as
-    ({ ok?: boolean; code?: string; message?: string } & Record<string, unknown>) | null;
+    | ({ ok?: boolean; code?: string; message?: string } & Record<string, unknown>)
+    | null;
   if (!body || body.ok === false || !response.ok)
     throw new AiError(body?.message ?? GENERIC, body?.code ?? 'error');
   return body as T;
@@ -77,6 +78,17 @@ export const chat = async (
     signal
   );
   return { reply: body.reply ?? '', proposals: body.proposals ?? [] };
+};
+
+export type RewriteMode = 'complete' | 'formal' | 'short' | 'fix';
+
+/** "Usar IA" no email: devolve o texto reescrito (o modelo da empresa, no servidor). */
+export const rewriteText = async (
+  input: { text: string; mode: RewriteMode; subject?: string; context?: string },
+  signal?: AbortSignal
+): Promise<string> => {
+  const body = await callFunction<{ text: string }>({ action: 'rewrite', ...input }, signal);
+  return body.text ?? '';
 };
 
 /** Grava o que a pessoa confirmou. */

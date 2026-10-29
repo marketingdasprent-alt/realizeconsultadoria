@@ -63,6 +63,8 @@
     "embla-carousel-react": "^8.6.0",
     "exceljs": "^4.4.0",
     "framer-motion": "^12.24.0",
+    "gifenc": "^1.0.3",
+    "gifuct-js": "^2.1.2",
     "input-otp": "^1.4.2",
     "jspdf": "^4.2.1",
     "jspdf-autotable": "^5.0.8",

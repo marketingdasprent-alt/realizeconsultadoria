@@ -74,11 +74,20 @@ export const SignatureEditor: React.FC<SignatureEditorProps> = ({ initial, onCha
     setUploading(true);
     for (const original of files) {
       const prepared = await prepareSignatureImage(original);
-      if (isHeavyGif(original))
-        toast({
-          title: 'GIF pesado',
-          description: `Tem ${(original.size / 1024 / 1024).toFixed(1)} MB: demora a abrir e alguns emails podem não o mostrar. O ideal é até 1200 px de largura e menos de 1 MB.`,
-        });
+      if (isHeavyGif(original)) {
+        const mb = (bytes: number) => `${(bytes / 1024 / 1024).toFixed(1).replace('.', ',')} MB`;
+        toast(
+          prepared.size < original.size
+            ? {
+                title: 'GIF comprimido',
+                description: `De ${mb(original.size)} para ${mb(prepared.size)}, com a animação.`,
+              }
+            : {
+                title: 'GIF pesado',
+                description: `Tem ${mb(original.size)}: pode demorar a abrir nalguns emails.`,
+              }
+        );
+      }
       const { url, error } = await uploadSignatureImage(prepared);
       if (!url) {
         toast({ title: error ?? 'A imagem não foi enviada', variant: 'destructive' });

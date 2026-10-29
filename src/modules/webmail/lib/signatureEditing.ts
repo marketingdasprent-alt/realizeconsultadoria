@@ -74,11 +74,18 @@ export const isHeavyGif = (file: File) => file.type === 'image/gif' && file.size
 
 /**
  * As imagens da assinatura têm 5 MB de limite; as acima de 400 KB são reduzidas (até 1200 px,
- * o dobro do que aparece) antes de enviar para o email não pesar. GIFs ficam sempre como estão
- * (reduzi-los tirava-lhes a animação).
+ * o dobro do que aparece) antes de enviar para o email não pesar. GIFs pesados são comprimidos
+ * mantendo a animação (gifCompress); fica o mais leve dos dois.
  */
 export const prepareSignatureImage = async (file: File): Promise<File> => {
-  if (file.type === 'image/gif' || file.size < 400 * 1024) return file;
+  if (file.type === 'image/gif') {
+    if (!isHeavyGif(file)) return file;
+    // Só se carrega o compressor quando é preciso (não pesa no resto da app).
+    const { compressGif } = await import('./gifCompress');
+    const compressed = await compressGif(file, MAX_SIDE);
+    return compressed && compressed.size < file.size ? compressed : file;
+  }
+  if (file.size < 400 * 1024) return file;
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));

@@ -7,7 +7,7 @@
 //   { action: 'execute', tool: 'event' | 'task' | 'reminder', args }
 //        → { ok, message, link? }          (grava uma proposta confirmada)
 //   { action: 'rewrite', text, mode: 'complete' | 'formal' | 'short' | 'fix', subject?, context? }
-//        → { ok: true, text }              ("Usar IA" no Webmail: reescreve o email)
+//        → { ok: true, text, subject }     ("Usar IA" no Webmail: reescreve o email e o assunto)
 //   erros: { ok: false, code, message }
 //
 // O modelo é qualquer servidor compatível com a API da OpenAI (Ollama, OpenAI, DeepSeek, ...).
@@ -23,7 +23,7 @@ import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { describeInstant, fold } from '../_shared/ai/time.ts';
 import {
-  cleanRewrite,
+  parseRewrite,
   MAX_REWRITE_CONTEXT,
   MAX_REWRITE_TEXT,
   REWRITE_MODES,
@@ -318,9 +318,9 @@ serve(async (req: Request) => {
       );
       if (status === 401 || status === 403)
         return fail('not_configured', 'A chave da IA não é válida. Fale com a administração.');
-      const result = cleanRewrite(typeof message?.content === 'string' ? message.content : '');
-      if (!result) return fail('unavailable', UNAVAILABLE);
-      return json({ ok: true, text: result });
+      const result = parseRewrite(typeof message?.content === 'string' ? message.content : '');
+      if (!result.text) return fail('unavailable', UNAVAILABLE);
+      return json({ ok: true, text: result.text, subject: result.subject });
     } catch (error) {
       const timedOut = error instanceof DOMException && error.name === 'AbortError';
       console.error('ai-chat: reescrever falhou', timedOut ? 'tempo esgotado' : error);

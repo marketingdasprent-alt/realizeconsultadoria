@@ -31,3 +31,25 @@ describe('Usar IA no email', () => {
     expect(prompt).toContain('Thiago');
   });
 });
+
+describe('assunto escrito pela IA', () => {
+  it('separa o assunto do texto', async () => {
+    const { parseRewrite } = await import('../../../supabase/functions/_shared/ai/rewrite');
+    expect(parseRewrite('ASSUNTO: Proposta de parceria\n\nBom dia,\n\nSegue a proposta.')).toEqual({
+      subject: 'Proposta de parceria',
+      text: 'Bom dia,\n\nSegue a proposta.',
+    });
+    expect(parseRewrite('**Assunto:** "Reunião sexta"\nOlá Ana')).toEqual({
+      subject: 'Reunião sexta',
+      text: 'Olá Ana',
+    });
+    expect(parseRewrite('Olá Ana, tudo bem?')).toEqual({ subject: '', text: 'Olá Ana, tudo bem?' });
+  });
+
+  it('respostas e reencaminhamentos mantêm o assunto', async () => {
+    const { keepsSubject } = await import('@/modules/webmail/hooks/useAiRewrite');
+    expect(keepsSubject('RE: Proposta')).toBe(true);
+    expect(keepsSubject('Fwd: Fatura')).toBe(true);
+    expect(keepsSubject('Proposta')).toBe(false);
+  });
+});

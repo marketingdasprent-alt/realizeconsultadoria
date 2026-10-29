@@ -21,9 +21,10 @@ export const rewritePrompt = (mode: RewriteMode, writerName: string) =>
   `Reescreve o texto do email que te derem, em português de Portugal (nunca do Brasil: "está a fazer", "telemóvel", "equipa", "facto"). ` +
   `${GOALS[mode]} ` +
   `Mantém exatamente os nomes, datas, horas, números, valores, endereços de email e ligações. ` +
-  `Não inventes informação, compromissos nem anexos. Não escrevas o assunto nem a assinatura com o nome (a assinatura é posta à parte). ` +
+  `Não inventes informação, compromissos nem anexos. Não escrevas a assinatura com o nome (a assinatura é posta à parte). ` +
   `Usa texto simples, sem markdown (nada de **, # ou listas com *). ` +
-  `Devolve só o texto final do email, sem comentários nem explicações antes ou depois.`;
+  `Escreve também um assunto curto e claro (até 8 palavras) para o email. ` +
+  `Responde exatamente neste formato, sem mais nada antes ou depois:\nASSUNTO: <o assunto>\n\n<o texto do email>`;
 
 /** O pedido à IA: o texto e, se for uma resposta, o email a que se responde (só contexto). */
 export const rewriteUserMessage = (text: string, subject: string, context: string) =>
@@ -36,6 +37,20 @@ export const rewriteUserMessage = (text: string, subject: string, context: strin
   ]
     .filter(Boolean)
     .join('\n\n');
+
+/** Separa o assunto ("ASSUNTO: ...") do texto do email que o modelo devolve. */
+export const parseRewrite = (raw: string): { subject: string; text: string } => {
+  const lines = raw.trim().replace(/\*\*/g, '').split('\n');
+  const index = lines.findIndex(line => /^\s*assunto\s*:/i.test(line));
+  // O assunto vem na primeira linha (às vezes depois de "Aqui está…").
+  if (index < 0 || index > 2) return { subject: '', text: cleanRewrite(raw) };
+  const subject = lines[index]
+    .replace(/^\s*assunto\s*:\s*/i, '')
+    .replace(/^["“<](.*)["”>]$/, '$1')
+    .trim()
+    .slice(0, 200);
+  return { subject, text: cleanRewrite(lines.slice(index + 1).join('\n')) };
+};
 
 /** Limpa o que o modelo devolve: aspas à volta, "Assunto:", markdown e espaços a mais. */
 export const cleanRewrite = (raw: string) =>

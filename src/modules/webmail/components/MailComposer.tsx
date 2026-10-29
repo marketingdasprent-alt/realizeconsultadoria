@@ -14,6 +14,7 @@ import { AiRewriteBar } from './AiRewriteBar';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import { useDraftSaver } from '../hooks/useDraftSaver';
+import { useAiRewrite } from '../hooks/useAiRewrite';
 import { composeSession } from '../lib/composeSession';
 import type { ContactEntry, ContactList } from '../lib/recipients';
 import { draftHasContent, stripSavedSignature } from '../lib/savedDraft';
@@ -188,6 +189,14 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   }, [draft]);
 
   const set = (key: keyof typeof fields, value: string) => setFields(f => ({ ...f, [key]: value }));
+  // "Usar IA": continua com a janela minimizada (o pedido vive aqui, não no botão).
+  const minimizedRef = useRef(minimized);
+  minimizedRef.current = minimized;
+  const ai = useAiRewrite(result => {
+    setFields(f => ({ ...f, body: result.text, subject: result.subject }));
+    if (minimizedRef.current)
+      toast({ title: 'A IA terminou o email', description: 'Abra a mensagem para rever.' });
+  });
   const size = files.reduce((total, file) => total + file.size, 0);
   const to = parseRecipients(fields.to);
   const sender = accounts.find(a => a.id === (accountId || fallback?.id));
@@ -338,7 +347,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
             className="min-w-0 flex-1 truncate text-left text-[14px] font-bold"
             title="Abrir a mensagem"
           >
-            {fields.subject.trim() || title}
+            {ai.busy && <Loader2 className="mr-1.5 inline h-3.5 w-3.5 animate-spin" />}
+            {ai.busy ? 'A IA está a escrever…' : fields.subject.trim() || title}
           </button>
           <button
             type="button"
@@ -489,10 +499,17 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               className="min-h-[96px]"
             />
             <AiRewriteBar
-              text={fields.body}
-              subject={fields.subject}
-              context={quote}
-              onChange={value => set('body', value)}
+              empty={!fields.body.trim()}
+              busy={ai.busy}
+              canUndo={!!ai.undoFor(fields.body)}
+              onRun={mode =>
+                void ai.run(mode, { text: fields.body, subject: fields.subject }, quote)
+              }
+              onUndo={() => {
+                const before = ai.undoFor(fields.body);
+                if (before) setFields(f => ({ ...f, body: before.text, subject: before.subject }));
+                ai.clearUndo();
+              }}
             />
             {signatureHtml && (
               // Já limpa (sem scripts nem eventos): é a assinatura da própria pessoa. Muda-se em cima.

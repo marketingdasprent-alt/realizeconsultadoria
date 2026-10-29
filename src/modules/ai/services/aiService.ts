@@ -82,13 +82,16 @@ export const chat = async (
 
 export type RewriteMode = 'complete' | 'formal' | 'short' | 'fix';
 
-/** "Usar IA" no email: devolve o texto reescrito (o modelo da empresa, no servidor). */
+/** "Usar IA" no email: o texto reescrito e um assunto sugerido (o modelo da empresa, no servidor). */
 export const rewriteText = async (
   input: { text: string; mode: RewriteMode; subject?: string; context?: string },
   signal?: AbortSignal
-): Promise<string> => {
-  const body = await callFunction<{ text: string }>({ action: 'rewrite', ...input }, signal);
-  return body.text ?? '';
+): Promise<{ text: string; subject: string }> => {
+  const body = await callFunction<{ text: string; subject?: string }>(
+    { action: 'rewrite', ...input },
+    signal
+  );
+  return { text: body.text ?? '', subject: body.subject ?? '' };
 };
 
 /** Grava o que a pessoa confirmou. */

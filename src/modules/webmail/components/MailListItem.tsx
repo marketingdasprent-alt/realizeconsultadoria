@@ -35,6 +35,12 @@ export const MailListItem: React.FC<MailListItemProps> = ({ mail, ...props }) =>
     run();
   };
   const checkbox = props.isSelected || props.selecting;
+  // Rascunhos não têm remetente: mostra-se para quem é (como no Outlook).
+  const who = mail.from
+    ? nameOf(mail.from)
+    : mail.to.length
+      ? `Para ${mail.to.map(nameOf).join(', ')}`
+      : '(rascunho sem destinatário)';
   return (
     <li>
       <div
@@ -65,7 +71,7 @@ export const MailListItem: React.FC<MailListItemProps> = ({ mail, ...props }) =>
               checkbox ? 'invisible' : '[@media(hover:hover)]:group-hover:invisible'
             )}
           >
-            <UserAvatar name={nameOf(mail.from)} size="md" />
+            <UserAvatar name={who} size="md" />
           </span>
           <span
             className={cn(
@@ -101,7 +107,7 @@ export const MailListItem: React.FC<MailListItemProps> = ({ mail, ...props }) =>
                 mail.unread ? 'font-extrabold' : 'font-semibold'
               )}
             >
-              {nameOf(mail.from)}
+              {who}
             </span>
             <span
               className={cn(

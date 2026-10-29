@@ -2,6 +2,7 @@ import React from 'react';
 import { format } from 'date-fns';
 import { AlertCircle, Ban, CheckCheck, Clock3, RotateCw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { richTextParts } from '@/modules/social/lib/richText';
 import { useOptionalMessenger } from '../context/useMessengerApi';
 import type { ChatMessage } from '../types';
 import { AudioAttachment } from './attachments/AudioAttachment';
@@ -37,7 +38,22 @@ const Body: React.FC<{ message: ChatMessage }> = ({ message }) => {
         <span
           className={cn('block whitespace-pre-wrap break-words', message.kind !== 'text' && 'mt-2')}
         >
-          {message.text}
+          {richTextParts(message.text).map((part, index) =>
+            part.kind === 'link' ? (
+              <a
+                key={index}
+                href={part.href}
+                target="_blank"
+                rel="noopener noreferrer"
+                onClick={event => event.stopPropagation()}
+                className="break-all font-semibold underline underline-offset-2 hover:opacity-80"
+              >
+                {part.value}
+              </a>
+            ) : (
+              <React.Fragment key={index}>{part.value}</React.Fragment>
+            )
+          )}
         </span>
       )}
     </>

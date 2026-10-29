@@ -31,6 +31,7 @@ import {
 } from '../hooks/useMailbox';
 import { FOLDERS, draftFrom, mailKey } from '../lib/mailFormat';
 import { draftFromSaved } from '../lib/savedDraft';
+import { composeSession } from '../lib/composeSession';
 import { mailService } from '../services/mailService';
 import { readSidebarWidth, saveSidebarWidth } from '../lib/sidebarWidth';
 import { providerOf, type MailProvider } from '../lib/providers';
@@ -48,8 +49,12 @@ const WebmailPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<MailSummary | null>(null);
-  const [draft, setDraftState] = useState<ComposeDraft | null>(null);
-  const [composerMinimized, setComposerMinimized] = useState(false);
+  // Uma mensagem que ficou a meio ao sair do Email volta, minimizada.
+  const [draft, setDraftState] = useState<ComposeDraft | null>(() => composeSession.get());
+  const [composerMinimized, setComposerMinimized] = useState(() => !!composeSession.get());
+  useEffect(() => {
+    if (!draft) composeSession.set(null);
+  }, [draft]);
   // Com uma mensagem já aberta (ou minimizada) não se abre outra por cima: volta-se a ela.
   const setDraft = (next: ComposeDraft | null) => {
     if (next && draft) {

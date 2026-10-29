@@ -14,6 +14,7 @@ import { AiRewriteBar } from './AiRewriteBar';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import { useDraftSaver } from '../hooks/useDraftSaver';
+import { composeSession } from '../lib/composeSession';
 import type { ContactEntry, ContactList } from '../lib/recipients';
 import { draftHasContent, stripSavedSignature } from '../lib/savedDraft';
 import type { ComposeDraft, ComposeInput, MailAccount } from '../types';
@@ -112,6 +113,24 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     const account =
       list.find(a => a.id === draft.accountId) ?? list.find(a => a.isDefault) ?? list[0];
     setAccountId(account?.id ?? '');
+    // Voltou ao Email com uma mensagem a meio: fica tudo como estava.
+    if (draft.resume) {
+      setFields({
+        to: draft.to ?? '',
+        cc: draft.cc ?? '',
+        bcc: draft.bcc ?? '',
+        subject: draft.subject ?? '',
+        body: draft.body ?? '',
+      });
+      setQuote(draft.resume.quote);
+      setShowCc(draft.resume.showCc);
+      setSigChoice(draft.resume.signature);
+      setFiles(draft.resume.files);
+      setMissingFiles([]);
+      setLoadingFiles(0);
+      setBusy(false);
+      return;
+    }
     // Rascunho reaberto: a assinatura sai do texto e volta ao seletor (completa, com imagens).
     let written = writtenPart(draft.body ?? '');
     let choice: SignatureChoice = 'default';
@@ -212,8 +231,13 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     files.map(file => [file.name, file.size]),
   ]);
   const initialSaved = useMemo(
-    () => (draft?.saved ? { id: draft.saved.messageId, accountId: draft.saved.accountId } : null),
-    [draft?.saved]
+    () =>
+      draft?.resume
+        ? draft.resume.saved
+        : draft?.saved
+          ? { id: draft.saved.messageId, accountId: draft.saved.accountId }
+          : null,
+    [draft?.saved, draft?.resume]
   );
   const saver = useDraftSaver({
     open: !!draft,
@@ -222,6 +246,31 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     initial: initialSaved,
     build: buildInput,
   });
+  // Guarda a mensagem como está, para não se perder ao ir a outra página da app e voltar.
+  const saverRef = useRef(saver);
+  saverRef.current = saver;
+  useEffect(() => {
+    if (!draft) return;
+    // Ainda sem nada escrito: não vale a pena reabrir.
+    if (!hasContent) return composeSession.set(null);
+    composeSession.set({
+      ...draft,
+      accountId: accountId || draft.accountId,
+      to: fields.to,
+      cc: fields.cc,
+      bcc: fields.bcc,
+      subject: fields.subject,
+      body: fields.body,
+      resume: {
+        quote,
+        signature: sigChoice,
+        showCc,
+        files,
+        saved: saverRef.current.current(),
+      },
+    });
+  }, [draft, hasContent, accountId, fields, quote, sigChoice, showCc, files, saver.status]);
+
   const close = async () => {
     // Fechar sem mexer em nada (ex.: abriu uma resposta e desistiu) não cria rascunho.
     if (!hasContent || loadingFiles > 0 || !saver.isDirty()) return onClose();

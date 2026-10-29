@@ -137,6 +137,17 @@ export interface ComposeDraft {
   };
   /** Responder: a citação do email original em HTML (vai no lugar dos "> " do texto). */
   replyHtml?: string;
+  /**
+   * Mensagem que já estava a ser escrita (saiu do Email e voltou): reabre exatamente como
+   * estava, com a citação, a assinatura escolhida, os anexos e o rascunho já guardado.
+   */
+  resume?: {
+    quote: string;
+    signature: string;
+    showCc: boolean;
+    files: File[];
+    saved: { id: string; accountId: string } | null;
+  };
   /** Reencaminhar: o HTML original e os anexos a voltar a anexar. */
   forward?: {
     messageId: string;

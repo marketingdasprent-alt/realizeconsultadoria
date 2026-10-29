@@ -291,6 +291,7 @@ const WebmailPage: React.FC = () => {
             onOpenAttachment={(mail, attachment) =>
               setPreview({ accountId: mail.accountId, messageId: mail.id, attachment })
             }
+            onWrite={address => setDraft({ accountId: selected.accountId, to: address.email })}
           />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-rz-muted">

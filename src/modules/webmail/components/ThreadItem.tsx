@@ -5,18 +5,25 @@ import { ChevronDown, Loader2, Paperclip } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useMailMessage } from '../hooks/useMailbox';
-import { formatAddressList, nameOf } from '../lib/mailFormat';
-import type { MailAttachmentInfo, MailMessage, MailSummary } from '../types';
+import { nameOf } from '../lib/mailFormat';
+import type { MailAddress, MailAttachmentInfo, MailMessage, MailSummary } from '../types';
 import { MailBody } from './MailBody';
+import { MailRecipients } from './MailRecipients';
 
 interface ThreadItemProps {
   mail: MailSummary;
   onDownload: (message: MailMessage, attachmentId: string) => void;
   onOpenAttachment: (message: MailMessage, attachment: MailAttachmentInfo) => void;
+  onWrite?: (address: MailAddress) => void;
 }
 
 /** Outra mensagem da conversa: fechada mostra quem, quando e o início; aberta, o email todo. */
-export const ThreadItem: React.FC<ThreadItemProps> = ({ mail, onDownload, onOpenAttachment }) => {
+export const ThreadItem: React.FC<ThreadItemProps> = ({
+  mail,
+  onDownload,
+  onOpenAttachment,
+  onWrite,
+}) => {
   const [open, setOpen] = useState(false);
   // Só carrega o corpo quando se abre.
   const { message, isLoading } = useMailMessage(open ? mail : null);
@@ -53,10 +60,9 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({ mail, onDownload, onOpen
       </button>
       {open && (
         <div className="px-4 pb-4">
-          <p className="truncate text-[12.5px] text-rz-muted">
-            Para {formatAddressList(message?.to ?? mail.to) || '—'}
-            {message?.cc.length ? ` · Cc ${formatAddressList(message.cc)}` : ''}
-          </p>
+          <div className="text-[12.5px]">
+            <MailRecipients to={message?.to ?? mail.to} cc={message?.cc ?? []} onWrite={onWrite} />
+          </div>
           {isLoading || !message ? (
             <p className="mt-3 flex items-center gap-2 text-[12.5px] text-rz-muted">
               <Loader2 className="h-4 w-4 animate-spin text-rz-primary" /> A abrir…

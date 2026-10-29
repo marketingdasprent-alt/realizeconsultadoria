@@ -18,10 +18,11 @@ import {
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useMailThread } from '../hooks/useMailbox';
-import { formatAddressList, nameOf } from '../lib/mailFormat';
+import { nameOf } from '../lib/mailFormat';
 import { printMail } from '../lib/printMail';
-import type { MailAttachmentInfo, MailMessage, MailSummary } from '../types';
+import type { MailAddress, MailAttachmentInfo, MailMessage, MailSummary } from '../types';
 import { MailBody } from './MailBody';
+import { AddressChip, MailRecipients } from './MailRecipients';
 import { ThreadItem } from './ThreadItem';
 
 export type ReaderAction =
@@ -55,6 +56,8 @@ interface MailReaderProps {
   onDownload: (message: MailMessage, attachmentId: string) => void;
   /** Abrir o anexo dentro do Realize (pré-visualização). */
   onOpenAttachment: (message: MailMessage, attachment: MailAttachmentInfo) => void;
+  /** Carregar numa pessoa do cabeçalho: email novo para ela. */
+  onWrite?: (address: MailAddress) => void;
 }
 
 /** Ler um email: cabeçalho, ações (incl. tarefa/evento), corpo isolado num iframe e anexos. */
@@ -66,6 +69,7 @@ export const MailReader: React.FC<MailReaderProps> = ({
   onAction,
   onDownload,
   onOpenAttachment,
+  onWrite,
 }) => {
   const thread = useMailThread(summary);
   // A conversa, a resposta mais recente em cima; sem outras mensagens, só o email aberto.
@@ -83,13 +87,18 @@ export const MailReader: React.FC<MailReaderProps> = ({
         <UserAvatar name={nameOf(summary.from)} size="md" />
         <div className="min-w-0 flex-1 text-[13px]">
           <p className="truncate">
-            <b className="text-[14px]">{nameOf(summary.from)}</b>{' '}
+            {summary.from ? (
+              <AddressChip
+                address={summary.from}
+                onWrite={onWrite}
+                className="text-[14px] font-bold"
+              />
+            ) : (
+              <b className="text-[14px]">{nameOf(summary.from)}</b>
+            )}{' '}
             <span className="text-rz-muted">{summary.from?.email}</span>
           </p>
-          <p className="truncate text-rz-muted">
-            Para {formatAddressList(message?.to ?? summary.to) || '—'}
-            {message?.cc.length ? ` · Cc ${formatAddressList(message.cc)}` : ''}
-          </p>
+          <MailRecipients to={message?.to ?? summary.to} cc={message?.cc ?? []} onWrite={onWrite} />
         </div>
         <time className="shrink-0 text-[12px] text-rz-muted">
           {format(new Date(summary.date), 'd MMM yyyy, HH:mm', { locale: pt })}
@@ -185,6 +194,7 @@ export const MailReader: React.FC<MailReaderProps> = ({
                   mail={mail}
                   onDownload={onDownload}
                   onOpenAttachment={onOpenAttachment}
+                  onWrite={onWrite}
                 />
               )
             )}

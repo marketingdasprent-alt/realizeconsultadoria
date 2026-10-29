@@ -7,6 +7,8 @@ import {
   caretRangeAt,
   dragHasFiles,
   imageFilesOf,
+  defaultSignatureWidth,
+  naturalWidthOf,
   prepareSignatureImage,
 } from '../lib/signatureEditing';
 import { uploadSignatureImage } from '../services/signatureService';
@@ -70,12 +72,17 @@ export const SignatureEditor: React.FC<SignatureEditorProps> = ({ initial, onCha
     if (!files.length) return;
     setUploading(true);
     for (const original of files) {
-      const { url, error } = await uploadSignatureImage(await prepareSignatureImage(original));
+      const prepared = await prepareSignatureImage(original);
+      const { url, error } = await uploadSignatureImage(prepared);
       if (!url) {
         toast({ title: error ?? 'A imagem não foi enviada', variant: 'destructive' });
         continue;
       }
-      command('insertHTML', `<img src="${url}" width="160" alt="">`);
+      const width = defaultSignatureWidth((await naturalWidthOf(prepared)) || 320);
+      command(
+        'insertHTML',
+        `<img src="${url}" width="${width}" style="width:${width}px;max-width:100%;height:auto" alt="">`
+      );
     }
     setUploading(false);
   };

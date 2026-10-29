@@ -24,11 +24,51 @@ export const dragHasFiles = (transfer: DataTransfer | null): boolean =>
 export const imageFilesOf = (files: FileList | File[] | null | undefined): File[] =>
   Array.from(files ?? []).filter(file => file.type.startsWith('image/'));
 
-const MAX_SIDE = 900;
+/**
+ * Largura máxima a que uma imagem aparece no email (a largura habitual de um email).
+ * O ficheiro guarda o dobro dos pontos: fica nítido nos ecrãs de alta resolução.
+ */
+export const SIGNATURE_MAX_WIDTH = 600;
+const MAX_SIDE = SIGNATURE_MAX_WIDTH * 2;
 
 /**
- * As imagens da assinatura têm 5 MB de limite; as acima de 400 KB são reduzidas (até 900 px)
- * antes de enviar para o email não pesar. GIFs animados ficam como estão.
+ * Largura a que a imagem aparece ao entrar na assinatura. As grandes (feitas com mais pontos
+ * para ficarem nítidas) mostram-se a metade, até 600 px; as pequenas ficam como são.
+ */
+export const defaultSignatureWidth = (naturalWidth: number): number =>
+  Math.round(Math.min(SIGNATURE_MAX_WIDTH, naturalWidth >= 400 ? naturalWidth / 2 : naturalWidth));
+
+/**
+ * Põe a largura na imagem de forma que todos os programas de email respeitem: o atributo
+ * (Outlook) e o estilo com max-width (Gmail e telemóveis encolhem-na para caber no ecrã).
+ * Sem largura: o tamanho real, mas nunca mais larga que o ecrã.
+ */
+export const applySignatureWidth = (image: HTMLImageElement, width: number | null) => {
+  image.removeAttribute('height');
+  if (width) {
+    image.setAttribute('width', String(width));
+    image.setAttribute('style', `width:${width}px;max-width:100%;height:auto`);
+  } else {
+    image.removeAttribute('width');
+    image.setAttribute('style', 'max-width:100%;height:auto');
+  }
+};
+
+/** Largura real da imagem, em pontos (0 se não se conseguir ler). */
+export const naturalWidthOf = async (file: File): Promise<number> => {
+  try {
+    const bitmap = await createImageBitmap(file);
+    const width = bitmap.width;
+    bitmap.close();
+    return width;
+  } catch {
+    return 0;
+  }
+};
+
+/**
+ * As imagens da assinatura têm 5 MB de limite; as acima de 400 KB são reduzidas (até 1200 px,
+ * o dobro do que aparece) antes de enviar para o email não pesar. GIFs animados ficam como estão.
  */
 export const prepareSignatureImage = async (file: File): Promise<File> => {
   if (file.type === 'image/gif' || file.size < 400 * 1024) return file;

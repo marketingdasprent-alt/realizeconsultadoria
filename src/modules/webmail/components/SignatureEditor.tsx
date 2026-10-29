@@ -8,6 +8,7 @@ import {
   dragHasFiles,
   imageFilesOf,
   defaultSignatureWidth,
+  isHeavyGif,
   naturalWidthOf,
   prepareSignatureImage,
 } from '../lib/signatureEditing';
@@ -73,6 +74,12 @@ export const SignatureEditor: React.FC<SignatureEditorProps> = ({ initial, onCha
     setUploading(true);
     for (const original of files) {
       const prepared = await prepareSignatureImage(original);
+      if (isHeavyGif(original) && prepared.type !== 'image/gif')
+        toast({
+          title: 'O GIF ficou imagem fixa',
+          description:
+            'Tinha mais de 1 MB e o Gmail não o mostrava. Para manter a animação, exporte o GIF com até 1200 px de largura e menos de 1 MB.',
+        });
       const { url, error } = await uploadSignatureImage(prepared);
       if (!url) {
         toast({ title: error ?? 'A imagem não foi enviada', variant: 'destructive' });

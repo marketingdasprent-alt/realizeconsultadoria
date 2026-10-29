@@ -31,3 +31,13 @@ describe('assinatura guardada', () => {
     expect(clean).toContain('max-width:100%');
   });
 });
+
+describe('GIF pesado', () => {
+  it('acima de 1 MB conta como pesado; leves e outras imagens não', async () => {
+    const { isHeavyGif } = await import('../signatureEditing');
+    const file = (type: string, size: number) => new File([new Uint8Array(size)], 'a', { type });
+    expect(isHeavyGif(file('image/gif', 3_600_000))).toBe(true);
+    expect(isHeavyGif(file('image/gif', 500_000))).toBe(false);
+    expect(isHeavyGif(file('image/png', 3_600_000))).toBe(false);
+  });
+});

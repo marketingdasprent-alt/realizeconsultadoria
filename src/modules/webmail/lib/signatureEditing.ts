@@ -67,11 +67,18 @@ export const naturalWidthOf = async (file: File): Promise<number> => {
 };
 
 /**
+ * GIF acima de 1 MB: o Gmail (que passa as imagens pelo seu proxy) muitas vezes não o mostra.
+ * Estes passam a imagem fixa (o primeiro quadro), nítida e leve.
+ */
+export const isHeavyGif = (file: File) => file.type === 'image/gif' && file.size > 1024 * 1024;
+
+/**
  * As imagens da assinatura têm 5 MB de limite; as acima de 400 KB são reduzidas (até 1200 px,
- * o dobro do que aparece) antes de enviar para o email não pesar. GIFs animados ficam como estão.
+ * o dobro do que aparece) antes de enviar para o email não pesar. GIFs animados leves ficam
+ * como estão; os pesados ficam imagem fixa (ver isHeavyGif).
  */
 export const prepareSignatureImage = async (file: File): Promise<File> => {
-  if (file.type === 'image/gif' || file.size < 400 * 1024) return file;
+  if (file.type === 'image/gif' ? !isHeavyGif(file) : file.size < 400 * 1024) return file;
   try {
     const bitmap = await createImageBitmap(file);
     const scale = Math.min(1, MAX_SIDE / Math.max(bitmap.width, bitmap.height));

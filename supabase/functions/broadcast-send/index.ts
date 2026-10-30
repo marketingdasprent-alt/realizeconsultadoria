@@ -159,11 +159,20 @@ serve(async (req: Request) => {
   // Assinatura de email de quem envia (só as próprias; o HTML é limpo antes de entrar).
   let signatureHtml: string | null = null;
   if (typeof body?.signatureId === 'string') {
+    // As da própria conta e as da conta ligada (admin ↔ colaborador).
+    const { data: linked } = await db
+      .from('employees')
+      .select('user_id, admin_user_id')
+      .or(`admin_user_id.eq.${caller.userId},user_id.eq.${caller.userId}`);
+    const owners = [
+      caller.userId,
+      ...(linked ?? []).flatMap(row => [row.user_id, row.admin_user_id]),
+    ].filter((id): id is string => !!id);
     const { data: signature } = await db
       .from('mail_signatures')
       .select('html')
       .eq('id', body.signatureId)
-      .eq('user_id', caller.userId)
+      .in('user_id', owners)
       .maybeSingle();
     signatureHtml = signature?.html ? cleanSignatureHtml(signature.html) : null;
   }

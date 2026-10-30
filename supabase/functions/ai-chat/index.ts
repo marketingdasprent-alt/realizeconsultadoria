@@ -278,7 +278,14 @@ serve(async (req: Request) => {
   // o assistente com dados pessoais continua só para colaboradores.
   if (!employee && body.action === 'rewrite') {
     const { data: isAdmin } = await admin.rpc('has_role', { _user_id: userId, _role: 'admin' });
-    if (isAdmin) {
+    const { data: linked } = await admin
+      .from('employees')
+      .select('name')
+      .eq('admin_user_id', userId)
+      .limit(1)
+      .maybeSingle();
+    if (isAdmin && linked) employee = { name: linked.name, company_id: null };
+    else if (isAdmin) {
       const { data: profile } = await admin
         .from('profiles')
         .select('name')

@@ -128,17 +128,12 @@ export const broadcastService = {
     return error || !data?.ok ? null : data.sent;
   },
 
-  /** As minhas assinaturas do Webmail (a predefinida primeiro), para assinar o comunicado. */
+  /**
+   * As minhas assinaturas do Webmail, também as da conta de colaborador ligada à de admin.
+   * Primeiro a da caixa com o endereço com que entrei, depois as predefinidas.
+   */
   mySignatures: async (): Promise<BroadcastSignature[]> => {
-    const { data: session } = await supabase.auth.getSession();
-    const userId = session.session?.user.id;
-    if (!userId) return [];
-    const { data } = await supabase
-      .from('mail_signatures')
-      .select('id, name, html, is_default')
-      .eq('user_id', userId)
-      .order('is_default', { ascending: false })
-      .order('name');
+    const { data } = await supabase.rpc('broadcast_signatures');
     return data ?? [];
   },
 

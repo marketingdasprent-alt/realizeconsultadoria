@@ -45,7 +45,10 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [saved] = useState(readSaved);
-  const [draft, setDraft] = useState<BroadcastDraft>(() => saved?.draft ?? emptyDraft());
+  // A assinatura volta a ser escolhida (a predefinida) se tinha ficado "só o nome".
+  const [draft, setDraft] = useState<BroadcastDraft>(() =>
+    saved ? { ...saved.draft, signatureId: saved.draft.signatureId ?? undefined } : emptyDraft()
+  );
   const [audience, setAudience] = useState<Audience>(() => saved?.audience ?? emptyAudience());
   const [publishInApp, setPublishInApp] = useState(saved?.publishInApp ?? true);
   const [attachments, setAttachments] = useState<BroadcastAttachment[]>(

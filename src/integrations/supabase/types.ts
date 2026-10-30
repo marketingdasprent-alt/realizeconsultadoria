@@ -3917,6 +3917,16 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      broadcast_signatures: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id: string;
+          name: string;
+          html: string;
+          is_default: boolean;
+          account_email: string;
+        }[];
+      };
       chat_add_members: {
         Args: { _conversation_id: string; _user_ids: string[] };
         Returns: number;

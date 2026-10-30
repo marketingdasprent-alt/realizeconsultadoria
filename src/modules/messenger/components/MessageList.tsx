@@ -15,6 +15,9 @@ interface MessageListProps {
   hasOlder: boolean;
   onLoadOlder: () => void;
   handlers: MessageActionHandlers;
+  /** Mensagens escolhidas para encaminhar (null = sem seleção). */
+  selection?: string[] | null;
+  onToggleSelect?: (id: string) => void;
 }
 
 const dayKey = (iso: string) => new Date(iso).toDateString();
@@ -27,6 +30,8 @@ export const MessageList: React.FC<MessageListProps> = ({
   hasOlder,
   onLoadOlder,
   handlers,
+  selection,
+  onToggleSelect,
 }) => {
   const endRef = useRef<HTMLDivElement>(null);
   const lastIdRef = useRef<string | null>(null);
@@ -87,6 +92,9 @@ export const MessageList: React.FC<MessageListProps> = ({
                 isSelected={selectedId === message.id}
                 onSelect={setSelectedId}
                 isMatch={!!term && matchesText(term, message.text)}
+                selecting={!!selection}
+                checked={!!selection?.includes(message.id)}
+                onToggleCheck={onToggleSelect}
                 {...handlers}
               />
             </React.Fragment>

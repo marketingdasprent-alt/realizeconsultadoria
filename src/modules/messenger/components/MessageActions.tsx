@@ -1,5 +1,6 @@
 import React from 'react';
 import {
+  CheckSquare,
   Copy,
   Forward,
   ListChecks,
@@ -29,6 +30,8 @@ export interface MessageActionHandlers {
   onCopy: (message: ChatMessage) => void;
   onCreateTask: (message: ChatMessage) => void;
   onForward: (message: ChatMessage) => void;
+  /** Começar a selecionar várias (para encaminhar de uma vez). */
+  onStartSelect?: (message: ChatMessage) => void;
 }
 
 const BUTTON =
@@ -44,6 +47,7 @@ export const MessageActions: React.FC<{ message: ChatMessage } & MessageActionHa
   onCopy,
   onCreateTask,
   onForward,
+  onStartSelect,
 }) => (
   <div
     className={cn(
@@ -96,6 +100,11 @@ export const MessageActions: React.FC<{ message: ChatMessage } & MessageActionHa
         <DropdownMenuItem className="rounded-xl" onClick={() => onForward(message)}>
           <Forward className="mr-2 h-4 w-4" /> Encaminhar
         </DropdownMenuItem>
+        {onStartSelect && (
+          <DropdownMenuItem className="rounded-xl" onClick={() => onStartSelect(message)}>
+            <CheckSquare className="mr-2 h-4 w-4" /> Selecionar várias
+          </DropdownMenuItem>
+        )}
         <DropdownMenuItem className="rounded-xl" onClick={() => onCreateTask(message)}>
           <ListChecks className="mr-2 h-4 w-4" /> Criar tarefa
         </DropdownMenuItem>

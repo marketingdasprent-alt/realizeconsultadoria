@@ -262,53 +262,63 @@ export const useMessengerActions = ({
 
   const forwardMessage = useCallback<Actions['forwardMessage']>(
     async (message, conversationIds) => {
+      // Várias: vão pela ordem em que foram escritas, como na conversa original.
+      const list = (Array.isArray(message) ? message : [message])
+        .slice()
+        .sort((a, b) => a.createdAt.localeCompare(b.createdAt));
       let failed = 0;
       for (const conversationId of conversationIds) {
-        try {
-          const attachment = message.attachment;
-          let path: string | null = null;
-          if (attachment?.path) {
-            const copy = await messengerService.copyFile(
-              attachment.path,
-              conversationId,
-              attachment.name
+        for (const message of list) {
+          try {
+            const attachment = message.attachment;
+            let path: string | null = null;
+            if (attachment?.path) {
+              const copy = await messengerService.copyFile(
+                attachment.path,
+                conversationId,
+                attachment.name
+              );
+              if (copy.error || !copy.data) throw copy.error ?? new Error('copy');
+              path = copy.data;
+            }
+            const { data, error } = await messengerService.insertMessage({
+              conversation_id: conversationId,
+              sender_id: user.userId,
+              kind: message.kind,
+              body: message.text?.trim() || null,
+              attachment_path: path,
+              attachment_name: path ? attachment?.name : null,
+              attachment_size: path ? attachment?.size : null,
+              attachment_mime: path ? attachment?.mime : null,
+              duration_sec: message.durationSec ?? null,
+              reply_to_id: null,
+            });
+            if (error || !data) throw error ?? new Error('insert');
+            qc.setQueryData(
+              CHAT_KEYS.thread(conversationId),
+              (cache: InfiniteData<MessageRow[]>) => (cache ? upsertThreadRow(cache, data) : cache)
             );
-            if (copy.error || !copy.data) throw copy.error ?? new Error('copy');
-            path = copy.data;
+          } catch {
+            failed += 1;
           }
-          const { data, error } = await messengerService.insertMessage({
-            conversation_id: conversationId,
-            sender_id: user.userId,
-            kind: message.kind,
-            body: message.text?.trim() || null,
-            attachment_path: path,
-            attachment_name: path ? attachment?.name : null,
-            attachment_size: path ? attachment?.size : null,
-            attachment_mime: path ? attachment?.mime : null,
-            duration_sec: message.durationSec ?? null,
-            reply_to_id: null,
-          });
-          if (error || !data) throw error ?? new Error('insert');
-          qc.setQueryData(CHAT_KEYS.thread(conversationId), (cache: InfiniteData<MessageRow[]>) =>
-            cache ? upsertThreadRow(cache, data) : cache
-          );
-        } catch {
-          failed += 1;
         }
       }
       refreshList();
+      const total = conversationIds.length * list.length;
       if (failed)
         fail(
-          failed === conversationIds.length
-            ? 'Não foi encaminhada.'
-            : 'Algumas conversas não receberam a mensagem.'
+          failed === total
+            ? list.length > 1
+              ? 'Não foram encaminhadas.'
+              : 'Não foi encaminhada.'
+            : 'Algumas mensagens não chegaram a todas as conversas.'
         );
       else
         toast({
-          title: conversationIds.length > 1 ? 'Mensagem encaminhada' : 'Mensagem encaminhada',
+          title: list.length > 1 ? `${list.length} mensagens encaminhadas` : 'Mensagem encaminhada',
           description:
             conversationIds.length > 1
-              ? `Enviada a ${conversationIds.length} conversas.`
+              ? `Enviadas a ${conversationIds.length} conversas.`
               : undefined,
         });
     },

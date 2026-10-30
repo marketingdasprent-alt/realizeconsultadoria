@@ -138,8 +138,11 @@ export interface MessengerApi {
   setGroupAvatar: (conversationId: string, file: File | null) => Promise<void>;
   /** URL temporário de um anexo privado. */
   getFileUrl: (path: string) => Promise<string | null>;
-  /** Reenvia uma mensagem (texto, imagem, ficheiro ou voz) para outras conversas. */
-  forwardMessage: (message: ChatMessage, conversationIds: string[]) => Promise<void>;
+  /** Reenvia uma ou várias mensagens (texto, imagem, ficheiro ou voz) para outras conversas. */
+  forwardMessage: (
+    message: ChatMessage | ChatMessage[],
+    conversationIds: string[]
+  ) => Promise<void>;
   /** Mensagem que falhou: tentar enviar outra vez. */
   retryMessage: (messageId: string) => Promise<void>;
   /** Mensagem que falhou: tirá-la da conversa. */

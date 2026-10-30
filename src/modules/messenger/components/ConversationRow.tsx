@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useRef, useState } from 'react';
 import { BellOff, Pin } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatListTime } from '../lib/format';
+import { dragHasFiles, dropToConversation } from '../lib/dropToConversation';
 import type { ConversationSummary } from '../types';
 import { ConversationAvatar } from './ConversationAvatar';
 
@@ -18,14 +19,46 @@ export const ConversationRow: React.FC<ConversationRowProps> = ({
   onSelect,
 }) => {
   const hasUnread = conversation.unread > 0;
+  // Arrastar ficheiros para cima: a conversa abre ao fim de um instante; largar anexa-os lá.
+  const [dragOver, setDragOver] = useState(false);
+  const openTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const stopTimer = () => {
+    if (openTimer.current) clearTimeout(openTimer.current);
+    openTimer.current = null;
+  };
   return (
     <button
       type="button"
       onClick={() => onSelect(conversation.id)}
+      onDragEnter={event => {
+        if (!dragHasFiles(event.dataTransfer) || !conversation.canPost) return;
+        event.preventDefault();
+        setDragOver(true);
+        if (!isActive && !openTimer.current)
+          openTimer.current = setTimeout(() => onSelect(conversation.id), 700);
+      }}
+      onDragOver={event => {
+        if (!dragHasFiles(event.dataTransfer) || !conversation.canPost) return;
+        event.preventDefault();
+        event.dataTransfer.dropEffect = 'copy';
+      }}
+      onDragLeave={() => {
+        setDragOver(false);
+        stopTimer();
+      }}
+      onDrop={event => {
+        if (!dragHasFiles(event.dataTransfer) || !conversation.canPost) return;
+        event.preventDefault();
+        setDragOver(false);
+        stopTimer();
+        dropToConversation(conversation.id, Array.from(event.dataTransfer.files));
+        onSelect(conversation.id);
+      }}
       aria-current={isActive ? 'true' : undefined}
       className={cn(
         'flex w-full items-center gap-3 rounded-2xl p-2.5 text-left transition-colors',
-        isActive ? 'bg-rz-primary-soft' : 'hover:bg-rz-canvas'
+        isActive ? 'bg-rz-primary-soft' : 'hover:bg-rz-canvas',
+        dragOver && 'bg-rz-primary-soft ring-2 ring-rz-primary/40'
       )}
     >
       <ConversationAvatar conversation={conversation} />

@@ -8,6 +8,8 @@ import { TaskFormDialog } from '@/modules/tasks/components/TaskFormDialog';
 import { useTasks } from '@/modules/tasks/hooks/useTasks';
 import { DeleteMessageDialog } from './DeleteMessageDialog';
 import { ForwardDialog } from './ForwardDialog';
+import { SelectionBar } from './composer/SelectionBar';
+import { onDropped, takeDropped } from '../lib/dropToConversation';
 import { RenameGroupDialog } from './RenameGroupDialog';
 import { GroupMembersSection } from './GroupMembersSection';
 import { MessageComposer } from './MessageComposer';
@@ -26,7 +28,13 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
   const [replyTo, setReplyTo] = useState<ChatMessage | null>(null);
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [toDelete, setToDelete] = useState<ChatMessage | null>(null);
-  const [toForward, setToForward] = useState<ChatMessage | null>(null);
+  const [toForward, setToForward] = useState<ChatMessage[] | null>(null);
+  // Escolher várias mensagens para encaminhar de uma vez.
+  const [selection, setSelection] = useState<string[] | null>(null);
+  const toggleSelect = (id: string) =>
+    setSelection(list =>
+      list ? (list.includes(id) ? list.filter(v => v !== id) : [...list, id]) : [id]
+    );
   // Quem se pode marcar com @: os outros membros da conversa.
   const directoryNames = new Map(api.directory.map(person => [person.userId, person.name]));
   const mentionPeople = api.members
@@ -45,6 +53,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
     setReplyTo(null);
     setEditing(null);
     setSearch(null);
+    setSelection(null);
   }, [conversation.id]);
 
   useEffect(() => {
@@ -53,7 +62,14 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
 
   // Ficheiros largados na conversa: vão para a bandeja da caixa de escrita (envio com Enter).
   const [staged, setStaged] = useState<File[]>([]);
-  useEffect(() => setStaged([]), [conversation.id]);
+  // Ficheiros largados em cima desta conversa na lista (ao abrir ou já aberta).
+  useEffect(() => {
+    setStaged(takeDropped(conversation.id));
+    return onDropped(() => {
+      const files = takeDropped(conversation.id);
+      if (files.length) setStaged(current => [...current, ...files].slice(0, 10));
+    });
+  }, [conversation.id]);
   const stageFiles = (files: File[]) => setStaged(current => [...current, ...files].slice(0, 10));
   const { isDragging, dropProps } = useFileDrop(stageFiles, conversation.canPost && !editing);
 
@@ -120,35 +136,51 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
             onDelete: setToDelete,
             onCopy: copy,
             onCreateTask: setTaskFrom,
-            onForward: setToForward,
+            onForward: message => setToForward([message]),
+            onStartSelect: message => setSelection([message.id]),
           }}
+          selection={selection}
+          onToggleSelect={toggleSelect}
         />
       )}
 
       <div className="pb-24 md:pb-0">
-        <MessageComposer
-          conversationId={conversation.id}
-          people={mentionPeople}
-          staged={staged}
-          onStagedChange={setStaged}
-          onSend={input => {
-            api.send(input);
-            setReplyTo(null);
-          }}
-          onEdit={(message, text) => {
-            api.editMessage(message.id, text);
-            setEditing(null);
-          }}
-          onTyping={api.notifyTyping}
-          replyTo={replyTo}
-          editing={editing}
-          onCancel={() => {
-            setReplyTo(null);
-            setEditing(null);
-          }}
-          disabled={!conversation.canPost}
-          disabledHint="Só quem gere este canal pode publicar"
-        />
+        {selection ? (
+          <SelectionBar
+            count={selection.length}
+            onCancel={() => setSelection(null)}
+            onForward={() => {
+              const chosen = api.messages.filter(m => selection.includes(m.id));
+              if (!chosen.length) return;
+              setToForward(chosen);
+              setSelection(null);
+            }}
+          />
+        ) : (
+          <MessageComposer
+            conversationId={conversation.id}
+            people={mentionPeople}
+            staged={staged}
+            onStagedChange={setStaged}
+            onSend={input => {
+              api.send(input);
+              setReplyTo(null);
+            }}
+            onEdit={(message, text) => {
+              api.editMessage(message.id, text);
+              setEditing(null);
+            }}
+            onTyping={api.notifyTyping}
+            replyTo={replyTo}
+            editing={editing}
+            onCancel={() => {
+              setReplyTo(null);
+              setEditing(null);
+            }}
+            disabled={!conversation.canPost}
+            disabledHint="Só quem gere este canal pode publicar"
+          />
+        )}
       </div>
 
       <TaskFormDialog
@@ -169,7 +201,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
         }
         onSave={tasks.create}
       />
-      <ForwardDialog message={toForward} onClose={() => setToForward(null)} />
+      <ForwardDialog messages={toForward} onClose={() => setToForward(null)} />
       <RenameGroupDialog
         group={renaming ? conversation : null}
         onClose={() => setRenaming(false)}

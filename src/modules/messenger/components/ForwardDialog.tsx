@@ -8,7 +8,8 @@ import type { ChatMessage } from '../types';
 import { ConversationAvatar } from './ConversationAvatar';
 
 interface ForwardDialogProps {
-  message: ChatMessage | null;
+  /** Uma ou várias mensagens (selecionadas na conversa). */
+  messages: ChatMessage[] | null;
   onClose: () => void;
 }
 
@@ -22,18 +23,19 @@ const preview = (message: ChatMessage) =>
         : (message.text ?? '');
 
 /** Escolher as conversas para onde encaminhar uma mensagem (texto, imagem, ficheiro ou voz). */
-export const ForwardDialog: React.FC<ForwardDialogProps> = ({ message, onClose }) => {
+export const ForwardDialog: React.FC<ForwardDialogProps> = ({ messages, onClose }) => {
+  const message = messages?.[0] ?? null;
   const api = useMessengerApi();
   const [query, setQuery] = useState('');
   const [selected, setSelected] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    if (!message) return;
+    if (!messages?.length) return;
     setQuery('');
     setSelected([]);
     setBusy(false);
-  }, [message]);
+  }, [messages]);
 
   const options = useMemo(
     () => api.conversations.filter(c => c.canPost && matchesText(query, c.title)),
@@ -44,21 +46,26 @@ export const ForwardDialog: React.FC<ForwardDialogProps> = ({ message, onClose }
     setSelected(list => (list.includes(id) ? list.filter(v => v !== id) : [...list, id]));
 
   const submit = async () => {
-    if (!message || !selected.length) return;
+    if (!messages?.length || !selected.length) return;
     setBusy(true);
-    await api.forwardMessage(message, selected);
+    await api.forwardMessage(messages, selected);
     setBusy(false);
     onClose();
   };
 
   return (
-    <Dialog open={!!message} onOpenChange={open => !open && onClose()}>
+    <Dialog open={!!messages?.length} onOpenChange={open => !open && onClose()}>
       <DialogContent className="flex max-h-[85vh] w-[94vw] max-w-md flex-col gap-0 overflow-hidden rounded-[28px] p-0">
         <div className="px-6 pb-3 pt-6">
           <DialogTitle className="text-xl font-extrabold">Encaminhar</DialogTitle>
           {message && (
             <p className="mt-2 line-clamp-2 rounded-2xl bg-rz-canvas px-3 py-2 text-[13px] text-rz-muted">
-              {preview(message)}
+              {messages && messages.length > 1
+                ? `${messages.length} mensagens: ${messages
+                    .slice(0, 3)
+                    .map(preview)
+                    .join(' · ')}${messages.length > 3 ? '…' : ''}`
+                : preview(message)}
             </p>
           )}
           <label className="mt-3 flex items-center gap-2 rounded-2xl bg-rz-canvas px-3 ring-1 ring-transparent focus-within:bg-white focus-within:ring-rz-primary/40">

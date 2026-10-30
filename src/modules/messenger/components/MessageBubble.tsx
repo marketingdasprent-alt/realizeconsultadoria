@@ -1,6 +1,6 @@
 import React from 'react';
 import { format } from 'date-fns';
-import { AlertCircle, Ban, CheckCheck, Clock3, RotateCw, X } from 'lucide-react';
+import { AlertCircle, Ban, Check, CheckCheck, Clock3, RotateCw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { richTextParts } from '@/modules/social/lib/richText';
 import { mentionParts } from '../lib/mentions';
@@ -21,6 +21,10 @@ interface MessageBubbleProps extends MessageActionHandlers {
   onSelect: (id: string | null) => void;
   /** Destaque da pesquisa na conversa. */
   isMatch?: boolean;
+  /** A escolher várias mensagens (para encaminhar): tocar marca ou desmarca. */
+  selecting?: boolean;
+  checked?: boolean;
+  onToggleCheck?: (id: string) => void;
 }
 
 /** Texto da mensagem: ligações clicáveis e os "@Nome" das pessoas marcadas em destaque. */
@@ -108,12 +112,35 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
   isSelected,
   onSelect,
   isMatch,
+  selecting,
+  checked,
+  onToggleCheck,
   ...handlers
 }) => {
   const mine = message.isMine;
   const canAct = !message.deleted && !message.pending && !message.failed;
+  const selectable = canAct && !!selecting;
   return (
-    <div className={cn('group flex flex-col', mine ? 'items-end' : 'items-start')}>
+    <div
+      onClick={selectable ? () => onToggleCheck?.(message.id) : undefined}
+      className={cn(
+        'group relative flex flex-col',
+        mine ? 'items-end' : 'items-start',
+        selectable && '-mx-2 cursor-pointer rounded-2xl px-2 py-0.5 pl-10',
+        selectable && checked && 'bg-rz-primary-soft/70'
+      )}
+    >
+      {selectable && (
+        <span
+          aria-hidden
+          className={cn(
+            'absolute left-2 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full ring-2',
+            checked ? 'bg-rz-primary text-white ring-rz-primary' : 'bg-white ring-rz-line'
+          )}
+        >
+          {checked && <Check className="h-3.5 w-3.5" strokeWidth={3} />}
+        </span>
+      )}
       {showAuthor && !mine && (
         <span className="mb-1 ml-3 text-xs font-semibold text-rz-primary">
           {message.authorName}
@@ -121,7 +148,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       )}
       <div className={cn('flex max-w-full items-center gap-2', mine && 'flex-row-reverse')}>
         <div
-          onClick={() => onSelect(isSelected ? null : message.id)}
+          onClick={() => !selecting && onSelect(isSelected ? null : message.id)}
           className={cn(
             'min-w-0 max-w-[min(34rem,78vw)] rounded-[22px] px-4 py-2.5 text-[14.5px] leading-relaxed shadow-sm transition-shadow',
             mine
@@ -158,7 +185,7 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
             {mine && message.read && <CheckCheck className="h-3.5 w-3.5" aria-label="Lida" />}
           </span>
         </div>
-        {canAct && (
+        {canAct && !selecting && (
           <div className={cn(!isSelected && 'hidden md:block')}>
             <MessageActions message={message} {...handlers} />
           </div>

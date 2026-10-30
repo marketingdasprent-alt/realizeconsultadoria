@@ -259,21 +259,37 @@ serve(async (req: Request) => {
   const userId = await authenticatedUserId(req, admin);
   if (!userId) return json({ ok: false, code: 'unauthorized' }, 401);
 
-  const { data: employee } = await admin
-    .from('employees')
-    .select('name, company_id')
-    .eq('user_id', userId)
-    .eq('is_active', true)
-    .limit(1)
-    .maybeSingle();
-  if (!employee) return json({ ok: false, code: 'forbidden' }, 403);
-
   let body: Record<string, unknown>;
   try {
     body = (await req.json()) as Record<string, unknown>;
   } catch {
     return json({ ok: false, code: 'bad_request' }, 400);
   }
+
+  const { data: found } = await admin
+    .from('employees')
+    .select('name, company_id')
+    .eq('user_id', userId)
+    .eq('is_active', true)
+    .limit(1)
+    .maybeSingle();
+  let employee: { name: string; company_id: string | null } | null = found;
+  // Admins sem ficha de colaborador também podem usar o "Usar IA" (email e comunicados);
+  // o assistente com dados pessoais continua só para colaboradores.
+  if (!employee && body.action === 'rewrite') {
+    const { data: isAdmin } = await admin.rpc('has_role', { _user_id: userId, _role: 'admin' });
+    if (isAdmin) {
+      const { data: profile } = await admin
+        .from('profiles')
+        .select('name')
+        .eq('id', userId)
+        .maybeSingle();
+      const { data: auth } = await admin.auth.admin.getUserById(userId);
+      const fallback = String(auth.user?.user_metadata?.name ?? auth.user?.email ?? 'a equipa');
+      employee = { name: profile?.name || fallback.split('@')[0], company_id: null };
+    }
+  }
+  if (!employee) return json({ ok: false, code: 'forbidden' }, 403);
 
   // Cliente com o JWT da pessoa: as regras de acesso da base de dados aplicam-se.
   const db = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
@@ -284,7 +300,8 @@ serve(async (req: Request) => {
   const ctx: ToolContext = {
     db,
     userId,
-    companyId: employee.company_id,
+    // Sem empresa só os admins do "Usar IA", que não chegam às ferramentas.
+    companyId: employee.company_id ?? '',
     now: new Date(),
     directory: async () => {
       if (!people) {

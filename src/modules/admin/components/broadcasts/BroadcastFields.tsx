@@ -71,23 +71,24 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
         />
       </Field>
       <Field id="bc-message" label="Mensagem" error={errors.message}>
-        <div className="relative">
-          <Textarea
-            id="bc-message"
-            ref={messageRef}
-            value={draft.message}
-            onChange={event => onChange({ message: event.target.value })}
-            placeholder="Escreva aqui. Uma linha em branco começa um parágrafo novo; endereços (https://…) ficam ligações."
-            className="min-h-[220px] pb-11 text-[14px] leading-relaxed"
-          />
+        <Textarea
+          id="bc-message"
+          ref={messageRef}
+          value={draft.message}
+          onChange={event => onChange({ message: event.target.value })}
+          placeholder="Escreva aqui. Uma linha em branco começa um parágrafo novo; endereços (https://…) ficam ligações."
+          className="min-h-[220px] text-[14px] leading-relaxed"
+        />
+        {/* Emoji e IA por baixo da caixa (dentro dela tapavam o texto ao deslizar). */}
+        <div className="flex flex-wrap items-start gap-1.5">
           <EmojiPicker
-            triggerClassName="absolute bottom-2 left-2 flex h-8 w-8 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-primary"
+            triggerClassName="mt-2 flex h-8 w-8 items-center justify-center rounded-full text-rz-muted ring-1 ring-rz-line hover:bg-rz-canvas hover:text-rz-primary"
             onPick={picked =>
               onChange({ message: insertAtCursor(messageRef.current, draft.message, picked) })
             }
           />
+          <BroadcastAi draft={draft} onChange={onChange} />
         </div>
-        <BroadcastAi draft={draft} onChange={onChange} />
       </Field>
       <Field id="bc-sender" label="Quem assina" error={errors.senderName}>
         <Input

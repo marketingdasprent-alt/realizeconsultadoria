@@ -6,6 +6,12 @@ import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { useDirectory } from '../hooks/useDirectory';
+import {
+  PEOPLE_GROUP_LABEL,
+  rankPeople,
+  readRecentPeople,
+  rememberRecentPerson,
+} from '../lib/peopleRanking';
 
 interface PeoplePickerProps {
   value: string[];
@@ -30,18 +36,25 @@ export const PeoplePicker: React.FC<PeoplePickerProps> = ({
   const [query, setQuery] = useState('');
   const [open, setOpen] = useState(false);
 
-  const options = useMemo(() => {
-    const people = [
-      ...(includeMe
-        ? [{ userId: user.userId, name: `${user.name} (eu)`, department: user.department }]
-        : []),
-      ...colleagues.map(p => ({ userId: p.userId, name: p.name, department: p.department })),
-    ];
-    const term = query;
-    return people.filter(p => matchesText(term, p.name, p.department));
-  }, [colleagues, includeMe, query, user]);
+  // Recentes (escolhidas há pouco neste browser), depois o meu departamento, depois as outras.
+  const [recent, setRecent] = useState(readRecentPeople);
+  const sections = useMemo(() => {
+    const me = includeMe
+      ? [{ userId: user.userId, name: `${user.name} (eu)`, department: user.department }]
+      : [];
+    const others = colleagues
+      .map(p => ({ userId: p.userId, name: p.name, department: p.department }))
+      .filter(p => matchesText(query, p.name, p.department));
+    const ranked = rankPeople(others, recent, user.department ?? null);
+    const mine = me.filter(p => matchesText(query, p.name, p.department));
+    return [...(mine.length ? [{ group: 'me' as const, people: mine }] : []), ...ranked];
+  }, [colleagues, includeMe, query, user, recent]);
 
   const toggle = (id: string) => {
+    if (!value.includes(id) && id !== user.userId) {
+      rememberRecentPerson(id);
+      setRecent(readRecentPeople());
+    }
     if (single) {
       onChange(value[0] === id ? [] : [id]);
       setOpen(false);
@@ -85,20 +98,31 @@ export const PeoplePicker: React.FC<PeoplePickerProps> = ({
             />
           </label>
           <ul className="rz-scroll max-h-60 overflow-y-auto">
-            {options.map(p => (
-              <li key={p.userId}>
-                <button
-                  type="button"
-                  onClick={() => toggle(p.userId)}
-                  className={cn(
-                    'flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13.5px] hover:bg-rz-canvas',
-                    value.includes(p.userId) && 'bg-rz-primary-soft'
-                  )}
-                >
-                  <UserAvatar name={p.name} userId={p.userId} size="xs" />
-                  <span className="min-w-0 flex-1 truncate font-semibold">{p.name}</span>
-                  {value.includes(p.userId) && <Check className="h-4 w-4 text-rz-primary" />}
-                </button>
+            {sections.map(section => (
+              <li key={section.group}>
+                {section.group !== 'me' && (
+                  <p className="px-2 pb-1 pt-2 text-[11px] font-bold uppercase tracking-wider text-rz-muted">
+                    {PEOPLE_GROUP_LABEL[section.group]}
+                  </p>
+                )}
+                <ul>
+                  {section.people.map(p => (
+                    <li key={p.userId}>
+                      <button
+                        type="button"
+                        onClick={() => toggle(p.userId)}
+                        className={cn(
+                          'flex w-full items-center gap-2.5 rounded-xl px-2 py-1.5 text-left text-[13.5px] hover:bg-rz-canvas',
+                          value.includes(p.userId) && 'bg-rz-primary-soft'
+                        )}
+                      >
+                        <UserAvatar name={p.name} userId={p.userId} size="xs" />
+                        <span className="min-w-0 flex-1 truncate font-semibold">{p.name}</span>
+                        {value.includes(p.userId) && <Check className="h-4 w-4 text-rz-primary" />}
+                      </button>
+                    </li>
+                  ))}
+                </ul>
               </li>
             ))}
           </ul>

@@ -26,7 +26,7 @@ export const BroadcastComposeTab: React.FC<BroadcastComposeTabProps> = ({
   onSent,
 }) => {
   const [confirming, setConfirming] = useState(false);
-  const reach = bc.recipients.length;
+  const reach = bc.reach;
 
   return (
     <div className="grid gap-5 xl:grid-cols-[minmax(0,1.1fr)_minmax(0,1fr)]">
@@ -39,8 +39,16 @@ export const BroadcastComposeTab: React.FC<BroadcastComposeTabProps> = ({
                 'A carregar…'
               ) : (
                 <>
-                  <strong className="text-rz-ink">{reach}</strong> por email
-                  {bc.missingEmail > 0 && ` · ${bc.missingEmail} sem email`}
+                  {bc.sendEmail ? (
+                    <>
+                      <strong className="text-rz-ink">{bc.recipients.length}</strong> por email
+                      {bc.missingEmail > 0 && ` · ${bc.missingEmail} sem email`}
+                    </>
+                  ) : (
+                    <>
+                      <strong className="text-rz-ink">{reach}</strong> só na app
+                    </>
+                  )}
                 </>
               )}
             </p>
@@ -67,6 +75,8 @@ export const BroadcastComposeTab: React.FC<BroadcastComposeTabProps> = ({
             onRemoveFile={bc.removeAttachment}
             publishInApp={bc.publishInApp}
             onPublishInApp={bc.setPublishInApp}
+            sendEmail={bc.sendEmail}
+            onSendEmail={bc.setSendEmail}
           />
         </section>
       </div>
@@ -117,8 +127,8 @@ export const BroadcastComposeTab: React.FC<BroadcastComposeTabProps> = ({
         open={confirming}
         onOpenChange={setConfirming}
         subject={bc.draft.subject}
-        emails={reach}
-        appOnly={bc.missingEmail}
+        emails={bc.sendEmail ? bc.recipients.length : 0}
+        appOnly={bc.sendEmail ? bc.missingEmail : reach}
         publishInApp={bc.publishInApp}
         onConfirm={() => void bc.send().then(ok => ok && onSent())}
       />

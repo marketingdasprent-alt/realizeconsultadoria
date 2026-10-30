@@ -165,6 +165,8 @@ export const broadcastService = {
     employeeIds: string[];
     audience: Audience & { label: string };
     publishInApp: boolean;
+    /** false: só na app (sem email). */
+    sendEmail: boolean;
     attachments: BroadcastAttachment[];
     test?: boolean;
   }): Promise<BroadcastResult> => {
@@ -174,6 +176,7 @@ export const broadcastService = {
         employeeIds: input.employeeIds,
         audience: input.audience,
         publishInApp: input.publishInApp,
+        sendEmail: input.sendEmail,
         attachments: input.attachments,
         test: input.test ?? false,
       },

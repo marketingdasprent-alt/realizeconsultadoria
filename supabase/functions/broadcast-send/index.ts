@@ -54,6 +54,8 @@ interface BroadcastRequest {
   employeeIds?: string[];
   audience?: { mode?: string; companyIds?: string[]; label?: string };
   publishInApp?: boolean;
+  /** false: só na app (sem email). */
+  sendEmail?: boolean;
   attachments?: Attachment[];
   test?: boolean;
 }
@@ -131,15 +133,22 @@ serve(async (req: Request) => {
         .in('id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000'])
         .eq('is_active', true);
   if (peopleError) return json({ ok: false, error: 'Não foi possível ler os colaboradores.' }, 500);
+  // Só na app: ninguém recebe email (o teste continua a ir por email a quem o pede).
+  const appOnly = !test && body?.sendEmail === false;
+  if (appOnly && !body?.publishInApp) {
+    return json({ ok: false, error: 'Escolha enviar por email, na app ou os dois.' }, 400);
+  }
   const emails = test
     ? [caller.email ?? ''].filter(email => EMAIL.test(email))
-    : [
-        ...new Set(
-          (people ?? [])
-            .map(person => (person.email ?? '').trim().toLowerCase())
-            .filter(email => EMAIL.test(email))
-        ),
-      ];
+    : appOnly
+      ? []
+      : [
+          ...new Set(
+            (people ?? [])
+              .map(person => (person.email ?? '').trim().toLowerCase())
+              .filter(email => EMAIL.test(email))
+          ),
+        ];
   if (!emails.length && !(body?.publishInApp && (people ?? []).length)) {
     return json(
       { ok: false, error: test ? 'A sua conta não tem email.' : 'Ninguém para enviar.' },

@@ -22,6 +22,7 @@ interface SavedBroadcast {
   draft: BroadcastDraft;
   audience: Audience;
   publishInApp: boolean;
+  sendEmail?: boolean;
   attachments: BroadcastAttachment[];
 }
 
@@ -53,7 +54,17 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
     saved ? { ...saved.draft, signatureId: saved.draft.signatureId ?? undefined } : emptyDraft()
   );
   const [audience, setAudience] = useState<Audience>(() => saved?.audience ?? emptyAudience());
-  const [publishInApp, setPublishInApp] = useState(saved?.publishInApp ?? true);
+  const [publishInApp, setPublishInAppState] = useState(saved?.publishInApp ?? true);
+  // Por email, na app ou nos dois; pelo menos um fica sempre ligado.
+  const [sendEmail, setSendEmailState] = useState(saved?.sendEmail ?? true);
+  const setPublishInApp = (value: boolean) => {
+    setPublishInAppState(value);
+    if (!value) setSendEmailState(true);
+  };
+  const setSendEmail = (value: boolean) => {
+    setSendEmailState(value);
+    if (!value) setPublishInAppState(true);
+  };
   const [attachments, setAttachments] = useState<BroadcastAttachment[]>(
     () => saved?.attachments ?? []
   );
@@ -65,12 +76,18 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
       else
         localStorage.setItem(
           DRAFT_KEY,
-          JSON.stringify({ draft, audience, publishInApp, attachments } satisfies SavedBroadcast)
+          JSON.stringify({
+            draft,
+            audience,
+            publishInApp,
+            sendEmail,
+            attachments,
+          } satisfies SavedBroadcast)
         );
     } catch {
       // sem armazenamento (janela privada): fica só em memória
     }
-  }, [draft, audience, publishInApp, attachments]);
+  }, [draft, audience, publishInApp, sendEmail, attachments]);
 
   // Assina com a assinatura de email de quem envia (a predefinida), se tiver.
   const signatures = useQuery({
@@ -114,6 +131,9 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
   const people = useMemo(() => employees.data ?? [], [employees.data]);
   const recipients = useMemo(() => recipientsOf(people, audience), [people, audience]);
   const missingEmail = useMemo(() => withoutEmail(people, audience), [people, audience]);
+  const reachTotal =
+    (sendEmail ? recipients.length : 0) +
+    (publishInApp ? (sendEmail ? missingEmail : recipients.length + missingEmail) : 0);
 
   const updateDraft = (patch: Partial<BroadcastDraft>) => {
     setDraft(current => ({ ...current, ...patch }));
@@ -141,7 +161,7 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
 
   /** Valida antes de pedir confirmação (o teste só precisa do texto). */
   const check = (test = false) => {
-    const reach = recipients.length + (publishInApp ? missingEmail : 0);
+    const reach = test ? 1 : reachTotal;
     const found = validateBroadcast(draft, test ? 1 : reach);
     setErrors(found);
     return Object.keys(found).length === 0;
@@ -155,6 +175,7 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
       employeeIds: audienceOf(people, audience).map(person => person.id),
       audience: { ...audience, label: audienceLabel(audience, companies) },
       publishInApp: test ? false : publishInApp,
+      sendEmail: test ? true : sendEmail,
       attachments,
       test,
     });
@@ -168,10 +189,12 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
       return true;
     }
     toast({
-      title: `Enviado a ${result.sent} ${result.sent === 1 ? 'pessoa' : 'pessoas'}`,
+      title: sendEmail
+        ? `Enviado a ${result.sent} ${result.sent === 1 ? 'pessoa' : 'pessoas'}`
+        : 'Publicado na app (sem email)',
       description: [
         result.failed.length ? `${result.failed.length} falharam.` : '',
-        result.notices ? 'Publicado também na app.' : '',
+        result.notices && sendEmail ? 'Publicado também na app.' : '',
       ]
         .filter(Boolean)
         .join(' '),
@@ -190,6 +213,10 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
     updateAudience,
     publishInApp,
     setPublishInApp,
+    sendEmail,
+    setSendEmail,
+    /** Quantas pessoas recebem: por email, na app (quem não tem email) ou só na app. */
+    reach: reachTotal,
     attachments,
     removeAttachment: (path: string) =>
       setAttachments(current => current.filter(file => file.path !== path)),

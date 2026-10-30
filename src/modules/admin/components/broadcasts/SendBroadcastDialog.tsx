@@ -36,10 +36,17 @@ export const SendBroadcastDialog: React.FC<SendBroadcastDialogProps> = ({
         <AlertDialogTitle>Enviar “{subject.trim()}”?</AlertDialogTitle>
         <AlertDialogDescription asChild>
           <div className="space-y-1 text-[14px]">
-            <p>
-              Vai por email a <strong>{emails}</strong> {emails === 1 ? 'pessoa' : 'pessoas'}.
-            </p>
-            {publishInApp && (
+            {emails > 0 ? (
+              <p>
+                Vai por email a <strong>{emails}</strong> {emails === 1 ? 'pessoa' : 'pessoas'}.
+              </p>
+            ) : (
+              <p>
+                Vai <strong>só na app</strong> (sem email) a <strong>{appOnly}</strong>{' '}
+                {appOnly === 1 ? 'pessoa' : 'pessoas'}, com notificação no telemóvel.
+              </p>
+            )}
+            {publishInApp && emails > 0 && (
               <p>
                 Fica também na app (Feed → Comunicados), com notificação no telemóvel
                 {appOnly > 0 ? ` — e ${appOnly} sem email só o veem lá` : ''}.

@@ -1,5 +1,5 @@
 import React, { useRef } from 'react';
-import { Loader2, Paperclip, Smartphone, X } from 'lucide-react';
+import { Loader2, Mail, Paperclip, Smartphone, X } from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -23,6 +23,8 @@ interface BroadcastFieldsProps {
   onRemoveFile: (path: string) => void;
   publishInApp: boolean;
   onPublishInApp: (value: boolean) => void;
+  sendEmail: boolean;
+  onSendEmail: (value: boolean) => void;
 }
 
 const Field: React.FC<{ id: string; label: string; error?: string; children: React.ReactNode }> = ({
@@ -54,6 +56,8 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
   onRemoveFile,
   publishInApp,
   onPublishInApp,
+  sendEmail,
+  onSendEmail,
   signatures,
 }) => {
   const fileInput = useRef<HTMLInputElement>(null);
@@ -154,9 +158,21 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
       </div>
 
       <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-rz-canvas px-4 py-3">
+        <Mail className="h-5 w-5 shrink-0 text-rz-primary" />
+        <span className="min-w-0 flex-1">
+          <span className="block text-[14px] font-semibold">Enviar por email</span>
+          <span className="block text-[12.5px] text-rz-muted">
+            Desligado: o comunicado fica só na app, sem email.
+          </span>
+        </span>
+        <Switch checked={sendEmail} onCheckedChange={onSendEmail} />
+      </label>
+      <label className="flex cursor-pointer items-center gap-3 rounded-2xl bg-rz-canvas px-4 py-3">
         <Smartphone className="h-5 w-5 shrink-0 text-rz-primary" />
         <span className="min-w-0 flex-1">
-          <span className="block text-[14px] font-semibold">Publicar também na app</span>
+          <span className="block text-[14px] font-semibold">
+            {sendEmail ? 'Publicar também na app' : 'Publicar na app'}
+          </span>
           <span className="block text-[12.5px] text-rz-muted">
             Fica no Feed → Comunicados e chega notificação ao telemóvel. Quem não tem email só o vê
             aqui.

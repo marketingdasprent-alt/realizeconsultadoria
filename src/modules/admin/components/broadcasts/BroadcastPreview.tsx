@@ -4,6 +4,8 @@ import type { BroadcastDraft } from '../../lib/broadcast';
 import type { BroadcastAttachment } from '../../services/broadcastService';
 import { signatureToHtml } from '@/modules/webmail/lib/signature';
 
+const EMAIL_FONT = "'Open Sans', Arial, Helvetica, sans-serif";
+
 const URL_PATTERN = /(https?:\/\/[^\s]+[^\s.,;:!?)])/g;
 
 /** Um parágrafo com as ligações a dourado (como no email). */
@@ -34,7 +36,11 @@ export const BroadcastPreview: React.FC<{
     .split(/\n\s*\n/)
     .filter(Boolean);
   return (
-    <div className="overflow-hidden rounded-[22px] bg-[#f4f2ee] p-3 sm:p-4">
+    <div
+      className="overflow-hidden rounded-[22px] bg-[#f4f2ee] p-3 sm:p-4"
+      // A mesma letra que o email leva (a da assinatura).
+      style={{ fontFamily: EMAIL_FONT }}
+    >
       <div className="overflow-hidden rounded-2xl bg-white shadow-rz-soft">
         <div className="bg-[#111111] px-6 py-4">
           <span className="block text-[17px] font-bold tracking-[2px] text-[#B7933D]">REALIZE</span>

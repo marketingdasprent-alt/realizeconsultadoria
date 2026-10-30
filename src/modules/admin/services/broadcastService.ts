@@ -139,9 +139,12 @@ export const broadcastService = {
 
   /** Nome de quem envia ("Thiago Galdino de Sousa" → "Thiago Sousa"), para o remetente. */
   senderName: async (): Promise<string> => {
-    const { data } = await supabase.rpc('broadcast_sender_name');
-    const words = (data ?? '').trim().split(/\s+/).filter(Boolean);
-    return words.length > 2 ? `${words[0]} ${words[words.length - 1]}` : words.join(' ');
+    const { data } = await supabase.rpc('broadcast_sender');
+    const sender = (data ?? {}) as { name?: string | null; department?: string | null };
+    const words = (sender.name ?? '').trim().split(/\s+/).filter(Boolean);
+    const name = words.length > 2 ? `${words[0]} ${words[words.length - 1]}` : words.join(' ');
+    // Nome e departamento (curto), ex.: "Thiago Sousa · Desenvolvimento".
+    return [name, sender.department?.trim()].filter(Boolean).join(' · ');
   },
 
   /** Guarda um anexo (bucket privado marketing-emails) antes de enviar. */

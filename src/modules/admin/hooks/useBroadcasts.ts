@@ -92,7 +92,10 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
   useEffect(() => {
     if (!senderName.data) return;
     setDraft(current =>
-      !current.senderName.trim() || current.senderName === OLD_DEFAULT_SENDER
+      // Vazio, o antigo "Recursos Humanos" ou só o nome (antes de haver departamento).
+      !current.senderName.trim() ||
+      current.senderName === OLD_DEFAULT_SENDER ||
+      current.senderName === senderName.data.split(' · ')[0]
         ? { ...current, senderName: senderName.data }
         : current
     );

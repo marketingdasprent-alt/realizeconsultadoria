@@ -6,6 +6,7 @@ import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { AiProactive } from '../components/AiProactive';
 import { ProposalCard } from '../components/ProposalCard';
+import { FoundFiles } from '../components/FoundFiles';
 import { useAiChat } from '../hooks/useAiChat';
 
 const SUGGESTIONS = [
@@ -98,6 +99,7 @@ const AiPage: React.FC = () => {
                     {message.content}
                   </p>
                 </div>
+                {message.files?.length ? <FoundFiles files={message.files} /> : null}
                 {message.proposals?.map(proposal => (
                   <div key={proposal.id} className="ml-9">
                     <ProposalCard proposal={proposal} onConfirm={confirm} onCancel={cancel} />

@@ -17,10 +17,19 @@ export interface AiProposal {
   link?: string;
 }
 
+/** Ficheiro ou pasta do servidor que a IA encontrou (só onde a pessoa tem acesso). */
+export interface AiFoundFile {
+  name: string;
+  path: string;
+  type: 'dir' | 'file';
+  modified: string;
+}
+
 export interface AiMessage {
   role: 'user' | 'assistant';
   content: string;
   proposals?: AiProposal[];
+  files?: AiFoundFile[];
 }
 
 export interface AiSuggestion {
@@ -72,12 +81,17 @@ const callFunction = async <T>(payload: unknown, signal?: AbortSignal): Promise<
 export const chat = async (
   messages: Pick<AiMessage, 'role' | 'content'>[],
   signal?: AbortSignal
-): Promise<{ reply: string; proposals: Omit<AiProposal, 'status'>[] }> => {
-  const body = await callFunction<{ reply: string; proposals: Omit<AiProposal, 'status'>[] }>(
-    { action: 'chat', messages },
-    signal
-  );
-  return { reply: body.reply ?? '', proposals: body.proposals ?? [] };
+): Promise<{
+  reply: string;
+  proposals: Omit<AiProposal, 'status'>[];
+  files: AiFoundFile[];
+}> => {
+  const body = await callFunction<{
+    reply: string;
+    proposals: Omit<AiProposal, 'status'>[];
+    files?: AiFoundFile[];
+  }>({ action: 'chat', messages }, signal);
+  return { reply: body.reply ?? '', proposals: body.proposals ?? [], files: body.files ?? [] };
 };
 
 export type RewriteMode = 'complete' | 'formal' | 'short' | 'fix';

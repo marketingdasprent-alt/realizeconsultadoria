@@ -17,6 +17,16 @@ export interface ToolContext {
   companyId: string;
   now: Date;
   directory: () => Promise<Person[]>;
+  /** Cabeçalho Authorization da pessoa: a pesquisa de ficheiros corre com as permissões dela. */
+  authorization: string;
+}
+
+/** Ficheiro ou pasta encontrado no servidor (aparece como cartão clicável na resposta). */
+export interface FoundFile {
+  name: string;
+  path: string;
+  type: 'dir' | 'file';
+  modified: string;
 }
 
 export interface Proposal {
@@ -31,6 +41,7 @@ export interface ToolResult {
   /** O que o modelo lê. */
   content: string;
   proposal?: Proposal;
+  files?: FoundFile[];
 }
 
 const str = (value: unknown, max = 200): string =>
@@ -58,6 +69,21 @@ export const TOOL_DEFS = [
     name: 'get_vacation_balance',
     description: 'Dias de férias do ano: total, usados e disponíveis.',
     parameters: { type: 'object', properties: {} },
+  },
+  {
+    name: 'find_files',
+    description:
+      'Procura ficheiros e pastas pelo nome no servidor de documentos da empresa, só nas pastas a que a pessoa tem acesso. Use para "encontra o contrato…", "onde está a tabela…". Devolve nomes e caminhos; os resultados aparecem à pessoa como cartões clicáveis.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: {
+          type: 'string',
+          description: 'Palavras do nome do ficheiro ou pasta (ex.: "contrato urbango")',
+        },
+      },
+      required: ['query'],
+    },
   },
   {
     name: 'find_colleague',
@@ -201,6 +227,53 @@ const getVacationBalance = async (ctx: ToolContext): Promise<ToolResult> => {
   if (!data) return { content: `Sem saldo de férias definido para ${year}.` };
   return {
     content: `Férias ${year}: ${data.total_days} dias no total, ${data.used_days} usados, ${data.total_days - data.used_days} disponíveis.`,
+  };
+};
+
+/** Pesquisa no servidor de ficheiros pela função company-files, com a sessão da pessoa. */
+const findFiles = async (ctx: ToolContext, args: Record<string, unknown>): Promise<ToolResult> => {
+  const query = str(args.query, 100);
+  if (query.length < 2) return { content: 'Pergunta à pessoa o nome (ou parte) do ficheiro.' };
+  const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/company-files`, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: ctx.authorization,
+      apikey: Deno.env.get('SUPABASE_ANON_KEY') ?? '',
+    },
+    body: JSON.stringify({ action: 'search', query }),
+  });
+  const body = (await res.json().catch(() => null)) as {
+    ok?: boolean;
+    message?: string;
+    data?: { results?: FoundFile[]; partial?: boolean };
+  } | null;
+  if (!body?.ok)
+    return { content: `Não foi possível procurar: ${body?.message ?? 'servidor indisponível'}.` };
+  const results = (body.data?.results ?? []).slice(0, 10);
+  if (!results.length)
+    return {
+      content: `Nada com "${query}" nas pastas a que a pessoa tem acesso. Sugere outras palavras ou pedir acesso à pasta certa.`,
+    };
+  const lines = results.map(
+    (file, index) =>
+      `${index + 1}. ${file.type === 'dir' ? 'Pasta' : 'Ficheiro'} "${file.name}" em ${file.path
+        .split('/')
+        .slice(0, -1)
+        .join(' / ')}`
+  );
+  return {
+    content:
+      `Encontrados (já aparecem à pessoa como cartões para abrir; não repitas os caminhos completos):\n${lines.join('\n')}` +
+      (body.data?.partial
+        ? '\nA pesquisa foi parcial (pastas muito grandes): pode haver mais.'
+        : ''),
+    files: results.map(file => ({
+      name: file.name,
+      path: file.path,
+      type: file.type,
+      modified: file.modified,
+    })),
   };
 };
 
@@ -360,6 +433,8 @@ export const runTool = async (
         return await getVacationBalance(ctx);
       case 'find_colleague':
         return await findColleague(ctx, args);
+      case 'find_files':
+        return await findFiles(ctx, args);
       case 'propose_event':
         return await proposeEvent(ctx, args);
       case 'propose_task':

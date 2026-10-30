@@ -41,6 +41,7 @@ import {
 } from '../_shared/company-files.ts';
 import { BLANK_MIME, blankFile, isBlankKind } from './templates.ts';
 import { thumbsFor, type ThumbTarget } from './thumbs.ts';
+import { searchFiles, type SearchEntry, type SearchHit } from './search.ts';
 
 const AGENT_URL = Deno.env.get('FILES_AGENT_URL') ?? 'https://files.dasprent.pt';
 const LOCAL_AGENT_URL = Deno.env.get('FILES_AGENT_LOCAL_URL') ?? 'http://127.0.0.1:8181';
@@ -66,13 +67,16 @@ interface CompanyFilesRequest {
     | 'upload'
     | 'admin-list'
     | 'admin-mkdir'
-    | 'thumbs';
+    | 'thumbs'
+    | 'search';
   path?: unknown;
   name?: unknown;
   kind?: unknown;
   size?: unknown;
   /** thumbs: [{ path, modified, size }] da listagem da pasta (até 30). */
   items?: unknown;
+  /** search: o que procurar no nome dos ficheiros e pastas. */
+  query?: unknown;
 }
 
 interface AgentEntry {
@@ -153,6 +157,29 @@ const callAgent = async <T>(
     );
   }
   return body as T;
+};
+
+/**
+ * Pesquisa do agente (GET /api/search?path=&q=), só dentro de `path`. Devolve null se o agente
+ * ainda não tiver esta rota (404/405/501), para se percorrer as pastas com /api/list.
+ */
+const agentSearch = async (
+  secret: string,
+  path: string,
+  query: string
+): Promise<SearchHit[] | null> => {
+  const token = await agentToken('search', path, TTL.request, secret);
+  const url = `${AGENT_URL}/api/search?path=${encodeURIComponent(path)}&q=${encodeURIComponent(query)}`;
+  let res: Response;
+  try {
+    res = await fetchWithTimeout(url, { headers: { Authorization: `Bearer ${token}` } });
+  } catch {
+    return null;
+  }
+  if ([404, 405, 501].includes(res.status)) return null;
+  if (!res.ok) return null;
+  const body = (await res.json().catch(() => null)) as { results?: SearchHit[] } | null;
+  return Array.isArray(body?.results) ? body.results : null;
 };
 
 /** Raízes de D:\\Shares que o agente serve (se ele não as listar). */
@@ -324,6 +351,25 @@ serve(async (req: Request) => {
         permission: folder.permission,
       }))
     );
+
+  // Procurar pelo nome, só nas pastas atribuídas (também o que a Realize IA usa).
+  if (body.action === 'search') {
+    const query = typeof body.query === 'string' ? body.query.trim().slice(0, 100) : '';
+    if (query.length < 2) return fail('Escreva pelo menos 2 letras.');
+    if (!folders.length) return ok({ results: [], partial: false });
+    return ok(
+      await searchFiles(
+        {
+          list: async folderPath =>
+            (await callAgent<AgentListing>(agentSecret, 'list', '/api/list', folderPath))
+              .entries as SearchEntry[],
+          search: (folderPath, q) => agentSearch(agentSecret, folderPath, q),
+        },
+        folders,
+        query
+      )
+    );
+  }
 
   if (body.action === 'thumbs') {
     const items = Array.isArray(body.items) ? body.items.slice(0, 30) : [];

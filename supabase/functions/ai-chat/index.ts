@@ -51,6 +51,7 @@ import {
   personalContext,
   runTool,
   TOOL_DEFS,
+  type FoundFile,
   type Proposal,
   type ToolContext,
 } from './tools.ts';
@@ -71,6 +72,10 @@ const SLOW = 'A IA está a demorar demasiado neste momento. Tente outra vez daqu
 // mais capaz mas lento no CPU. Perguntas ("quantos dias de férias tenho?", "o que tenho
 // amanhã?") vão para o modelo rápido, com os dados da pessoa já incluídos.
 // "Agenda" sozinha ("o que tenho na agenda?") é a agenda, não o verbo: vai para o modelo rápido.
+// Pedidos de ficheiros ("encontra o contrato…", "onde está a pasta…").
+const FILES_HINT =
+  /(ficheiro|ficheiros|arquivo|pasta|documento|documentos|contrato|encontra|procura|onde esta)/;
+
 const ACTION_HINT =
   /\b(marca|marcar|marque|agendar|agende|agenda (uma?|reuniao|evento|chamada)|desmarca|lembra|lembrar|lembre|lembrete|convida|convidar|convide|cria|criar|crie|adiciona|adicionar|nova reuniao|nova tarefa)\b/;
 
@@ -105,7 +110,7 @@ const systemPrompt = (firstName: string, now: Date, withTools: boolean, context:
   `Dados atuais desta pessoa (usa-os para responder; não precisas de os ir buscar):\n${context}\n` +
   `Responde sempre em português de Portugal, de forma clara e muito concisa: no máximo três ou quatro frases, ou uma lista curta, a não ser que peçam mais detalhe. ` +
   (withTools
-    ? `Tens ferramentas: lê a agenda, as tarefas e o saldo de férias da pessoa, procura colegas, e prepara eventos, tarefas e lembretes. ` +
+    ? `Tens ferramentas: lê a agenda, as tarefas e o saldo de férias da pessoa, procura colegas, procura ficheiros e pastas no servidor de documentos da empresa (só onde a pessoa tem acesso; os resultados aparecem como cartões para abrir), e prepara eventos, tarefas e lembretes. ` +
       `Para marcar, criar ou lembrar algo usa SEMPRE propose_event, propose_task ou propose_reminder: elas só preparam uma proposta e a pessoa confirma num cartão. ` +
       `Depois de preparar, diz numa frase o que preparaste e que basta confirmar no cartão; nunca digas que já ficou criado. ` +
       `Calcula datas relativas (amanhã, sexta, daqui a duas semanas) a partir de agora. Se faltar a data ou a hora, pergunta antes. ` +
@@ -359,6 +364,7 @@ serve(async (req: Request) => {
     // Sem empresa só os admins do "Usar IA", que não chegam às ferramentas.
     companyId: employee.company_id ?? '',
     now: new Date(),
+    authorization: req.headers.get('Authorization') ?? '',
     directory: async () => {
       if (!people) {
         const { data } = await db.rpc('chat_directory');
@@ -447,7 +453,9 @@ serve(async (req: Request) => {
   if (!history) return json({ ok: false, code: 'bad_request' }, 400);
 
   const lastUser = history[history.length - 1].content;
-  const withTools = ACTION_HINT.test(fold(lastUser));
+  // Com o Claude as ferramentas vão sempre (é rápido); no servidor próprio só quando o pedido as pede.
+  const withTools =
+    claudeEnabled() || ACTION_HINT.test(fold(lastUser)) || FILES_HINT.test(fold(lastUser));
   const model = withTools ? toolsModel : chatModel;
   const messages: ModelMessage[] = [
     {
@@ -462,6 +470,7 @@ serve(async (req: Request) => {
     ...history,
   ];
   const proposals: Proposal[] = [];
+  const files: FoundFile[] = [];
   const deadline = Date.now() + TIME_BUDGET_MS;
   let reply = '';
 
@@ -507,6 +516,8 @@ serve(async (req: Request) => {
           parseArgs(call.function?.arguments)
         );
         if (result.proposal) proposals.push(result.proposal);
+        if (result.files)
+          files.push(...result.files.filter(f => !files.some(x => x.path === f.path)));
         messages.push({
           role: 'tool',
           tool_call_id: call.id ?? call.function?.name,
@@ -527,5 +538,5 @@ serve(async (req: Request) => {
     reply = proposals.length
       ? 'Preparei isto para si. Confirme abaixo.'
       : 'Não consegui responder a isso. Pode reformular o pedido?';
-  return json({ ok: true, reply, proposals });
+  return json({ ok: true, reply, proposals, files });
 });

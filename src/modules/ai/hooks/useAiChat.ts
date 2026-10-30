@@ -6,6 +6,7 @@ import {
   executeProposal,
   type AiMessage,
   type AiProposal,
+  type AiFoundFile,
 } from '../services/aiService';
 
 const MAX_KEPT = 40;
@@ -87,7 +88,7 @@ export const useAiChat = () => {
       const controller = new AbortController();
       abort.current = controller;
       try {
-        let answer: { reply: string; proposals: AiProposal[] };
+        let answer: { reply: string; proposals: AiProposal[]; files?: AiFoundFile[] };
         if (isPreview) {
           await new Promise(resolve => setTimeout(resolve, 600));
           answer = demoReply(content);
@@ -99,6 +100,7 @@ export const useAiChat = () => {
           answer = {
             reply: result.reply,
             proposals: result.proposals.map(p => ({ ...p, status: 'pending' as const })),
+            files: result.files,
           };
         }
         if (!answer.reply.trim()) {
@@ -110,6 +112,7 @@ export const useAiChat = () => {
               role: 'assistant',
               content: answer.reply,
               proposals: answer.proposals.length ? answer.proposals : undefined,
+              files: answer.files?.length ? answer.files : undefined,
             },
           ]);
         }

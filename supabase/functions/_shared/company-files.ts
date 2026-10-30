@@ -9,7 +9,7 @@
 // com os nomes exatamente como o agente os devolve.
 
 export type FolderPermission = 'read' | 'edit';
-export type AgentOp = 'list' | 'download' | 'mkdir' | 'upload' | 'callback';
+export type AgentOp = 'list' | 'download' | 'mkdir' | 'upload' | 'callback' | 'search';
 export type OnlyOfficeDocumentType = 'word' | 'cell' | 'slide' | 'pdf';
 export type EditorMode = 'edit' | 'view';
 

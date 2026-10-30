@@ -226,19 +226,20 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
         'internetMessageId',
         'internetMessageHeaders',
       ].join(',');
-      const message = await session.json<GraphMessage>(
-        `${messageUrl(messageId)}?$select=${select}`
-      );
+      // O email e a lista de anexos em paralelo: poupa uma ida ao Microsoft 365 por email
+      // (a lista é pequena, só nomes e tamanhos; sem anexos vem vazia).
+      const [message, list] = await Promise.all([
+        session.json<GraphMessage>(`${messageUrl(messageId)}?$select=${select}`),
+        session
+          .json<{
+            value?: GraphAttachment[];
+          }>(`${messageUrl(messageId)}/attachments?$select=id,name,contentType,size,isInline`)
+          .catch(() => ({ value: [] as GraphAttachment[] })),
+      ]);
       const isHtml = (message.body?.contentType ?? '').toLowerCase() === 'html';
       let html = isHtml ? (message.body?.content ?? null) : null;
-
-      let attachments: GraphAttachment[] = [];
-      if (message.hasAttachments || (html && /cid:/i.test(html))) {
-        const list = await session.json<{ value?: GraphAttachment[] }>(
-          `${messageUrl(messageId)}/attachments?$select=id,name,contentType,size,isInline`
-        );
-        attachments = list.value ?? [];
-      }
+      const attachments: GraphAttachment[] =
+        message.hasAttachments || (html && /cid:/i.test(html)) ? (list.value ?? []) : [];
 
       // Imagens inline (cid:) → data: URLs; essas deixam de aparecer como anexos.
       const embedded = new Set<string>();

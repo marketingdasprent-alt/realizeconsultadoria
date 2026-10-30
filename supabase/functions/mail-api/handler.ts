@@ -39,6 +39,7 @@ import {
 } from '../_shared/mail/request.ts';
 import type { MailDriver } from '../_shared/mail/types.ts';
 import {
+  ACCOUNT_COLUMNS,
   deleteMailAccount,
   loadAccount,
   readSecret,
@@ -129,6 +130,40 @@ const createDriver = async (
   if (!oauth || !secret) throw await reauthError(db, account.id);
   const session = new OAuthSession(db, account.id, oauth, secret);
   return oauth === 'google' ? createGmailDriver(session, account) : createGraphDriver(session);
+};
+
+/** Tempos (ms) de abrir o primeiro email da Entrada: driver, lista, abrir a frio e outra vez. */
+const probeOpen = async (db: SupabaseClient, accountId: string) => {
+  const { data } = await db
+    .from('mail_accounts')
+    .select(ACCOUNT_COLUMNS)
+    .eq('id', accountId)
+    .maybeSingle();
+  const account = data as MailAccountRow | null;
+  if (!account) return { found: false };
+  const times: Record<string, number> = {};
+  const time = async <T>(name: string, run: () => Promise<T>) => {
+    const started = Date.now();
+    try {
+      return await run();
+    } finally {
+      times[name] = Date.now() - started;
+    }
+  };
+  try {
+    const driver = await time('driver', () => createDriver(db, account));
+    const list = await time('list', () =>
+      driver.list({ folder: 'inbox', query: null, pageToken: null, limit: 25 })
+    );
+    const first = list.messages[0];
+    if (first) {
+      await time('get_first', () => driver.get(first.id));
+      await time('get_again', () => driver.get(first.id));
+    }
+    return { found: true, provider: account.auth_method, times, messages: list.messages.length };
+  } catch (error) {
+    return { found: true, provider: account.auth_method, times, error: errorMessage(error) };
+  }
 };
 
 const requireAccount = async (db: SupabaseClient, userId: string, body: Body) => {
@@ -338,6 +373,9 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
     const body: unknown = await req.json().catch(() => null);
     if (isRecord(body) && body.action === 'poll-new')
       return ok(await pollNewMail(db, createDriver));
+    // Diagnóstico da lentidão ao abrir emails: cronometra cada passo numa caixa (sem conteúdo).
+    if (isRecord(body) && body.action === 'probe-open' && isUuid(body.account_id))
+      return ok(await probeOpen(db, body.account_id));
     if (!isRecord(body) || !isUuid(body.access_id)) return badRequest();
     try {
       return ok(await shareAccessById(db, body.access_id));

@@ -111,6 +111,17 @@ const WebmailPage: React.FC = () => {
     ? (list.messages.find(m => mailKey(m) === mailKey(active)) ?? active)
     : null;
   const { message, isLoading: messageLoading } = useMailMessage(active);
+  // Marca como lido só depois de o email abrir: nas caixas IMAP as operações vão em fila na
+  // mesma ligação, e marcar primeiro atrasava a abertura.
+  const readMarked = useRef<string | null>(null);
+  useEffect(() => {
+    if (!active || !message || message.id !== active.id) return;
+    const key = mailKey(active);
+    if (readMarked.current === key) return;
+    readMarked.current = key;
+    void actions.setRead(active, true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando o email aberto carrega
+  }, [message, active]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => setQuery(search), 400);
@@ -147,7 +158,6 @@ const WebmailPage: React.FC = () => {
     if (folder === 'drafts' && !customOpen) return void openSavedDraft(summary);
     setActive(summary);
     if (summary.unread) list.keep(summary);
-    void actions.setRead(summary, true);
   };
   // Lixo pela lista (um ou vários): se o email aberto for um deles, o leitor fecha.
   const closeIfAmong = (mails: MailSummary[]) => {

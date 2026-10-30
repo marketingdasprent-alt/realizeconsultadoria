@@ -68,7 +68,7 @@ export const useMessengerActions = ({
       // ZIP do Windows, ficheiros sem tipo…: o tipo é normalizado antes de validar e enviar.
       const mime = blob ? normalizeMime(blob.type, input.file?.name ?? '') : '';
       if (blob) {
-        const problem = validateFile(blob.size, mime);
+        const problem = validateFile(blob.size, mime, input.file?.name ?? '');
         if (problem) return fail(problem);
       }
       const name = input.file?.name ?? `voz-${Date.now()}.${extensionFor(mime)}`;

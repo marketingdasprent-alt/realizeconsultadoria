@@ -19,6 +19,11 @@ describe('tipos dos anexos', () => {
   it('valida tamanho e tipo', () => {
     expect(validateFile(1024, normalizeMime('application/x-zip-compressed'))).toBeNull();
     expect(validateFile(30 * 1024 * 1024, 'application/pdf')).toMatch(/25 MB/);
-    expect(validateFile(10, 'video/mp4')).toMatch(/não é suportado/);
+    expect(validateFile(10, 'video/mp4')).toBeNull();
+    expect(validateFile(10, normalizeMime('', 'PRODUTO.md'), 'PRODUTO.md')).toBeNull();
+    expect(validateFile(10, normalizeMime('', 'dados.json'), 'dados.json')).toBeNull();
+    expect(validateFile(10, 'application/octet-stream', '.env.local')).toMatch(/\.env/);
+    expect(validateFile(10, 'application/x-msdownload', 'setup.exe')).toMatch(/programas/);
+    expect(validateFile(10, 'application/octet-stream', 'coisa.xyz')).toMatch(/não é suportado/);
   });
 });

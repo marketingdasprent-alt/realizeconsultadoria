@@ -24,10 +24,28 @@ export const ALLOWED_MIME = new Set([
   'audio/mp4',
   'audio/aac',
   'audio/wav',
+  // Documentos de texto, código e compactados do dia a dia, e vídeos curtos.
+  'text/markdown',
+  'application/json',
+  'application/xml',
+  'text/xml',
+  'application/vnd.rar',
+  'application/x-rar-compressed',
+  'application/x-7z-compressed',
+  'video/mp4',
+  'video/quicktime',
+  'application/rtf',
+  'application/vnd.oasis.opendocument.text',
+  'application/vnd.oasis.opendocument.spreadsheet',
 ]);
 
 /** Valor do atributo accept do seletor de ficheiros. */
-export const ACCEPT_ATTRIBUTE = [...ALLOWED_MIME].filter(m => !m.startsWith('audio/')).join(',');
+// Também pela extensão: o Windows nem sempre dá tipo a .md, .json, .rar, .7z…
+export const ACCEPT_ATTRIBUTE = [
+  ...[...ALLOWED_MIME].filter(m => !m.startsWith('audio/')),
+  ...['.md', '.markdown', '.json', '.xml', '.log', '.txt', '.rar', '.7z', '.zip'],
+  ...['.mp4', '.mov', '.rtf', '.odt', '.ods', '.csv', '.heic'],
+].join(',');
 
 /** "audio/webm;codecs=opus" → "audio/webm". */
 export const baseMime = (mime: string): string => mime.split(';')[0].trim().toLowerCase();
@@ -36,6 +54,9 @@ export const baseMime = (mime: string): string => mime.split(';')[0].trim().toLo
 const MIME_ALIASES: Record<string, string> = {
   'application/x-zip-compressed': 'application/zip',
   'application/x-zip': 'application/zip',
+  'text/x-markdown': 'text/markdown',
+  'application/x-rar': 'application/vnd.rar',
+  'application/x-7z': 'application/x-7z-compressed',
   'image/jpg': 'image/jpeg',
   'audio/x-wav': 'audio/wav',
   'audio/wave': 'audio/wav',
@@ -66,6 +87,18 @@ const BY_EXTENSION: Record<string, string> = {
   wav: 'audio/wav',
   ogg: 'audio/ogg',
   webm: 'audio/webm',
+  md: 'text/markdown',
+  markdown: 'text/markdown',
+  json: 'application/json',
+  xml: 'application/xml',
+  log: 'text/plain',
+  rar: 'application/vnd.rar',
+  '7z': 'application/x-7z-compressed',
+  mp4: 'video/mp4',
+  mov: 'video/quicktime',
+  rtf: 'application/rtf',
+  odt: 'application/vnd.oasis.opendocument.text',
+  ods: 'application/vnd.oasis.opendocument.spreadsheet',
 };
 
 /** Tipo do ficheiro já normalizado (alias e, sem tipo, pela extensão do nome). */
@@ -81,10 +114,17 @@ export const extensionFor = (mime: string): string =>
     baseMime(mime)
   ] ?? 'bin';
 
+// Nunca se enviam programas nem ficheiros de configuração com segredos (.env).
+const BLOCKED =
+  /(^\.env(\..*)?$)|\.(exe|msi|bat|cmd|com|scr|ps1|vbs|vbe|jse|wsf|hta|cpl|jar|reg|lnk|sh)$/i;
+
 /** Mensagem de erro para um ficheiro que não pode ser enviado, ou null se estiver bem. */
-export const validateFile = (size: number, mime: string): string | null => {
+export const validateFile = (size: number, mime: string, name = ''): string | null => {
   if (size > MAX_FILE_BYTES) return 'O ficheiro tem mais de 25 MB.';
-  if (!ALLOWED_MIME.has(baseMime(mime))) return 'Este tipo de ficheiro não é suportado.';
+  if (BLOCKED.test(name.trim()))
+    return 'Por segurança, programas e ficheiros .env (com palavras-passe) não se enviam aqui.';
+  if (!ALLOWED_MIME.has(baseMime(mime)))
+    return 'Este tipo de ficheiro não é suportado. Envie-o num ZIP.';
   return null;
 };
 

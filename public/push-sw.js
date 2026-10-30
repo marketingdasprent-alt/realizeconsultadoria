@@ -15,14 +15,19 @@ self.addEventListener('push', event => {
       renotify: !!data.tag,
       data: { url: data.url || '/colaborador' },
     });
-  // Mensagens: com o Realize aberto e à frente não há aviso do sistema (como no WhatsApp Web);
-  // a bolinha e a conversa atualizam-se dentro da app.
+  // Mensagens: só não há aviso quando essa mesma conversa está aberta e à frente (como no
+  // WhatsApp Web). Com o Realize aberto noutra página (Email, Início…), o aviso aparece.
   if (!data.conversationId) return event.waitUntil(show());
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
-      const reading = clients.some(
-        client => client.focused && client.visibilityState === 'visible'
-      );
+      const reading = clients.some(client => {
+        if (!client.focused || client.visibilityState !== 'visible') return false;
+        try {
+          return new URL(client.url).searchParams.get('c') === data.conversationId;
+        } catch {
+          return false;
+        }
+      });
       return reading ? undefined : show();
     })
   );

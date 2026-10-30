@@ -15,7 +15,9 @@ describe('largura das imagens da assinatura', () => {
     applySignatureWidth(image, 450);
     expect(image.getAttribute('width')).toBe('450');
     expect(image.getAttribute('height')).toBeNull();
-    expect(image.getAttribute('style')).toBe('width:450px;max-width:100%;height:auto');
+    expect(image.getAttribute('style')).toBe(
+      'display:block;width:450px;max-width:100%;height:auto'
+    );
     applySignatureWidth(image, null);
     expect(image.getAttribute('width')).toBeNull();
     expect(image.getAttribute('style')).toBe('max-width:100%;height:auto');

@@ -8,6 +8,7 @@ import {
   caretRangeAt,
   dragHasFiles,
   imageFilesOf,
+  BLOCK_WIDTH,
   defaultSignatureWidth,
   isHeavyGif,
   naturalWidthOf,
@@ -97,7 +98,9 @@ export const SignatureEditor: React.FC<SignatureEditorProps> = ({ initial, onCha
       const width = defaultSignatureWidth((await naturalWidthOf(prepared)) || 320);
       command(
         'insertHTML',
-        `<img src="${url}" width="${width}" style="width:${width}px;max-width:100%;height:auto" alt="">`
+        width >= BLOCK_WIDTH
+          ? `<div><img src="${url}" width="${width}" style="display:block;width:${width}px;max-width:100%;height:auto" alt=""></div>`
+          : `<img src="${url}" width="${width}" style="width:${width}px;max-width:100%;height:auto" alt="">`
       );
     }
     setUploading(false);

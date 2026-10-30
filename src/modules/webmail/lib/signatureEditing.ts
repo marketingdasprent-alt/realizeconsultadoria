@@ -29,6 +29,8 @@ export const imageFilesOf = (files: FileList | File[] | null | undefined): File[
  * O ficheiro guarda o dobro dos pontos: fica nítido nos ecrãs de alta resolução.
  */
 export const SIGNATURE_MAX_WIDTH = 600;
+/** A partir desta largura a imagem fica sozinha na linha (como no editor). */
+export const BLOCK_WIDTH = 300;
 const MAX_SIDE = SIGNATURE_MAX_WIDTH * 2;
 
 /**
@@ -47,7 +49,9 @@ export const applySignatureWidth = (image: HTMLImageElement, width: number | nul
   image.removeAttribute('height');
   if (width) {
     image.setAttribute('width', String(width));
-    image.setAttribute('style', `width:${width}px;max-width:100%;height:auto`);
+    // As grandes (faixas de assinatura) ficam numa linha só delas, nunca ao lado do texto.
+    const block = width >= BLOCK_WIDTH ? 'display:block;' : '';
+    image.setAttribute('style', `${block}width:${width}px;max-width:100%;height:auto`);
   } else {
     image.removeAttribute('width');
     image.setAttribute('style', 'max-width:100%;height:auto');

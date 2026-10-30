@@ -8,6 +8,7 @@ import { insertAtCursor } from '@/lib/insertAtCursor';
 import { EmojiPicker } from '@/modules/messenger/components/EmojiPicker';
 import type { BroadcastDraft, BroadcastErrors } from '../../lib/broadcast';
 import type { BroadcastAttachment } from '../../services/broadcastService';
+import { BroadcastAi } from './BroadcastAi';
 
 interface BroadcastFieldsProps {
   draft: BroadcastDraft;
@@ -82,6 +83,7 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
             }
           />
         </div>
+        <BroadcastAi draft={draft} onChange={onChange} />
       </Field>
       <Field id="bc-sender" label="Quem assina" error={errors.senderName}>
         <Input

@@ -24,13 +24,13 @@ export const rewritePrompt = (mode: RewriteMode, writerName: string) =>
   `Não inventes informação, compromissos nem anexos. Não escrevas a assinatura com o nome (a assinatura é posta à parte) nem marcadores como [Seu Nome] ou [Cargo]. ` +
   `Usa o tom de Portugal: "Caros colegas" ou "Bom dia," (nunca "Prezados"), e termina com "Com os melhores cumprimentos," (nunca "Atenciosamente"). ` +
   `Usa texto simples, sem markdown (nada de **, # ou listas com *). ` +
-  `Escreve também um assunto curto e claro (até 8 palavras) para o email. ` +
+  `Escreve sempre um assunto curto, claro e específico (até 8 palavras) que resuma o email; se já houver um assunto, melhora-o em vez de o copiar. ` +
   `Responde exatamente neste formato, sem mais nada antes ou depois:\nASSUNTO: <o assunto>\n\n<o texto do email>`;
 
 /** O pedido à IA: o texto e, se for uma resposta, o email a que se responde (só contexto). */
 export const rewriteUserMessage = (text: string, subject: string, context: string) =>
   [
-    subject ? `Assunto: ${subject}` : '',
+    subject ? `Assunto atual (escreve um melhor, mais claro e específico): ${subject}` : '',
     context
       ? `Email a que se está a responder (só para contexto, não o reescrevas):\n${context}`
       : '',

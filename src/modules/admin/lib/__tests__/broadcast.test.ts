@@ -71,7 +71,7 @@ describe('broadcast audience', () => {
     expect(validateBroadcast({ subject: '', message: ' ', senderName: '' }, 0)).toEqual({
       subject: 'Escreva o assunto.',
       message: 'Escreva a mensagem.',
-      senderName: 'Indique quem assina.',
+      senderName: 'Indique o nome do remetente.',
       audience: 'Ninguém recebe com esta escolha.',
     });
     expect(validateBroadcast({ subject: 'Olá', message: 'Texto', senderName: 'RH' }, 3)).toEqual(

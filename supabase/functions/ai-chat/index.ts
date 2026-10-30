@@ -228,7 +228,14 @@ serve(async (req: Request) => {
           apiKey,
           [
             { role: 'system', content: rewritePrompt('complete', 'Teste') },
-            { role: 'user', content: rewriteUserMessage(String(probe.text ?? 'ola'), '', '') },
+            {
+              role: 'user',
+              content: rewriteUserMessage(
+                String(probe.text ?? 'ola'),
+                String(probe.subject ?? ''),
+                ''
+              ),
+            },
           ],
           false,
           TIME_BUDGET_MS,

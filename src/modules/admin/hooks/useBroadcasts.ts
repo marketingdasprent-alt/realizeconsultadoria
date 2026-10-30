@@ -34,10 +34,13 @@ const readSaved = (): SavedBroadcast | null => {
   }
 };
 
+// Remetente antigo por omissão: rascunhos com ele passam a ter o nome de quem envia.
+const OLD_DEFAULT_SENDER = 'Recursos Humanos · Realize Consultadoria';
+
 const emptyDraft = (): BroadcastDraft => ({
   subject: '',
   message: '',
-  senderName: 'Recursos Humanos · Realize Consultadoria',
+  senderName: '',
 });
 
 /** Pessoas → Comunicados: rascunho, a quem vai, anexos, teste e envio. */
@@ -79,6 +82,21 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
     if (!signatures.data || draft.signatureId !== undefined) return;
     setDraft(current => ({ ...current, signatureId: signatures.data[0]?.id ?? null }));
   }, [signatures.data, draft.signatureId]);
+
+  // Remetente por omissão: quem envia ("Thiago Sousa"), não um departamento.
+  const senderName = useQuery({
+    queryKey: ['admin', 'broadcast-sender-name'],
+    queryFn: broadcastService.senderName,
+    staleTime: Infinity,
+  });
+  useEffect(() => {
+    if (!senderName.data) return;
+    setDraft(current =>
+      !current.senderName.trim() || current.senderName === OLD_DEFAULT_SENDER
+        ? { ...current, senderName: senderName.data }
+        : current
+    );
+  }, [senderName.data, draft.senderName]);
   const [uploading, setUploading] = useState(false);
   const [errors, setErrors] = useState<BroadcastErrors>({});
   const [busy, setBusy] = useState<'test' | 'send' | null>(null);
@@ -156,7 +174,7 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
         .join(' '),
       variant: result.failed.length ? 'destructive' : undefined,
     });
-    setDraft({ ...emptyDraft(), signatureId: draft.signatureId });
+    setDraft({ ...emptyDraft(), signatureId: draft.signatureId, senderName: draft.senderName });
     setAttachments([]);
     void queryClient.invalidateQueries({ queryKey: HISTORY_KEY });
     return true;

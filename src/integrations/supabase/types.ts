@@ -3917,6 +3917,10 @@ export type Database = {
       [_ in never]: never;
     };
     Functions: {
+      broadcast_sender_name: {
+        Args: Record<PropertyKey, never>;
+        Returns: string;
+      };
       broadcast_signatures: {
         Args: Record<PropertyKey, never>;
         Returns: {

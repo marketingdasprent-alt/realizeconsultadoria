@@ -90,7 +90,7 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
           <BroadcastAi draft={draft} onChange={onChange} />
         </div>
       </Field>
-      <Field id="bc-sender" label="Quem assina" error={errors.senderName}>
+      <Field id="bc-sender" label="Nome do remetente" error={errors.senderName}>
         <Input
           id="bc-sender"
           value={draft.senderName}
@@ -98,6 +98,9 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
           maxLength={120}
           className="h-10"
         />
+        <p className="mt-1 text-[12px] text-rz-muted">
+          É o nome que aparece no "De:" da caixa de entrada de quem recebe.
+        </p>
         <BroadcastSignaturePicker
           signatures={signatures}
           value={draft.signatureId ?? null}

@@ -97,7 +97,7 @@ export const validateBroadcast = (draft: BroadcastDraft, recipients: number): Br
   const errors: BroadcastErrors = {};
   if (!draft.subject.trim()) errors.subject = 'Escreva o assunto.';
   if (!draft.message.trim()) errors.message = 'Escreva a mensagem.';
-  if (!draft.senderName.trim()) errors.senderName = 'Indique quem assina.';
+  if (!draft.senderName.trim()) errors.senderName = 'Indique o nome do remetente.';
   if (recipients === 0) errors.audience = 'Ninguém recebe com esta escolha.';
   return errors;
 };

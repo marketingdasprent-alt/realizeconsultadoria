@@ -18,7 +18,7 @@ describe('Usar IA no email', () => {
 
   it('o pedido leva o assunto e o email original só como contexto', () => {
     const message = rewriteUserMessage('envio amanha', 'Proposta', 'Bom dia, enviam a proposta?');
-    expect(message).toContain('Assunto: Proposta');
+    expect(message).toContain('Assunto atual (escreve um melhor, mais claro e específico): Proposta');
     expect(message).toContain('só para contexto');
     expect(message.endsWith('Texto a reescrever:\nenvio amanha')).toBe(true);
     expect(rewriteUserMessage('olá', '', '')).toBe('Texto a reescrever:\nolá');

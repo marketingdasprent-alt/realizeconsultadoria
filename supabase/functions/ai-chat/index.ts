@@ -40,6 +40,13 @@ import {
   serviceClient,
 } from '../_shared/mail-server/http.ts';
 import {
+  callClaude,
+  claudeEnabled,
+  ClaudeRefusal,
+  CLAUDE_REFUSAL_TEXT,
+  claudeModel,
+} from './claude.ts';
+import {
   executeProposal,
   personalContext,
   runTool,
@@ -114,8 +121,29 @@ const callModel = async (
   messages: ModelMessage[],
   withTools: boolean,
   timeoutMs = 90_000,
-  maxTokens = 700
+  maxTokens = 700,
+  useClaude = true
 ): Promise<{ message?: ModelMessage; status: number }> => {
+  // Primeiro o Claude (se houver chave). Falhou: segue para o servidor próprio, abaixo.
+  // Recusa por segurança: responde-se com a recusa, sem tentar o servidor próprio.
+  if (useClaude && claudeEnabled()) {
+    try {
+      const message = await callClaude(
+        messages,
+        withTools ? TOOL_DEFS : null,
+        maxTokens,
+        Math.min(timeoutMs, 60_000)
+      );
+      return { message, status: 200 };
+    } catch (error) {
+      if (error instanceof ClaudeRefusal)
+        return { message: { role: 'assistant', content: CLAUDE_REFUSAL_TEXT }, status: 200 };
+      console.error(
+        'ai-chat: Claude indisponível, a usar o servidor próprio:',
+        error instanceof Error ? `${error.name}: ${error.message.slice(0, 200)}` : String(error)
+      );
+    }
+  }
   const response = await fetchWithTimeout(
     `${baseUrl}/chat/completions`,
     {
@@ -129,7 +157,8 @@ const callModel = async (
         stream: false,
         max_tokens: maxTokens,
         temperature: 0.3,
-        messages,
+        // Sem o conteúdo original do Claude (campo só nosso, o servidor próprio não o conhece).
+        messages: messages.map(({ _claude: _ignored, ...rest }) => rest),
         ...(withTools
           ? { tools: TOOL_DEFS.map(def => ({ type: 'function', function: def })) }
           : {}),
@@ -155,7 +184,8 @@ const callModel = async (
  */
 const healthCheck = async (baseUrl: string, chatModel: string, toolsModel: string) => {
   const apiKey = (Deno.env.get('AI_API_KEY') ?? Deno.env.get('OLLAMA_API_KEY'))?.trim();
-  const probe = async (model: string, withTools: boolean) => {
+  // useClaude: mede o Claude; sem ele, o servidor próprio (a reserva).
+  const probe = async (model: string, withTools: boolean, useClaude = false) => {
     const started = Date.now();
     try {
       const { message, status } = await callModel(
@@ -166,7 +196,10 @@ const healthCheck = async (baseUrl: string, chatModel: string, toolsModel: strin
           { role: 'system', content: 'Responde em português de Portugal, numa frase.' },
           { role: 'user', content: withTools ? 'O que tenho na agenda esta semana?' : 'Diz olá.' },
         ],
-        withTools
+        withTools,
+        90_000,
+        700,
+        useClaude
       );
       return {
         model,
@@ -187,7 +220,16 @@ const healthCheck = async (baseUrl: string, chatModel: string, toolsModel: strin
   };
   return {
     ok: true,
-    probes: await Promise.all([probe(chatModel, false), probe(toolsModel, true)]),
+    probes: await Promise.all([
+      ...(claudeEnabled()
+        ? [
+            probe(`claude:${claudeModel()}`, false, true),
+            probe(`claude:${claudeModel()}`, true, true),
+          ]
+        : []),
+      probe(chatModel, false),
+      probe(toolsModel, true),
+    ]),
   };
 };
 
@@ -451,7 +493,13 @@ serve(async (req: Request) => {
         reply = typeof message.content === 'string' ? message.content.trim() : '';
         break;
       }
-      messages.push({ role: 'assistant', content: message.content ?? '', tool_calls: calls });
+      // Com o conteúdo original do Claude, se veio dele (a volta seguinte precisa dele).
+      messages.push({
+        ...message,
+        role: 'assistant',
+        content: message.content ?? '',
+        tool_calls: calls,
+      });
       for (const call of calls.slice(0, 4)) {
         const result = await runTool(
           ctx,

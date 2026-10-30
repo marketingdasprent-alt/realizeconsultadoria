@@ -6,6 +6,7 @@ import { ModuleIcon } from '@/modules/workspace/components/ModuleIcon';
 import { getModule } from '@/modules/workspace/lib/navigation';
 import { TicketListItem } from '../components/TicketListItem';
 import { NewTicketDialog } from '../components/NewTicketDialog';
+import { RemoteSupportCard } from '../components/RemoteSupportCard';
 import { TicketThread } from '../components/TicketThread';
 import { useMyTickets } from '../hooks/useMyTickets';
 import { countTickets, filterTickets, TICKET_FILTERS, type TicketFilter } from '../lib/ticketRules';
@@ -71,6 +72,7 @@ const SupportPage: React.FC = () => {
               </button>
             ))}
           </div>
+          <RemoteSupportCard />
         </div>
         <div className="rz-scroll min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-28 pt-1 md:pb-3">
           {isLoading ? (

@@ -66,10 +66,9 @@ const prefixed = (prefix: string, subject: string) =>
 const quote = (message: MailMessage) => {
   const when = format(new Date(message.date), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: pt });
   const body = (message.text ?? htmlToText(message.html ?? '')).trim();
-  return `\n\nEm ${when}, ${nameOf(message.from)} escreveu:\n${body
-    .split('\n')
-    .map(line => `> ${line}`)
-    .join('\n')}`;
+  // Sem "> " no início das linhas: na caixa de escrever lê-se como texto normal (com a barra
+  // ao lado), e o email sai com a citação em HTML (repliedHtml).
+  return `\n\nEm ${when}, ${nameOf(message.from)} escreveu:\n${body}`;
 };
 
 /** Rascunho para responder (a todos) ou reencaminhar. */

@@ -49,7 +49,8 @@ describe('webmail', () => {
     expect(draft.cc).toBe('rui@exemplo.pt, Marta <marta@exemplo.pt>');
     expect(draft.subject).toBe('Re: Plano de férias');
     expect(draft.inReplyTo).toBe('m1');
-    expect(draft.body).toContain('> Segue o plano.');
+    expect(draft.body).toContain('escreveu:\nOlá!\nSegue o plano.');
+    expect(draft.body).not.toContain('> ');
     expect(draftFrom({ ...message, subject: 'RE: x' }, 'reply', '').subject).toBe('RE: x');
   });
 

@@ -8,7 +8,7 @@ const storageKey = (userId: string) => `rz-tabs:${userId || 'preview'}`;
 /**
  * Abas (como no Chrome): navegar para um módulo (ou abrir um ficheiro dos Documentos) abre ou
  * atualiza a sua aba; as abas ficam guardadas neste dispositivo. Atalhos: Alt+1…9 muda de
- * aba, Alt+W fecha a atual. Um só estado para a barra e para os ficheiros abertos
+ * aba, Alt+W (ou Ctrl+W na app instalada) fecha a atual. Um só estado para a barra e para os ficheiros abertos
  * (WorkspaceTabsProvider).
  */
 export const useWorkspaceTabsState = () => {
@@ -57,6 +57,21 @@ export const useWorkspaceTabsState = () => {
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
+      // Ctrl+W na app instalada (janela própria): fecha a aba do Realize em vez da janela.
+      // Num separador normal o browser fecha-o antes de a página receber a tecla (Alt+W serve).
+      if (
+        (event.ctrlKey || event.metaKey) &&
+        !event.altKey &&
+        !event.shiftKey &&
+        event.code === 'KeyW' &&
+        active &&
+        tabs.length > 1 &&
+        window.matchMedia?.('(display-mode: standalone)').matches
+      ) {
+        event.preventDefault();
+        close(active);
+        return;
+      }
       if (!event.altKey || event.ctrlKey || event.metaKey) return;
       const digit = /^Digit([1-9])$/.exec(event.code)?.[1];
       if (digit) {

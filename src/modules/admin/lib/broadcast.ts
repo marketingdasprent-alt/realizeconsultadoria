@@ -87,6 +87,8 @@ export interface BroadcastDraft {
   subject: string;
   message: string;
   senderName: string;
+  /** Assinatura de email de quem envia (Webmail); null = só o nome; undefined = ainda por escolher. */
+  signatureId?: string | null;
 }
 
 export type BroadcastErrors = Partial<Record<keyof BroadcastDraft | 'audience', string>>;

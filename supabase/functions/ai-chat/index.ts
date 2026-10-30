@@ -215,6 +215,43 @@ serve(async (req: Request) => {
     const systemToken = Deno.env.get('MAIL_SYSTEM_TOKEN');
     if (!systemToken || req.headers.get('x-system-token') !== systemToken)
       return json({ ok: false }, 401);
+    // { probe: 'rewrite' }: mede o "Usar IA" (modelo de escrita) e mostra o início da resposta.
+    const probe = (await req.json().catch(() => ({}))) as Record<string, unknown>;
+    if (probe.probe === 'rewrite') {
+      const apiKey = (Deno.env.get('AI_API_KEY') ?? Deno.env.get('OLLAMA_API_KEY'))?.trim();
+      const writeModel = Deno.env.get('AI_WRITE_MODEL') || toolsModel;
+      const started = Date.now();
+      try {
+        const { message, status } = await callModel(
+          baseUrl,
+          writeModel,
+          apiKey,
+          [
+            { role: 'system', content: rewritePrompt('complete', 'Teste') },
+            { role: 'user', content: rewriteUserMessage(String(probe.text ?? 'ola'), '', '') },
+          ],
+          false,
+          TIME_BUDGET_MS,
+          1500
+        );
+        const raw = typeof message?.content === 'string' ? message.content : null;
+        return json({
+          ok: true,
+          model: writeModel,
+          status,
+          ms: Date.now() - started,
+          raw: raw?.slice(0, 400) ?? null,
+          parsed: raw ? parseRewrite(raw) : null,
+        });
+      } catch (error) {
+        return json({
+          ok: false,
+          model: writeModel,
+          ms: Date.now() - started,
+          error: error instanceof Error ? `${error.name}: ${error.message}` : String(error),
+        });
+      }
+    }
     return json(await healthCheck(baseUrl, chatModel, toolsModel));
   }
 
@@ -303,24 +340,31 @@ serve(async (req: Request) => {
     const subject = typeof body.subject === 'string' ? body.subject.slice(0, 300) : '';
     const context =
       typeof body.context === 'string' ? body.context.trim().slice(0, MAX_REWRITE_CONTEXT) : '';
+    const deadline = Date.now() + TIME_BUDGET_MS;
     try {
-      const { message, status } = await callModel(
-        baseUrl,
-        writeModel,
-        apiKey,
-        [
-          { role: 'system', content: rewritePrompt(mode, employee.name.split(' ')[0]) },
-          { role: 'user', content: rewriteUserMessage(text, subject, context) },
-        ],
-        false,
-        TIME_BUDGET_MS,
-        1500
-      );
-      if (status === 401 || status === 403)
-        return fail('not_configured', 'A chave da IA não é válida. Fale com a administração.');
-      const result = parseRewrite(typeof message?.content === 'string' ? message.content : '');
-      if (!result.text) return fail('unavailable', UNAVAILABLE);
-      return json({ ok: true, text: result.text, subject: result.subject });
+      // O servidor da IA às vezes falha quando está a carregar o modelo: tenta-se outra vez.
+      for (let attempt = 0; attempt < 2; attempt += 1) {
+        const remaining = deadline - Date.now();
+        if (remaining < 20_000) break;
+        const { message, status } = await callModel(
+          baseUrl,
+          writeModel,
+          apiKey,
+          [
+            { role: 'system', content: rewritePrompt(mode, employee.name.split(' ')[0]) },
+            { role: 'user', content: rewriteUserMessage(text, subject, context) },
+          ],
+          false,
+          remaining,
+          1500
+        );
+        if (status === 401 || status === 403)
+          return fail('not_configured', 'A chave da IA não é válida. Fale com a administração.');
+        const result = parseRewrite(typeof message?.content === 'string' ? message.content : '');
+        if (result.text) return json({ ok: true, text: result.text, subject: result.subject });
+        console.error('ai-chat: reescrever sem texto', status, 'tentativa', attempt + 1);
+      }
+      return fail('unavailable', UNAVAILABLE);
     } catch (error) {
       const timedOut = error instanceof DOMException && error.name === 'AbortError';
       console.error('ai-chat: reescrever falhou', timedOut ? 'tempo esgotado' : error);

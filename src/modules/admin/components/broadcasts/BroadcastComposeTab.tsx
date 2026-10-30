@@ -60,6 +60,7 @@ export const BroadcastComposeTab: React.FC<BroadcastComposeTabProps> = ({
             draft={bc.draft}
             errors={bc.errors}
             onChange={bc.updateDraft}
+            signatures={bc.signatures}
             attachments={bc.attachments}
             uploading={bc.uploading}
             onAddFiles={files => void bc.addFiles(files)}
@@ -71,7 +72,11 @@ export const BroadcastComposeTab: React.FC<BroadcastComposeTabProps> = ({
       </div>
 
       <aside className="space-y-3 xl:sticky xl:top-4 xl:self-start">
-        <BroadcastPreview draft={bc.draft} attachments={bc.attachments} />
+        <BroadcastPreview
+          draft={bc.draft}
+          attachments={bc.attachments}
+          signatureHtml={bc.signatures.find(sig => sig.id === bc.draft.signatureId)?.html ?? null}
+        />
         {!loadingPermissions && !canSend ? (
           <p className="rounded-2xl bg-amber-50 px-4 py-3 text-[13px] text-amber-800">
             Pode ver, mas não tem permissão para enviar comunicados.

@@ -21,7 +21,8 @@ export const rewritePrompt = (mode: RewriteMode, writerName: string) =>
   `Reescreve o texto do email que te derem, em português de Portugal (nunca do Brasil: "está a fazer", "telemóvel", "equipa", "facto"). ` +
   `${GOALS[mode]} ` +
   `Mantém exatamente os nomes, datas, horas, números, valores, endereços de email e ligações. ` +
-  `Não inventes informação, compromissos nem anexos. Não escrevas a assinatura com o nome (a assinatura é posta à parte). ` +
+  `Não inventes informação, compromissos nem anexos. Não escrevas a assinatura com o nome (a assinatura é posta à parte) nem marcadores como [Seu Nome] ou [Cargo]. ` +
+  `Usa o tom de Portugal: "Caros colegas" ou "Bom dia," (nunca "Prezados"), e termina com "Com os melhores cumprimentos," (nunca "Atenciosamente"). ` +
   `Usa texto simples, sem markdown (nada de **, # ou listas com *). ` +
   `Escreve também um assunto curto e claro (até 8 palavras) para o email. ` +
   `Responde exatamente neste formato, sem mais nada antes ou depois:\nASSUNTO: <o assunto>\n\n<o texto do email>`;
@@ -61,5 +62,8 @@ export const cleanRewrite = (raw: string) =>
     .replace(/^["“](.*)["”]$/s, '$1')
     .replace(/\*\*(.+?)\*\*/g, '$1')
     .replace(/^#+\s*/gm, '')
+    // Marcadores por preencher ("[Seu Nome]", "[Cargo]"): a assinatura já trata disso.
+    .replace(/^[ \t]*\[[^\]\n]{1,40}\][ \t]*$/gm, '')
+    .replace(/^Atenciosamente,?$/gim, 'Com os melhores cumprimentos,')
     .replace(/\n{3,}/g, '\n\n')
     .trim();

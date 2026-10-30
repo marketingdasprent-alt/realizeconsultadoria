@@ -19,7 +19,7 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { adminCaller } from '../_shared/admin-caller.ts';
-import { broadcastEmailHtml } from '../_shared/broadcast-email.ts';
+import { broadcastEmailHtml, cleanSignatureHtml } from '../_shared/broadcast-email.ts';
 
 const SENDER_EMAIL = 'marketing@dasprent.pt';
 const BATCH_SIZE = 10;
@@ -50,6 +50,7 @@ interface BroadcastRequest {
   subject?: string;
   message?: string;
   senderName?: string;
+  signatureId?: string | null;
   employeeIds?: string[];
   audience?: { mode?: string; companyIds?: string[]; label?: string };
   publishInApp?: boolean;
@@ -155,7 +156,19 @@ serve(async (req: Request) => {
     if (signed?.signedUrl) attachments.push({ url: signed.signedUrl, name: file.name });
   }
 
-  const html = broadcastEmailHtml({ subject, message, senderName });
+  // Assinatura de email de quem envia (só as próprias; o HTML é limpo antes de entrar).
+  let signatureHtml: string | null = null;
+  if (typeof body?.signatureId === 'string') {
+    const { data: signature } = await db
+      .from('mail_signatures')
+      .select('html')
+      .eq('id', body.signatureId)
+      .eq('user_id', caller.userId)
+      .maybeSingle();
+    signatureHtml = signature?.html ? cleanSignatureHtml(signature.html) : null;
+  }
+
+  const html = broadcastEmailHtml({ subject, message, senderName, signatureHtml });
   const failed: string[] = [];
   let sent = 0;
   for (let i = 0; i < emails.length; i += BATCH_SIZE) {

@@ -9,11 +9,14 @@ import { EmojiPicker } from '@/modules/messenger/components/EmojiPicker';
 import type { BroadcastDraft, BroadcastErrors } from '../../lib/broadcast';
 import type { BroadcastAttachment } from '../../services/broadcastService';
 import { BroadcastAi } from './BroadcastAi';
+import { BroadcastSignaturePicker } from './BroadcastSignaturePicker';
+import type { BroadcastSignature } from '../../services/broadcastService';
 
 interface BroadcastFieldsProps {
   draft: BroadcastDraft;
   errors: BroadcastErrors;
   onChange: (patch: Partial<BroadcastDraft>) => void;
+  signatures: BroadcastSignature[];
   attachments: BroadcastAttachment[];
   uploading: boolean;
   onAddFiles: (files: FileList | null) => void;
@@ -51,6 +54,7 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
   onRemoveFile,
   publishInApp,
   onPublishInApp,
+  signatures,
 }) => {
   const fileInput = useRef<HTMLInputElement>(null);
   const messageRef = useRef<HTMLTextAreaElement>(null);
@@ -92,6 +96,11 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
           onChange={event => onChange({ senderName: event.target.value })}
           maxLength={120}
           className="h-10"
+        />
+        <BroadcastSignaturePicker
+          signatures={signatures}
+          value={draft.signatureId ?? null}
+          onChange={signatureId => onChange({ signatureId })}
         />
       </Field>
 

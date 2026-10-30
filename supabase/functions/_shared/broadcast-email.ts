@@ -26,10 +26,24 @@ export const messageToHtml = (message: string): string =>
     )
     .join('');
 
+/**
+ * Assinatura de email (HTML guardado pela própria pessoa no Webmail) sem nada que corra:
+ * fora scripts, estilos, iframes e formulários, atributos on*, e ligações javascript:/data:.
+ */
+export const cleanSignatureHtml = (html: string): string =>
+  html
+    .slice(0, 20000)
+    .replace(/<(script|style|iframe|object|embed|form|svg|math)\b[\s\S]*?<\/\1\s*>/gi, '')
+    .replace(/<(script|style|iframe|object|embed|form|link|meta|base|input|button)\b[^>]*>/gi, '')
+    .replace(/\s+on[a-z]+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
+    .replace(/(href|src)\s*=\s*(["']?)\s*(javascript|vbscript|data):[^"'\s>]*\2/gi, '$1="#"');
+
 export const broadcastEmailHtml = (opts: {
   subject: string;
   message: string;
   senderName: string;
+  /** Assinatura de quem envia (já limpa); sem ela, vai só o nome. */
+  signatureHtml?: string | null;
 }): string => `<!doctype html>
 <html lang="pt"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${escapeHtml(opts.subject)}</title></head>
@@ -46,7 +60,7 @@ export const broadcastEmailHtml = (opts: {
           ${messageToHtml(opts.message)}
         </td></tr>
         <tr><td style="padding:4px 28px 26px 28px;font-size:14px;color:#555555;">
-          ${escapeHtml(opts.senderName)}
+          ${opts.signatureHtml || escapeHtml(opts.senderName)}
         </td></tr>
         <tr><td style="background:#faf8f4;padding:14px 28px;font-size:11px;color:#8a8597;">
           Comunicado interno da Realize Consultadoria · ${new Date().getFullYear()}

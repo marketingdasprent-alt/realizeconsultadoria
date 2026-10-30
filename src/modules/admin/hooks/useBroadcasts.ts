@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import {
@@ -15,6 +15,24 @@ import {
 import { broadcastService, type BroadcastAttachment } from '../services/broadcastService';
 
 const HISTORY_KEY = ['admin', 'broadcasts'];
+// O comunicado a meio fica guardado neste browser: sair para o Workspace e voltar não o perde.
+const DRAFT_KEY = 'rz.admin.broadcast.draft';
+
+interface SavedBroadcast {
+  draft: BroadcastDraft;
+  audience: Audience;
+  publishInApp: boolean;
+  attachments: BroadcastAttachment[];
+}
+
+const readSaved = (): SavedBroadcast | null => {
+  try {
+    const raw = localStorage.getItem(DRAFT_KEY);
+    return raw ? (JSON.parse(raw) as SavedBroadcast) : null;
+  } catch {
+    return null;
+  }
+};
 
 const emptyDraft = (): BroadcastDraft => ({
   subject: '',
@@ -26,10 +44,38 @@ const emptyDraft = (): BroadcastDraft => ({
 export const useBroadcasts = (companies: { id: string; name: string }[]) => {
   const { toast } = useToast();
   const queryClient = useQueryClient();
-  const [draft, setDraft] = useState<BroadcastDraft>(emptyDraft);
-  const [audience, setAudience] = useState<Audience>(emptyAudience);
-  const [publishInApp, setPublishInApp] = useState(true);
-  const [attachments, setAttachments] = useState<BroadcastAttachment[]>([]);
+  const [saved] = useState(readSaved);
+  const [draft, setDraft] = useState<BroadcastDraft>(() => saved?.draft ?? emptyDraft());
+  const [audience, setAudience] = useState<Audience>(() => saved?.audience ?? emptyAudience());
+  const [publishInApp, setPublishInApp] = useState(saved?.publishInApp ?? true);
+  const [attachments, setAttachments] = useState<BroadcastAttachment[]>(
+    () => saved?.attachments ?? []
+  );
+
+  useEffect(() => {
+    try {
+      const empty = !draft.subject.trim() && !draft.message.trim() && !attachments.length;
+      if (empty) localStorage.removeItem(DRAFT_KEY);
+      else
+        localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ draft, audience, publishInApp, attachments } satisfies SavedBroadcast)
+        );
+    } catch {
+      // sem armazenamento (janela privada): fica só em memória
+    }
+  }, [draft, audience, publishInApp, attachments]);
+
+  // Assina com a assinatura de email de quem envia (a predefinida), se tiver.
+  const signatures = useQuery({
+    queryKey: ['admin', 'broadcast-signatures'],
+    queryFn: broadcastService.mySignatures,
+    staleTime: 5 * 60_000,
+  });
+  useEffect(() => {
+    if (!signatures.data || draft.signatureId !== undefined) return;
+    setDraft(current => ({ ...current, signatureId: signatures.data[0]?.id ?? null }));
+  }, [signatures.data, draft.signatureId]);
   const [uploading, setUploading] = useState(false);
   const [errors, setErrors] = useState<BroadcastErrors>({});
   const [busy, setBusy] = useState<'test' | 'send' | null>(null);
@@ -107,7 +153,7 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
         .join(' '),
       variant: result.failed.length ? 'destructive' : undefined,
     });
-    setDraft(emptyDraft());
+    setDraft({ ...emptyDraft(), signatureId: draft.signatureId });
     setAttachments([]);
     void queryClient.invalidateQueries({ queryKey: HISTORY_KEY });
     return true;
@@ -127,6 +173,7 @@ export const useBroadcasts = (companies: { id: string; name: string }[]) => {
     uploading,
     errors,
     busy,
+    signatures: signatures.data ?? [],
     people,
     isLoading: employees.isLoading,
     recipients,

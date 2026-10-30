@@ -8,6 +8,13 @@ type SentReaction = Omit<NoticeReactionRow, 'notification_id'>;
 
 export type BroadcastHistoryRow = Database['public']['Tables']['marketing_emails']['Row'];
 
+export interface BroadcastSignature {
+  id: string;
+  name: string;
+  html: string;
+  is_default: boolean;
+}
+
 export interface BroadcastAttachment {
   name: string;
   path: string;
@@ -119,6 +126,20 @@ export const broadcastService = {
       { body: { action: 'remind', noticeIds, employeeIds } }
     );
     return error || !data?.ok ? null : data.sent;
+  },
+
+  /** As minhas assinaturas do Webmail (a predefinida primeiro), para assinar o comunicado. */
+  mySignatures: async (): Promise<BroadcastSignature[]> => {
+    const { data: session } = await supabase.auth.getSession();
+    const userId = session.session?.user.id;
+    if (!userId) return [];
+    const { data } = await supabase
+      .from('mail_signatures')
+      .select('id, name, html, is_default')
+      .eq('user_id', userId)
+      .order('is_default', { ascending: false })
+      .order('name');
+    return data ?? [];
   },
 
   /** Guarda um anexo (bucket privado marketing-emails) antes de enviar. */

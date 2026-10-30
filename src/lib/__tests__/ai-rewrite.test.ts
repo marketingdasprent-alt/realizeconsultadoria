@@ -53,3 +53,14 @@ describe('assunto escrito pela IA', () => {
     expect(keepsSubject('Proposta')).toBe(false);
   });
 });
+
+describe('limpeza do texto da IA', () => {
+  it('tira marcadores por preencher e troca a despedida brasileira', async () => {
+    const { cleanRewrite } = await import('../../../supabase/functions/_shared/ai/rewrite');
+    expect(
+      cleanRewrite(
+        'Caros colegas,\n\nObrigado.\n\nAtenciosamente,\n\n[Seu Nome]\n[Seu Cargo]\n[Seu Email]'
+      )
+    ).toBe('Caros colegas,\n\nObrigado.\n\nCom os melhores cumprimentos,');
+  });
+});

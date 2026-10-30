@@ -71,7 +71,7 @@ export const AiRewriteBar: React.FC<AiRewriteBarProps> = ({
     </div>
     {busy && (
       <span className="text-[12px] text-rz-muted">
-        Pode demorar uns 20 segundos. Pode minimizar, continua a escrever.
+        Pode demorar até 1 minuto. Pode minimizar, continua a escrever.
       </span>
     )}
     {canUndo && !busy && (

@@ -2,6 +2,7 @@ import React from 'react';
 import { Paperclip } from 'lucide-react';
 import type { BroadcastDraft } from '../../lib/broadcast';
 import type { BroadcastAttachment } from '../../services/broadcastService';
+import { signatureToHtml } from '@/modules/webmail/lib/signature';
 
 const URL_PATTERN = /(https?:\/\/[^\s]+[^\s.,;:!?)])/g;
 
@@ -24,7 +25,10 @@ const Paragraph: React.FC<{ text: string }> = ({ text }) => (
 export const BroadcastPreview: React.FC<{
   draft: BroadcastDraft;
   attachments: BroadcastAttachment[];
-}> = ({ draft, attachments }) => {
+  /** Assinatura de email escolhida (no lugar do nome, como no email). */
+  signatureHtml?: string | null;
+}> = ({ draft, attachments, signatureHtml }) => {
+  const signature = signatureToHtml(signatureHtml ?? null);
   const paragraphs = draft.message
     .trim()
     .split(/\n\s*\n/)
@@ -45,7 +49,15 @@ export const BroadcastPreview: React.FC<{
           ) : (
             <p className="text-rz-muted">A mensagem aparece aqui enquanto escreve.</p>
           )}
-          <p className="pb-4 pt-1 text-[13px] text-[#555555]">{draft.senderName}</p>
+          {signature ? (
+            // Já limpa (sem scripts nem eventos): é a assinatura da própria pessoa.
+            <div
+              className="pb-4 pt-1 text-[13px] [&_img]:inline-block [&_img]:max-w-full"
+              dangerouslySetInnerHTML={{ __html: signature }}
+            />
+          ) : (
+            <p className="pb-4 pt-1 text-[13px] text-[#555555]">{draft.senderName}</p>
+          )}
         </div>
         {attachments.length > 0 && (
           <div className="flex flex-wrap gap-1.5 border-t border-[#eee] px-6 py-3">

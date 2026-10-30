@@ -5,7 +5,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useDirectory } from '@/modules/social/hooks/useDirectory';
 import { attachmentClipboard, useCopiedAttachments } from '../lib/attachmentClipboard';
 import { attachmentFile } from '../lib/attachments';
-import { parseRecipients } from '../lib/mailFormat';
+import { MAIL_FONT, parseRecipients } from '../lib/mailFormat';
 import { FORWARD_MARKER } from '../lib/forward';
 import { signatureToHtml, writtenPart } from '../lib/signature';
 import { checkBeforeSend, type SendCheck } from '../lib/sendCheck';
@@ -491,7 +491,11 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               className={FIELD}
             />
           </Row>
-          <div className="rz-scroll min-h-[160px] flex-1 overflow-y-auto px-5 py-4 text-[14.5px] leading-relaxed">
+          <div
+            className="rz-scroll min-h-[160px] flex-1 overflow-y-auto px-5 py-4 text-[14.5px] leading-relaxed"
+            // A mesma letra com que o email sai (e a das assinaturas).
+            style={{ fontFamily: MAIL_FONT }}
+          >
             <AutoTextarea
               value={fields.body}
               onChange={e => set('body', e.target.value)}

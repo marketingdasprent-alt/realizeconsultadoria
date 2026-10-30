@@ -3,6 +3,7 @@ import { Code2, ImagePlus, PenLine } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { sanitizeSignatureHtml, signatureToHtml } from '../lib/signature';
+import { MAIL_FONT } from '../lib/mailFormat';
 import {
   caretRangeAt,
   dragHasFiles,
@@ -221,6 +222,7 @@ export const SignatureEditor: React.FC<SignatureEditorProps> = ({ initial, onCha
             onClick={event =>
               setImage(event.target instanceof HTMLImageElement ? event.target : null)
             }
+            style={{ fontFamily: MAIL_FONT }}
             className="min-h-[300px] resize-y overflow-auto rounded-2xl bg-white px-4 py-3 text-[14px] leading-relaxed outline-none ring-1 ring-rz-line focus:ring-rz-primary/40 [&_a]:text-rz-primary [&_a]:underline [&_img]:inline-block [&_img]:cursor-pointer [&_ol]:list-decimal [&_ol]:pl-6 [&_ul]:list-disc [&_ul]:pl-6"
             aria-label="Assinatura"
           />
@@ -246,7 +248,7 @@ export const SignatureEditor: React.FC<SignatureEditorProps> = ({ initial, onCha
           <iframe
             title="Pré-visualização da assinatura"
             sandbox=""
-            srcDoc={`<!doctype html><meta charset="utf-8"><body style="margin:12px;font-family:Arial,sans-serif;font-size:14px">${sanitizeSignatureHtml(html)}</body>`}
+            srcDoc={`<!doctype html><meta charset="utf-8"><body style="margin:12px;font-family:${MAIL_FONT};font-size:14px">${sanitizeSignatureHtml(html)}</body>`}
             className="h-44 w-full rounded-2xl bg-white ring-1 ring-rz-line"
           />
         </>

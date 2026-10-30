@@ -1,6 +1,6 @@
 // Assinaturas de email em HTML: limpeza (o HTML vai para emails de terceiros), conversão das
 // assinaturas antigas em texto e montagem do email final (texto + assinatura + citação).
-import { htmlToText, textToHtml } from './mailFormat';
+import { htmlToText, MAIL_FONT, textToHtml } from './mailFormat';
 
 const ALLOWED_TAGS = new Set([
   'a',
@@ -144,7 +144,9 @@ export const composeWithSignature = (
   const quoted = match ? text.slice(match.index) : '';
   const html =
     textToHtml(written) +
-    (signature ? `<div style="margin-top:16px">${signature}</div>` : '') +
+    (signature
+      ? `<div style="margin-top:16px;font-family:${MAIL_FONT};font-size:14px">${signature}</div>`
+      : '') +
     (quoted ? (quotedHtml ?? textToHtml(quoted)) : '');
   const plain = signature ? `${written}\n\n--\n${htmlToText(signature).trim()}${quoted}` : text;
   return { text: plain, html };

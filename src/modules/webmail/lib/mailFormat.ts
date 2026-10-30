@@ -128,8 +128,14 @@ const escapeHtml = (text: string) =>
   text.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 
 /** Texto do compositor → HTML simples (parágrafos e citações). */
+/**
+ * Letra dos emails escritos no Realize: a mesma das assinaturas (Open Sans); onde não houver,
+ * Arial. O texto, a assinatura e a pré-visualização usam todos esta.
+ */
+export const MAIL_FONT = "'Open Sans',Arial,Helvetica,sans-serif";
+
 export const textToHtml = (text: string) =>
-  `<div style="font-family:Arial,sans-serif;font-size:14px;line-height:1.5">${escapeHtml(text)
+  `<div style="font-family:${MAIL_FONT};font-size:14px;line-height:1.5">${escapeHtml(text)
     .split('\n')
     .map(line =>
       line.startsWith('&gt; ') ? `<span style="color:#64748b">${line}</span>` : line || '&nbsp;'

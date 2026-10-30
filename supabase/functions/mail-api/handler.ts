@@ -280,13 +280,20 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const folderId = optionalString(body.folder_id, 1000);
       if (folderId && /[\r\n\0]/.test(folderId)) return badRequest();
       const driver = await createDriver(db, account, pendingSecret);
+      const params = {
+        folder,
+        query: optionalString(body.query, 200),
+        pageToken: optionalString(body.page_token, 4000),
+        limit: parseListLimit(body.limit),
+        folderId,
+      };
       try {
-        const result = await driver.list({
-          folder,
-          query: optionalString(body.query, 200),
-          pageToken: optionalString(body.page_token, 4000),
-          limit: parseListLimit(body.limit),
-          folderId,
+        // Uma falha de ligação passageira (ex.: servidor partilhado a recusar várias ligações
+        // ao mesmo tempo) tenta-se outra vez antes de desistir.
+        const result = await driver.list(params).catch(async error => {
+          if (!isMailError(error) || error.code !== 'provider_error') throw error;
+          await new Promise(resolve => setTimeout(resolve, 1500));
+          return driver.list(params);
         });
         await updateAccountStatus(db, account.id, {
           status: 'active',
@@ -296,7 +303,19 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
         return ok(result);
       } catch (error) {
         if (isMailError(error) && error.code === 'provider_error') {
-          await updateAccountStatus(db, account.id, { status: 'error', last_error: error.message });
+          // Só fica "com erro" (o ⚠️) se a caixa não sincroniza há mais de 30 minutos; uma falha
+          // isolada fica só registada, sem alarmar quem usa a caixa.
+          const { data: row } = await db
+            .from('mail_accounts')
+            .select('last_sync_at')
+            .eq('id', account.id)
+            .maybeSingle();
+          const lastSync = row?.last_sync_at ? Date.parse(row.last_sync_at) : 0;
+          const stuck = !lastSync || Date.now() - lastSync > 30 * 60_000;
+          await updateAccountStatus(db, account.id, {
+            ...(stuck ? { status: 'error' as const } : {}),
+            last_error: error.message,
+          });
         }
         throw error;
       }

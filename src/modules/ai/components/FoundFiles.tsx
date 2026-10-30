@@ -2,17 +2,22 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { FileText, Folder } from 'lucide-react';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
+import { opensInEditor, previewKind } from '@/modules/documents/lib/companyFiles';
 import type { AiFoundFile } from '../services/aiService';
 
 /** Ficheiros e pastas que a Realize IA encontrou no servidor: abrem na página Documentos. */
 export const FoundFiles: React.FC<{ files: AiFoundFile[] }> = ({ files }) => {
   const { basePath } = useWorkspace();
   const linkFor = (file: AiFoundFile) => {
+    // As mesmas regras da página Documentos: editor, pré-visualização (imagens e vídeos) ou, para
+    // os outros tipos (ZIP, executáveis…), a pasta onde está (de onde se descarrega).
     const params = new URLSearchParams();
     if (file.type === 'dir') params.set('pasta', file.path);
     else {
       params.set('pasta', file.path.slice(0, file.path.lastIndexOf('/')));
-      params.set('abrir', file.path);
+      const entry = { name: file.name, type: 'file' as const };
+      if (opensInEditor(entry)) params.set('abrir', file.path);
+      else if (previewKind(entry)) params.set('ver', file.path);
     }
     return `${basePath}/documentos?${params.toString()}`;
   };

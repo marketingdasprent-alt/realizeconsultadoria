@@ -27,6 +27,12 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
   const [editing, setEditing] = useState<ChatMessage | null>(null);
   const [toDelete, setToDelete] = useState<ChatMessage | null>(null);
   const [toForward, setToForward] = useState<ChatMessage | null>(null);
+  // Quem se pode marcar com @: os outros membros da conversa.
+  const directoryNames = new Map(api.directory.map(person => [person.userId, person.name]));
+  const mentionPeople = api.members
+    .filter(member => member.userId !== api.me.userId)
+    .map(member => ({ userId: member.userId, name: directoryNames.get(member.userId) ?? '' }))
+    .filter(person => person.name);
   const [renaming, setRenaming] = useState(false);
   const [search, setSearch] = useState<string | null>(null);
   // Mensagem a transformar em tarefa (briefing §28: Chat → Tarefas).
@@ -122,6 +128,7 @@ export const ConversationView: React.FC<ConversationViewProps> = ({ conversation
       <div className="pb-24 md:pb-0">
         <MessageComposer
           conversationId={conversation.id}
+          people={mentionPeople}
           staged={staged}
           onStagedChange={setStaged}
           onSend={input => {

@@ -2,6 +2,7 @@ import React from 'react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
+  AtSign,
   Award,
   Bell,
   FolderOpen,
@@ -23,6 +24,7 @@ const KINDS: Record<string, { icon: typeof Bell; tint: string }> = {
   document: { icon: FolderOpen, tint: 'from-amber-400 to-orange-500' },
   assistant: { icon: Sparkles, tint: 'from-violet-500 via-fuchsia-500 to-amber-400' },
   mail: { icon: Mail, tint: 'from-sky-400 to-blue-600' },
+  mention: { icon: AtSign, tint: 'from-violet-500 to-fuchsia-500' },
 };
 
 interface NotificationItemProps {

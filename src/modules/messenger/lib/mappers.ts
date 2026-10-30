@@ -69,12 +69,24 @@ export const toConversation = (
   };
 };
 
-const groupReactions = (rows: ReactionRow[], myUserId: string): MessageReaction[] => {
+const groupReactions = (
+  rows: ReactionRow[],
+  myUserId: string,
+  names: Map<string, string>
+): MessageReaction[] => {
   const byEmoji = new Map<string, MessageReaction>();
   for (const row of rows) {
-    const current = byEmoji.get(row.emoji) ?? { emoji: row.emoji, count: 0, mine: false };
+    const current = byEmoji.get(row.emoji) ?? {
+      emoji: row.emoji,
+      count: 0,
+      mine: false,
+      names: [],
+    };
     current.count += 1;
     current.mine = current.mine || row.user_id === myUserId;
+    current.names.push(
+      row.user_id === myUserId ? 'Eu' : (names.get(row.user_id) ?? FORMER_COLLEAGUE)
+    );
     byEmoji.set(row.emoji, current);
   }
   return [...byEmoji.values()];
@@ -127,8 +139,13 @@ export const toMessage = (row: MessageRow, ctx: MessageContext): ChatMessage => 
       : undefined,
     reactions: groupReactions(
       ctx.reactions.filter(reaction => reaction.message_id === row.id),
-      ctx.myUserId
+      ctx.myUserId,
+      ctx.names
     ),
+    mentionNames: (row.mentions ?? [])
+      .map(id => ctx.names.get(id))
+      .filter((name): name is string => !!name),
+    mentionsMe: (row.mentions ?? []).includes(ctx.myUserId),
     read: isMine && ctx.isDirect && !!peer && peer.last_read_at >= row.created_at,
   };
 };

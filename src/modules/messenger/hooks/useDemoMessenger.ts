@@ -102,10 +102,17 @@ export const useDemoMessenger = (): MessengerApi => {
         const next = existing
           ? list
               .map(r =>
-                r.emoji === emoji ? { ...r, count: r.count + (r.mine ? -1 : 1), mine: !r.mine } : r
+                r.emoji === emoji
+                  ? {
+                      ...r,
+                      count: r.count + (r.mine ? -1 : 1),
+                      mine: !r.mine,
+                      names: r.mine ? r.names.filter(n => n !== 'Eu') : [...r.names, 'Eu'],
+                    }
+                  : r
               )
               .filter(r => r.count > 0)
-          : [...list, { emoji, count: 1, mine: true }];
+          : [...list, { emoji, count: 1, mine: true, names: ['Eu'] }];
         return { ...m, reactions: next };
       }),
     [patchMessage]

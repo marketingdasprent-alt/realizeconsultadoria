@@ -116,6 +116,7 @@ export const useMessengerActions = ({
           attachment_mime: blob ? mime : null,
           duration_sec: input.audio ? Math.round(input.audio.durationSec * 10) / 10 : null,
           reply_to_id: input.replyToId ?? null,
+          mentions: input.mentions ?? [],
         });
         if (error || !data) throw error ?? new Error('insert');
         qc.setQueryData(CHAT_KEYS.thread(conversationId), (cache: InfiniteData<MessageRow[]>) =>

@@ -47,6 +47,8 @@ export interface MessageReaction {
   emoji: string;
   count: number;
   mine: boolean;
+  /** Quem reagiu (eu aparece como "Eu"). */
+  names: string[];
 }
 
 export interface ChatAttachment {
@@ -72,6 +74,10 @@ export interface ChatMessage {
   deleted?: boolean;
   replyTo?: { id: string; authorName: string; text: string };
   reactions?: MessageReaction[];
+  /** Nomes das pessoas marcadas com @ (para destacar no texto). */
+  mentionNames?: string[];
+  /** Fui marcado nesta mensagem. */
+  mentionsMe?: boolean;
   /** Lida pelo colega (conversas privadas). */
   read?: boolean;
   /** A enviar (ainda sem confirmação do servidor). */
@@ -87,6 +93,8 @@ export interface SendInput {
   file?: File;
   audio?: { blob: Blob; durationSec: number };
   replyToId?: string;
+  /** Pessoas marcadas com @ (recebem notificação). */
+  mentions?: string[];
 }
 
 export type MemberFlag = 'pinned' | 'muted' | 'archived';

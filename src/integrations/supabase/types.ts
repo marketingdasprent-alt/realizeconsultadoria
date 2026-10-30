@@ -1083,6 +1083,7 @@ export type Database = {
           edited_at: string | null;
           id: string;
           kind: string;
+          mentions: string[];
           reply_to_id: string | null;
           sender_id: string | null;
         };
@@ -1099,6 +1100,7 @@ export type Database = {
           edited_at?: string | null;
           id?: string;
           kind?: string;
+          mentions?: string[];
           reply_to_id?: string | null;
           sender_id?: string | null;
         };
@@ -1115,6 +1117,7 @@ export type Database = {
           edited_at?: string | null;
           id?: string;
           kind?: string;
+          mentions?: string[];
           reply_to_id?: string | null;
           sender_id?: string | null;
         };

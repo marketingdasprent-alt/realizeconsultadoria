@@ -209,7 +209,7 @@ export const DEMO_MESSAGES: Record<string, ChatMessage[]> = {
         authorName: 'Eu',
         text: 'Olá Ana! Sim, de 4 a 15. Está tudo bem com as datas?',
       },
-      reactions: [{ emoji: '🎉', count: 1, mine: true }],
+      reactions: [{ emoji: '🎉', count: 1, mine: true, names: ['Eu'] }],
     }),
   ],
   ai: [

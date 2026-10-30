@@ -3,6 +3,8 @@ import { format } from 'date-fns';
 import { AlertCircle, Ban, CheckCheck, Clock3, RotateCw, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { richTextParts } from '@/modules/social/lib/richText';
+import { mentionParts } from '../lib/mentions';
+import { ReactionChips } from './ReactionChips';
 import { useOptionalMessenger } from '../context/useMessengerApi';
 import type { ChatMessage } from '../types';
 import { AudioAttachment } from './attachments/AudioAttachment';
@@ -21,6 +23,36 @@ interface MessageBubbleProps extends MessageActionHandlers {
   isMatch?: boolean;
 }
 
+/** Texto da mensagem: ligações clicáveis e os "@Nome" das pessoas marcadas em destaque. */
+const MessageText: React.FC<{ text: string; mentions: string[] }> = ({ text, mentions }) => (
+  <>
+    {mentionParts(text, mentions).map((chunk, index) =>
+      chunk.mention ? (
+        <span key={index} className="rounded-md bg-black/10 px-0.5 font-bold">
+          {chunk.text}
+        </span>
+      ) : (
+        richTextParts(chunk.text).map((part, partIndex) =>
+          part.kind === 'link' ? (
+            <a
+              key={`${index}-${partIndex}`}
+              href={part.href}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={event => event.stopPropagation()}
+              className="break-all font-semibold underline underline-offset-2 hover:opacity-80"
+            >
+              {part.value}
+            </a>
+          ) : (
+            <React.Fragment key={`${index}-${partIndex}`}>{part.value}</React.Fragment>
+          )
+        )
+      )
+    )}
+  </>
+);
+
 const Body: React.FC<{ message: ChatMessage }> = ({ message }) => {
   if (message.deleted) {
     return (
@@ -38,22 +70,7 @@ const Body: React.FC<{ message: ChatMessage }> = ({ message }) => {
         <span
           className={cn('block whitespace-pre-wrap break-words', message.kind !== 'text' && 'mt-2')}
         >
-          {richTextParts(message.text).map((part, index) =>
-            part.kind === 'link' ? (
-              <a
-                key={index}
-                href={part.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                onClick={event => event.stopPropagation()}
-                className="break-all font-semibold underline underline-offset-2 hover:opacity-80"
-              >
-                {part.value}
-              </a>
-            ) : (
-              <React.Fragment key={index}>{part.value}</React.Fragment>
-            )
-          )}
+          <MessageText text={message.text} mentions={message.mentionNames ?? []} />
         </span>
       )}
     </>
@@ -112,7 +129,9 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
               : 'rounded-bl-md bg-white text-rz-ink ring-1 ring-rz-line',
             message.pending && 'opacity-70',
             message.failed && 'opacity-80 ring-2 ring-red-300',
-            isMatch && 'ring-2 ring-amber-400'
+            isMatch && 'ring-2 ring-amber-400',
+            // Fui marcado: a mensagem fica destacada.
+            !isMatch && message.mentionsMe && !mine && 'ring-2 ring-rz-primary/50'
           )}
         >
           {message.replyTo && !message.deleted && (
@@ -147,21 +166,11 @@ export const MessageBubble: React.FC<MessageBubbleProps> = ({
       </div>
       {message.failed && <FailedNotice messageId={message.id} />}
       {!message.deleted && message.reactions && message.reactions.length > 0 && (
-        <div className={cn('-mt-1.5 flex flex-wrap gap-1', mine ? 'mr-3' : 'ml-3')}>
-          {message.reactions.map(reaction => (
-            <button
-              key={reaction.emoji}
-              type="button"
-              onClick={() => handlers.onReact(message, reaction.emoji)}
-              className={cn(
-                'rounded-full bg-white px-2 py-0.5 text-xs shadow-sm ring-1 transition-colors hover:bg-rz-canvas',
-                reaction.mine ? 'ring-rz-primary/50' : 'ring-rz-line'
-              )}
-            >
-              {reaction.emoji} {reaction.count > 1 && reaction.count}
-            </button>
-          ))}
-        </div>
+        <ReactionChips
+          reactions={message.reactions}
+          mine={mine}
+          onReact={emoji => handlers.onReact(message, emoji)}
+        />
       )}
     </div>
   );

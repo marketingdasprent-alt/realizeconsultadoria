@@ -5,6 +5,9 @@ import { cn } from '@/lib/utils';
 import { EmojiSuggestions } from '@/modules/workspace/components/EmojiSuggestions';
 import { useEmojiAutocomplete } from '@/modules/workspace/hooks/useEmojiAutocomplete';
 import { useAudioRecorder } from '../hooks/useAudioRecorder';
+import { useMentions } from '../hooks/useMentions';
+import type { MentionPerson } from '../lib/mentions';
+import { MentionSuggestions } from './composer/MentionSuggestions';
 import { filesFromPaste } from '@/modules/workspace/hooks/useFileDrop';
 import { ACCEPT_ATTRIBUTE } from '../lib/files';
 import type { ChatMessage, SendInput } from '../types';
@@ -28,6 +31,8 @@ interface MessageComposerProps {
   /** Anexos à espera de envio (clipe, colar ou largar na conversa). */
   staged: File[];
   onStagedChange: (files: File[]) => void;
+  /** Quem se pode marcar com @ (os outros membros da conversa). */
+  people?: MentionPerson[];
 }
 
 const MAX_STAGED = 10;
@@ -45,6 +50,13 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
   const recorder = useAudioRecorder();
   // ":so" → lista de emojis, como no WhatsApp.
   const emoji = useEmojiAutocomplete({ value: text, onChange: setText, fieldRef: areaRef });
+  // "@an" → colegas da conversa, como no WhatsApp.
+  const mention = useMentions({
+    value: text,
+    onChange: setText,
+    fieldRef: areaRef,
+    people: props.people ?? [],
+  });
   const canSend = !disabled && (text.trim().length > 0 || (staged.length > 0 && !editing));
 
   // Ao abrir uma conversa, escreve-se logo (no telemóvel não, para o teclado não tapar a conversa).
@@ -70,7 +82,15 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
         )
       );
       onStagedChange([]);
-    } else onSend({ text: text.trim(), replyToId: replyTo?.id });
+    } else {
+      const mentions = mention.mentionedIn(text);
+      onSend({
+        text: text.trim(),
+        replyToId: replyTo?.id,
+        ...(mentions.length ? { mentions } : {}),
+      });
+    }
+    mention.reset();
     setText('');
   };
 
@@ -103,6 +123,12 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
           disabled && 'opacity-70'
         )}
       >
+        <MentionSuggestions
+          suggestions={mention.suggestions}
+          active={mention.active}
+          onPick={mention.pick}
+          onHover={mention.setActive}
+        />
         <EmojiSuggestions
           suggestions={emoji.suggestions}
           active={emoji.active}
@@ -167,10 +193,17 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
                 onChange={event => {
                   setText(event.target.value);
                   emoji.update(event.target.value);
+                  mention.update(event.target.value);
                   onTyping();
                 }}
-                onSelect={() => emoji.update()}
-                onBlur={emoji.close}
+                onSelect={() => {
+                  emoji.update();
+                  mention.update();
+                }}
+                onBlur={() => {
+                  emoji.close();
+                  mention.close();
+                }}
                 onPaste={event => {
                   // Ctrl+V de uma captura de ecrã ou de ficheiros copiados: vão para a bandeja.
                   const files = filesFromPaste(event);
@@ -179,6 +212,7 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
                   pickFiles(files);
                 }}
                 onKeyDown={event => {
+                  if (mention.onKeyDown(event)) return;
                   if (emoji.onKeyDown(event)) return;
                   if (event.key === 'Enter' && !event.shiftKey) {
                     event.preventDefault();
@@ -189,7 +223,11 @@ export const MessageComposer: React.FC<MessageComposerProps> = props => {
                 rows={Math.min(5, Math.max(1, text.split('\n').length))}
                 disabled={disabled}
                 placeholder={
-                  disabled ? (props.disabledHint ?? 'Envio indisponível') : 'Escreva uma mensagem…'
+                  disabled
+                    ? (props.disabledHint ?? 'Envio indisponível')
+                    : props.people?.length
+                      ? 'Escreva uma mensagem… (@ para marcar)'
+                      : 'Escreva uma mensagem…'
                 }
                 className="max-h-32 min-h-10 flex-1 resize-none bg-transparent px-2 py-2.5 text-[14.5px] outline-none placeholder:text-rz-muted"
                 aria-label="Mensagem"

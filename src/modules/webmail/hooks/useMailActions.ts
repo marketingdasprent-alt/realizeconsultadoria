@@ -110,6 +110,8 @@ export const useMailActions = (folder?: MailFolder) => {
         return false;
       }
       toast({ title: 'Email enviado' });
+      // Enviado: o rascunho guardado sozinho sai da pasta Rascunhos.
+      if (input.draft) void mailService.deleteDraft(input.draft.accountId, input.draft.id);
       // Sem esperar: as listas atualizam-se em segundo plano e quem recebeu passa a ser sugerido.
       void qc.invalidateQueries({ queryKey: ['mail', 'list'] });
       void contactService

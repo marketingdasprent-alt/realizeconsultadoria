@@ -132,6 +132,10 @@ export const useDraftSaver = ({
     isDirty: () => snapshot !== savedSnapshot.current,
     /** Deixa de guardar (enviado ou descartado). */
     stop: cancel,
+    /** Espera que acabe a gravação em curso (para saber o id do rascunho a apagar). */
+    settled: async () => {
+      if (running.current) await running.current.catch(() => false);
+    },
     /** Descarta: apaga o rascunho guardado. */
     discard: async () => {
       cancel();

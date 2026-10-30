@@ -327,6 +327,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     if (!draft) return;
     setBusy(true);
     saver.stop();
+    // Se estava a guardar, espera: senão esse rascunho ficava esquecido depois de enviar.
+    await saver.settled();
     const saved = saver.current();
     const input: ComposeInput = { ...(await buildInput()), draft: saved ?? undefined };
     setBusy(false);

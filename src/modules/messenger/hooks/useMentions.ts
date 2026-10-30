@@ -73,7 +73,7 @@ export const useMentions = ({ value, onChange, fieldRef, people }: UseMentionsOp
     onKeyDown,
     close: () => setOpen(null),
     /** Quem ficou marcado no texto a enviar. */
-    mentionedIn: (text: string) => mentionedIds(text, picked),
+    mentionedIn: (text: string) => mentionedIds(text, picked, people),
     reset: () => setPicked([]),
   };
 };

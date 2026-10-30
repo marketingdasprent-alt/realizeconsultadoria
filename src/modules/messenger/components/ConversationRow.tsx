@@ -10,6 +10,8 @@ interface ConversationRowProps {
   conversation: ConversationSummary;
   isActive: boolean;
   onSelect: (id: string) => void;
+  /** Fui marcado (@) e ainda não abri a conversa. */
+  mentioned?: boolean;
 }
 
 /** Linha da lista: avatar, nome, última mensagem, hora e não lidas. */
@@ -17,6 +19,7 @@ export const ConversationRow: React.FC<ConversationRowProps> = ({
   conversation,
   isActive,
   onSelect,
+  mentioned,
 }) => {
   const hasUnread = conversation.unread > 0;
   // Arrastar ficheiros para cima: a conversa abre ao fim de um instante; largar anexa-os lá.
@@ -96,6 +99,14 @@ export const ConversationRow: React.FC<ConversationRowProps> = ({
             )}
             {conversation.lastMessage}
           </span>
+          {mentioned && (
+            <span
+              title="Foi marcado nesta conversa"
+              className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-rz-primary text-[12px] font-extrabold leading-none text-white"
+            >
+              @
+            </span>
+          )}
           {hasUnread && (
             <span
               className={cn(

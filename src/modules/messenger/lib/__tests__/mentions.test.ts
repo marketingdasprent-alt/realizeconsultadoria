@@ -45,3 +45,18 @@ describe('marcar pessoas (@)', () => {
     expect(mentionParts('sem nada', [])).toEqual([{ text: 'sem nada', mention: false }]);
   });
 });
+
+describe('@ escrito à mão', () => {
+  const team = [
+    { userId: 't', name: 'Thiago Sousa' },
+    { userId: 'a1', name: 'Ana Silva' },
+    { userId: 'a2', name: 'Ana Costa' },
+  ];
+  it('marca quando o primeiro nome é de uma só pessoa', () => {
+    expect(mentionedIds('@thiago mandei no whats', [], team)).toEqual(['t']);
+    expect(mentionedIds('olá @Thiago!', [], team)).toEqual(['t']);
+    expect(mentionedIds('@ana vê isto', [], team)).toEqual([]);
+    expect(mentionedIds('@anasilva vê isto', [], team)).toEqual(['a1']);
+    expect(mentionedIds('email ana@x.pt', [], team)).toEqual([]);
+  });
+});

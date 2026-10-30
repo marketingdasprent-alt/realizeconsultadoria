@@ -51,10 +51,25 @@ export const insertMention = (
   };
 };
 
-/** Quem continua marcado no texto final (se apagou o "@Nome", já não conta). */
-export const mentionedIds = (text: string, picked: MentionPerson[]): string[] => [
-  ...new Set(picked.filter(p => text.includes(`@${p.name}`)).map(p => p.userId)),
-];
+/**
+ * Quem fica marcado no texto final: os escolhidos da lista (se o "@Nome" ainda lá está) e os
+ * escritos à mão ("@thiago", "@Ana Silva"), quando o nome ou o primeiro nome é de uma só pessoa.
+ */
+export const mentionedIds = (
+  text: string,
+  picked: MentionPerson[],
+  people: MentionPerson[] = []
+): string[] => {
+  const ids = new Set(picked.filter(p => text.includes(`@${p.name}`)).map(p => p.userId));
+  const typed = [...text.matchAll(/(?:^|\s)@([\p{L}\p{N}._'-]{2,30})/gu)].map(m => fold(m[1]));
+  for (const word of typed) {
+    const full = people.filter(p => fold(p.name).replace(/\s+/g, '').startsWith(word));
+    const first = people.filter(p => fold(p.name).split(/\s+/)[0] === word);
+    const match = first.length === 1 ? first : full.length === 1 ? full : [];
+    match.forEach(p => ids.add(p.userId));
+  }
+  return [...ids];
+};
 
 /** O texto partido em bocados, com os "@Nome" das pessoas marcadas à parte (para destacar). */
 export const mentionParts = (

@@ -7,6 +7,7 @@ import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { FILTERS } from '../lib/format';
 import type { ConversationFilter, ConversationSummary } from '../types';
 import { ConversationRow } from './ConversationRow';
+import { useMentionBadges } from '../hooks/useMentionBadges';
 
 interface ConversationListProps {
   conversations: ConversationSummary[];
@@ -31,6 +32,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
   className,
 }) => {
   const { basePath } = useWorkspace();
+  const mentioned = useMentionBadges(activeId);
   const [query, setQuery] = useState('');
   const [onlyUnread, setOnlyUnread] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
@@ -147,6 +149,7 @@ export const ConversationList: React.FC<ConversationListProps> = ({
                   conversation={conversation}
                   isActive={conversation.id === activeId}
                   onSelect={onSelect}
+                  mentioned={mentioned.has(conversation.id) && conversation.id !== activeId}
                 />
               </li>
             ))}

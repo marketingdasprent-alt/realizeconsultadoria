@@ -21,10 +21,18 @@ window.addEventListener('vite:preloadError', event => {
 registerSW({
   onRegisteredSW(_swUrl, registration) {
     if (registration) {
-      // Check for updates every 60 seconds
-      setInterval(() => {
+      // Cada verificação é um pedido ao alojamento (Edge Requests da Vercel): verificar ao
+      // voltar à janela (no máximo 1x a cada 15 min) e de hora a hora com a app aberta.
+      let lastCheck = Date.now();
+      const check = (minGap: number) => {
+        if (Date.now() - lastCheck < minGap) return;
+        lastCheck = Date.now();
         registration.update();
-      }, 60 * 1000);
+      };
+      document.addEventListener('visibilitychange', () => {
+        if (document.visibilityState === 'visible') check(15 * 60 * 1000);
+      });
+      setInterval(() => check(0), 60 * 60 * 1000);
     }
   },
   onRegisterError(error) {

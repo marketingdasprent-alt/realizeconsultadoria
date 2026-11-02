@@ -133,8 +133,20 @@ const escapeHtml = (text: string) =>
  */
 export const MAIL_FONT = "'Open Sans',Arial,Helvetica,sans-serif";
 
+// Endereços no texto já escapado (https://…, www.…); a pontuação no fim fica fora da ligação.
+const URL_IN_TEXT = /\b(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"]|www\.[^\s<]+[^\s<.,;:!?)\]'"])/g;
+
+/** Endereços passam a ligações clicáveis no email enviado. */
+export const linkifyHtml = (escaped: string) =>
+  escaped.replace(URL_IN_TEXT, url => {
+    const href = url.startsWith('www.') ? `https://${url}` : url;
+    return `<a href="${href}" target="_blank" style="color:#2563eb;text-decoration:underline">${url}</a>`;
+  });
+
 export const textToHtml = (text: string) =>
-  `<div style="font-family:${MAIL_FONT};font-size:14px;line-height:1.5">${escapeHtml(text)
+  `<div style="font-family:${MAIL_FONT};font-size:14px;line-height:1.5">${linkifyHtml(
+    escapeHtml(text)
+  )
     .split('\n')
     .map(line =>
       line.startsWith('&gt; ') ? `<span style="color:#64748b">${line}</span>` : line || '&nbsp;'

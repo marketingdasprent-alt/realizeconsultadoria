@@ -80,3 +80,16 @@ describe('webmail', () => {
     expect(readerDocument({ html: null, text: '<b>' })).toContain('&lt;b&gt;');
   });
 });
+
+describe('ligações no email enviado', () => {
+  it('endereços passam a links, sem levar a pontuação', async () => {
+    const { textToHtml } = await import('../mailFormat');
+    const html = textToHtml(
+      'Decada: https://www.facebook.com/decada.ousada/\nRD: https://www.facebook.com/profile.php?id=615&x=1 (ver)\nSite www.dasprent.pt.'
+    );
+    expect(html).toContain('<a href="https://www.facebook.com/decada.ousada/"');
+    expect(html).toContain('href="https://www.facebook.com/profile.php?id=615&amp;x=1"');
+    expect(html).toContain('<a href="https://www.dasprent.pt"');
+    expect(html).toContain('</a>.');
+  });
+});

@@ -1,7 +1,9 @@
 import React, { useRef, useState } from 'react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Check, Paperclip, Plus, SendHorizontal, Trash2 } from 'lucide-react';
+import { Check, Loader2, Paperclip, Plus, SendHorizontal, Trash2 } from 'lucide-react';
+import { FilePreviewDialog, type PreviewFile } from '@/components/FilePreviewDialog';
+import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { formatBytes } from '@/modules/messenger/lib/files';
 import { useDirectory } from '@/modules/social/hooks/useDirectory';
@@ -134,11 +136,15 @@ export const ChecklistSection: React.FC<{ detail: Detail }> = ({ detail }) => {
 
 export const AttachmentsSection: React.FC<{ detail: Detail }> = ({ detail }) => {
   const fileRef = useRef<HTMLInputElement>(null);
-  const open = async (path: string) => {
-    const tab = window.open('', '_blank');
+  // Abre dentro do Realize (imagem, PDF, vídeo, texto); os outros tipos descarregam-se daí.
+  const [preview, setPreview] = useState<PreviewFile | null>(null);
+  const [opening, setOpening] = useState<string | null>(null);
+  const open = async (path: string, name: string) => {
+    setOpening(path);
     const url = await taskService.getFileUrl(path);
-    if (url && tab) tab.location.href = url;
-    else tab?.close();
+    setOpening(null);
+    if (url) setPreview({ name, url });
+    else toast({ title: 'Não foi possível abrir o anexo', variant: 'destructive' });
   };
   return (
     <section>
@@ -148,10 +154,14 @@ export const AttachmentsSection: React.FC<{ detail: Detail }> = ({ detail }) => 
           <li key={file.id}>
             <button
               type="button"
-              onClick={() => open(file.path)}
+              onClick={() => void open(file.path, file.name)}
               className="flex w-full items-center gap-2 rounded-xl bg-rz-canvas px-3 py-2 text-left text-[13px] hover:bg-rz-primary-soft"
             >
-              <Paperclip className="h-4 w-4 text-rz-muted" />
+              {opening === file.path ? (
+                <Loader2 className="h-4 w-4 animate-spin text-rz-primary" />
+              ) : (
+                <Paperclip className="h-4 w-4 text-rz-muted" />
+              )}
               <span className="flex-1 truncate font-semibold">{file.name}</span>
               <span className="text-xs text-rz-muted">{formatBytes(file.size)}</span>
             </button>
@@ -175,6 +185,7 @@ export const AttachmentsSection: React.FC<{ detail: Detail }> = ({ detail }) => 
           e.target.value = '';
         }}
       />
+      <FilePreviewDialog file={preview} onClose={() => setPreview(null)} />
     </section>
   );
 };

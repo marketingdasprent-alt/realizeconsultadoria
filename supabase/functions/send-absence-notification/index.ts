@@ -183,7 +183,7 @@ const handler = async (req: Request): Promise<Response> => {
               <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 0 auto;">
                 <tr>
                   <td style="background-color: #d5b884; border-radius: 6px;">
-                    <a href="https://realize.dasprent.pt/admin/pedidos" style="display: inline-block; padding: 16px 40px; color: #000000; text-decoration: none; font-weight: 600; font-size: 16px;">
+                    <a href="https://admin.realizeconsultadoria.pt/admin/pedidos" style="display: inline-block; padding: 16px 40px; color: #000000; text-decoration: none; font-weight: 600; font-size: 16px;">
                       Ver Pedidos
                     </a>
                   </td>

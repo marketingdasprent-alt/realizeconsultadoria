@@ -180,7 +180,7 @@ serve(async req => {
     if (brevoApiKey) {
       try {
         const companyName = employeeData.companies?.name || 'Realize Consultadoria';
-        const loginUrl = 'https://realize.dasprent.pt/colaborador/login';
+        const loginUrl = 'https://app.realizeconsultadoria.pt/colaborador/login';
 
         // Build credentials section based on whether password was changed
         const credentialsSection = new_password

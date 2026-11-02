@@ -214,7 +214,7 @@ async function sendBirthdayEmail(
             <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 28px auto 0;">
               <tr>
                 <td style="background-color: #d5b884; border-radius: 6px;">
-                  <a href="https://realize.dasprent.pt/admin/colaboradores"
+                  <a href="https://admin.realizeconsultadoria.pt/admin/colaboradores"
                     style="display: inline-block; padding: 14px 36px; color: #000000; text-decoration: none; font-weight: 600; font-size: 15px;">
                     Ver Colaboradores
                   </a>

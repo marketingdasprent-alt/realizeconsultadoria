@@ -200,7 +200,7 @@ describe('authService', () => {
       await authService.resetPassword('test@example.com');
 
       expect(supabase.auth.resetPasswordForEmail).toHaveBeenCalledWith('test@example.com', {
-        redirectTo: 'https://realize.dasprent.pt/auth/set-password',
+        redirectTo: 'https://app.realizeconsultadoria.pt/auth/set-password',
       });
     });
   });

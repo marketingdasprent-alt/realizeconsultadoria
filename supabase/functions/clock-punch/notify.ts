@@ -4,7 +4,7 @@
 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-const REVIEW_URL = 'https://realize.dasprent.pt/admin/ponto?tab=revisao';
+const REVIEW_URL = 'https://admin.realizeconsultadoria.pt/admin/ponto?tab=revisao';
 
 const FLAG_LABELS: Record<string, string> = {
   remote: 'Fora do local de trabalho',

@@ -11,7 +11,7 @@ export function cn(...inputs: ClassValue[]) {
  * NUNCA apontarem para domínios de preview (ex.: Lovable), mesmo que a app
  * tenha sido aberta a partir de um.
  */
-export const APP_BASE_URL = 'https://realize.dasprent.pt';
+export const APP_BASE_URL = 'https://app.realizeconsultadoria.pt';
 
 /**
  * Devolve a origem a usar para links externos (emails).

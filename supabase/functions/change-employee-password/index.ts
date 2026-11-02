@@ -132,7 +132,7 @@ serve(async (req: Request) => {
     // Send email if requested
     if (send_email) {
       if (brevoApiKey) {
-        const baseUrl = 'https://realize.dasprent.pt';
+        const baseUrl = 'https://app.realizeconsultadoria.pt';
         const emailHtml = `
           <!DOCTYPE html>
           <html>

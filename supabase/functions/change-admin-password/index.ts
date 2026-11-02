@@ -84,7 +84,7 @@ serve(async (req: Request) => {
         .maybeSingle();
 
       if (profile?.email) {
-        const baseUrl = 'https://realize.dasprent.pt';
+        const baseUrl = 'https://admin.realizeconsultadoria.pt';
 
         const emailHtml = `
           <!DOCTYPE html>

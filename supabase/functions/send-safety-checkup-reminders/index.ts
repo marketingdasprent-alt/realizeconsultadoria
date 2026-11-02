@@ -260,7 +260,7 @@ async function sendReminderEmail(
             <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 30px auto 0;">
               <tr>
                 <td style="background-color: #d5b884; border-radius: 6px;">
-                  <a href="https://realize.dasprent.pt/admin/colaboradores" style="display: inline-block; padding: 16px 40px; color: #000000; text-decoration: none; font-weight: 600; font-size: 16px;">
+                  <a href="https://admin.realizeconsultadoria.pt/admin/colaboradores" style="display: inline-block; padding: 16px 40px; color: #000000; text-decoration: none; font-weight: 600; font-size: 16px;">
                     Ver Colaboradores
                   </a>
                 </td>
@@ -349,7 +349,7 @@ async function sendRenewalReminderEmail(
             <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 30px auto 0;">
               <tr>
                 <td style="background-color: #d5b884; border-radius: 6px;">
-                  <a href="https://realize.dasprent.pt/admin/colaboradores" style="display: inline-block; padding: 16px 40px; color: #000000; text-decoration: none; font-weight: 600; font-size: 16px;">
+                  <a href="https://admin.realizeconsultadoria.pt/admin/colaboradores" style="display: inline-block; padding: 16px 40px; color: #000000; text-decoration: none; font-weight: 600; font-size: 16px;">
                     Ver Colaboradores
                   </a>
                 </td>

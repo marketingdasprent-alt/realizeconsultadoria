@@ -287,7 +287,7 @@ const handler = async (req: Request): Promise<Response> => {
               }
 
               <div style="margin-top: 40px; text-align: center;">
-                <a href="https://realize.dasprent.pt/admin/juridico" style="background-color: #d4af37; color: #1a1a2e; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px;">ACEDER AO PAINEL JURÍDICO</a>
+                <a href="https://admin.realizeconsultadoria.pt/admin/juridico" style="background-color: #d4af37; color: #1a1a2e; padding: 15px 30px; text-decoration: none; border-radius: 5px; font-weight: bold; font-size: 14px;">ACEDER AO PAINEL JURÍDICO</a>
               </div>
             </td>
           </tr>

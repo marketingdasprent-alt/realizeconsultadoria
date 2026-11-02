@@ -207,6 +207,6 @@ describe('tag URLs', () => {
   it('always point to the production domain', async () => {
     const { buildStaticTagUrl } =
       await import('@/modules/timeclock/services/timeClockLocationService');
-    expect(buildStaticTagUrl('abc')).toBe('https://realize.dasprent.pt/ponto/nfc?t=abc');
+    expect(buildStaticTagUrl('abc')).toBe('https://app.realizeconsultadoria.pt/ponto/nfc?t=abc');
   });
 });

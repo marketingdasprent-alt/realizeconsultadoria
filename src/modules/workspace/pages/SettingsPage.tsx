@@ -9,11 +9,13 @@ import {
   KeyRound,
   Receipt,
   LogOut,
+  Moon,
   ShieldCheck,
   Stethoscope,
   Trash2,
   UserRound,
 } from 'lucide-react';
+import { ThemeSwitch } from '@/components/ThemeSwitch';
 import { cn } from '@/lib/utils';
 import { ROUTES } from '@/lib/constants';
 import { safetyCheckupView } from '@/lib/employee-home';
@@ -155,6 +157,16 @@ const SettingsPage: React.FC = () => {
         <div className="space-y-4">
           <WorkScheduleCard />
           <PushCard />
+
+          <section className={CARD}>
+            <h2 className="flex items-center gap-2 text-[17px] font-bold">
+              <Moon className="h-5 w-5 text-rz-primary" /> Aparência
+            </h2>
+            <p className="mb-3 mt-1 text-[13px] text-rz-muted">
+              Tema claro ou escuro. Em “Sistema” segue o do computador ou telemóvel.
+            </p>
+            <ThemeSwitch />
+          </section>
 
           <section className={cn(CARD, 'space-y-1 p-3 md:p-3')}>
             <p className="px-3 pb-1 pt-2 text-[11px] font-bold uppercase tracking-[0.14em] text-rz-muted">

@@ -19,8 +19,18 @@
       content="consultoria RH, recursos humanos, imigração Portugal, vistos, autorização residência, gestão colaboradores"
     />
 
-    <!-- Force light color scheme — prevents system dark mode from affecting the app -->
+    <!-- Claro por omissão; o modo escuro do Realize liga-se pela classe "dark" (antes de a app abrir, sem clarão) -->
     <meta name="color-scheme" content="light" />
+    <script>
+      try {
+        var t = localStorage.getItem('rz.theme');
+        if (
+          t === 'dark' ||
+          ((!t || t === 'system') && matchMedia('(prefers-color-scheme: dark)').matches)
+        )
+          document.documentElement.classList.add('dark');
+      } catch (e) {}
+    </script>
 
     <!-- PWA Meta Tags -->
     <meta name="theme-color" content="#B7933D" />

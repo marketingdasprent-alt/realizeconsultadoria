@@ -1,6 +1,8 @@
 import { createRoot } from 'react-dom/client';
 import App from './App.tsx';
 import './index.css';
+import './styles/dark.css';
+import './styles/dark-remap.css';
 import { registerSW } from 'virtual:pwa-register';
 import GlobalErrorBoundary from './components/GlobalErrorBoundary';
 import { applyAppManifest } from './lib/app-manifest';

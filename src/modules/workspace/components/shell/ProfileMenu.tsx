@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { Link } from 'react-router-dom';
 import { ChevronRight, Download, KeyRound, LogOut, Settings, ShieldCheck } from 'lucide-react';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { ThemeSwitch } from '@/components/ThemeSwitch';
 import { ROUTES } from '@/lib/constants';
 import { isStandalone } from '@/lib/pwa-install';
 import { useOptionalWorkday } from '@/modules/timeclock/context/useWorkday';
@@ -70,6 +71,7 @@ export const ProfileMenu: React.FC = () => {
             )}
           </div>
         </div>
+        <ThemeSwitch />
         <div className="rounded-[22px] bg-white p-1.5 shadow-rz-soft">
           <Link to={modulePath(basePath, SETTINGS_MODULE)} onClick={close} className={ROW}>
             <Settings className="h-[18px] w-[18px] text-rz-muted" /> Definições

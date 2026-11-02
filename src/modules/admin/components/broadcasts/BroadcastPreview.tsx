@@ -37,7 +37,7 @@ export const BroadcastPreview: React.FC<{
     .filter(Boolean);
   return (
     <div
-      className="overflow-hidden rounded-[22px] bg-[#f4f2ee] p-3 sm:p-4"
+      className="rz-keep-light overflow-hidden rounded-[22px] bg-[#f4f2ee] p-3 sm:p-4"
       // A mesma letra que o email leva (a da assinatura).
       style={{ fontFamily: EMAIL_FONT }}
     >

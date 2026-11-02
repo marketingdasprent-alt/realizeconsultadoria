@@ -148,7 +148,7 @@ export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
             <iframe
               src={url}
               title={attachment.filename}
-              className="h-full w-full border-0 bg-white"
+              className="rz-keep-light h-full w-full border-0 bg-white"
             />
           ) : kind === 'video' && url ? (
             <video src={url} controls className="max-h-full max-w-full" />

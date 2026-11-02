@@ -1,6 +1,7 @@
 import { Toaster } from '@/components/ui/toaster';
 import { Toaster as Sonner } from '@/components/ui/sonner';
 import { TooltipProvider } from '@/components/ui/tooltip';
+import { ThemeProvider } from 'next-themes';
 import { lazy, Suspense } from 'react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
@@ -86,144 +87,153 @@ const App = () => (
   <GlobalErrorBoundary>
     <AuthProvider>
       <QueryClientProvider client={queryClient}>
-        <TooltipProvider>
-          <Toaster />
-          <Sonner />
-          <BrowserRouter>
-            <AppManifestSync />
-            <Suspense fallback={null}>
-              <Routes>
-                {/* Public Routes */}
-                {/* Login único: colaboradores e admins; cada conta vai para a sua área */}
-                <Route path={ROUTES.AUTH.LOGIN} element={<LoginPage />} />
-                <Route path="/site" element={<Index />} />
-                <Route path="/instalar" element={<InstallPage />} />
-                <Route path="/politica-privacidade" element={<PrivacyPolicyPage />} />
-                <Route path="/cookies" element={<CookiesPolicyPage />} />
-                <Route path="/termos-condicoes" element={<TermsPage />} />
-                <Route path="/eliminar-conta" element={<DeleteAccountPage />} />
+        {/* Tema claro/escuro (chave igual à do script no index.html) */}
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          storageKey="rz.theme"
+          disableTransitionOnChange
+        >
+          <TooltipProvider>
+            <Toaster />
+            <Sonner />
+            <BrowserRouter>
+              <AppManifestSync />
+              <Suspense fallback={null}>
+                <Routes>
+                  {/* Public Routes */}
+                  {/* Login único: colaboradores e admins; cada conta vai para a sua área */}
+                  <Route path={ROUTES.AUTH.LOGIN} element={<LoginPage />} />
+                  <Route path="/site" element={<Index />} />
+                  <Route path="/instalar" element={<InstallPage />} />
+                  <Route path="/politica-privacidade" element={<PrivacyPolicyPage />} />
+                  <Route path="/cookies" element={<CookiesPolicyPage />} />
+                  <Route path="/termos-condicoes" element={<TermsPage />} />
+                  <Route path="/eliminar-conta" element={<DeleteAccountPage />} />
 
-                {/* Auth Callback */}
-                <Route path="/auth/callback" element={<AuthCallbackPage />} />
-                <Route path="/auth/set-password" element={<SetPasswordPage />} />
-                <Route path={ROUTES.AUTH.SWITCH} element={<AccountSwitchPage />} />
+                  {/* Auth Callback */}
+                  <Route path="/auth/callback" element={<AuthCallbackPage />} />
+                  <Route path="/auth/set-password" element={<SetPasswordPage />} />
+                  <Route path={ROUTES.AUTH.SWITCH} element={<AccountSwitchPage />} />
 
-                {/* Admin Routes */}
-                <Route path="/admin/login" element={<LoginAlias />} />
-                <Route
-                  element={
-                    <ProtectedRoute requiredRole="admin">
-                      <AdminLayout />
-                    </ProtectedRoute>
-                  }
-                >
-                  <Route path="/admin" element={<AdminDashboard />} />
-                  <Route path="/admin/juridico" element={<LegalPage />} />
-                  <Route path="/admin/empresas" element={<CompaniesPage />} />
-                  <Route path="/admin/colaboradores" element={<EmployeesPage />} />
-                  <Route path="/admin/colaboradores/novo" element={<EmployeeFormPage />} />
-                  <Route path="/admin/colaboradores/:id" element={<EmployeeFormPage />} />
-                  <Route path="/admin/calendario" element={<CalendarPage />} />
-                  {/* Pedidos passou para Férias e Ausências (aba Pedidos) */}
-                  <Route path="/admin/pedidos" element={<RequestsRedirect />} />
-                  <Route path="/admin/suporte" element={<SupportTicketsPage />} />
-                  <Route path="/admin/acessos" element={<AccessesPage />} />
-                  <Route path="/admin/ponto" element={<TimeClockAdminPage />} />
-                  {/* Documentos passou para Colaboradores (aprovar, importar recibos, validades) */}
+                  {/* Admin Routes */}
+                  <Route path="/admin/login" element={<LoginAlias />} />
                   <Route
-                    path="/admin/documentos"
-                    element={<Navigate to="/admin/colaboradores" replace />}
-                  />
-                  <Route path="/admin/financeiro" element={<FinancePage />} />
-                  <Route path="/admin/configuracoes" element={<SettingsPage />} />
-                  <Route path={ROUTES.ADMIN.BROADCASTS} element={<BroadcastsPage />} />
-                </Route>
-
-                {/* Employee Routes */}
-                <Route path="/colaborador/login" element={<LoginAlias />} />
-                <Route
-                  element={
-                    <ProtectedRoute requiredRole="employee">
-                      {/* Realize 2.0: jornada (relógio da barra superior) partilhada por toda a
-                        área; menu lateral + barra superior, as páginas renderizam no Outlet */}
-                      <WorkdayProvider>
-                        <WorkspaceLayout />
-                      </WorkdayProvider>
-                    </ProtectedRoute>
-                  }
-                >
-                  {/* O Messenger é a página inicial (briefing §2) */}
-                  <Route path="/colaborador" element={<MessengerPage />} />
-                  <Route path="/colaborador/perfil" element={<ProfilePage />} />
-                  {/* Páginas atuais, sem alterações, até serem redesenhadas (Fase 3) */}
-                  <Route path="/colaborador/pedidos" element={<AbsencesPage />} />
-                  <Route path="/colaborador/tickets" element={<SupportPage />} />
-                  <Route path="/colaborador/suporte-equipa" element={<SupportDeskPage />} />
-                  <Route path="/colaborador/documentos" element={<MyDocumentsPage />} />
-                  <Route
-                    path="/colaborador/definicoes/documentos"
-                    element={<PersonalDocumentsPage />}
-                  />
-                  <Route path="/colaborador/ponto" element={<MyTimeClockPage />} />
-                  {/* Fase 2: Feed (com os avisos dos RH), colegas e apreciações */}
-                  <Route path="/colaborador/feed" element={<FeedPage />} />
-                  <Route
-                    path="/colaborador/avisos"
-                    element={<Navigate to="/colaborador/feed?filtro=comunicados" replace />}
-                  />
-                  <Route path="/colaborador/pessoas" element={<PeoplePage />} />
-                  <Route path="/colaborador/pessoas/:userId" element={<ColleagueProfilePage />} />
-                  <Route path="/colaborador/apreciacoes" element={<AppreciationsPage />} />
-                  <Route path="/colaborador/email" element={<WebmailPage />} />
-                  <Route path="/colaborador/tarefas" element={<TasksPage />} />
-                  <Route path="/colaborador/calendario" element={<MyCalendarPage />} />
-                  <Route path="/colaborador/organograma" element={<OrgChartPage />} />
-                  <Route path="/colaborador/ai" element={<AiPage />} />
-                  <Route path="/colaborador/definicoes" element={<AccountSettingsPage />} />
-                  {/* O antigo "Mais" passou para o Menu (telemóvel) e para as Definições */}
-                  <Route
-                    path="/colaborador/mais"
-                    element={<Navigate to="/colaborador/definicoes" replace />}
-                  />
-                  {PLANNED_MODULES.map(module => (
-                    <Route
-                      key={module.key}
-                      path={`/colaborador/${module.path}`}
-                      element={<ModuleComingSoonPage moduleKey={module.key} />}
-                    />
-                  ))}
-                </Route>
-
-                {WorkspacePreview && (
-                  <Route
-                    path="/dev/realize-2/*"
                     element={
-                      <Suspense fallback={null}>
-                        <WorkspacePreview />
-                      </Suspense>
+                      <ProtectedRoute requiredRole="admin">
+                        <AdminLayout />
+                      </ProtectedRoute>
+                    }
+                  >
+                    <Route path="/admin" element={<AdminDashboard />} />
+                    <Route path="/admin/juridico" element={<LegalPage />} />
+                    <Route path="/admin/empresas" element={<CompaniesPage />} />
+                    <Route path="/admin/colaboradores" element={<EmployeesPage />} />
+                    <Route path="/admin/colaboradores/novo" element={<EmployeeFormPage />} />
+                    <Route path="/admin/colaboradores/:id" element={<EmployeeFormPage />} />
+                    <Route path="/admin/calendario" element={<CalendarPage />} />
+                    {/* Pedidos passou para Férias e Ausências (aba Pedidos) */}
+                    <Route path="/admin/pedidos" element={<RequestsRedirect />} />
+                    <Route path="/admin/suporte" element={<SupportTicketsPage />} />
+                    <Route path="/admin/acessos" element={<AccessesPage />} />
+                    <Route path="/admin/ponto" element={<TimeClockAdminPage />} />
+                    {/* Documentos passou para Colaboradores (aprovar, importar recibos, validades) */}
+                    <Route
+                      path="/admin/documentos"
+                      element={<Navigate to="/admin/colaboradores" replace />}
+                    />
+                    <Route path="/admin/financeiro" element={<FinancePage />} />
+                    <Route path="/admin/configuracoes" element={<SettingsPage />} />
+                    <Route path={ROUTES.ADMIN.BROADCASTS} element={<BroadcastsPage />} />
+                  </Route>
+
+                  {/* Employee Routes */}
+                  <Route path="/colaborador/login" element={<LoginAlias />} />
+                  <Route
+                    element={
+                      <ProtectedRoute requiredRole="employee">
+                        {/* Realize 2.0: jornada (relógio da barra superior) partilhada por toda a
+                        área; menu lateral + barra superior, as páginas renderizam no Outlet */}
+                        <WorkdayProvider>
+                          <WorkspaceLayout />
+                        </WorkdayProvider>
+                      </ProtectedRoute>
+                    }
+                  >
+                    {/* O Messenger é a página inicial (briefing §2) */}
+                    <Route path="/colaborador" element={<MessengerPage />} />
+                    <Route path="/colaborador/perfil" element={<ProfilePage />} />
+                    {/* Páginas atuais, sem alterações, até serem redesenhadas (Fase 3) */}
+                    <Route path="/colaborador/pedidos" element={<AbsencesPage />} />
+                    <Route path="/colaborador/tickets" element={<SupportPage />} />
+                    <Route path="/colaborador/suporte-equipa" element={<SupportDeskPage />} />
+                    <Route path="/colaborador/documentos" element={<MyDocumentsPage />} />
+                    <Route
+                      path="/colaborador/definicoes/documentos"
+                      element={<PersonalDocumentsPage />}
+                    />
+                    <Route path="/colaborador/ponto" element={<MyTimeClockPage />} />
+                    {/* Fase 2: Feed (com os avisos dos RH), colegas e apreciações */}
+                    <Route path="/colaborador/feed" element={<FeedPage />} />
+                    <Route
+                      path="/colaborador/avisos"
+                      element={<Navigate to="/colaborador/feed?filtro=comunicados" replace />}
+                    />
+                    <Route path="/colaborador/pessoas" element={<PeoplePage />} />
+                    <Route path="/colaborador/pessoas/:userId" element={<ColleagueProfilePage />} />
+                    <Route path="/colaborador/apreciacoes" element={<AppreciationsPage />} />
+                    <Route path="/colaborador/email" element={<WebmailPage />} />
+                    <Route path="/colaborador/tarefas" element={<TasksPage />} />
+                    <Route path="/colaborador/calendario" element={<MyCalendarPage />} />
+                    <Route path="/colaborador/organograma" element={<OrgChartPage />} />
+                    <Route path="/colaborador/ai" element={<AiPage />} />
+                    <Route path="/colaborador/definicoes" element={<AccountSettingsPage />} />
+                    {/* O antigo "Mais" passou para o Menu (telemóvel) e para as Definições */}
+                    <Route
+                      path="/colaborador/mais"
+                      element={<Navigate to="/colaborador/definicoes" replace />}
+                    />
+                    {PLANNED_MODULES.map(module => (
+                      <Route
+                        key={module.key}
+                        path={`/colaborador/${module.path}`}
+                        element={<ModuleComingSoonPage moduleKey={module.key} />}
+                      />
+                    ))}
+                  </Route>
+
+                  {WorkspacePreview && (
+                    <Route
+                      path="/dev/realize-2/*"
+                      element={
+                        <Suspense fallback={null}>
+                          <WorkspacePreview />
+                        </Suspense>
+                      }
+                    />
+                  )}
+
+                  {/* Registo de ponto por tag NFC: aberto pelo telemóvel ao encostar à tag.
+                  Sem sessão → login do colaborador, que depois regressa aqui. */}
+                  <Route
+                    path="/ponto/nfc"
+                    element={
+                      <ProtectedRoute>
+                        <WorkdayProvider>
+                          <TimeClockNfcPage />
+                        </WorkdayProvider>
+                      </ProtectedRoute>
                     }
                   />
-                )}
 
-                {/* Registo de ponto por tag NFC: aberto pelo telemóvel ao encostar à tag.
-                  Sem sessão → login do colaborador, que depois regressa aqui. */}
-                <Route
-                  path="/ponto/nfc"
-                  element={
-                    <ProtectedRoute>
-                      <WorkdayProvider>
-                        <TimeClockNfcPage />
-                      </WorkdayProvider>
-                    </ProtectedRoute>
-                  }
-                />
-
-                {/* Catch-all */}
-                <Route path="*" element={<NotFound />} />
-              </Routes>
-            </Suspense>
-          </BrowserRouter>
-        </TooltipProvider>
+                  {/* Catch-all */}
+                  <Route path="*" element={<NotFound />} />
+                </Routes>
+              </Suspense>
+            </BrowserRouter>
+          </TooltipProvider>
+        </ThemeProvider>
       </QueryClientProvider>
     </AuthProvider>
   </GlobalErrorBoundary>

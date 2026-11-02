@@ -1,0 +1,69 @@
+/*
+ * Modo escuro do Realize (preto puro). Vale só nas áreas da app (html.rz-theme: Workspace,
+ * admin e entrada); o site público fica sempre claro. A classe "dark" vem do seletor de tema
+ * (next-themes, "Sistema" por omissão) e do script no index.html, antes de a app abrir.
+ */
+:root {
+  --rz-surface: 0 0% 100%;
+}
+
+html.rz-theme.dark {
+  color-scheme: dark;
+
+  --rz-surface: 0 0% 7%;
+  --rz-primary: 252 90% 70%;
+  --rz-primary-soft: 252 35% 17%;
+  --rz-ink: 0 0% 93%;
+  --rz-ink-muted: 240 5% 62%;
+  --rz-line: 0 0% 17%;
+  --rz-canvas: 0 0% 11%;
+  --rz-aurora: #000;
+
+  --background: 0 0% 0%;
+  --foreground: 0 0% 93%;
+  --card: 0 0% 7%;
+  --card-foreground: 0 0% 93%;
+  --popover: 0 0% 9%;
+  --popover-foreground: 0 0% 93%;
+  --primary: 252 90% 70%;
+  --primary-foreground: 0 0% 100%;
+  --ring: 252 90% 70%;
+  --secondary: 0 0% 12%;
+  --secondary-foreground: 0 0% 93%;
+  --muted: 0 0% 12%;
+  --muted-foreground: 240 5% 62%;
+  --accent: 252 35% 17%;
+  --accent-foreground: 252 90% 82%;
+  --destructive: 0 72% 51%;
+  --border: 0 0% 17%;
+  --input: 0 0% 22%;
+}
+
+html.rz-theme.dark body {
+  background: #000;
+}
+
+html.rz-theme.dark .rz-scroll {
+  scrollbar-color: hsl(0 0% 26%) transparent;
+}
+html.rz-theme.dark .rz-scroll::-webkit-scrollbar-thumb {
+  background: hsl(0 0% 26%);
+  background-clip: padding-box;
+}
+
+/* Botões e etiquetas "invertidos" (fundo de tinta, texto branco): no escuro, branco com texto preto. */
+html.rz-theme.dark .bg-rz-ink.text-white {
+  color: #000;
+}
+
+/* Enquanto a app carrega (o #root ainda vazio), o ecrã já fica preto: sem clarão branco. */
+html.dark body:has(> #root:empty) {
+  background: #000;
+}
+
+/* Conteúdo que tem de ficar claro (corpo dos emails, pré-visualizações de documentos). */
+html.rz-theme.dark .rz-keep-light {
+  color-scheme: light;
+  --rz-surface: 0 0% 100%;
+  color: #1e1b2e;
+}

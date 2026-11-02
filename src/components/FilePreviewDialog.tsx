@@ -70,7 +70,11 @@ export const FilePreviewDialog: React.FC<{ file: PreviewFile | null; onClose: ()
             <img src={file.url} alt={file.name} className="max-h-full max-w-full object-contain" />
           )}
           {file && kind === 'pdf' && (
-            <iframe src={file.url} title={file.name} className="h-full w-full bg-white" />
+            <iframe
+              src={file.url}
+              title={file.name}
+              className="rz-keep-light h-full w-full bg-white"
+            />
           )}
           {file && kind === 'video' && (
             <video src={file.url} controls className="max-h-full max-w-full" />

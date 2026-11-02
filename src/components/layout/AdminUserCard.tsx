@@ -1,5 +1,6 @@
 import React from 'react';
 import { LogOut } from 'lucide-react';
+import { ThemeCycleButton } from '@/components/ThemeSwitch';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
 
 interface AdminUserCardProps {
@@ -49,6 +50,7 @@ export const AdminUserCard: React.FC<AdminUserCardProps> = ({
         <p className="truncate text-[13.5px] font-semibold text-white">{userName}</p>
         <p className="text-[11.5px] text-white/55">Administrador</p>
       </div>
+      <ThemeCycleButton className="flex h-9 w-9 items-center justify-center rounded-xl text-white/65 transition-colors hover:bg-white/10 hover:text-white" />
       <button
         type="button"
         onClick={onLogout}

@@ -54,7 +54,7 @@ export const MailBody: React.FC<MailBodyProps> = ({ message, onDownload, onOpenA
         srcDoc={readerDocument(message)}
         onLoad={onFrameLoad}
         style={{ height }}
-        className="mt-5 w-full border-0"
+        className="rz-keep-light mt-5 w-full rounded-xl border-0 bg-white"
       />
       {message.attachments.length > 0 && (
         <ul className="mt-4 flex flex-wrap gap-2">

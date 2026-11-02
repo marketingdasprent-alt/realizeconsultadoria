@@ -252,7 +252,7 @@ export const SignatureEditor: React.FC<SignatureEditorProps> = ({ initial, onCha
             title="Pré-visualização da assinatura"
             sandbox=""
             srcDoc={`<!doctype html><meta charset="utf-8"><body style="margin:12px;font-family:${MAIL_FONT};font-size:14px">${sanitizeSignatureHtml(html)}</body>`}
-            className="h-44 w-full rounded-2xl bg-white ring-1 ring-rz-line"
+            className="rz-keep-light h-44 w-full rounded-2xl bg-white ring-1 ring-rz-line"
           />
         </>
       )}

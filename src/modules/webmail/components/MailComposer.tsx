@@ -520,7 +520,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
             {signatureHtml && (
               // Já limpa (sem scripts nem eventos): é a assinatura da própria pessoa. Muda-se em cima.
               <div
-                className="mt-3 text-[13.5px] [&_img]:inline-block"
+                className="rz-keep-light mt-3 rounded-xl text-[13.5px] dark:bg-white dark:p-3 [&_img]:inline-block"
                 dangerouslySetInnerHTML={{ __html: signatureHtml }}
               />
             )}

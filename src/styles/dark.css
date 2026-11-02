@@ -56,6 +56,19 @@ html.rz-theme.dark .bg-rz-ink.text-white {
   color: #000;
 }
 
+/* Etiquetas de estado com cor no style (verde "ativo", amarelo "pendente" nos Domínios,
+   Serviços e Jurídico): os mesmos tons do remap. */
+html.rz-theme.dark [style*='220, 252, 231'] {
+  background-color: rgb(34 197 94 / 0.16) !important;
+  border-color: rgb(34 197 94 / 0.35) !important;
+  color: rgb(134 239 172) !important;
+}
+html.rz-theme.dark [style*='254, 243, 199'] {
+  background-color: rgb(245 158 11 / 0.16) !important;
+  border-color: rgb(245 158 11 / 0.35) !important;
+  color: rgb(252 211 77) !important;
+}
+
 /* Enquanto a app carrega (o #root ainda vazio), o ecrã já fica preto: sem clarão branco. */
 html.dark body:has(> #root:empty) {
   background: #000;

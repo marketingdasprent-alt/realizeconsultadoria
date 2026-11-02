@@ -1262,7 +1262,11 @@ const EmployeeFinancialTab = ({
                     layout="vertical"
                     margin={{ top: 8, right: 24, bottom: 8, left: 16 }}
                   >
-                    <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="#e5e7eb" />
+                    <CartesianGrid
+                      strokeDasharray="3 3"
+                      horizontal={false}
+                      stroke="hsl(var(--rz-line))"
+                    />
                     <XAxis
                       type="number"
                       tickFormatter={v => formatCurrency(v as number)}

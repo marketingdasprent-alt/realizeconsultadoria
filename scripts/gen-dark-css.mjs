@@ -14,6 +14,8 @@ const add = (cls, decl, { hover = true } = {}) => {
   if (hover) {
     rules.push(`${P} .${esc(`hover:${cls}`)}:hover { ${decl} }`);
     rules.push(`${P} .group:hover .${esc(`group-hover:${cls}`)} { ${decl} }`);
+    rules.push(`${P} .${esc(`focus:${cls}`)}:focus { ${decl} }`);
+    rules.push(`${P} .${esc(`focus-within:${cls}`)}:focus-within { ${decl} }`);
   }
 };
 
@@ -48,6 +50,9 @@ add('bg-black/5', 'background-color: hsl(0 0% 100% / 0.06);');
 add('bg-black/10', 'background-color: hsl(0 0% 100% / 0.1);');
 add('border-white/60', 'border-color: hsl(var(--rz-line));', { hover: false });
 for (const a of [5, 10]) add(`ring-black/${a}`, '--tw-ring-color: hsl(0 0% 100% / 0.08);');
+// Anel branco à volta de avatares e bolinhas (separa do fundo): passa à cor do fundo escuro.
+add('ring-white', '--tw-ring-color: hsl(var(--rz-surface));');
+add('border-white', 'border-color: hsl(var(--rz-surface));');
 add(
   'from-white',
   '--tw-gradient-from: hsl(var(--rz-surface)) var(--tw-gradient-from-position); --tw-gradient-to: hsl(var(--rz-surface) / 0) var(--tw-gradient-to-position); --tw-gradient-stops: var(--tw-gradient-from), var(--tw-gradient-to);',
@@ -84,7 +89,10 @@ for (const c of COLORS) {
     add(`text-${c}-${s}`, `color: ${color(c, 300)};`);
     for (const a of [40, 70, 80]) add(`text-${c}-${s}/${a}`, `color: ${color(c, 300, `${a}%`)};`);
   }
+  for (const a of [30, 50]) add(`bg-${c}-200/${a}`, `background-color: ${color(c, 500, '14%')};`);
   for (const s of [100, 200, 300]) {
+    for (const a of [50, 60, 70])
+      add(`border-${c}-${s}/${a}`, `border-color: ${color(c, 500, '25%')};`);
     add(`border-${c}-${s}`, `border-color: ${color(c, 500, '35%')};`);
     add(`ring-${c}-${s}`, `--tw-ring-color: ${color(c, 500, '35%')};`);
   }
@@ -102,6 +110,9 @@ const stop = (kind, cls, value) => {
   gradient[kind].push(`${P} .${esc(cls)} { ${decl} }`);
 };
 for (const kind of ['from', 'via', 'to']) {
+  for (const n of NEUTRALS)
+    for (const shade of [50, 100])
+      stop(kind, `${kind}-${n}-${shade}`, on => `hsl(0 0% ${shade === 50 ? 11 : 14}% / ${on})`);
   for (const c of COLORS)
     for (const [shade, alpha] of [
       [50, 14],

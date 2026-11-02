@@ -49,7 +49,7 @@ html.rz-admin [data-ui='table'] tbody tr:hover {
 /* Separadores como os filtros da área do colaborador (cantos que aguentam quebrar a linha). */
 html.rz-admin [data-ui='tabs-list'] {
   border-radius: 1.25rem;
-  background: hsl(0 0% 100%);
+  background: hsl(var(--rz-surface));
   box-shadow: inset 0 0 0 1px hsl(var(--rz-line));
 }
 html.rz-admin [data-ui='tabs-list'] > [role='tab'] {
@@ -58,7 +58,8 @@ html.rz-admin [data-ui='tabs-list'] > [role='tab'] {
 }
 html.rz-admin [data-ui='tabs-list'] > [role='tab'][data-state='active'] {
   background: hsl(var(--rz-ink));
-  color: hsl(0 0% 100%);
+  /* A cor da superfície: no escuro a tinta é clara, e o texto passa a escuro. */
+  color: hsl(var(--rz-surface));
 }
 
 /* Botões: letra do 2.0 e a ação principal (dourada no admin antigo) em violeta, como na

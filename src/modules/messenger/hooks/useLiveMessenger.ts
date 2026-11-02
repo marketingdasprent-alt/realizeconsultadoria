@@ -19,6 +19,7 @@ import { useChatRealtime } from './useChatRealtime';
 import { useConversationChannel } from './useConversationChannel';
 import { useMessengerActions } from './useMessengerActions';
 import { usePresence } from './usePresence';
+import { useThreadPoll } from './useThreadPoll';
 
 export interface LiveMessengerUser {
   userId: string;
@@ -96,17 +97,33 @@ export const useLiveMessenger = (user: LiveMessengerUser): MessengerApi => {
     [qc]
   );
 
+  const onMessage = (row: MessageRow, event: 'INSERT' | 'UPDATE') => {
+    qc.setQueryData(CHAT_KEYS.thread(row.conversation_id), (data: InfiniteData<MessageRow[]>) =>
+      upsertThreadRow(data, row)
+    );
+    const seenNow = row.conversation_id === activeId && document.visibilityState === 'visible';
+    if (event === 'INSERT' && seenNow && row.sender_id !== user.userId) {
+      markRead(row.conversation_id);
+    }
+    refreshList();
+  };
+
+  // O que o tempo real não entregou: só as mensagens que faltam ou mudaram (da mais antiga
+  // para a mais recente, para ficarem pela ordem certa).
+  useThreadPoll(activeId, rows => {
+    if (!activeId) return;
+    const cached = qc.getQueryData<InfiniteData<MessageRow[]>>(CHAT_KEYS.thread(activeId));
+    if (!cached) return;
+    const known = new Map(cached.pages.flat().map(m => [m.id, m]));
+    for (const row of rows.slice().reverse()) {
+      const old = known.get(row.id);
+      if (!old) onMessage(row, 'INSERT');
+      else if (JSON.stringify(old) !== JSON.stringify(row)) onMessage(row, 'UPDATE');
+    }
+  });
+
   useChatRealtime(user.userId, {
-    onMessage: (row, event) => {
-      qc.setQueryData(CHAT_KEYS.thread(row.conversation_id), (data: InfiniteData<MessageRow[]>) =>
-        upsertThreadRow(data, row)
-      );
-      const seenNow = row.conversation_id === activeId && document.visibilityState === 'visible';
-      if (event === 'INSERT' && seenNow && row.sender_id !== user.userId) {
-        markRead(row.conversation_id);
-      }
-      refreshList();
-    },
+    onMessage,
     onMembership: ({ conversationId, userId, event }) => {
       if (conversationId === activeId) {
         qc.invalidateQueries({ queryKey: CHAT_KEYS.members(conversationId) });

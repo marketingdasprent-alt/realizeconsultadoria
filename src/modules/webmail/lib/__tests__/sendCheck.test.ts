@@ -12,7 +12,7 @@ const base = {
 
 describe('checkBeforeSend', () => {
   it('lets a complete email go without asking', () => {
-    expect(checkBeforeSend(base)).toEqual({ blocked: false, missing: [] });
+    expect(checkBeforeSend(base)).toEqual({ blocked: false, missing: [], invalid: [] });
   });
 
   it('blocks when there is nobody to send to', () => {
@@ -26,6 +26,15 @@ describe('checkBeforeSend', () => {
     expect(checkBeforeSend({ ...base, to: [], cc: ['rui@x.pt'] })).toEqual({
       blocked: false,
       missing: ['ninguém no campo "Para" (só Cc/Bcc)'],
+      invalid: [],
     });
+  });
+
+  it('flags text left in a recipient field that is not an email', () => {
+    const unparsed = [
+      { label: 'Para', text: '' },
+      { label: 'Cc', text: 'rui@x ' },
+    ];
+    expect(checkBeforeSend({ ...base, unparsed }).invalid).toEqual(['"rui@x" (Cc)']);
   });
 });

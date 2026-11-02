@@ -5,6 +5,8 @@ export interface SendCheck {
   blocked: boolean;
   /** O que falta mas pode seguir assim, se a pessoa confirmar. */
   missing: string[];
+  /** Texto escrito num campo de destinatários que não é um email: tem de se corrigir. */
+  invalid: string[];
 }
 
 export const checkBeforeSend = (input: {
@@ -15,11 +17,16 @@ export const checkBeforeSend = (input: {
   /** Só o que a pessoa escreveu (sem a citação de uma resposta ou reencaminhamento). */
   written: string;
   attachments: number;
+  /** Texto que ficou escrito num campo de destinatários sem ser um email válido. */
+  unparsed?: { label: string; text: string }[];
 }): SendCheck => {
   const recipients = input.to.length + input.cc.length + input.bcc.length;
   const missing: string[] = [];
   if (recipients > 0 && !input.to.length) missing.push('ninguém no campo "Para" (só Cc/Bcc)');
   if (!input.subject.trim()) missing.push('assunto');
   if (!input.written.trim() && !input.attachments) missing.push('texto da mensagem');
-  return { blocked: recipients === 0, missing };
+  const invalid = (input.unparsed ?? [])
+    .filter(({ text }) => text.trim())
+    .map(({ label, text }) => `"${text.trim()}" (${label})`);
+  return { blocked: recipients === 0, missing, invalid };
 };

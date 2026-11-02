@@ -26,6 +26,8 @@ interface RecipientFieldProps {
   autoFocus?: boolean;
   placeholder?: string;
   label: string;
+  /** O que está escrito e ainda não passou a etiqueta (para avisar antes de enviar). */
+  onDraftChange?: (text: string) => void;
 }
 
 const CHIP =
@@ -42,8 +44,13 @@ export const RecipientField: React.FC<RecipientFieldProps> = ({
   autoFocus,
   placeholder,
   label,
+  onDraftChange,
 }) => {
-  const [draft, setDraft] = useState('');
+  const [draft, setDraftState] = useState('');
+  const setDraft = (text: string) => {
+    setDraftState(text);
+    onDraftChange?.(text);
+  };
   const [open, setOpen] = useState(false);
   const [highlight, setHighlight] = useState(0);
   const input = useRef<HTMLInputElement>(null);

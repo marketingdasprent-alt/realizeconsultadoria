@@ -90,6 +90,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   // Resposta/reencaminhamento: a citação fica à parte, depois da assinatura (como sai no email).
   const [quote, setQuote] = useState('');
   const [showCc, setShowCc] = useState(false);
+  // Texto por passar a etiqueta em cada campo (um endereço mal escrito não pode sumir calado).
+  const [unparsed, setUnparsed] = useState({ to: '', cc: '', bcc: '' });
   const [files, setFiles] = useState<File[]>([]);
   const addFiles = (added: File[]) => setFiles(current => [...current, ...added]);
   // Anexo copiado noutro email ("Copiar" no visualizador): oferece-se para colar aqui.
@@ -318,8 +320,13 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       subject: fields.subject,
       written: writtenPart(fields.body),
       attachments: files.length,
+      unparsed: [
+        { label: 'Para', text: unparsed.to },
+        { label: 'Cc', text: unparsed.cc },
+        { label: 'Bcc', text: unparsed.bcc },
+      ],
     });
-    if (result.blocked || result.missing.length) return setCheck(result);
+    if (result.blocked || result.invalid.length || result.missing.length) return setCheck(result);
     void sendNow();
   };
 
@@ -445,6 +452,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
             <RecipientField
               value={fields.to}
               onChange={value => set('to', value)}
+              onDraftChange={text => setUnparsed(u => ({ ...u, to: text }))}
               team={team}
               contacts={contacts}
               lists={lists}
@@ -468,6 +476,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 <RecipientField
                   value={fields.cc}
                   onChange={value => set('cc', value)}
+                  onDraftChange={text => setUnparsed(u => ({ ...u, cc: text }))}
                   team={team}
                   contacts={contacts}
                   lists={lists}
@@ -478,6 +487,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
                 <RecipientField
                   value={fields.bcc}
                   onChange={value => set('bcc', value)}
+                  onDraftChange={text => setUnparsed(u => ({ ...u, bcc: text }))}
                   team={team}
                   contacts={contacts}
                   lists={lists}

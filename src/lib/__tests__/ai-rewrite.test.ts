@@ -18,7 +18,9 @@ describe('Usar IA no email', () => {
 
   it('o pedido leva o assunto e o email original só como contexto', () => {
     const message = rewriteUserMessage('envio amanha', 'Proposta', 'Bom dia, enviam a proposta?');
-    expect(message).toContain('Assunto atual (escreve um melhor, mais claro e específico): Proposta');
+    expect(message).toContain(
+      'Assunto atual (escreve um melhor, mais claro e específico): Proposta'
+    );
     expect(message).toContain('só para contexto');
     expect(message.endsWith('Texto a reescrever:\nenvio amanha')).toBe(true);
     expect(rewriteUserMessage('olá', '', '')).toBe('Texto a reescrever:\nolá');
@@ -55,12 +57,15 @@ describe('assunto escrito pela IA', () => {
 });
 
 describe('limpeza do texto da IA', () => {
-  it('tira marcadores por preencher e troca a despedida brasileira', async () => {
+  it('tira marcadores por preencher e a despedida (a assinatura já a traz)', async () => {
     const { cleanRewrite } = await import('../../../supabase/functions/_shared/ai/rewrite');
     expect(
       cleanRewrite(
         'Caros colegas,\n\nObrigado.\n\nAtenciosamente,\n\n[Seu Nome]\n[Seu Cargo]\n[Seu Email]'
       )
-    ).toBe('Caros colegas,\n\nObrigado.\n\nCom os melhores cumprimentos,');
+    ).toBe('Caros colegas,\n\nObrigado.');
+    expect(cleanRewrite('Bom dia,\n\nSegue.\n\nCom os melhores cumprimentos,')).toBe(
+      'Bom dia,\n\nSegue.'
+    );
   });
 });

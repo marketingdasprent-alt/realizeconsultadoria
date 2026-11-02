@@ -22,7 +22,8 @@ export const rewritePrompt = (mode: RewriteMode, writerName: string) =>
   `${GOALS[mode]} ` +
   `Mantém exatamente os nomes, datas, horas, números, valores, endereços de email e ligações. ` +
   `Não inventes informação, compromissos nem anexos. Não escrevas a assinatura com o nome (a assinatura é posta à parte) nem marcadores como [Seu Nome] ou [Cargo]. ` +
-  `Usa o tom de Portugal: "Caros colegas" ou "Bom dia," (nunca "Prezados"), e termina com "Com os melhores cumprimentos," (nunca "Atenciosamente"). ` +
+  `Usa o tom de Portugal: "Caros colegas" ou "Bom dia," (nunca "Prezados"). ` +
+  `Não escrevas despedida no fim ("Com os melhores cumprimentos", "Atenciosamente", "Obrigado e cumprimentos"…): a assinatura já a traz. ` +
   `Usa texto simples, sem markdown (nada de **, # ou listas com *). ` +
   `Escreve sempre um assunto curto, claro e específico (até 8 palavras) que resuma o email; se já houver um assunto, melhora-o em vez de o copiar. ` +
   `Responde exatamente neste formato, sem mais nada antes ou depois:\nASSUNTO: <o assunto>\n\n<o texto do email>`;
@@ -64,6 +65,10 @@ export const cleanRewrite = (raw: string) =>
     .replace(/^#+\s*/gm, '')
     // Marcadores por preencher ("[Seu Nome]", "[Cargo]"): a assinatura já trata disso.
     .replace(/^[ \t]*\[[^\]\n]{1,40}\][ \t]*$/gm, '')
-    .replace(/^Atenciosamente,?$/gim, 'Com os melhores cumprimentos,')
+    // Sem despedida no fim: a assinatura já a traz.
+    .replace(
+      /\n+\s*(com os melhores cumprimentos|melhores cumprimentos|cumprimentos|atenciosamente|com os meus cumprimentos)[,.!]?\s*$/i,
+      ''
+    )
     .replace(/\n{3,}/g, '\n\n')
     .trim();

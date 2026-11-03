@@ -4,6 +4,7 @@
 import { parseAddress, parseAddressList } from './address.ts';
 import { decodeHtmlEntities, normalizeContentId } from './html.ts';
 import { base64UrlDecode, decodeBytes, decodeHeaderValue, parseHeaderParams } from './mime.ts';
+import { messageKey } from './labels.ts';
 import type { MailAttachmentInfo, MailMessage, MailSummary } from './types.ts';
 
 export interface GmailHeader {
@@ -73,6 +74,7 @@ export const parseGmailSummary = (message: GmailMessage): MailSummary => {
     starred: labels.includes('STARRED'),
     // Em metadata não vêm as partes; multipart/mixed é o indicador habitual de anexos.
     has_attachments: (message.payload?.mimeType ?? '').toLowerCase() === 'multipart/mixed',
+    message_key: messageKey(gmailHeader(headers, 'Message-ID')),
   };
 };
 

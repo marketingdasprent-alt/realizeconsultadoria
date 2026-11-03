@@ -71,6 +71,7 @@ export const GRAPH_SUMMARY_FIELDS = [
   'from',
   'sender',
   'toRecipients',
+  'internetMessageId',
 ];
 
 /** Texto para $search do Graph (entre aspas; sem aspas/barras do utilizador). */

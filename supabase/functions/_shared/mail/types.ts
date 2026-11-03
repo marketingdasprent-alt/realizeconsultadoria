@@ -43,6 +43,10 @@ export interface MailSummary {
   unread: boolean;
   starred: boolean;
   has_attachments: boolean;
+  /** Message-ID normalizado (chave dos marcadores); null se o email não o tiver. */
+  message_key?: string | null;
+  /** Marcadores do email (ids de mail_labels), acrescentados pelo servidor. */
+  label_ids?: string[];
 }
 
 export interface MailAttachmentInfo {

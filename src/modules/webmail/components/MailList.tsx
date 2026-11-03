@@ -8,9 +8,12 @@ import { mailErrorText, type MailError } from '../services/mailService';
 import type { MailAccount, MailSummary } from '../types';
 import { MailBulkBar } from './MailBulkBar';
 import { MailContextMenu, type ListMailAction } from './MailContextMenu';
+import { LabelChips } from './LabelChips';
+import { LabelPicker } from './LabelPicker';
 import { MailListItem } from './MailListItem';
 import { MoveToFolder } from './MoveToFolder';
 import type { MoveTarget } from '../hooks/useFolderActions';
+import type { MailLabel } from '../types';
 
 interface MailListProps {
   title: string;
@@ -31,6 +34,11 @@ interface MailListProps {
   onMove: (mails: MailSummary[], target: MoveTarget) => void;
   /** Criar regra para o remetente deste email. */
   onRule?: (mail: MailSummary) => void;
+  /** Marcadores: todos por id (para as etiquetas), os de cada caixa e as ações. */
+  labelsById?: Map<string, MailLabel>;
+  labelsByAccount?: Record<string, MailLabel[]>;
+  onLabel?: (mails: MailSummary[], label: MailLabel) => void;
+  onManageLabels?: (accountId: string) => void;
   /** Responder, reencaminhar, criar tarefa/evento ou imprimir, a partir do menu do clique direito. */
   onAction?: (mail: MailSummary, action: ListMailAction) => void;
   onHover?: (mail: MailSummary | null) => void;
@@ -92,12 +100,25 @@ export const MailList: React.FC<MailListProps> = props => {
           onClear={selection.clear}
           moveSlot={
             selection.count > 0 && oneAccount ? (
-              <MoveToFolder
-                mails={selection.selected}
-                accounts={props.accounts}
-                onMove={moveMails}
-                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
-              />
+              <>
+                {props.onLabel && (
+                  <LabelPicker
+                    mails={selection.selected}
+                    labels={props.labelsByAccount?.[selection.selected[0]?.accountId] ?? []}
+                    onToggle={(mails, label) => {
+                      props.onLabel?.(mails, label);
+                    }}
+                    onManage={id => props.onManageLabels?.(id)}
+                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
+                  />
+                )}
+                <MoveToFolder
+                  mails={selection.selected}
+                  accounts={props.accounts}
+                  onMove={moveMails}
+                  className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
+                />
+              </>
             ) : null
           }
         >
@@ -141,6 +162,11 @@ export const MailList: React.FC<MailListProps> = props => {
           return (
             <MailListItem
               key={key}
+              chips={
+                props.labelsById ? (
+                  <LabelChips labelIds={mail.labelIds} byId={props.labelsById} />
+                ) : undefined
+              }
               wrap={row => (
                 <MailContextMenu
                   mail={mail}
@@ -150,6 +176,9 @@ export const MailList: React.FC<MailListProps> = props => {
                   onChange={onBulkOf}
                   onMove={moveMails}
                   onRule={props.onRule}
+                  labels={props.labelsByAccount?.[mail.accountId]}
+                  onLabel={props.onLabel}
+                  onManageLabels={props.onManageLabels}
                   onAction={props.onAction}
                 >
                   {row}

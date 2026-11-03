@@ -1,6 +1,7 @@
 // Microsoft Graph (mensagens do Outlook/Microsoft 365) → formato do Webmail.
 
 import { decodeHtmlEntities } from './html.ts';
+import { messageKey } from './labels.ts';
 import type { MailAddress, MailAttachmentInfo, MailMessage, MailSummary } from './types.ts';
 
 export interface GraphRecipient {
@@ -74,6 +75,7 @@ export const parseGraphSummary = (m: GraphMessage): MailSummary => ({
   unread: m.isRead === false && !m.isDraft,
   starred: m.flag?.flagStatus === 'flagged',
   has_attachments: !!m.hasAttachments,
+  message_key: messageKey(m.internetMessageId),
 });
 
 export const graphHeader = (m: GraphMessage, name: string): string | null => {

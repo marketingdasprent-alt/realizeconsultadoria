@@ -24,6 +24,8 @@ interface MailListItemProps {
   onHover?: (mail: MailSummary | null) => void;
   /** Envolve a linha (ex.: no menu do clique direito). */
   wrap?: (row: React.ReactElement) => React.ReactElement;
+  /** Marcadores do email (etiquetas coloridas). */
+  chips?: React.ReactNode;
 }
 
 // No rato, o lixo e a caixa de seleção só aparecem ao passar por cima; no toque estão sempre.
@@ -152,6 +154,7 @@ export const MailListItem: React.FC<MailListItemProps> = ({ mail, ...props }) =>
             />
           </button>
         </div>
+        {props.chips && <div className="mt-0.5">{props.chips}</div>}
         <p className="truncate text-[12.5px] text-rz-muted">{mail.snippet}</p>
       </div>
       {mail.unread && <span className="mt-2 h-2 w-2 shrink-0 rounded-full bg-rz-primary" />}

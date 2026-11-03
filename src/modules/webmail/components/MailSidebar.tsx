@@ -15,9 +15,10 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FOLDERS, SIDEBAR_ROW } from '../lib/mailFormat';
-import type { MailAccount, MailCustomFolder, MailFolder } from '../types';
+import type { MailAccount, MailCustomFolder, MailFolder, MailLabel } from '../types';
 import { MailAccountList } from './MailAccountList';
 import { MailCustomFolders, type CustomFolderRef } from './MailCustomFolders';
+import { MailLabelsSection, type LabelFilter } from './MailLabelsSection';
 import { UnreadCount } from './MailAccountRow';
 
 const FOLDER_ICONS: Record<MailFolder, LucideIcon> = {
@@ -46,6 +47,11 @@ interface MailSidebarProps {
   onCustomFolder: (folder: CustomFolderRef) => void;
   /** Nova pasta/subpasta (não existe na pré-visualização). */
   onNewFolder?: (accountId: string | null, parentId: string | null) => void;
+  /** Marcadores por caixa, o filtro ativo e a gestão (não existe na pré-visualização). */
+  labels?: Record<string, MailLabel[]>;
+  labelFilter?: LabelFilter | null;
+  onLabelFilter?: (filter: LabelFilter | null) => void;
+  onManageLabels?: (accountId: string | null) => void;
   onCompose: () => void;
   onConnect: () => void;
   onSettings: (account: MailAccount) => void;
@@ -122,6 +128,17 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
       onPick={props.onCustomFolder}
       onNew={props.onNewFolder}
     />
+
+    {props.onLabelFilter && (
+      <MailLabelsSection
+        accounts={props.accounts}
+        scope={props.scope}
+        byAccount={props.labels ?? {}}
+        selected={props.labelFilter ?? null}
+        onPick={props.onLabelFilter}
+        onManage={props.onManageLabels}
+      />
+    )}
 
     <section>
       <p className="mb-1 px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-rz-muted">

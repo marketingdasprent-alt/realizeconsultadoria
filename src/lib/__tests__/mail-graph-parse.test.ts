@@ -59,6 +59,7 @@ describe('parseGraphSummary', () => {
       unread: true,
       starred: true,
       has_attachments: true,
+      message_key: 'm1@realize.pt',
     });
   });
 

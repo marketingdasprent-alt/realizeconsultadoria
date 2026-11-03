@@ -28,9 +28,10 @@ import { useAccountFolders } from '../hooks/useAccountFolders';
 import { useFolderActions, type MoveTarget } from '../hooks/useFolderActions';
 import type { MailChange } from '../hooks/useMailChanges';
 import { mailLink } from '../lib/mailLink';
-import type { MailAccount, MailSummary } from '../types';
+import type { MailAccount, MailLabel, MailSummary } from '../types';
 import type { ReaderAction } from './MailReader';
 import { MailMoveSubmenu } from './MailMoveSubmenu';
+import { MailLabelSubmenu } from './MailLabelSubmenu';
 import { NewMailFolderDialog } from './NewMailFolderDialog';
 
 /** O que se pode fazer a um email pelo menu sem o abrir primeiro à mão. */
@@ -51,6 +52,10 @@ interface MailContextMenuProps {
   onAction?: (mail: MailSummary, action: ListMailAction) => void;
   /** "Criar regra para este remetente…". */
   onRule?: (mail: MailSummary) => void;
+  /** Marcadores da caixa deste email e o que fazer com eles. */
+  labels?: MailLabel[];
+  onLabel?: (mails: MailSummary[], label: MailLabel) => void;
+  onManageLabels?: (accountId: string) => void;
   /** A linha. */
   children: React.ReactElement;
 }
@@ -67,6 +72,9 @@ export const MailContextMenu: React.FC<MailContextMenuProps> = ({
   onMove,
   onAction,
   onRule,
+  labels = [],
+  onLabel,
+  onManageLabels,
   children,
 }) => {
   const { isPreview } = useWorkspace();
@@ -144,6 +152,14 @@ export const MailContextMenu: React.FC<MailContextMenuProps> = ({
           {!isPreview && (
             <>
               <ContextMenuSeparator />
+              {onLabel && (
+                <MailLabelSubmenu
+                  targets={targets}
+                  labels={labels}
+                  onToggle={onLabel}
+                  onManage={() => onManageLabels?.(mail.accountId)}
+                />
+              )}
               <MailMoveSubmenu
                 folders={folders.data ?? []}
                 isLoading={folders.isLoading}

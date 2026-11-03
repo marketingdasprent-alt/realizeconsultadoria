@@ -22,8 +22,10 @@ import { nameOf } from '../lib/mailFormat';
 import { printMail } from '../lib/printMail';
 import type { MailAddress, MailAttachmentInfo, MailMessage, MailSummary } from '../types';
 import type { MoveTarget } from '../hooks/useFolderActions';
-import type { MailAccount } from '../types';
+import type { MailAccount, MailLabel } from '../types';
 import { MailBody } from './MailBody';
+import { LabelChips } from './LabelChips';
+import { LabelPicker } from './LabelPicker';
 import { MoveToFolder } from './MoveToFolder';
 import { AddressChip, MailRecipients } from './MailRecipients';
 import { ThreadItem } from './ThreadItem';
@@ -64,6 +66,11 @@ interface MailReaderProps {
   /** Caixas (para a janela "Nova pasta" do Mover para) e a ação de mover. */
   accounts: MailAccount[];
   onMove: (mails: MailSummary[], target: MoveTarget) => void;
+  /** Marcadores: todos por id, os desta caixa e as ações. */
+  labelsById?: Map<string, MailLabel>;
+  labels?: MailLabel[];
+  onLabel?: (mails: MailSummary[], label: MailLabel) => void;
+  onManageLabels?: (accountId: string) => void;
 }
 
 /** Ler um email: cabeçalho, ações (incl. tarefa/evento), corpo isolado num iframe e anexos. */
@@ -78,6 +85,10 @@ export const MailReader: React.FC<MailReaderProps> = ({
   onWrite,
   accounts,
   onMove,
+  labelsById,
+  labels = [],
+  onLabel,
+  onManageLabels,
 }) => {
   const thread = useMailThread(summary);
   // A conversa, a resposta mais recente em cima; sem outras mensagens, só o email aberto.
@@ -160,6 +171,16 @@ export const MailReader: React.FC<MailReaderProps> = ({
               <span className="hidden 2xl:inline">{label}</span>
             </button>
           ))}
+          {onLabel && (
+            <LabelPicker
+              mails={[summary]}
+              labels={labels}
+              onToggle={onLabel}
+              onManage={id => onManageLabels?.(id)}
+              withLabel
+              className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
+            />
+          )}
           <MoveToFolder
             mails={[summary]}
             accounts={accounts}
@@ -187,6 +208,9 @@ export const MailReader: React.FC<MailReaderProps> = ({
         <h2 className="text-[21px] font-extrabold leading-tight">
           {summary.subject || '(sem assunto)'}
         </h2>
+        {labelsById && (
+          <LabelChips labelIds={summary.labelIds} byId={labelsById} max={8} className="mt-2" />
+        )}
         {others > 0 && (
           <p className="mt-2 text-[12.5px] font-semibold text-rz-muted">
             Conversa com {others + 1} mensagens · abra as anteriores para as ler

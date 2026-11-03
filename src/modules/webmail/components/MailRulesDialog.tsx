@@ -3,7 +3,9 @@ import { AlertTriangle, ArrowRight, Folder, Loader2, Plus, Trash2, Workflow } fr
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { useAccountLabels } from '../hooks/useMailLabels';
 import { useMailRules } from '../hooks/useMailRules';
+import { LabelChips } from './LabelChips';
 import { ACCOUNT_DOTS, accountName } from '../lib/mailFormat';
 import type { MailAccount, MailRule } from '../types';
 import { MailRuleForm, type RuleDraft } from './MailRuleForm';
@@ -37,6 +39,9 @@ export const MailRulesDialog: React.FC<MailRulesDialogProps> = ({
   const [account, setAccount] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
   const { rules, save, toggle, remove } = useMailRules(account);
+  const labelsById = new Map(
+    (useAccountLabels(account).data ?? []).map(label => [label.id, label])
+  );
 
   useEffect(() => {
     if (!open) return;
@@ -97,8 +102,15 @@ export const MailRulesDialog: React.FC<MailRulesDialogProps> = ({
                   <p className="break-words font-semibold">Se {summary(rule)}</p>
                   <p className="mt-0.5 flex items-center gap-1.5 text-rz-muted">
                     <ArrowRight className="h-3.5 w-3.5 shrink-0" />
-                    <Folder className="h-3.5 w-3.5 shrink-0" />
-                    <span className="truncate">{rule.folderName}</span>
+                    {rule.labelIds.length > 0 && (
+                      <LabelChips labelIds={rule.labelIds} byId={labelsById} max={4} />
+                    )}
+                    {rule.folderName && (
+                      <>
+                        <Folder className="h-3.5 w-3.5 shrink-0" />
+                        <span className="truncate">{rule.folderName}</span>
+                      </>
+                    )}
                     {rule.markRead && <span>· marcar como lido</span>}
                   </p>
                   {rule.lastError && (
@@ -140,8 +152,9 @@ export const MailRulesDialog: React.FC<MailRulesDialogProps> = ({
                     name: '',
                     fromContains: draft.fromContains.trim() || null,
                     keyword: draft.keyword.trim() || null,
-                    folderId: draft.folderId,
-                    folderName,
+                    folderId: draft.folderId || null,
+                    folderName: draft.folderId ? folderName : null,
+                    labelIds: draft.labelIds,
                     markRead: draft.markRead,
                   },
                   applyNow: draft.applyNow,

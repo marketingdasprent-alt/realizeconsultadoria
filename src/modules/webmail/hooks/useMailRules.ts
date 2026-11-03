@@ -6,7 +6,7 @@ import type { MailRule } from '../types';
 const key = (accountId: string | null) => ['mail', 'rules', accountId] as const;
 
 type NewRule = Pick<MailRule, 'name' | 'fromContains' | 'keyword' | 'folderId' | 'folderName'> &
-  Partial<Pick<MailRule, 'id' | 'markRead' | 'isActive'>>;
+  Partial<Pick<MailRule, 'id' | 'markRead' | 'isActive' | 'labelIds'>>;
 
 /** Regras de uma caixa: lista, criar (e aplicar aos emails que já lá estão), ligar/desligar, apagar. */
 export const useMailRules = (accountId: string | null) => {

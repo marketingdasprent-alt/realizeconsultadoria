@@ -1,13 +1,18 @@
 import React, { useState } from 'react';
 import { Loader2 } from 'lucide-react';
 import { RzSelect } from '@/modules/workspace/components/RzSelect';
+import { cn } from '@/lib/utils';
 import { useAccountFolders } from '../hooks/useAccountFolders';
+import { useAccountLabels } from '../hooks/useMailLabels';
+import { labelStyle } from '../lib/labelColors';
 import { flattenFolders } from '../lib/folderTree';
 
 export interface RuleDraft {
   fromContains: string;
   keyword: string;
   folderId: string;
+  /** Marcadores a pôr. */
+  labelIds: string[];
   markRead: boolean;
   applyNow: boolean;
 }
@@ -38,18 +43,21 @@ export const MailRuleForm: React.FC<MailRuleFormProps> = ({
     fromContains: initial?.fromContains ?? '',
     keyword: initial?.keyword ?? '',
     folderId: initial?.folderId ?? '',
+    labelIds: initial?.labelIds ?? [],
     markRead: initial?.markRead ?? false,
     applyNow: initial?.applyNow ?? true,
   });
   const set = (patch: Partial<RuleDraft>) => setDraft(current => ({ ...current, ...patch }));
   const folder = list.find(item => item.folder.id === draft.folderId)?.folder;
-  const valid = (draft.fromContains.trim() || draft.keyword.trim()) && !!folder;
+  const labels = useAccountLabels(accountId).data ?? [];
+  const valid =
+    (draft.fromContains.trim() || draft.keyword.trim()) && (!!folder || draft.labelIds.length > 0);
 
   return (
     <form
       onSubmit={event => {
         event.preventDefault();
-        if (valid && folder) onSave(draft, folder.name);
+        if (valid) onSave(draft, folder?.name ?? '');
       }}
       className="space-y-3 rounded-2xl bg-rz-canvas p-3"
     >
@@ -76,15 +84,56 @@ export const MailRuleForm: React.FC<MailRuleFormProps> = ({
         />
       </label>
       <div>
-        <span className="mb-1 block text-[12px] font-bold text-rz-muted">Mover para a pasta</span>
+        <span className="mb-1 block text-[12px] font-bold text-rz-muted">Pôr os marcadores</span>
+        <div className="flex flex-wrap gap-1.5">
+          {labels.map(label => {
+            const checked = draft.labelIds.includes(label.id);
+            return (
+              <button
+                key={label.id}
+                type="button"
+                aria-pressed={checked}
+                onClick={() =>
+                  set({
+                    labelIds: checked
+                      ? draft.labelIds.filter(id => id !== label.id)
+                      : [...draft.labelIds, label.id],
+                  })
+                }
+                className={cn(
+                  'inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[12.5px] font-semibold ring-1',
+                  checked
+                    ? 'bg-rz-primary-soft text-rz-primary ring-rz-primary'
+                    : 'bg-white text-rz-muted ring-rz-line'
+                )}
+              >
+                <span className={cn('h-2 w-2 rounded-full', labelStyle(label.color).dot)} />
+                {label.name}
+              </button>
+            );
+          })}
+          {labels.length === 0 && (
+            <p className="text-[12px] text-rz-muted">
+              Ainda não há marcadores nesta caixa (crie-os em “Marcadores”).
+            </p>
+          )}
+        </div>
+      </div>
+      <div>
+        <span className="mb-1 block text-[12px] font-bold text-rz-muted">
+          Mover para a pasta (opcional)
+        </span>
         <RzSelect
           value={draft.folderId}
           onChange={folderId => set({ folderId })}
-          placeholder={folders.isLoading ? 'A carregar…' : 'Escolha a pasta'}
-          options={list.map(({ folder: item, depth }) => ({
-            value: item.id,
-            label: `${'— '.repeat(depth)}${item.name}`,
-          }))}
+          placeholder={folders.isLoading ? 'A carregar…' : 'Não mover'}
+          options={[
+            { value: '', label: 'Não mover' },
+            ...list.map(({ folder: item, depth }) => ({
+              value: item.id,
+              label: `${'— '.repeat(depth)}${item.name}`,
+            })),
+          ]}
           ariaLabel="Pasta de destino"
           className="h-10 w-full rounded-xl bg-white px-3 text-[14px] ring-1 ring-rz-line"
         />

@@ -10,6 +10,10 @@ import { ContactListsDialog } from '../components/ContactListsDialog';
 import { AttachmentPreview, type PreviewTarget } from '../components/AttachmentPreview';
 import { MailAccountDialog } from '../components/MailAccountDialog';
 import { MailRulesDialog } from '../components/MailRulesDialog';
+import { ManageLabelsDialog } from '../components/ManageLabelsDialog';
+import type { LabelFilter } from '../components/MailLabelsSection';
+import { useLabelActions } from '../hooks/useLabelActions';
+import { useAllMailLabels } from '../hooks/useMailLabels';
 import type { ListMailAction } from '../components/MailContextMenu';
 import { printMail } from '../lib/printMail';
 import type { RuleDraft } from '../components/MailRuleForm';
@@ -85,6 +89,9 @@ const WebmailPage: React.FC = () => {
 
   const accounts = mail.accounts;
   const customFolders = useMailFolders(accounts);
+  const labels = useAllMailLabels(accounts);
+  const [labelFilter, setLabelFilter] = useState<LabelFilter | null>(null);
+  const [manageLabels, setManageLabels] = useState<{ accountId: string | null } | null>(null);
   const people = useContacts(accounts);
   const unread = useUnreadCounts(accounts);
   // Caixa escolhida que deixou de existir (ex.: acabou de ser desligada): volta ao normal.
@@ -94,6 +101,7 @@ const WebmailPage: React.FC = () => {
   // Os "por ler" contam só a Entrada: numa pasta da pessoa não se acertam à mão.
   const actions = useMailActions(customOpen ? undefined : folder);
   const folderActions = useFolderActions(customOpen ? undefined : folder);
+  const labelActions = useLabelActions(customOpen ? undefined : folder);
   const { isPreview } = useWorkspace();
   const [rulesDialog, setRulesDialog] = useState<{
     accountId: string | null;
@@ -302,6 +310,10 @@ const WebmailPage: React.FC = () => {
               setRulesDialog({ accountId: current === 'all' ? null : current, prefill: null });
             }
       }
+      labels={isPreview ? undefined : labels.byAccount}
+      labelFilter={labelFilter}
+      onLabelFilter={isPreview ? undefined : setLabelFilter}
+      onManageLabels={isPreview ? undefined : accountId => setManageLabels({ accountId })}
       onNewFolder={
         isPreview ? undefined : (accountId, parentId) => setNewFolder({ accountId, parentId })
       }
@@ -333,7 +345,18 @@ const WebmailPage: React.FC = () => {
       <SidebarResizer width={sidebarWidth} onChange={setSidebarWidth} onCommit={saveSidebarWidth} />
       <MailList
         title={customOpen?.name ?? FOLDERS.find(f => f.key === folder)?.label ?? 'Email'}
-        messages={list.messages}
+        messages={
+          labelFilter
+            ? list.messages.filter(
+                m =>
+                  m.accountId === labelFilter.accountId && m.labelIds?.includes(labelFilter.labelId)
+              )
+            : list.messages
+        }
+        labelsById={isPreview ? undefined : labels.byId}
+        labelsByAccount={isPreview ? undefined : labels.byAccount}
+        onLabel={isPreview ? undefined : (mails, label) => void labelActions.toggle(mails, label)}
+        onManageLabels={accountId => setManageLabels({ accountId })}
         accounts={accounts}
         activeKey={active ? mailKey(active) : null}
         showAccount={current === 'all'}
@@ -390,6 +413,12 @@ const WebmailPage: React.FC = () => {
             onWrite={address => setDraft({ accountId: selected.accountId, to: address.email })}
             accounts={accounts}
             onMove={moveMails}
+            labelsById={isPreview ? undefined : labels.byId}
+            labels={labels.byAccount[selected.accountId]}
+            onLabel={
+              isPreview ? undefined : (mails, label) => void labelActions.toggle(mails, label)
+            }
+            onManageLabels={accountId => setManageLabels({ accountId })}
           />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-rz-muted">
@@ -407,6 +436,12 @@ const WebmailPage: React.FC = () => {
           {sidebar('h-full pt-12')}
         </SheetContent>
       </Sheet>
+      <ManageLabelsDialog
+        open={!!manageLabels}
+        onClose={() => setManageLabels(null)}
+        accounts={accounts}
+        accountId={manageLabels?.accountId ?? (current === 'all' ? null : current)}
+      />
       <MailRulesDialog
         open={!!rulesDialog}
         onClose={() => setRulesDialog(null)}

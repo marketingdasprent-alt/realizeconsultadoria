@@ -29,7 +29,7 @@ const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const GMAIL_UPLOAD_SEND =
   'https://gmail.googleapis.com/upload/gmail/v1/users/me/messages/send?uploadType=multipart';
 const METADATA =
-  'format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date';
+  'format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date&metadataHeaders=Message-ID';
 /** Acima disto o JSON { raw } (base64url, +33%) passa o limite do endpoint simples; usa-se o upload. */
 const SIMPLE_SEND_MAX = 3 * 1024 * 1024;
 const INLINE_IMAGE_MAX = 512 * 1024;

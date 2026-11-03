@@ -20,12 +20,46 @@ export interface MailRule {
   name: string;
   fromContains: string | null;
   keyword: string | null;
-  folderId: string;
-  folderName: string;
+  /** Pasta de destino (opcional se a regra só põe marcadores). */
+  folderId: string | null;
+  folderName: string | null;
+  /** Marcadores que a regra põe. */
+  labelIds: string[];
   markRead: boolean;
   isActive: boolean;
   /** Porque é que a última aplicação falhou (ex.: a pasta foi apagada). */
   lastError: string | null;
+}
+
+export const LABEL_COLORS = [
+  'red',
+  'orange',
+  'amber',
+  'green',
+  'teal',
+  'blue',
+  'purple',
+  'pink',
+  'gray',
+] as const;
+export type LabelColor = (typeof LABEL_COLORS)[number];
+
+/** O que acontece quando o marcador é posto num email. */
+export interface LabelAutomation {
+  folderId: string | null;
+  folderName: string | null;
+  markRead: boolean;
+  /** Marcadores que saem do email quando este entra. */
+  removeLabelIds: string[];
+}
+
+/** Marcador colorido de uma caixa; partilhado por quem tem acesso a ela. */
+export interface MailLabel {
+  id: string;
+  accountId: string;
+  name: string;
+  color: LabelColor;
+  onApply: LabelAutomation;
 }
 
 export interface MailCustomFolder {
@@ -86,6 +120,10 @@ export interface MailSummary {
   unread: boolean;
   starred: boolean;
   hasAttachments: boolean;
+  /** Chave do email para os marcadores (Message-ID); ausente nos exemplos. */
+  messageKey?: string | null;
+  /** Marcadores do email (ids). */
+  labelIds?: string[];
 }
 
 export interface MailAttachmentInfo {

@@ -64,6 +64,14 @@ import { createGmailDriver } from './drivers/gmail.ts';
 import { createGraphDriver } from './drivers/graph.ts';
 import { createImapDriver, testImapLogin, type ImapAccountConfig } from './drivers/imap.ts';
 import { pollNewMail } from './poll.ts';
+import {
+  MAX_LABELS_PER_ACCOUNT,
+  applyLabel,
+  attachLabels,
+  cleanAutomation,
+  isLabelColor,
+  listLabels,
+} from './labels.ts';
 import { MAX_RULES_PER_ACCOUNT, applyRules, listRules } from './rules.ts';
 import { OAuthSession } from './session.ts';
 import { shareAccess, shareAccessById } from './share.ts';
@@ -246,6 +254,10 @@ const ACTIONS = [
   'rule-save',
   'rule-delete',
   'rule-run',
+  'labels',
+  'label-save',
+  'label-delete',
+  'label-apply',
 ] as const;
 type Action = (typeof ACTIONS)[number];
 
@@ -309,7 +321,10 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
           last_error: null,
           last_sync_at: new Date().toISOString(),
         });
-        return ok(result);
+        return ok({
+          ...result,
+          messages: await attachLabels(db, account.id, result.messages),
+        });
       } catch (error) {
         if (isMailError(error) && error.code === 'provider_error') {
           // Só fica "com erro" (o ⚠️) se a caixa não sincroniza há mais de 30 minutos; uma falha
@@ -349,17 +364,29 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const keyword = text(body.keyword, 200);
       const folderId = text(body.folder_id, 1000);
       const folderName = text(body.folder_name, 200);
-      if ((!fromContains && !keyword) || !folderId || !folderName) return badRequest();
-      if (/[\r\n\0]/.test(folderId)) return badRequest();
-      const driver = await createDriver(db, account, pendingSecret);
-      // A pasta tem de existir mesmo nesta caixa
-      if (!(await driver.folders()).some(folder => folder.id === folderId)) return badRequest();
+      const knownLabels = new Set((await listLabels(db, account.id)).map(label => label.id));
+      const labelIds = [
+        ...new Set(
+          (Array.isArray(body.label_ids) ? body.label_ids : []).filter(
+            (id): id is string => isUuid(id) && knownLabels.has(id)
+          )
+        ),
+      ].slice(0, 10);
+      // Pelo menos uma ação: pasta e/ou marcadores
+      if ((!fromContains && !keyword) || (!folderId && !labelIds.length)) return badRequest();
+      if (folderId) {
+        if (!folderName || /[\r\n\0]/.test(folderId)) return badRequest();
+        const driver = await createDriver(db, account, pendingSecret);
+        // A pasta tem de existir mesmo nesta caixa
+        if (!(await driver.folders()).some(folder => folder.id === folderId)) return badRequest();
+      }
       const row = {
         name: text(body.name, 100) ?? '',
         from_contains: fromContains,
         keyword,
         folder_id: folderId,
-        folder_name: folderName,
+        folder_name: folderId ? folderName : null,
+        label_ids: labelIds,
         mark_read: body.mark_read === true,
         is_active: body.is_active !== false,
         last_error: null,
@@ -408,14 +435,99 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const result = await applyRules(db, driver, rules, true);
       return ok({ moved: result.count });
     }
+    case 'labels':
+      return ok(await listLabels(db, account.id));
+    case 'label-save': {
+      const name = optionalString(body.name, 40)?.trim();
+      if (!name || !isLabelColor(body.color)) return badRequest();
+      const all = await listLabels(db, account.id);
+      const labelId = isUuid(body.label_id) ? body.label_id : null;
+      if (!labelId && all.length >= MAX_LABELS_PER_ACCOUNT)
+        return json({
+          ok: false,
+          code: 'bad_request',
+          message: 'Esta caixa já tem o máximo de marcadores (' + MAX_LABELS_PER_ACCOUNT + ').',
+        });
+      // Um marcador não se tira a si próprio
+      const others = new Set(all.filter(label => label.id !== labelId).map(label => label.id));
+      const automation = cleanAutomation(body.on_apply, others);
+      if (automation.folder_id) {
+        const folders = await (await createDriver(db, account, pendingSecret)).folders();
+        if (!folders.some(folder => folder.id === automation.folder_id)) {
+          delete automation.folder_id;
+          delete automation.folder_name;
+        }
+      }
+      const row = { name, color: body.color, on_apply: automation };
+      const duplicate = () =>
+        json({
+          ok: false,
+          code: 'bad_request',
+          message: 'Já existe um marcador com esse nome.',
+        });
+      if (labelId) {
+        const { data, error } = await db
+          .from('mail_labels')
+          .update(row)
+          .eq('id', labelId)
+          .eq('account_id', account.id)
+          .select('id');
+        if (error?.code === '23505') return duplicate();
+        if (error) throw error;
+        return (data ?? []).length ? ok({ id: labelId }) : badRequest();
+      }
+      const { data, error } = await db
+        .from('mail_labels')
+        .insert({ ...row, account_id: account.id, created_by: userId })
+        .select('id')
+        .single();
+      if (error?.code === '23505') return duplicate();
+      if (error) throw error;
+      return ok({ id: data.id });
+    }
+    case 'label-delete': {
+      if (!isUuid(body.label_id)) return badRequest();
+      const { error } = await db
+        .from('mail_labels')
+        .delete()
+        .eq('id', body.label_id)
+        .eq('account_id', account.id);
+      if (error) throw error;
+      return ok();
+    }
+    case 'label-apply': {
+      if (!isUuid(body.label_id) || !Array.isArray(body.items) || body.items.length > 100)
+        return badRequest();
+      const items = body.items.flatMap((raw: unknown) => {
+        const item = (raw ?? {}) as Record<string, unknown>;
+        const id = optionalString(item.id, 2000);
+        const key = optionalString(item.key, 600);
+        return id && key ? [{ id, key }] : [];
+      });
+      const label = (await listLabels(db, account.id)).find(item => item.id === body.label_id);
+      if (!label) return badRequest();
+      const driver = await createDriver(db, account, pendingSecret);
+      const result = await applyLabel(
+        db,
+        driver,
+        account.id,
+        label,
+        items,
+        body.on === true,
+        userId
+      );
+      return ok({ moved: [...result.moved], error: result.error });
+    }
     case 'move': {
       const folderId = optionalString(body.folder_id, 1000);
       if (!folderId || /[\r\n\0]/.test(folderId)) return badRequest();
       await (await createDriver(db, account, pendingSecret)).move(messageId, folderId);
       return ok();
     }
-    case 'get':
-      return ok(await (await createDriver(db, account, pendingSecret)).get(messageId));
+    case 'get': {
+      const message = await (await createDriver(db, account, pendingSecret)).get(messageId);
+      return ok((await attachLabels(db, account.id, [message]))[0]);
+    }
     case 'attachment': {
       const attachmentId = optionalString(body.attachment_id, 2000);
       if (!attachmentId) return badRequest();

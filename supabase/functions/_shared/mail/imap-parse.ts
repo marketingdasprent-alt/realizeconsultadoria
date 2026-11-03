@@ -11,6 +11,8 @@ export interface ImapAddressLike {
   group?: ImapAddressLike[];
 }
 
+import { messageKey } from './labels.ts';
+
 export interface ImapEnvelopeLike {
   date?: Date | string;
   subject?: string;
@@ -120,6 +122,7 @@ export const imapSummary = (input: {
     unread: !hasFlag(input.flags, '\\Seen'),
     starred: hasFlag(input.flags, '\\Flagged'),
     has_attachments: imapHasAttachments(input.bodyStructure),
+    message_key: messageKey(input.envelope?.messageId),
   };
 };
 
@@ -193,6 +196,7 @@ export const parsedMailToMessage = (
     html,
     text,
     attachments,
+    message_key: messageKey(parsed.messageId),
     message_id_header: parsed.messageId ?? null,
     references,
   };

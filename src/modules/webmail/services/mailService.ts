@@ -10,7 +10,9 @@ import type {
   MailAccount,
   MailAddress,
   MailCustomFolder,
+  MailLabel,
   MailRule,
+  LabelColor,
   MailFolder,
   MailMessage,
   MailSignature,
@@ -80,6 +82,8 @@ const toSummary = (accountId: string, row: Row): MailSummary => ({
   unread: !!row.unread,
   starred: !!row.starred,
   hasAttachments: !!row.has_attachments,
+  messageKey: (row.message_key as string | null) ?? null,
+  labelIds: Array.isArray(row.label_ids) ? (row.label_ids as string[]) : [],
 });
 
 const toMessage = (accountId: string, row: Row): MailMessage => ({
@@ -377,8 +381,9 @@ export const mailService = {
       name: str(row.name),
       fromContains: row.from_contains ? str(row.from_contains) : null,
       keyword: row.keyword ? str(row.keyword) : null,
-      folderId: str(row.folder_id),
-      folderName: str(row.folder_name),
+      folderId: row.folder_id ? str(row.folder_id) : null,
+      folderName: row.folder_name ? str(row.folder_name) : null,
+      labelIds: Array.isArray(row.label_ids) ? (row.label_ids as string[]) : [],
       markRead: row.mark_read === true,
       isActive: row.is_active !== false,
       lastError: row.last_error ? str(row.last_error) : null,
@@ -390,7 +395,7 @@ export const mailService = {
   saveRule: (
     accountId: string,
     rule: Pick<MailRule, 'name' | 'fromContains' | 'keyword' | 'folderId' | 'folderName'> &
-      Partial<Pick<MailRule, 'id' | 'markRead' | 'isActive'>>
+      Partial<Pick<MailRule, 'id' | 'markRead' | 'isActive' | 'labelIds'>>
   ) =>
     call<{ id: string }>('mail-api', {
       action: 'rule-save',
@@ -401,6 +406,7 @@ export const mailService = {
       keyword: rule.keyword,
       folder_id: rule.folderId,
       folder_name: rule.folderName,
+      label_ids: rule.labelIds ?? [],
       mark_read: rule.markRead ?? false,
       is_active: rule.isActive ?? true,
     }),
@@ -414,6 +420,64 @@ export const mailService = {
       action: 'rule-run',
       account_id: accountId,
       rule_id: ruleId,
+    }),
+
+  /** Marcadores desta caixa (partilhados por quem a usa). */
+  labels: async (accountId: string) => {
+    const { data, error } = await call<Row[]>('mail-api', {
+      action: 'labels',
+      account_id: accountId,
+    });
+    const labels: MailLabel[] = (data ?? []).map(row => {
+      const auto = (row.on_apply ?? {}) as Row;
+      return {
+        id: str(row.id),
+        accountId,
+        name: str(row.name),
+        color: str(row.color) as LabelColor,
+        onApply: {
+          folderId: auto.folder_id ? str(auto.folder_id) : null,
+          folderName: auto.folder_name ? str(auto.folder_name) : null,
+          markRead: auto.mark_read === true,
+          removeLabelIds: Array.isArray(auto.remove_label_ids)
+            ? (auto.remove_label_ids as string[])
+            : [],
+        },
+      };
+    });
+    return { data: labels, error };
+  },
+
+  /** Cria (ou, com `id`, altera) um marcador. */
+  saveLabel: (
+    accountId: string,
+    label: Pick<MailLabel, 'name' | 'color' | 'onApply'> & { id?: string }
+  ) =>
+    call<{ id: string }>('mail-api', {
+      action: 'label-save',
+      account_id: accountId,
+      label_id: label.id,
+      name: label.name,
+      color: label.color,
+      on_apply: {
+        folder_id: label.onApply.folderId,
+        folder_name: label.onApply.folderName,
+        mark_read: label.onApply.markRead,
+        remove_label_ids: label.onApply.removeLabelIds,
+      },
+    }),
+
+  deleteLabel: (accountId: string, labelId: string) =>
+    call('mail-api', { action: 'label-delete', account_id: accountId, label_id: labelId }),
+
+  /** Pôr ou tirar um marcador a emails (todos da mesma caixa); devolve os que a automação moveu. */
+  applyLabel: (accountId: string, labelId: string, mails: MailSummary[], on: boolean) =>
+    call<{ moved: string[]; error: string | null }>('mail-api', {
+      action: 'label-apply',
+      account_id: accountId,
+      label_id: labelId,
+      on,
+      items: mails.map(mail => ({ id: mail.id, key: mail.messageKey || `id:${mail.id}` })),
     }),
 
   /** Move o email para uma pasta da pessoa (id da lista de pastas). */

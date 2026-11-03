@@ -129,6 +129,7 @@ describe('mensagens IMAP', () => {
       unread: true,
       starred: true,
       has_attachments: true,
+      message_key: null,
     });
   });
 

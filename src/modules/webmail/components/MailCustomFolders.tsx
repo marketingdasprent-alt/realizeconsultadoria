@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { ChevronRight, Folder } from 'lucide-react';
+import { ChevronRight, Folder, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ACCOUNT_DOTS, SIDEBAR_ROW, accountName } from '../lib/mailFormat';
 import type { MailAccount, MailCustomFolder } from '../types';
@@ -18,6 +18,8 @@ interface MailCustomFoldersProps {
   byAccount: Record<string, MailCustomFolder[]>;
   selected: CustomFolderRef | null;
   onPick: (folder: CustomFolderRef) => void;
+  /** Nova pasta (accountId null = a pessoa escolhe a caixa) ou subpasta de parentId. */
+  onNew?: (accountId: string | null, parentId: string | null) => void;
 }
 
 const childrenOf = (folders: MailCustomFolder[]) => {
@@ -37,6 +39,7 @@ export const MailCustomFolders: React.FC<MailCustomFoldersProps> = ({
   byAccount,
   selected,
   onPick,
+  onNew,
 }) => {
   const [open, setOpen] = useState<Set<string>>(new Set());
   const shown = accounts.filter(
@@ -47,7 +50,7 @@ export const MailCustomFolders: React.FC<MailCustomFoldersProps> = ({
     // eslint-disable-next-line react-hooks/exhaustive-deps -- shown deriva de accounts/scope
     [byAccount, accounts, scope]
   );
-  if (!shown.length) return null;
+  if (!shown.length && !onNew) return null;
 
   const toggle = (key: string) =>
     setOpen(current => {
@@ -64,7 +67,7 @@ export const MailCustomFolders: React.FC<MailCustomFoldersProps> = ({
       const isActive = selected?.accountId === account.id && selected.id === folder.id;
       return (
         <li key={key}>
-          <div className="relative">
+          <div className="group relative">
             {kids.length > 0 && (
               <button
                 type="button"
@@ -93,6 +96,17 @@ export const MailCustomFolders: React.FC<MailCustomFoldersProps> = ({
               <span className="min-w-0 flex-1 truncate text-left">{folder.name}</span>
               <UnreadCount value={folder.unread ?? undefined} />
             </button>
+            {onNew && (
+              <button
+                type="button"
+                onClick={() => onNew(account.id, folder.id)}
+                aria-label={`Nova subpasta em ${folder.name}`}
+                title="Nova subpasta"
+                className="absolute right-1.5 top-1/2 hidden h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-white text-rz-muted shadow-sm hover:text-rz-primary [@media(hover:hover)]:group-hover:flex"
+              >
+                <Plus className="h-3.5 w-3.5" />
+              </button>
+            )}
           </div>
           {isOpen && kids.length > 0 && <ul>{renderLevel(account, folder.id, depth + 1)}</ul>}
         </li>
@@ -101,9 +115,27 @@ export const MailCustomFolders: React.FC<MailCustomFoldersProps> = ({
 
   return (
     <section>
-      <p className="mb-1 px-3 text-[11px] font-bold uppercase tracking-[0.12em] text-rz-muted">
-        As minhas pastas
-      </p>
+      <div className="mb-1 flex items-center justify-between px-3">
+        <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-rz-muted">
+          As minhas pastas
+        </p>
+        {onNew && (
+          <button
+            type="button"
+            onClick={() => onNew(scope === 'all' ? null : scope, null)}
+            aria-label="Nova pasta"
+            title="Nova pasta"
+            className="flex h-6 w-6 items-center justify-center rounded-full text-rz-muted hover:bg-white hover:text-rz-primary"
+          >
+            <Plus className="h-4 w-4" />
+          </button>
+        )}
+      </div>
+      {!shown.length && (
+        <p className="px-3 pb-1 text-[12.5px] text-rz-muted">
+          Crie pastas para organizar os emails (ex.: Tratados).
+        </p>
+      )}
       {shown.map(account => (
         <div key={account.id} className="mb-1">
           {scope === 'all' && (

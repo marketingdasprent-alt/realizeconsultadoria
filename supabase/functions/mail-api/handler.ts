@@ -239,6 +239,8 @@ const ACTIONS = [
   'share-access',
   'unread-counts',
   'folders',
+  'create-folder',
+  'move',
 ] as const;
 type Action = (typeof ACTIONS)[number];
 
@@ -270,6 +272,7 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
     'set-starred',
     'trash',
     'delete-draft',
+    'move',
   ];
   const messageId = optionalString(body.message_id, 2000) ?? '';
   if (needsMessage.includes(action) && !messageId) return badRequest();
@@ -323,6 +326,22 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
     }
     case 'folders':
       return ok(await (await createDriver(db, account, pendingSecret)).folders());
+    case 'create-folder': {
+      const name = optionalString(body.name, 100)?.trim();
+      const parentId = optionalString(body.parent_id, 1000) ?? null;
+      // Sem separadores nem caracteres de controlo: o nome é só uma pasta, nunca um caminho
+      if (!name || /[\\/.\r\n\0]/.test(name) || (parentId && /[\r\n\0]/.test(parentId)))
+        return badRequest();
+      return ok(
+        await (await createDriver(db, account, pendingSecret)).createFolder(name, parentId)
+      );
+    }
+    case 'move': {
+      const folderId = optionalString(body.folder_id, 1000);
+      if (!folderId || /[\r\n\0]/.test(folderId)) return badRequest();
+      await (await createDriver(db, account, pendingSecret)).move(messageId, folderId);
+      return ok();
+    }
     case 'get':
       return ok(await (await createDriver(db, account, pendingSecret)).get(messageId));
     case 'attachment': {

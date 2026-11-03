@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ConnectMailDialog } from '../components/ConnectMailDialog';
+import { NewMailFolderDialog } from '../components/NewMailFolderDialog';
 import { ContactListsDialog } from '../components/ContactListsDialog';
 import { AttachmentPreview, type PreviewTarget } from '../components/AttachmentPreview';
 import { MailAccountDialog } from '../components/MailAccountDialog';
@@ -20,6 +21,8 @@ import { useContacts } from '../hooks/useContacts';
 import { useKeptUnread } from '../hooks/useKeptUnread';
 import { useMailAccounts } from '../hooks/useMailAccounts';
 import { useMailActions } from '../hooks/useMailActions';
+import { useFolderActions, type MoveTarget } from '../hooks/useFolderActions';
+import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { useMailFolders } from '../hooks/useMailFolders';
 import type { MailChange } from '../hooks/useMailChanges';
 import { useUnreadCounts } from '../hooks/useUnreadCounts';
@@ -86,6 +89,12 @@ const WebmailPage: React.FC = () => {
   const customOpen = custom && custom.accountId === current ? custom : null;
   // Os "por ler" contam só a Entrada: numa pasta da pessoa não se acertam à mão.
   const actions = useMailActions(customOpen ? undefined : folder);
+  const folderActions = useFolderActions(customOpen ? undefined : folder);
+  const { isPreview } = useWorkspace();
+  const [newFolder, setNewFolder] = useState<{
+    accountId: string | null;
+    parentId: string | null;
+  } | null>(null);
   const box = useMailbox(accounts, current, folder, query, customOpen?.id ?? null);
   // Em "Não lidos" o email aberto fica na lista até se sair da pasta ou atualizar.
   const list = useKeptUnread(folder, current, query, box.messages);
@@ -163,6 +172,11 @@ const WebmailPage: React.FC = () => {
   const closeIfAmong = (mails: MailSummary[]) => {
     if (active && mails.some(m => mailKey(m) === mailKey(active))) setActive(null);
   };
+  const moveMails = (mails: MailSummary[], target: MoveTarget) => {
+    closeIfAmong(mails);
+    list.drop(mails);
+    void folderActions.move(mails, target);
+  };
   const bulk = (mails: MailSummary[], kind: MailChange) => {
     if (kind === 'trash') {
       closeIfAmong(mails);
@@ -235,6 +249,9 @@ const WebmailPage: React.FC = () => {
       }
       customFolders={customFolders.byAccount}
       customFolder={customOpen}
+      onNewFolder={
+        isPreview ? undefined : (accountId, parentId) => setNewFolder({ accountId, parentId })
+      }
       onCustomFolder={picked =>
         choose(() => {
           setScope(picked.accountId);
@@ -277,6 +294,7 @@ const WebmailPage: React.FC = () => {
           void actions.trash(target);
         }}
         onBulk={bulk}
+        onMove={moveMails}
         onHover={prefetch}
         onRefresh={() => {
           list.clear();
@@ -307,6 +325,8 @@ const WebmailPage: React.FC = () => {
               setPreview({ accountId: mail.accountId, messageId: mail.id, attachment })
             }
             onWrite={address => setDraft({ accountId: selected.accountId, to: address.email })}
+            accounts={accounts}
+            onMove={moveMails}
           />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-rz-muted">
@@ -324,6 +344,17 @@ const WebmailPage: React.FC = () => {
           {sidebar('h-full pt-12')}
         </SheetContent>
       </Sheet>
+      <NewMailFolderDialog
+        open={!!newFolder}
+        onClose={() => setNewFolder(null)}
+        accounts={accounts}
+        accountId={newFolder?.accountId ?? null}
+        parentId={newFolder?.parentId ?? null}
+        onCreate={async (accountId, name, parentId) => {
+          const result = await folderActions.create(accountId, name, parentId);
+          return result.error;
+        }}
+      />
       <MailComposer
         draft={draft}
         accounts={accounts}

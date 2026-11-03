@@ -12,6 +12,8 @@ interface MailBulkBarProps {
   onToggleAll: () => void;
   onAction: (kind: MailChange) => void;
   onClear: () => void;
+  /** Botão "Mover para…" (só quando os selecionados são todos da mesma caixa). */
+  moveSlot?: React.ReactNode;
   /** O que aparece sem nada selecionado (a pesquisa). */
   children: React.ReactNode;
 }
@@ -74,6 +76,7 @@ export const MailBulkBar: React.FC<MailBulkBarProps> = props => {
               />
             </button>
           ))}
+          {props.moveSlot}
           <button
             type="button"
             onClick={props.onClear}

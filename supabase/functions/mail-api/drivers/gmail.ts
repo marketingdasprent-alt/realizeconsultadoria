@@ -291,6 +291,31 @@ export const createGmailDriver = (
         .sort((a, b) => a.date.localeCompare(b.date));
     },
 
+    async createFolder(name, parentId) {
+      // "Clientes/Norte" é a subetiqueta "Norte" de "Clientes": o nome da mãe vem da etiqueta.
+      const parent = parentId
+        ? await session.json<{ name?: string }>(`${GMAIL}/labels/${enc(parentId)}`)
+        : null;
+      const label = await session.json<{ id: string }>(`${GMAIL}/labels`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: parent?.name ? `${parent.name}/${name}` : name,
+          labelListVisibility: 'labelShow',
+          messageListVisibility: 'show',
+        }),
+      });
+      return { id: label.id };
+    },
+
+    async move(messageId, folderId) {
+      await session.json(`${GMAIL}/messages/${enc(messageId)}/modify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ addLabelIds: [folderId], removeLabelIds: ['INBOX'] }),
+      });
+    },
+
     async unreadCount() {
       const inbox = await session.json<{ messagesUnread?: number }>(`${GMAIL}/labels/INBOX`);
       return inbox.messagesUnread ?? 0;

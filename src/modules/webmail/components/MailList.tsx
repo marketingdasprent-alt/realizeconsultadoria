@@ -7,7 +7,10 @@ import { ACCOUNT_DOTS, accountName, mailKey } from '../lib/mailFormat';
 import { mailErrorText, type MailError } from '../services/mailService';
 import type { MailAccount, MailSummary } from '../types';
 import { MailBulkBar } from './MailBulkBar';
+import { MailContextMenu } from './MailContextMenu';
 import { MailListItem } from './MailListItem';
+import { MoveToFolder } from './MoveToFolder';
+import type { MoveTarget } from '../hooks/useFolderActions';
 
 interface MailListProps {
   title: string;
@@ -24,6 +27,8 @@ interface MailListProps {
   onTrash: (mail: MailSummary) => void;
   /** Ação sobre os emails selecionados. */
   onBulk: (mails: MailSummary[], kind: MailChange) => void;
+  /** Mover emails (todos da mesma caixa) para uma pasta da pessoa. */
+  onMove: (mails: MailSummary[], target: MoveTarget) => void;
   onHover?: (mail: MailSummary | null) => void;
   onRefresh: () => void;
   onMenu: () => void;
@@ -41,10 +46,16 @@ export const MailList: React.FC<MailListProps> = props => {
   const colorOf = new Map(props.accounts.map(a => [a.id, ACCOUNT_DOTS[a.color]]));
   const emailOf = new Map(props.accounts.map(a => [a.id, accountName(a)]));
   const selection = useMailSelection(props.messages, props.selectionKey);
-  const onBulk = (kind: MailChange) => {
-    props.onBulk(selection.selected, kind);
+  const onBulkOf = (mails: MailSummary[], kind: MailChange) => {
+    props.onBulk(mails, kind);
     if (kind === 'trash') selection.clear();
   };
+  const onBulk = (kind: MailChange) => onBulkOf(selection.selected, kind);
+  const moveMails = (mails: MailSummary[], target: MoveTarget) => {
+    props.onMove(mails, target);
+    selection.clear();
+  };
+  const oneAccount = new Set(selection.selected.map(m => m.accountId)).size === 1;
   return (
     <section className={cn('flex min-h-0 flex-col bg-white', props.className)} aria-label="Emails">
       <div className="space-y-3 px-4 pb-2 pt-4">
@@ -75,6 +86,16 @@ export const MailList: React.FC<MailListProps> = props => {
           onToggleAll={selection.toggleAll}
           onAction={onBulk}
           onClear={selection.clear}
+          moveSlot={
+            selection.count > 0 && oneAccount ? (
+              <MoveToFolder
+                mails={selection.selected}
+                accounts={props.accounts}
+                onMove={moveMails}
+                className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
+              />
+            ) : null
+          }
         >
           <label className="flex h-10 min-w-0 flex-1 items-center gap-2 rounded-full bg-rz-canvas px-4 text-rz-muted focus-within:ring-2 focus-within:ring-rz-primary/30">
             <Search className="h-4 w-4 shrink-0" />
@@ -106,22 +127,42 @@ export const MailList: React.FC<MailListProps> = props => {
         {!props.isLoading && props.messages.length === 0 && (
           <p className="mt-12 text-center text-sm text-rz-muted">Nenhum email aqui.</p>
         )}
-        {props.messages.map(mail => (
-          <MailListItem
-            key={mailKey(mail)}
-            mail={mail}
-            isActive={props.activeKey === mailKey(mail)}
-            isSelected={selection.isSelected(mailKey(mail))}
-            selecting={selection.count > 0}
-            accountDot={props.showAccount ? colorOf.get(mail.accountId) : undefined}
-            accountName={props.showAccount ? emailOf.get(mail.accountId) : undefined}
-            onOpen={props.onOpen}
-            onSelect={(target, range) => selection.toggle(mailKey(target), range)}
-            onToggleStar={props.onToggleStar}
-            onTrash={props.onTrash}
-            onHover={props.onHover}
-          />
-        ))}
+        {props.messages.map(mail => {
+          const key = mailKey(mail);
+          // Clique direito num email dentro da seleção atua em todos os selecionados (da mesma caixa)
+          const group =
+            selection.isSelected(key) && selection.count > 1 && oneAccount
+              ? selection.selected
+              : [mail];
+          return (
+            <MailListItem
+              key={key}
+              wrap={row => (
+                <MailContextMenu
+                  mail={mail}
+                  targets={group}
+                  accounts={props.accounts}
+                  onOpen={props.onOpen}
+                  onChange={onBulkOf}
+                  onMove={moveMails}
+                >
+                  {row}
+                </MailContextMenu>
+              )}
+              mail={mail}
+              isActive={props.activeKey === mailKey(mail)}
+              isSelected={selection.isSelected(mailKey(mail))}
+              selecting={selection.count > 0}
+              accountDot={props.showAccount ? colorOf.get(mail.accountId) : undefined}
+              accountName={props.showAccount ? emailOf.get(mail.accountId) : undefined}
+              onOpen={props.onOpen}
+              onSelect={(target, range) => selection.toggle(mailKey(target), range)}
+              onToggleStar={props.onToggleStar}
+              onTrash={props.onTrash}
+              onHover={props.onHover}
+            />
+          );
+        })}
         {props.hasMore && (
           <li className="py-3 text-center">
             <button

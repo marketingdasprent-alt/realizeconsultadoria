@@ -76,6 +76,8 @@ interface ImapClient {
   messageFlagsAdd(range: string, flags: string[], options: UidOption): Promise<boolean>;
   messageFlagsRemove(range: string, flags: string[], options: UidOption): Promise<boolean>;
   messageMove(range: string, destination: string, options: UidOption): Promise<unknown>;
+  mailboxCreate(path: string): Promise<unknown>;
+  mailboxSubscribe(path: string): Promise<unknown>;
   append(path: string, content: string, flags?: string[]): Promise<{ uid?: number } | false>;
   messageDelete(range: string, options: UidOption): Promise<boolean>;
   download(
@@ -653,6 +655,43 @@ export const createImapDriver = (
 
     folders() {
       return withClient(async client => customImapFolders(await client.list()));
+    },
+
+    createFolder(name, parentId) {
+      return withClient(async client => {
+        const mailboxes = await client.list();
+        const parent = parentId ? mailboxes.find(m => m.path === parentId) : null;
+        if (parentId && !parent) throw mailError('bad_request');
+        // Em servidores com prefixo (ex.: cPanel: "INBOX.Enviados") as pastas novas ficam também
+        // sob esse prefixo; senão no topo.
+        const sub = mailboxes.find(
+          m => m.path.toUpperCase().startsWith('INBOX') && m.path.length > 5
+        );
+        const delimiter = parent?.delimiter || sub?.delimiter || mailboxes[0]?.delimiter || '/';
+        const prefix =
+          parent || !sub || sub.path.slice(5, 5 + delimiter.length) !== delimiter
+            ? ''
+            : sub.path.slice(0, 5) + delimiter;
+        const path = parent ? `${parent.path}${delimiter}${name}` : `${prefix}${name}`;
+        if (mailboxes.some(m => m.path.toLowerCase() === path.toLowerCase()))
+          throw mailError('bad_request', 'Já existe uma pasta com esse nome.');
+        await client.mailboxCreate(path);
+        // Sem subscrever, alguns servidores não a mostram noutros programas
+        await client.mailboxSubscribe(path).catch(() => undefined);
+        return { id: path };
+      });
+    },
+
+    move(messageId, folderId) {
+      return withClient(async client => {
+        const { path, uid } = ref(messageId);
+        if (path === folderId) return;
+        const exists = (await client.list()).some(m => m.path === folderId);
+        if (!exists) throw mailError('bad_request', 'A pasta já não existe.');
+        await withMailbox(client, path, false, async () => {
+          await client.messageMove(String(uid), folderId, { uid: true });
+        });
+      });
     },
 
     unreadCount() {

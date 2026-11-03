@@ -43,6 +43,8 @@ interface MailSidebarProps {
   customFolders: Record<string, MailCustomFolder[]>;
   customFolder: CustomFolderRef | null;
   onCustomFolder: (folder: CustomFolderRef) => void;
+  /** Nova pasta/subpasta (não existe na pré-visualização). */
+  onNewFolder?: (accountId: string | null, parentId: string | null) => void;
   onCompose: () => void;
   onConnect: () => void;
   onSettings: (account: MailAccount) => void;
@@ -115,6 +117,7 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
       byAccount={props.customFolders}
       selected={props.customFolder}
       onPick={props.onCustomFolder}
+      onNew={props.onNewFolder}
     />
 
     <section>

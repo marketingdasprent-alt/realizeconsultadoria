@@ -150,6 +150,10 @@ export interface MailDriver {
   unreadCount(): Promise<number>;
   /** Pastas criadas pela pessoa (sem as fixas: Entrada, Enviados, Lixo…). */
   folders(): Promise<MailFolderInfo[]>;
+  /** Cria uma pasta (ou uma subpasta de `parentId`); devolve o id da nova. */
+  createFolder(name: string, parentId: string | null): Promise<{ id: string }>;
+  /** Move o email para uma pasta da pessoa (`folderId`, da lista de folders). */
+  move(messageId: string, folderId: string): Promise<void>;
 }
 
 /** Segredo guardado no Vault para contas OAuth. */

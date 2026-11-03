@@ -355,6 +355,24 @@ export const mailService = {
     return { data: folders, error };
   },
 
+  /** Nova pasta (ou subpasta de `parentId`) na caixa; devolve o id da nova. */
+  createFolder: (accountId: string, name: string, parentId: string | null) =>
+    call<{ id: string }>('mail-api', {
+      action: 'create-folder',
+      account_id: accountId,
+      name,
+      parent_id: parentId ?? undefined,
+    }),
+
+  /** Move o email para uma pasta da pessoa (id da lista de pastas). */
+  move: (accountId: string, messageId: string, folderId: string) =>
+    call('mail-api', {
+      action: 'move',
+      account_id: accountId,
+      message_id: messageId,
+      folder_id: folderId,
+    }),
+
   /** As mensagens da mesma conversa, mais antiga primeiro (vazio sem agrupamento). */
   thread: async (accountId: string, threadId: string) => {
     const { data, error } = await call<Row[]>('mail-api', {

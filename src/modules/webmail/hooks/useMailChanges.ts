@@ -15,7 +15,7 @@ const PER_ACCOUNT = 3;
 type ListData = InfiniteData<{ messages: MailSummary[] }>;
 
 /** Atualiza já as listas em memória e as guardadas no browser (antes da resposta). */
-const patchLists = (
+export const patchLists = (
   qc: QueryClient,
   userId: string,
   target: MailSummary,

@@ -21,7 +21,10 @@ import { useMailThread } from '../hooks/useMailbox';
 import { nameOf } from '../lib/mailFormat';
 import { printMail } from '../lib/printMail';
 import type { MailAddress, MailAttachmentInfo, MailMessage, MailSummary } from '../types';
+import type { MoveTarget } from '../hooks/useFolderActions';
+import type { MailAccount } from '../types';
 import { MailBody } from './MailBody';
+import { MoveToFolder } from './MoveToFolder';
 import { AddressChip, MailRecipients } from './MailRecipients';
 import { ThreadItem } from './ThreadItem';
 
@@ -58,6 +61,9 @@ interface MailReaderProps {
   onOpenAttachment: (message: MailMessage, attachment: MailAttachmentInfo) => void;
   /** Carregar numa pessoa do cabeçalho: email novo para ela. */
   onWrite?: (address: MailAddress) => void;
+  /** Caixas (para a janela "Nova pasta" do Mover para) e a ação de mover. */
+  accounts: MailAccount[];
+  onMove: (mails: MailSummary[], target: MoveTarget) => void;
 }
 
 /** Ler um email: cabeçalho, ações (incl. tarefa/evento), corpo isolado num iframe e anexos. */
@@ -70,6 +76,8 @@ export const MailReader: React.FC<MailReaderProps> = ({
   onDownload,
   onOpenAttachment,
   onWrite,
+  accounts,
+  onMove,
 }) => {
   const thread = useMailThread(summary);
   // A conversa, a resposta mais recente em cima; sem outras mensagens, só o email aberto.
@@ -152,6 +160,13 @@ export const MailReader: React.FC<MailReaderProps> = ({
               <span className="hidden 2xl:inline">{label}</span>
             </button>
           ))}
+          <MoveToFolder
+            mails={[summary]}
+            accounts={accounts}
+            onMove={onMove}
+            withLabel
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
+          />
         </div>
         <button
           type="button"

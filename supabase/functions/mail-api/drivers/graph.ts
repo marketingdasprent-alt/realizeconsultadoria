@@ -364,6 +364,26 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
       });
     },
 
+    async createFolder(name, parentId) {
+      const url = parentId
+        ? `${ME}/mailFolders/${enc(parentId)}/childFolders`
+        : `${ME}/mailFolders`;
+      const folder = await session.json<{ id: string }>(url, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ displayName: name }),
+      });
+      return { id: folder.id };
+    },
+
+    async move(messageId, folderId) {
+      await session.json(`${messageUrl(messageId)}/move`, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ destinationId: folderId }),
+      });
+    },
+
     async thread(threadId: string) {
       // Todas as pastas (Entrada, Enviados…); ordena-se aqui (o Graph recusa ordenar com este filtro).
       const filter = encodeURIComponent(`conversationId eq '${threadId.replace(/'/g, "''")}'`);

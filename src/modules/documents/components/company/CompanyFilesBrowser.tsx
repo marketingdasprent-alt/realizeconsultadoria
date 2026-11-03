@@ -11,6 +11,7 @@ import { CompanyFileRow } from './CompanyFileRow';
 import { CompanyFilesSearch } from './CompanyFilesSearch';
 import { CompanyFolderActions } from './CompanyFolderActions';
 import { CompanyUploadList } from './CompanyUploadList';
+import { DeleteEntryDialog } from './DeleteEntryDialog';
 
 const VIEW_KEY = 'rz.docs.view';
 
@@ -67,6 +68,9 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
     }
   };
   const { isDragging, dropProps } = useFileDrop(uploads.upload, canEdit);
+  // Só admins, e só dentro de uma pasta (as pastas atribuídas não se eliminam daqui).
+  const [toDelete, setToDelete] = useState<CompanyEntry | null>(null);
+  const onDelete = path && listing.data?.canDelete ? setToDelete : undefined;
 
   const open = (entry: CompanyEntry) =>
     entry.type === 'dir' ? onNavigate(entry.path) : onOpenFile(entry);
@@ -147,11 +151,22 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
           Nada encontrado para “{query.trim()}”{path ? ' nesta pasta' : ''}.
         </p>
       ) : view === 'grid' ? (
-        <CompanyFileGrid entries={shown} onOpen={open} onDownload={onDownload} />
+        <CompanyFileGrid
+          entries={shown}
+          onOpen={open}
+          onDownload={onDownload}
+          onDelete={onDelete}
+        />
       ) : (
         <ul className="space-y-0.5">
           {shown.map(entry => (
-            <CompanyFileRow key={entry.path} entry={entry} onOpen={open} onDownload={onDownload} />
+            <CompanyFileRow
+              key={entry.path}
+              entry={entry}
+              onOpen={open}
+              onDownload={onDownload}
+              onDelete={onDelete}
+            />
           ))}
         </ul>
       )}
@@ -160,6 +175,7 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
           Esta pasta tem demasiados ficheiros; só aparecem os primeiros 5000.
         </p>
       )}
+      <DeleteEntryDialog entry={toDelete} folder={path} onClose={() => setToDelete(null)} />
     </section>
   );
 };

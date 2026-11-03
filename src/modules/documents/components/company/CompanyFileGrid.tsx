@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Download, LayoutGrid, List } from 'lucide-react';
+import { Download, LayoutGrid, List, Trash2 } from 'lucide-react';
 import { formatFileSize } from '@/lib/documents';
 import { cn } from '@/lib/utils';
 import { useFolderThumbs } from '../../hooks/useFolderThumbs';
@@ -49,6 +49,8 @@ interface CompanyFileGridProps {
   entries: CompanyEntry[];
   onOpen: (entry: CompanyEntry) => void;
   onDownload: (entry: CompanyEntry) => void;
+  /** Só para admins. */
+  onDelete?: (entry: CompanyEntry) => void;
 }
 
 /** Miniatura do ficheiro (ou o ícone do tipo enquanto chega / se não houver). */
@@ -80,6 +82,7 @@ export const CompanyFileGrid: React.FC<CompanyFileGridProps> = ({
   entries,
   onOpen,
   onDownload,
+  onDelete,
 }) => {
   const thumbs = useFolderThumbs(entries, true);
   return (
@@ -107,17 +110,30 @@ export const CompanyFileGrid: React.FC<CompanyFileGridProps> = ({
               </span>
             </span>
           </button>
-          {entry.type === 'file' && (
-            <button
-              type="button"
-              onClick={() => onDownload(entry)}
-              aria-label={`Descarregar ${entry.name}`}
-              title="Descarregar"
-              className="absolute right-2 top-2 hidden h-8 w-8 items-center justify-center rounded-full bg-white/90 text-rz-muted shadow-sm hover:text-rz-primary group-hover:flex"
-            >
-              <Download className="h-4 w-4" />
-            </button>
-          )}
+          <span className="absolute right-2 top-2 hidden gap-1 group-hover:flex">
+            {entry.type === 'file' && (
+              <button
+                type="button"
+                onClick={() => onDownload(entry)}
+                aria-label={`Descarregar ${entry.name}`}
+                title="Descarregar"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-rz-muted shadow-sm hover:text-rz-primary"
+              >
+                <Download className="h-4 w-4" />
+              </button>
+            )}
+            {onDelete && (
+              <button
+                type="button"
+                onClick={() => onDelete(entry)}
+                aria-label={`Eliminar ${entry.name}`}
+                title="Eliminar"
+                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-rz-muted shadow-sm hover:text-rose-600"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
+            )}
+          </span>
         </li>
       ))}
     </ul>

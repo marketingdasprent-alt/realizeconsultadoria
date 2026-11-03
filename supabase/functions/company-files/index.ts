@@ -13,6 +13,8 @@
 // POST { action: 'thumbs', items: [{ path, modified, size }] } → miniaturas (vista em grelha)
 // POST { action: 'upload', path, name, size } → link para o browser enviar o ficheiro direto
 //                                               ao agente (PUT, 10 min), com um nome livre
+// POST { action: 'delete', path }   → só admins: move o ficheiro/pasta para D:\Shares\_Lixo_Realize
+//                                     (o agente nunca apaga; o lixo limpa-se ao fim de 30 dias)
 //
 // Respostas { ok: true, data } ou { ok: false, message }. Os segredos nunca saem daqui: o
 // browser só recebe tokens curtos, de uma operação e de um caminho; o document.url e o
@@ -68,7 +70,8 @@ interface CompanyFilesRequest {
     | 'admin-list'
     | 'admin-mkdir'
     | 'thumbs'
-    | 'search';
+    | 'search'
+    | 'delete';
   path?: unknown;
   name?: unknown;
   kind?: unknown;
@@ -98,6 +101,7 @@ const AGENT_ERRORS: Record<number, string> = {
   404: 'A pasta ou o ficheiro já não existe.',
   409: 'Já existe uma pasta ou ficheiro com esse nome.',
   413: 'O ficheiro é demasiado grande.',
+  423: 'O ficheiro está aberto (no editor ou noutro computador). Feche-o e tente outra vez.',
 };
 
 /** Erro com mensagem para o colaborador. */
@@ -130,7 +134,7 @@ const callAgent = async <T>(
   let res: Response;
   try {
     res = await fetchWithTimeout(agentUrl(AGENT_URL, route, path), {
-      method: file ? 'PUT' : op === 'mkdir' ? 'POST' : 'GET',
+      method: file ? 'PUT' : op === 'mkdir' || op === 'delete' ? 'POST' : 'GET',
       headers: {
         Authorization: `Bearer ${token}`,
         ...(file ? { 'Content-Type': file.type } : {}),
@@ -407,11 +411,34 @@ serve(async (req: Request) => {
   const permission = accessFor(body.action === 'mkdir' ? parentPath(path) : path, folders);
   if (!permission) return fail('Não tem acesso a esta pasta.');
 
+  const isAdmin = async () =>
+    (await db.rpc('has_role', { _user_id: userId, _role: 'admin' })).data === true;
+
   try {
     switch (body.action) {
       case 'list': {
         const listing = await callAgent<AgentListing>(agentSecret, 'list', '/api/list', path);
-        return ok({ path, permission, entries: listing.entries, truncated: listing.truncated });
+        return ok({
+          path,
+          permission,
+          entries: listing.entries,
+          truncated: listing.truncated,
+          canDelete: await isAdmin(),
+        });
+      }
+      case 'delete': {
+        if (!(await isAdmin())) return fail('Só os administradores podem eliminar.');
+        // Nunca uma raiz do servidor nem a própria pasta atribuída (só o que está dentro dela)
+        if (!parentPath(path) || folders.some(folder => folder.path === path))
+          return fail('Esta pasta não pode ser eliminada.');
+        const result = await callAgent<{ type?: string; trash?: string }>(
+          agentSecret,
+          'delete',
+          '/api/delete',
+          path
+        );
+        console.log('company-files: eliminado', userId, path, '→', result?.trash ?? '?');
+        return ok({ path, trash: result?.trash ?? null });
       }
       case 'download': {
         const token = await agentToken('download', path, TTL.browserDownload, agentSecret);

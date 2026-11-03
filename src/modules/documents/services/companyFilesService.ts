@@ -27,6 +27,8 @@ export interface CompanyListing {
   permission: FolderPermission | null;
   entries: CompanyEntry[];
   truncated: boolean;
+  /** Só admins: podem eliminar (vai para o lixo do servidor). */
+  canDelete?: boolean;
 }
 
 export interface EditorSession {
@@ -108,6 +110,10 @@ export const companyFilesService = {
   /** Cria uma pasta (a pasta-mãe tem de existir e ter permissão de edição). */
   createFolder: (path: string) =>
     call<{ path: string; created: boolean }>({ action: 'mkdir', path }),
+
+  /** Só admins: move o ficheiro ou a pasta para o lixo do servidor (recuperável 30 dias). */
+  remove: (path: string) =>
+    call<{ path: string; trash: string | null }>({ action: 'delete', path }),
 
   /** Documento em branco (Word, Excel ou PowerPoint) na pasta; devolve o caminho. */
   createDocument: (folder: string, name: string, kind: NewDocumentKind) =>

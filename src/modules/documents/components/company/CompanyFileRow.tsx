@@ -1,5 +1,5 @@
 import React from 'react';
-import { ChevronRight, Download } from 'lucide-react';
+import { ChevronRight, Download, Trash2 } from 'lucide-react';
 import { formatFileSize } from '@/lib/documents';
 import { cn } from '@/lib/utils';
 import { fileKind } from '../../lib/companyFiles';
@@ -22,10 +22,17 @@ interface CompanyFileRowProps {
   /** Pasta: entrar; ficheiro: abrir no editor (ou descarregar, se não abrir). */
   onOpen: (entry: CompanyEntry) => void;
   onDownload: (entry: CompanyEntry) => void;
+  /** Só para admins. */
+  onDelete?: (entry: CompanyEntry) => void;
 }
 
 /** Uma linha da lista de ficheiros. */
-export const CompanyFileRow: React.FC<CompanyFileRowProps> = ({ entry, onOpen, onDownload }) => {
+export const CompanyFileRow: React.FC<CompanyFileRowProps> = ({
+  entry,
+  onOpen,
+  onDownload,
+  onDelete,
+}) => {
   const { icon: Icon, tint } = KIND_STYLES[fileKind(entry)];
   const isFolder = entry.type === 'dir';
   const meta = isFolder
@@ -63,6 +70,17 @@ export const CompanyFileRow: React.FC<CompanyFileRowProps> = ({ entry, onOpen, o
           className="mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-rz-muted hover:bg-white hover:text-rz-primary"
         >
           <Download className="h-4 w-4" />
+        </button>
+      )}
+      {onDelete && (
+        <button
+          type="button"
+          onClick={() => onDelete(entry)}
+          aria-label={`Eliminar ${entry.name}`}
+          title="Eliminar"
+          className="mr-1 flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-rz-muted hover:bg-white hover:text-rose-600"
+        >
+          <Trash2 className="h-4 w-4" />
         </button>
       )}
     </li>

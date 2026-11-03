@@ -41,7 +41,7 @@ export interface ConversationSummary {
   canPost: boolean;
 }
 
-export type MessageKind = 'text' | 'image' | 'file' | 'audio';
+export type MessageKind = 'text' | 'image' | 'file' | 'audio' | 'system';
 
 export interface MessageReaction {
   emoji: string;

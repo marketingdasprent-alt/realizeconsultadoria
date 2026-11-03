@@ -31,6 +31,7 @@ export const toPerson = (row: DirectoryRow): DirectoryPerson => ({
 const lastMessageText = (row: ConversationRow): string => {
   if (!row.last_kind) return 'Sem mensagens';
   if (row.last_deleted) return 'Mensagem eliminada';
+  if (row.last_kind === 'system') return row.last_body ?? '';
   if (row.last_kind === 'audio') return '🎤 Mensagem de voz';
   if (row.last_kind === 'image') return `📷 ${row.last_body || 'Fotografia'}`;
   if (row.last_kind === 'file') return `📎 ${row.last_attachment_name ?? 'Ficheiro'}`;
@@ -55,6 +56,7 @@ export const toConversation = (
     lastMessage: lastMessageText(row),
     lastAuthor:
       row.last_kind &&
+      row.last_kind !== 'system' &&
       (fromMe ? 'Eu' : !isDirect ? row.last_sender_name?.split(' ')[0] : undefined),
     lastAt: row.last_message_at ?? row.created_at,
     unread: row.unread,

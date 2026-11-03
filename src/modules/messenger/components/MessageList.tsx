@@ -6,6 +6,7 @@ import type { ChatMessage } from '../types';
 import { ImageLightbox } from './ImageLightbox';
 import { ImageViewerContext } from './ImageViewerContext';
 import { MessageBubble } from './MessageBubble';
+import { SystemNotice } from './SystemNotice';
 import type { MessageActionHandlers } from './MessageActions';
 
 interface MessageListProps {
@@ -86,17 +87,21 @@ export const MessageList: React.FC<MessageListProps> = ({
                   </span>
                 </div>
               )}
-              <MessageBubble
-                message={message}
-                showAuthor={showAuthor}
-                isSelected={selectedId === message.id}
-                onSelect={setSelectedId}
-                isMatch={!!term && matchesText(term, message.text)}
-                selecting={!!selection}
-                checked={!!selection?.includes(message.id)}
-                onToggleCheck={onToggleSelect}
-                {...handlers}
-              />
+              {message.kind === 'system' ? (
+                <SystemNotice message={message} />
+              ) : (
+                <MessageBubble
+                  message={message}
+                  showAuthor={showAuthor}
+                  isSelected={selectedId === message.id}
+                  onSelect={setSelectedId}
+                  isMatch={!!term && matchesText(term, message.text)}
+                  selecting={!!selection}
+                  checked={!!selection?.includes(message.id)}
+                  onToggleCheck={onToggleSelect}
+                  {...handlers}
+                />
+              )}
             </React.Fragment>
           );
         })}

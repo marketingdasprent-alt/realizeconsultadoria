@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
-import { Crown, Loader2, LogOut, UserPlus, X } from 'lucide-react';
+import { Crown, Loader2, LogOut, Search, UserPlus, X } from 'lucide-react';
+import { matchesText } from '@/lib/text';
 import { PeoplePicker } from '@/modules/social/components/PeoplePicker';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import type { DirectoryPerson } from '../types';
@@ -28,6 +29,7 @@ export const GroupMembersSection: React.FC<GroupMembersSectionProps> = ({
   onLeft,
 }) => {
   const [toAdd, setToAdd] = useState<string[]>([]);
+  const [search, setSearch] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [confirmLeave, setConfirmLeave] = useState(false);
   const byId = new Map(directory.map(p => [p.userId, p]));
@@ -40,6 +42,7 @@ export const GroupMembersSection: React.FC<GroupMembersSectionProps> = ({
       nameOf(a.userId).localeCompare(nameOf(b.userId), 'pt')
   );
   const inGroup = new Set(members.map(m => m.userId));
+  const shown = sorted.filter(member => matchesText(search, nameOf(member.userId)));
 
   const run = async (key: string, task: () => Promise<void>) => {
     setBusy(key);
@@ -50,8 +53,25 @@ export const GroupMembersSection: React.FC<GroupMembersSectionProps> = ({
   return (
     <section className="space-y-3 border-t border-rz-line pt-4">
       <p className="text-[13px] font-bold">Pessoas no grupo ({members.length})</p>
+      {members.length > 6 && (
+        <label className="flex h-9 items-center gap-2 rounded-full bg-rz-canvas px-3 text-rz-muted focus-within:ring-2 focus-within:ring-rz-primary/30">
+          <Search className="h-4 w-4 shrink-0" />
+          <input
+            value={search}
+            onChange={event => setSearch(event.target.value)}
+            placeholder="Pesquisar pessoas do grupo"
+            aria-label="Pesquisar pessoas do grupo"
+            className="w-full bg-transparent text-[13.5px] text-rz-ink outline-none placeholder:text-rz-muted"
+          />
+        </label>
+      )}
       <ul className="max-h-56 space-y-1 overflow-y-auto">
-        {sorted.map(member => (
+        {shown.length === 0 && (
+          <li className="px-1 py-3 text-center text-[13px] text-rz-muted">
+            Ninguém com esse nome.
+          </li>
+        )}
+        {shown.map(member => (
           <li key={member.userId} className="flex items-center gap-2.5 rounded-xl px-1 py-1">
             <UserAvatar name={nameOf(member.userId)} userId={member.userId} size="xs" />
             <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold">

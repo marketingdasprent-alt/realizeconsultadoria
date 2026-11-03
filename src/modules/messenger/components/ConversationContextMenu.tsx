@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   AppWindow,
   Archive,
@@ -6,7 +6,9 @@ import {
   Bell,
   BellOff,
   CheckCheck,
+  Folder,
   Link2,
+  Mail,
   MessageSquare,
   Pin,
   PinOff,
@@ -19,6 +21,11 @@ import {
   ContextMenuTrigger,
 } from '@/components/ui/context-menu';
 import { toast } from '@/hooks/use-toast';
+import {
+  PersonAccessDialog,
+  type PersonAccessTab,
+} from '@/modules/workspace/components/PersonAccessDialog';
+import { useIsAdmin } from '@/modules/workspace/hooks/useIsAdmin';
 import { useMessengerApi } from '../context/useMessengerApi';
 import type { ConversationSummary } from '../types';
 
@@ -42,6 +49,13 @@ export const ConversationContextMenu: React.FC<ConversationContextMenuProps> = (
   children,
 }) => {
   const api = useMessengerApi();
+  const isAdmin = useIsAdmin();
+  const [access, setAccess] = useState<PersonAccessTab | null>(null);
+  // Opções de admin: numa conversa privada, dar acessos à pessoa do outro lado
+  const person =
+    isAdmin && conversation.kind === 'direct' && conversation.peerUserId
+      ? { userId: conversation.peerUserId, name: conversation.title }
+      : null;
   const copyLink = async () => {
     try {
       await navigator.clipboard.writeText(conversationLink(conversation.id));
@@ -52,54 +66,72 @@ export const ConversationContextMenu: React.FC<ConversationContextMenuProps> = (
   };
 
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
-      <ContextMenuContent className="w-60 rounded-xl">
-        <ContextMenuItem onSelect={() => onOpen(conversation.id)} className="gap-2">
-          <MessageSquare className={ICON} /> Abrir conversa
-        </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => window.open(conversationLink(conversation.id), '_blank', 'noopener')}
-          className="gap-2"
-        >
-          <AppWindow className={ICON} /> Abrir em nova janela
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        {conversation.unread > 0 && (
-          <ContextMenuItem onSelect={() => void api.markRead(conversation.id)} className="gap-2">
-            <CheckCheck className={ICON} /> Marcar como lida
+    <>
+      <ContextMenu>
+        <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
+        <ContextMenuContent className="w-60 rounded-xl">
+          <ContextMenuItem onSelect={() => onOpen(conversation.id)} className="gap-2">
+            <MessageSquare className={ICON} /> Abrir conversa
           </ContextMenuItem>
-        )}
-        <ContextMenuItem
-          onSelect={() => void api.setFlag(conversation.id, 'pinned', !conversation.pinned)}
-          className="gap-2"
-        >
-          {conversation.pinned ? <PinOff className={ICON} /> : <Pin className={ICON} />}
-          {conversation.pinned ? 'Desafixar' : 'Fixar no topo'}
-        </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => void api.setFlag(conversation.id, 'muted', !conversation.muted)}
-          className="gap-2"
-        >
-          {conversation.muted ? <Bell className={ICON} /> : <BellOff className={ICON} />}
-          {conversation.muted ? 'Ativar notificações' : 'Silenciar'}
-        </ContextMenuItem>
-        <ContextMenuItem
-          onSelect={() => void api.setFlag(conversation.id, 'archived', !conversation.archived)}
-          className="gap-2"
-        >
-          {conversation.archived ? (
-            <ArchiveRestore className={ICON} />
-          ) : (
-            <Archive className={ICON} />
+          <ContextMenuItem
+            onSelect={() => window.open(conversationLink(conversation.id), '_blank', 'noopener')}
+            className="gap-2"
+          >
+            <AppWindow className={ICON} /> Abrir em nova janela
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          {conversation.unread > 0 && (
+            <ContextMenuItem onSelect={() => void api.markRead(conversation.id)} className="gap-2">
+              <CheckCheck className={ICON} /> Marcar como lida
+            </ContextMenuItem>
           )}
-          {conversation.archived ? 'Desarquivar' : 'Arquivar'}
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onSelect={() => void copyLink()} className="gap-2">
-          <Link2 className={ICON} /> Copiar link da conversa
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+          <ContextMenuItem
+            onSelect={() => void api.setFlag(conversation.id, 'pinned', !conversation.pinned)}
+            className="gap-2"
+          >
+            {conversation.pinned ? <PinOff className={ICON} /> : <Pin className={ICON} />}
+            {conversation.pinned ? 'Desafixar' : 'Fixar no topo'}
+          </ContextMenuItem>
+          <ContextMenuItem
+            onSelect={() => void api.setFlag(conversation.id, 'muted', !conversation.muted)}
+            className="gap-2"
+          >
+            {conversation.muted ? <Bell className={ICON} /> : <BellOff className={ICON} />}
+            {conversation.muted ? 'Ativar notificações' : 'Silenciar'}
+          </ContextMenuItem>
+          <ContextMenuItem
+            onSelect={() => void api.setFlag(conversation.id, 'archived', !conversation.archived)}
+            className="gap-2"
+          >
+            {conversation.archived ? (
+              <ArchiveRestore className={ICON} />
+            ) : (
+              <Archive className={ICON} />
+            )}
+            {conversation.archived ? 'Desarquivar' : 'Arquivar'}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem onSelect={() => void copyLink()} className="gap-2">
+            <Link2 className={ICON} /> Copiar link da conversa
+          </ContextMenuItem>
+          {person && (
+            <>
+              <ContextMenuSeparator />
+              <ContextMenuItem onSelect={() => setAccess('mail')} className="gap-2">
+                <Mail className={ICON} /> Dar acesso a caixa de email…
+              </ContextMenuItem>
+              <ContextMenuItem onSelect={() => setAccess('folders')} className="gap-2">
+                <Folder className={ICON} /> Dar acesso a pasta…
+              </ContextMenuItem>
+            </>
+          )}
+        </ContextMenuContent>
+      </ContextMenu>
+      <PersonAccessDialog
+        person={access ? person : null}
+        tab={access ?? 'folders'}
+        onClose={() => setAccess(null)}
+      />
+    </>
   );
 };

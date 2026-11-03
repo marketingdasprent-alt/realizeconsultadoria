@@ -210,8 +210,8 @@ const adminAction = async (
   body: CompanyFilesRequest,
   secret: string
 ) => {
-  const { data: isAdmin } = await db.rpc('has_role', { _user_id: userId, _role: 'admin' });
-  if (isAdmin !== true) return fail('Só os administradores podem gerir as pastas.');
+  if (!(await canDeleteFiles(db, userId)))
+    return fail('Só os administradores podem gerir as pastas.');
 
   if (body.action === 'admin-list') {
     const raw = typeof body.path === 'string' ? body.path : '';

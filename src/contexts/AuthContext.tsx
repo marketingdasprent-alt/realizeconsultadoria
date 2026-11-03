@@ -277,6 +277,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   );
 };
 
+/** Como useAuth, mas sem erro fora do AuthProvider (null): para opções que só alguns veem. */
+export const useAuthOptional = () => useContext(AuthContext) ?? null;
+
 // Hook para usar o contexto de autenticação
 export const useAuth = () => {
   const context = useContext(AuthContext);

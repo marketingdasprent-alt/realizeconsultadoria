@@ -19,29 +19,8 @@ export interface DeleteRequestRow {
   created_at: string;
 }
 
-/**
- * Pode aprovar/eliminar logo: administrador (papel admin ou grupo de admin ativo), pela conta
- * com que entrou ou pela conta de admin ligada à ficha (employees.admin_user_id) — nos
- * Documentos a pessoa está quase sempre com a conta de colaborador.
- */
-export const canDeleteFiles = async (db: SupabaseClient, userId: string) => {
-  const { data: linked } = await db
-    .from('employees')
-    .select('admin_user_id')
-    .eq('user_id', userId)
-    .not('admin_user_id', 'is', null);
-  const ids = [userId, ...(linked ?? []).map(row => row.admin_user_id as string)];
-  const [role, groups] = await Promise.all([
-    db.from('user_roles').select('role').in('user_id', ids).eq('role', 'admin').limit(1),
-    db
-      .from('admin_group_members')
-      .select('admin_groups!inner(is_active)')
-      .in('user_id', ids)
-      .eq('admin_groups.is_active', true)
-      .limit(1),
-  ]);
-  return (role.data?.length ?? 0) > 0 || (groups.data?.length ?? 0) > 0;
-};
+/** Pode aprovar/eliminar logo: administrador (ver _shared/admin-account.ts). */
+export { isAdminAccount as canDeleteFiles } from '../_shared/admin-account.ts';
 
 /**
  * Quem recebe o aviso: papel admin e grupo "Super Admin", e a conta de colaborador ligada a

@@ -1,5 +1,5 @@
 import { useQuery } from '@tanstack/react-query';
-import { useAuth } from '@/contexts/AuthContext';
+import { useAuthOptional } from '@/contexts/AuthContext';
 import { accountSwitchService } from '@/modules/auth/services/accountSwitchService';
 
 /**
@@ -8,7 +8,7 @@ import { accountSwitchService } from '@/modules/auth/services/accountSwitchServi
  * volta a verificar sempre).
  */
 export const useIsAdmin = (): boolean => {
-  const { user } = useAuth();
+  const user = useAuthOptional()?.user;
   const { data: targets = [] } = useQuery({
     queryKey: ['auth', 'switch-targets', user?.id],
     queryFn: async () => (await accountSwitchService.targets()).data,

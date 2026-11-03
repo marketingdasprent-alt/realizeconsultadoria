@@ -35,7 +35,7 @@ Content-Type: multipart/form-data
 - **Português (PT-PT)**: modelo `large-v3` ou `medium`; `small` só se o servidor for muito fraco.
 - Aceitar áudio **webm/opus** (é o que o browser grava) além de ogg, mp4/m4a, mp3 e wav (o
   faster-whisper trata disto com o ffmpeg).
-- Limite de pedido de pelo menos **25 MB** (o Realize recusa áudios com mais de 10 minutos).
+- Limite de pedido de pelo menos **25 MB** (o Realize recusa áudios com mais de 3 minutos: a medição foi ~32 s por minuto de áudio).
 - **Desempenho esperado:** com CPU, 1 minuto de áudio demora ~10–40 s conforme o processador e o
   modelo; com GPU, 2–5 s. O Realize espera até 2 minutos por resposta.
 - **Sem guardar o áudio:** o servidor só devolve o texto e não deve guardar os pedidos.

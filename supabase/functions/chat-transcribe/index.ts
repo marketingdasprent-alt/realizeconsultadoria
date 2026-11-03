@@ -22,8 +22,10 @@ const STT_KEY = Deno.env.get('STT_API_KEY')?.trim();
 const STT_MODEL = Deno.env.get('STT_MODEL')?.trim() || 'large-v3';
 const BUCKET = 'chat-files';
 const MAX_BYTES = 25 * 1024 * 1024;
-const MAX_SECONDS = 10 * 60;
-const STT_TIMEOUT_MS = 120_000;
+// O servidor (Whisper medium, só processador) demora ~32 s por minuto de áudio e a função tem
+// um limite de ~150 s: 3 minutos de áudio cabem, mais não.
+const MAX_SECONDS = 3 * 60;
+const STT_TIMEOUT_MS = 130_000;
 
 const ok = (data: unknown) => json({ ok: true, data });
 const fail = (message: string) => json({ ok: false, message });
@@ -81,7 +83,7 @@ const transcribe = async (db: Db, userId: string, messageId: string) => {
 
   if (!STT_URL) return fail('A transcrição ainda não está ativa (falta ligar o servidor de voz).');
   if (Number(message.duration_sec ?? 0) > MAX_SECONDS)
-    return fail('O áudio é demasiado longo para transcrever (máximo 10 minutos).');
+    return fail('O áudio é demasiado longo para transcrever (máximo 3 minutos).');
 
   const { data: signed } = await db.storage
     .from(BUCKET)

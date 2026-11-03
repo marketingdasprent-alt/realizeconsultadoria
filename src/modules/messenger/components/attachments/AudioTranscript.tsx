@@ -36,7 +36,7 @@ export const AudioTranscript: React.FC<{ message: ChatMessage }> = ({ message })
         ) : (
           <Captions className="h-3.5 w-3.5" />
         )}
-        {busy ? 'A transcrever…' : 'Transcrever'}
+        {busy ? 'A transcrever… (pode demorar)' : 'Transcrever'}
       </button>
     );
   }

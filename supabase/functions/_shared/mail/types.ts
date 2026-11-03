@@ -116,6 +116,8 @@ export interface MailSendParams {
   attachments: OutgoingAttachment[];
   /** Conteúdo já descodificado dos anexos (mesma ordem de attachments). */
   attachmentBytes: Uint8Array[];
+  /** Imagens da assinatura já dentro do email (o html refere-as por cid:). */
+  inline?: { cid: string; mime: string; content: Uint8Array }[];
 }
 
 /** Operações que cada fornecedor (Gmail API, Microsoft Graph, IMAP/SMTP) implementa. */

@@ -521,6 +521,7 @@ export const createImapDriver = (
         subject: params.subject,
         text: params.text,
         html: params.html,
+        inline: params.inline,
         attachments: params.attachments.map((a, i) => ({
           filename: a.filename,
           mime: a.mime,

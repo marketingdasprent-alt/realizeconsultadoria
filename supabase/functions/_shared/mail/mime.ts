@@ -356,6 +356,44 @@ export interface RawAttachment {
   content: Uint8Array;
 }
 
+/** Imagem dentro do HTML (src="cid:…"), ex.: a da assinatura. */
+export interface RawInlineImage {
+  cid: string;
+  mime: string;
+  content: Uint8Array;
+}
+
+/**
+ * Imagens das assinaturas (bucket público `mail-signatures` em `storageBase`) passam de link a
+ * `cid:` — o Outlook bloqueia imagens externas por omissão, mas mostra as que vêm no email.
+ * Devolve o HTML já com `cid:` e o que é preciso descarregar (no máx. `limit` imagens).
+ */
+export const signatureImagesToCid = (
+  html: string,
+  storageBase: string,
+  limit = 10
+): { html: string; images: { cid: string; url: string }[] } => {
+  const prefix = `${storageBase.replace(/\/+$/, '')}/storage/v1/object/public/mail-signatures/`;
+  const images: { cid: string; url: string }[] = [];
+  const byUrl = new Map<string, string>();
+  const out = html.replace(
+    /(<img\b[^>]*?\bsrc\s*=\s*)(["'])([^"']+)\2/gi,
+    (match, start: string, quote: string, url: string) => {
+      const clean = url.replace(/&amp;/g, '&');
+      if (!clean.startsWith(prefix)) return match;
+      let cid = byUrl.get(clean);
+      if (!cid) {
+        if (images.length >= limit) return match;
+        cid = `sig${images.length + 1}.${randomHex(6)}@realize`;
+        byUrl.set(clean, cid);
+        images.push({ cid, url: clean });
+      }
+      return `${start}${quote}cid:${cid}${quote}`;
+    }
+  );
+  return { html: out, images };
+};
+
 export interface RawMessageInput {
   from: MailAddress;
   to: MailAddress[];
@@ -367,6 +405,8 @@ export interface RawMessageInput {
   text: string;
   html: string;
   attachments?: RawAttachment[];
+  /** Imagens referidas no HTML por cid: (multipart/related). */
+  inline?: RawInlineImage[];
   inReplyTo?: string | null;
   references?: string | null;
   messageId?: string | null;
@@ -412,11 +452,24 @@ export const buildRawMessage = (input: RawMessageInput): string => {
   const seed = randomHex(8);
   const html = input.html.trim() ? input.html : '';
   const text = input.text;
-  const body = html
-    ? multipart('alternative', `=_alt_${seed}`, [
-        textPart('text/plain', text),
+  const inline = html ? (input.inline ?? []) : [];
+  const htmlPart = inline.length
+    ? multipart('related', `=_rel_${seed}`, [
         textPart('text/html', html),
+        ...inline.map(image =>
+          [
+            `Content-Type: ${safeMime(image.mime)}`,
+            `Content-ID: <${sanitizeHeaderText(image.cid)}>`,
+            'Content-Disposition: inline',
+            'Content-Transfer-Encoding: base64',
+            '',
+            wrapBase64(bytesToBase64(image.content)),
+          ].join(CRLF)
+        ),
       ])
+    : textPart('text/html', html);
+  const body = html
+    ? multipart('alternative', `=_alt_${seed}`, [textPart('text/plain', text), htmlPart])
     : textPart('text/plain', text);
 
   const attachments = input.attachments ?? [];

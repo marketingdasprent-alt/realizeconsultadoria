@@ -172,6 +172,21 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
         await uploadLargeAttachment(draftId, attachment.filename, attachment.mime, bytes);
       }
     }
+    // Imagens da assinatura (o html refere-as por cid:)
+    for (const [index, image] of (params.inline ?? []).entries()) {
+      await session.json(`${messageUrl(draftId)}/attachments`, {
+        method: 'POST',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({
+          '@odata.type': '#microsoft.graph.fileAttachment',
+          name: `assinatura-${index + 1}.${image.mime.split('/')[1] || 'png'}`,
+          contentType: image.mime,
+          contentBytes: bytesToBase64(image.content),
+          contentId: image.cid,
+          isInline: true,
+        }),
+      });
+    }
     return draftId;
   };
 

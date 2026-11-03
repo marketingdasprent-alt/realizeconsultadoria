@@ -59,6 +59,7 @@ import { microsoftAppToken, revokeGoogleToken } from '../_shared/mail-server/oau
 import { GRAPH_BASE } from '../_shared/mail/folders.ts';
 import { denoResolver } from '../_shared/mail-server/dns.ts';
 import { discoverDomain, domainOfEmail } from '../_shared/mail/discover.ts';
+import { embedSignatureImages } from '../_shared/mail-server/inline-images.ts';
 import { createGmailDriver } from './drivers/gmail.ts';
 import { createGraphDriver } from './drivers/graph.ts';
 import { createImapDriver, testImapLogin, type ImapAccountConfig } from './drivers/imap.ts';
@@ -341,7 +342,9 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
           : json({ ok: false, code: parsed.code, message: MAIL_ERROR_MESSAGES[parsed.code] });
       }
       const driver = await createDriver(db, account, pendingSecret);
-      return ok(await driver.send(parsed.value));
+      // Imagens da assinatura dentro do email (o Outlook bloqueia as que vêm por link)
+      const embedded = await embedSignatureImages(parsed.value.html);
+      return ok(await driver.send({ ...parsed.value, ...embedded }));
     }
     case 'save-draft': {
       const parsed = parseSendRequest(body, { draft: true });

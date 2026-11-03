@@ -14,6 +14,7 @@ import {
   extractHeader,
   formatAddressHeader,
   parseHeaderParams,
+  signatureImagesToCid,
   utf8Decode,
 } from '../../../supabase/functions/_shared/mail/mime';
 import {
@@ -211,5 +212,34 @@ describe('HTML de emails', () => {
     expect(replaceCidLinks(html, { 'logo@realize': 'data:image/png;base64,AAA' })).toBe(
       '<img src="data:image/png;base64,AAA"><img src=\'cid:outro\'>'
     );
+  });
+});
+
+describe('imagens da assinatura dentro do email', () => {
+  const base = 'https://ref.supabase.co';
+  const sig = base + '/storage/v1/object/public/mail-signatures/u/a.png';
+
+  it('troca só as imagens do bucket das assinaturas por cid:', () => {
+    const html = `<p>Olá</p><img src="${sig}" width="300"><img src="https://outro.pt/x.png"><img src='${sig}'>`;
+    const result = signatureImagesToCid(html, base);
+    expect(result.images).toHaveLength(1);
+    expect(result.images[0].url).toBe(sig);
+    expect(result.html).toContain('src="cid:' + result.images[0].cid + '"');
+    expect(result.html).toContain("src='cid:" + result.images[0].cid + "'");
+    expect(result.html).toContain('https://outro.pt/x.png');
+  });
+
+  it('põe as imagens numa parte multipart/related com Content-ID', () => {
+    const raw = buildRawMessage({
+      from: { name: 'A', email: 'a@x.pt' },
+      to: [{ name: '', email: 'b@x.pt' }],
+      subject: 's',
+      text: 't',
+      html: '<img src="cid:sig1@realize">',
+      inline: [{ cid: 'sig1@realize', mime: 'image/png', content: new Uint8Array([1, 2, 3]) }],
+    });
+    expect(raw).toContain('multipart/related');
+    expect(raw).toContain('Content-ID: <sig1@realize>');
+    expect(raw).toContain('Content-Disposition: inline');
   });
 });

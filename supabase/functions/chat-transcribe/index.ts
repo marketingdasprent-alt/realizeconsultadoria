@@ -90,7 +90,7 @@ const transcribe = async (db: Db, userId: string, messageId: string) => {
     .createSignedUrl(message.attachment_path as string, 120);
   if (!signed?.signedUrl) return fail('Não foi possível abrir o áudio.');
   const audio = await fetchWithTimeout(signed.signedUrl, {}, 30_000);
-  if (!audio.ok) return fail('Não foi possível abrir o áudio.');
+  if (!audio.ok) return fail(`Não foi possível abrir o áudio (HTTP ${audio.status}).`);
   const bytes = new Uint8Array(await audio.arrayBuffer());
   if (bytes.byteLength > MAX_BYTES) return fail('O áudio é demasiado grande para transcrever.');
 
@@ -113,18 +113,16 @@ const transcribe = async (db: Db, userId: string, messageId: string) => {
       STT_TIMEOUT_MS
     );
     if (!res.ok) {
-      console.error(
-        'chat-transcribe: servidor de voz',
-        res.status,
-        (await res.text()).slice(0, 200)
-      );
-      return fail('O servidor de voz não conseguiu transcrever. Tente daqui a pouco.');
+      const detail = (await res.text()).replace(/s+/g, ' ').slice(0, 160);
+      console.error('chat-transcribe: servidor de voz', res.status, detail);
+      return fail(`O servidor de voz recusou o pedido (HTTP ${res.status}). ${detail}`.trim());
     }
     const body = (await res.json().catch(() => null)) as { text?: unknown } | null;
     text = typeof body?.text === 'string' ? body.text.trim() : '';
   } catch (error) {
-    console.error('chat-transcribe:', error instanceof Error ? error.message : error);
-    return fail('O servidor de voz não respondeu. Tente daqui a pouco.');
+    const reason = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    console.error('chat-transcribe:', reason);
+    return fail(`Não foi possível falar com o servidor de voz (${reason.slice(0, 160)}).`);
   }
 
   await db

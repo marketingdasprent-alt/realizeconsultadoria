@@ -13,8 +13,10 @@
 // POST { action: 'thumbs', items: [{ path, modified, size }] } → miniaturas (vista em grelha)
 // POST { action: 'upload', path, name, size } → link para o browser enviar o ficheiro direto
 //                                               ao agente (PUT, 10 min), com um nome livre
-// POST { action: 'delete', path }   → só admins: move o ficheiro/pasta para D:\Shares\_Lixo_Realize
-//                                     (o agente nunca apaga; o lixo limpa-se ao fim de 30 dias)
+// POST { action: 'delete', path, kind: 'file'|'dir' } → admin: move logo para o lixo do servidor
+//      (D:\Shares\_Lixo_Realize, 30 dias); quem tem edição: pedido que um admin aprova
+// POST { action: 'delete-requests' }            → só admins: pedidos pendentes
+// POST { action: 'delete-decide', id, approve } → só admins: aprova (elimina) ou recusa
 //
 // Respostas { ok: true, data } ou { ok: false, message }. Os segredos nunca saem daqui: o
 // browser só recebe tokens curtos, de uma operação e de um caminho; o document.url e o
@@ -44,6 +46,7 @@ import {
 import { BLANK_MIME, blankFile, isBlankKind } from './templates.ts';
 import { thumbsFor, type ThumbTarget } from './thumbs.ts';
 import { searchFiles, type SearchEntry, type SearchHit } from './search.ts';
+import { canDeleteFiles, decideRequest, pendingRequests, requestDelete } from './deleteRequests.ts';
 
 const AGENT_URL = Deno.env.get('FILES_AGENT_URL') ?? 'https://files.dasprent.pt';
 const LOCAL_AGENT_URL = Deno.env.get('FILES_AGENT_LOCAL_URL') ?? 'http://127.0.0.1:8181';
@@ -71,7 +74,9 @@ interface CompanyFilesRequest {
     | 'admin-mkdir'
     | 'thumbs'
     | 'search'
-    | 'delete';
+    | 'delete'
+    | 'delete-requests'
+    | 'delete-decide';
   path?: unknown;
   name?: unknown;
   kind?: unknown;
@@ -80,6 +85,9 @@ interface CompanyFilesRequest {
   items?: unknown;
   /** search: o que procurar no nome dos ficheiros e pastas. */
   query?: unknown;
+  /** delete-decide: o pedido e a decisão. */
+  id?: unknown;
+  approve?: unknown;
 }
 
 interface AgentEntry {
@@ -272,30 +280,6 @@ const loadEmployeeFolders = async (
   return value;
 };
 
-/**
- * Pode eliminar: administrador (papel admin ou grupo de admin ativo), pela conta com que entrou
- * ou pela conta de admin ligada à ficha (employees.admin_user_id) — nos Documentos a pessoa
- * está quase sempre com a conta de colaborador.
- */
-const canDeleteFiles = async (db: ReturnType<typeof serviceClient>, userId: string) => {
-  const { data: linked } = await db
-    .from('employees')
-    .select('admin_user_id')
-    .eq('user_id', userId)
-    .not('admin_user_id', 'is', null);
-  const ids = [userId, ...(linked ?? []).map(row => row.admin_user_id as string)];
-  const [role, groups] = await Promise.all([
-    db.from('user_roles').select('role').in('user_id', ids).eq('role', 'admin').limit(1),
-    db
-      .from('admin_group_members')
-      .select('admin_groups!inner(is_active)')
-      .in('user_id', ids)
-      .eq('admin_groups.is_active', true)
-      .limit(1),
-  ]);
-  return (role.data?.length ?? 0) > 0 || (groups.data?.length ?? 0) > 0;
-};
-
 /** Nomes do que já existe numa pasta (para não substituir nada). */
 const namesIn = async (secret: string, path: string) =>
   (await callAgent<AgentListing>(secret, 'list', '/api/list', path)).entries.map(
@@ -429,6 +413,31 @@ serve(async (req: Request) => {
     );
   }
 
+  /** Move para o lixo do servidor (o agente nunca apaga); devolve onde ficou. */
+  const trash = async (target: string) => {
+    const result = await callAgent<{ trash?: string }>(
+      agentSecret,
+      'delete',
+      '/api/delete',
+      target
+    );
+    console.log('company-files: eliminado', userId, target, '→', result?.trash ?? '?');
+    return result?.trash ?? null;
+  };
+
+  if (body.action === 'delete-requests' || body.action === 'delete-decide') {
+    if (!(await canDeleteFiles(db, userId))) return fail('Só os administradores podem aprovar.');
+    if (body.action === 'delete-requests') return ok(await pendingRequests(db));
+    if (typeof body.id !== 'string') return fail('Pedido inválido.');
+    const { error } = await decideRequest(db, {
+      id: body.id,
+      approve: body.approve === true,
+      deciderId: userId,
+      trash,
+    });
+    return error ? fail(error) : ok({ id: body.id });
+  }
+
   const path = cleanPath(body.path);
   if (!path) return fail('Caminho inválido.');
   // Uma pasta nova precisa de acesso à pasta onde é criada
@@ -450,18 +459,20 @@ serve(async (req: Request) => {
         });
       }
       case 'delete': {
-        if (!(await isAdmin())) return fail('Só os administradores podem eliminar.');
         // Nunca uma raiz do servidor nem a própria pasta atribuída (só o que está dentro dela)
         if (!parentPath(path) || folders.some(folder => folder.path === path))
           return fail('Esta pasta não pode ser eliminada.');
-        const result = await callAgent<{ type?: string; trash?: string }>(
-          agentSecret,
-          'delete',
-          '/api/delete',
-          path
-        );
-        console.log('company-files: eliminado', userId, path, '→', result?.trash ?? '?');
-        return ok({ path, trash: result?.trash ?? null });
+        // Admin elimina logo; quem tem edição faz um pedido que um admin aprova.
+        if (await isAdmin()) return ok({ path, trash: await trash(path), requested: false });
+        if (permission !== 'edit') return fail(READ_ONLY);
+        await requestDelete(db, {
+          userId,
+          userName: mine.name,
+          path,
+          name: baseName(path),
+          type: body.kind === 'dir' ? 'dir' : 'file',
+        });
+        return ok({ path, trash: null, requested: true });
       }
       case 'download': {
         const token = await agentToken('download', path, TTL.browserDownload, agentSecret);

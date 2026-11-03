@@ -11,14 +11,21 @@ interface DeleteEntryDialogProps {
   entry: CompanyEntry | null;
   /** Pasta aberta, para a atualizar no fim. */
   folder: string | null;
+  /** Admin: elimina logo. Senão fica um pedido que um admin aprova. */
+  direct: boolean;
   onClose: () => void;
 }
 
 /**
- * Confirmação para eliminar (só admins). O servidor não apaga: move para o lixo
- * (D:\Shares\_Lixo_Realize), onde fica 30 dias.
+ * Confirmação para eliminar. Admin: o servidor move logo para o lixo (D:\Shares\_Lixo_Realize,
+ * 30 dias). Os outros: fica um pedido e os admins são avisados pelo Realize AI.
  */
-export const DeleteEntryDialog: React.FC<DeleteEntryDialogProps> = ({ entry, folder, onClose }) => {
+export const DeleteEntryDialog: React.FC<DeleteEntryDialogProps> = ({
+  entry,
+  folder,
+  direct,
+  onClose,
+}) => {
   const queryClient = useQueryClient();
   const { toast } = useToast();
   const [error, setError] = useState<string | null>(null);
@@ -33,14 +40,21 @@ export const DeleteEntryDialog: React.FC<DeleteEntryDialogProps> = ({ entry, fol
   const confirm = async () => {
     if (!entry || isDeleting) return;
     setIsDeleting(true);
-    const { error: message } = await companyFilesService.remove(entry.path);
+    const { data, error: message } = await companyFilesService.remove(entry);
     setIsDeleting(false);
     if (message) {
       setError(message);
       return;
     }
-    await queryClient.invalidateQueries({ queryKey: companyFolderKey(folder) });
-    toast({ title: `${isFolder ? 'Pasta eliminada' : 'Ficheiro eliminado'}: ${entry.name}` });
+    if (data?.requested) {
+      toast({
+        title: 'Pedido enviado',
+        description: 'Um administrador decide no Realize AI. Recebe um aviso com a resposta.',
+      });
+    } else {
+      await queryClient.invalidateQueries({ queryKey: companyFolderKey(folder) });
+      toast({ title: `${isFolder ? 'Pasta eliminada' : 'Ficheiro eliminado'}: ${entry.name}` });
+    }
     onClose();
   };
 
@@ -49,15 +63,16 @@ export const DeleteEntryDialog: React.FC<DeleteEntryDialogProps> = ({ entry, fol
       <DialogContent className="rounded-[28px] sm:max-w-sm sm:rounded-[28px]">
         <DialogTitle className="flex items-center gap-2 text-[18px] font-extrabold">
           <Trash2 className="h-5 w-5 text-rose-600" />
-          {isFolder ? 'Eliminar pasta' : 'Eliminar ficheiro'}
+          {direct ? 'Eliminar' : 'Pedir para eliminar'} {isFolder ? 'pasta' : 'ficheiro'}
         </DialogTitle>
         <p className="break-words text-[14px] text-rz-ink">
           Eliminar <strong>{entry?.name}</strong>
           {isFolder ? ' e tudo o que tem dentro' : ''}?
         </p>
         <p className="text-[13px] text-rz-muted">
-          Vai para o lixo do servidor e fica lá 30 dias. Para recuperar, fale com quem gere o
-          servidor.
+          {direct
+            ? 'Vai para o lixo do servidor e fica lá 30 dias. Para recuperar, fale com quem gere o servidor.'
+            : 'Um administrador tem de aprovar. Até lá continua aqui.'}
         </p>
         {error && <p className="text-[13px] text-rose-600">{error}</p>}
         <div className="flex justify-end gap-2">
@@ -75,7 +90,8 @@ export const DeleteEntryDialog: React.FC<DeleteEntryDialogProps> = ({ entry, fol
             disabled={isDeleting}
             className="inline-flex h-10 items-center gap-2 rounded-full bg-rose-600 px-5 text-sm font-bold text-white disabled:opacity-40"
           >
-            {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />} Eliminar
+            {isDeleting && <Loader2 className="h-4 w-4 animate-spin" />}
+            {direct ? 'Eliminar' : 'Pedir'}
           </button>
         </div>
       </DialogContent>

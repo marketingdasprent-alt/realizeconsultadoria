@@ -4,6 +4,7 @@ import { cn } from '@/lib/utils';
 import { WorkspacePage } from '@/modules/workspace/components/WorkspacePage';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
+import { AiDeleteRequests } from '../components/AiDeleteRequests';
 import { AiProactive } from '../components/AiProactive';
 import { ProposalCard } from '../components/ProposalCard';
 import { FoundFiles } from '../components/FoundFiles';
@@ -54,6 +55,7 @@ const AiPage: React.FC = () => {
             </button>
           )}
         </header>
+        <AiDeleteRequests />
         <AiProactive />
 
         <div className="rz-scroll min-h-0 flex-1 space-y-3 overflow-y-auto rounded-[24px] bg-white p-4 ring-1 ring-rz-line">

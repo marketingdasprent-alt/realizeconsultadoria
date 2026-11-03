@@ -27,8 +27,18 @@ export interface CompanyListing {
   permission: FolderPermission | null;
   entries: CompanyEntry[];
   truncated: boolean;
-  /** Só admins: podem eliminar (vai para o lixo do servidor). */
+  /** Admins: eliminam logo (vai para o lixo do servidor); os outros fazem um pedido. */
   canDelete?: boolean;
+}
+
+/** Pedido para eliminar, à espera de um admin (cartões no Realize AI). */
+export interface DeleteRequest {
+  id: string;
+  path: string;
+  name: string;
+  entry_type: 'file' | 'dir';
+  requester_name: string | null;
+  created_at: string;
 }
 
 export interface EditorSession {
@@ -111,9 +121,23 @@ export const companyFilesService = {
   createFolder: (path: string) =>
     call<{ path: string; created: boolean }>({ action: 'mkdir', path }),
 
-  /** Só admins: move o ficheiro ou a pasta para o lixo do servidor (recuperável 30 dias). */
-  remove: (path: string) =>
-    call<{ path: string; trash: string | null }>({ action: 'delete', path }),
+  /**
+   * Admin: move o ficheiro ou a pasta para o lixo do servidor (recuperável 30 dias). Os outros
+   * (com edição): pedido que um admin aprova no Realize AI (`requested`).
+   */
+  remove: (entry: Pick<CompanyEntry, 'path' | 'type'>) =>
+    call<{ path: string; trash: string | null; requested: boolean }>({
+      action: 'delete',
+      path: entry.path,
+      kind: entry.type,
+    }),
+
+  /** Só admins: pedidos para eliminar pendentes (erro para quem não é admin). */
+  deleteRequests: () => call<DeleteRequest[]>({ action: 'delete-requests' }),
+
+  /** Só admins: aprova (elimina para o lixo) ou recusa um pedido. */
+  decideDelete: (id: string, approve: boolean) =>
+    call<{ id: string }>({ action: 'delete-decide', id, approve }),
 
   /** Documento em branco (Word, Excel ou PowerPoint) na pasta; devolve o caminho. */
   createDocument: (folder: string, name: string, kind: NewDocumentKind) =>

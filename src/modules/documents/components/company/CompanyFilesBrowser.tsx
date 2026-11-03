@@ -68,9 +68,10 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
     }
   };
   const { isDragging, dropProps } = useFileDrop(uploads.upload, canEdit);
-  // Só admins, e só dentro de uma pasta (as pastas atribuídas não se eliminam daqui).
+  // Dentro de uma pasta: admins eliminam logo; quem tem edição pede (um admin aprova).
   const [toDelete, setToDelete] = useState<CompanyEntry | null>(null);
-  const onDelete = path && listing.data?.canDelete ? setToDelete : undefined;
+  const direct = !!listing.data?.canDelete;
+  const onDelete = path && (direct || canEdit) ? setToDelete : undefined;
 
   const open = (entry: CompanyEntry) =>
     entry.type === 'dir' ? onNavigate(entry.path) : onOpenFile(entry);
@@ -175,7 +176,12 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
           Esta pasta tem demasiados ficheiros; só aparecem os primeiros 5000.
         </p>
       )}
-      <DeleteEntryDialog entry={toDelete} folder={path} onClose={() => setToDelete(null)} />
+      <DeleteEntryDialog
+        entry={toDelete}
+        folder={path}
+        direct={direct}
+        onClose={() => setToDelete(null)}
+      />
     </section>
   );
 };

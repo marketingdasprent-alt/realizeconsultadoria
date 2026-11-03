@@ -80,6 +80,9 @@ verify_jwt = false
 [functions.person-access]
 verify_jwt = false
 
+[functions.chat-transcribe]
+verify_jwt = false
+
 [functions.switch-account]
 verify_jwt = false
 

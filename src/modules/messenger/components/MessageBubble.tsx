@@ -8,6 +8,7 @@ import { ReactionChips } from './ReactionChips';
 import { useOptionalMessenger } from '../context/useMessengerApi';
 import type { ChatMessage } from '../types';
 import { AudioAttachment } from './attachments/AudioAttachment';
+import { AudioTranscript } from './attachments/AudioTranscript';
 import { FileAttachment } from './attachments/FileAttachment';
 import { ImageAttachment } from './attachments/ImageAttachment';
 import { MessageActions, type MessageActionHandlers } from './MessageActions';
@@ -69,7 +70,12 @@ const Body: React.FC<{ message: ChatMessage }> = ({ message }) => {
     <>
       {message.kind === 'image' && <ImageAttachment message={message} />}
       {message.kind === 'file' && <FileAttachment message={message} />}
-      {message.kind === 'audio' && <AudioAttachment message={message} />}
+      {message.kind === 'audio' && (
+        <>
+          <AudioAttachment message={message} />
+          <AudioTranscript message={message} />
+        </>
+      )}
       {message.text && (
         <span
           className={cn('block whitespace-pre-wrap break-words', message.kind !== 'text' && 'mt-2')}

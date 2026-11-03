@@ -10,6 +10,8 @@ import { ContactListsDialog } from '../components/ContactListsDialog';
 import { AttachmentPreview, type PreviewTarget } from '../components/AttachmentPreview';
 import { MailAccountDialog } from '../components/MailAccountDialog';
 import { MailRulesDialog } from '../components/MailRulesDialog';
+import type { ListMailAction } from '../components/MailContextMenu';
+import { printMail } from '../lib/printMail';
 import type { RuleDraft } from '../components/MailRuleForm';
 import { MailComposer } from '../components/MailComposer';
 import { MailList } from '../components/MailList';
@@ -230,6 +232,23 @@ const WebmailPage: React.FC = () => {
     setDraft(draftFrom(message, action, email));
   };
 
+  // Ação pedida no menu do clique direito (responder, tarefa…): abre o email e, quando ele
+  // carrega, faz a ação.
+  const [pending, setPending] = useState<{ key: string; action: ListMailAction } | null>(null);
+  const fromList = (target: MailSummary, action: ListMailAction) => {
+    open(target);
+    setPending({ key: mailKey(target), action });
+  };
+  useEffect(() => {
+    if (!pending) return;
+    if (!active || mailKey(active) !== pending.key) return setPending(null);
+    if (!message || message.id !== active.id) return;
+    setPending(null);
+    if (pending.action === 'print') printMail(message);
+    else onAction(pending.action);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só quando o email pedido carrega
+  }, [pending, active, message]);
+
   if (mail.isLoading)
     return <Loader2 className="mx-auto mt-24 h-7 w-7 animate-spin text-rz-primary" />;
 
@@ -329,6 +348,7 @@ const WebmailPage: React.FC = () => {
         }}
         onBulk={bulk}
         onMove={moveMails}
+        onAction={isPreview ? undefined : fromList}
         onRule={
           isPreview
             ? undefined

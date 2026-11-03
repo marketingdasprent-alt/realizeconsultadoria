@@ -6,6 +6,7 @@ import { cn } from '@/lib/utils';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { FILTERS } from '../lib/format';
 import type { ConversationFilter, ConversationSummary } from '../types';
+import { ConversationContextMenu } from './ConversationContextMenu';
 import { ConversationRow } from './ConversationRow';
 import { useMentionBadges } from '../hooks/useMentionBadges';
 
@@ -144,14 +145,20 @@ export const ConversationList: React.FC<ConversationListProps> = ({
         {visible.length > 0 ? (
           <ul className="space-y-0.5">
             {visible.map(conversation => (
-              <li key={conversation.id}>
-                <ConversationRow
-                  conversation={conversation}
-                  isActive={conversation.id === activeId}
-                  onSelect={onSelect}
-                  mentioned={mentioned.has(conversation.id) && conversation.id !== activeId}
-                />
-              </li>
+              <ConversationContextMenu
+                key={conversation.id}
+                conversation={conversation}
+                onOpen={onSelect}
+              >
+                <li>
+                  <ConversationRow
+                    conversation={conversation}
+                    isActive={conversation.id === activeId}
+                    onSelect={onSelect}
+                    mentioned={mentioned.has(conversation.id) && conversation.id !== activeId}
+                  />
+                </li>
+              </ConversationContextMenu>
             ))}
           </ul>
         ) : (

@@ -124,6 +124,8 @@ export interface MessengerApi {
   deleteMessage: (messageId: string) => Promise<void>;
   toggleReaction: (messageId: string, emoji: string) => Promise<void>;
   setFlag: (conversationId: string, flag: MemberFlag, value: boolean) => Promise<void>;
+  /** Marca a conversa como lida (sem a abrir). */
+  markRead: (conversationId: string) => Promise<void>;
   startDirect: (userId: string) => Promise<string | null>;
   createGroup: (title: string, userIds: string[]) => Promise<string | null>;
   /** Membros da conversa aberta (o dono do grupo tem role 'owner'). */

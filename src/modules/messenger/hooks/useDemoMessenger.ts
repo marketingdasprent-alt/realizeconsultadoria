@@ -193,6 +193,7 @@ export const useDemoMessenger = (): MessengerApi => {
       patchMessage(id, m => ({ ...m, deleted: true, text: undefined, attachment: undefined })),
     toggleReaction,
     setFlag: async (id, flag, value) => patchConversation(id, { [flag]: value }),
+    markRead: async id => patchConversation(id, { unread: 0 }),
     startDirect,
     createGroup,
     renameGroup: async (id, title) => patchConversation(id, { title }),

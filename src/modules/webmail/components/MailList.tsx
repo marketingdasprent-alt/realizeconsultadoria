@@ -7,7 +7,7 @@ import { ACCOUNT_DOTS, accountName, mailKey } from '../lib/mailFormat';
 import { mailErrorText, type MailError } from '../services/mailService';
 import type { MailAccount, MailSummary } from '../types';
 import { MailBulkBar } from './MailBulkBar';
-import { MailContextMenu } from './MailContextMenu';
+import { MailContextMenu, type ListMailAction } from './MailContextMenu';
 import { MailListItem } from './MailListItem';
 import { MoveToFolder } from './MoveToFolder';
 import type { MoveTarget } from '../hooks/useFolderActions';
@@ -31,6 +31,8 @@ interface MailListProps {
   onMove: (mails: MailSummary[], target: MoveTarget) => void;
   /** Criar regra para o remetente deste email. */
   onRule?: (mail: MailSummary) => void;
+  /** Responder, reencaminhar, criar tarefa/evento ou imprimir, a partir do menu do clique direito. */
+  onAction?: (mail: MailSummary, action: ListMailAction) => void;
   onHover?: (mail: MailSummary | null) => void;
   onRefresh: () => void;
   onMenu: () => void;
@@ -148,6 +150,7 @@ export const MailList: React.FC<MailListProps> = props => {
                   onChange={onBulkOf}
                   onMove={moveMails}
                   onRule={props.onRule}
+                  onAction={props.onAction}
                 >
                   {row}
                 </MailContextMenu>

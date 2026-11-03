@@ -215,6 +215,7 @@ export const useLiveMessenger = (user: LiveMessengerUser): MessengerApi => {
     typing: channel.typingUserIds.map(id => names.get(id)?.split(' ')[0] ?? 'Alguém'),
     notifyTyping: channel.notifyTyping,
     members: (membersQ.data ?? []).map(m => ({ userId: m.user_id, role: m.role })),
+    markRead,
     ...actions,
   };
 };

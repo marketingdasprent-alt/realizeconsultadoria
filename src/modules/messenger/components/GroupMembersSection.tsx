@@ -51,10 +51,10 @@ export const GroupMembersSection: React.FC<GroupMembersSectionProps> = ({
   };
 
   return (
-    <section className="space-y-3 border-t border-rz-line pt-4">
-      <p className="text-[13px] font-bold">Pessoas no grupo ({members.length})</p>
+    <section className="space-y-3">
+      <p className="text-[15px] font-extrabold">Pessoas no grupo ({members.length})</p>
       {members.length > 6 && (
-        <label className="flex h-9 items-center gap-2 rounded-full bg-rz-canvas px-3 text-rz-muted focus-within:ring-2 focus-within:ring-rz-primary/30">
+        <label className="flex h-10 items-center gap-2 rounded-full bg-rz-canvas px-3 text-rz-muted focus-within:ring-2 focus-within:ring-rz-primary/30">
           <Search className="h-4 w-4 shrink-0" />
           <input
             value={search}
@@ -65,15 +65,18 @@ export const GroupMembersSection: React.FC<GroupMembersSectionProps> = ({
           />
         </label>
       )}
-      <ul className="max-h-56 space-y-1 overflow-y-auto">
-        {shown.length === 0 && (
+      <ul className="rz-scroll max-h-[min(42vh,22rem)] min-h-[10rem] space-y-0.5 overflow-y-auto pr-1">
+        {shown.length === 0 && search.trim() !== '' && (
           <li className="px-1 py-3 text-center text-[13px] text-rz-muted">
             Ninguém com esse nome.
           </li>
         )}
         {shown.map(member => (
-          <li key={member.userId} className="flex items-center gap-2.5 rounded-xl px-1 py-1">
-            <UserAvatar name={nameOf(member.userId)} userId={member.userId} size="xs" />
+          <li
+            key={member.userId}
+            className="flex items-center gap-3 rounded-xl px-2 py-1.5 hover:bg-rz-canvas"
+          >
+            <UserAvatar name={nameOf(member.userId)} userId={member.userId} size="sm" />
             <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold">
               {nameOf(member.userId)}
             </span>

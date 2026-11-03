@@ -9,6 +9,8 @@ import { NewMailFolderDialog } from '../components/NewMailFolderDialog';
 import { ContactListsDialog } from '../components/ContactListsDialog';
 import { AttachmentPreview, type PreviewTarget } from '../components/AttachmentPreview';
 import { MailAccountDialog } from '../components/MailAccountDialog';
+import { MailRulesDialog } from '../components/MailRulesDialog';
+import type { RuleDraft } from '../components/MailRuleForm';
 import { MailComposer } from '../components/MailComposer';
 import { MailList } from '../components/MailList';
 import { MailReader, type ReaderAction } from '../components/MailReader';
@@ -91,6 +93,10 @@ const WebmailPage: React.FC = () => {
   const actions = useMailActions(customOpen ? undefined : folder);
   const folderActions = useFolderActions(customOpen ? undefined : folder);
   const { isPreview } = useWorkspace();
+  const [rulesDialog, setRulesDialog] = useState<{
+    accountId: string | null;
+    prefill: Partial<RuleDraft> | null;
+  } | null>(null);
   const [newFolder, setNewFolder] = useState<{
     accountId: string | null;
     parentId: string | null;
@@ -249,6 +255,14 @@ const WebmailPage: React.FC = () => {
       }
       customFolders={customFolders.byAccount}
       customFolder={customOpen}
+      onRules={
+        isPreview
+          ? undefined
+          : () => {
+              setMenuOpen(false);
+              setRulesDialog({ accountId: current === 'all' ? null : current, prefill: null });
+            }
+      }
       onNewFolder={
         isPreview ? undefined : (accountId, parentId) => setNewFolder({ accountId, parentId })
       }
@@ -295,6 +309,15 @@ const WebmailPage: React.FC = () => {
         }}
         onBulk={bulk}
         onMove={moveMails}
+        onRule={
+          isPreview
+            ? undefined
+            : target =>
+                setRulesDialog({
+                  accountId: target.accountId,
+                  prefill: { fromContains: target.from?.email ?? '' },
+                })
+        }
         onHover={prefetch}
         onRefresh={() => {
           list.clear();
@@ -344,6 +367,13 @@ const WebmailPage: React.FC = () => {
           {sidebar('h-full pt-12')}
         </SheetContent>
       </Sheet>
+      <MailRulesDialog
+        open={!!rulesDialog}
+        onClose={() => setRulesDialog(null)}
+        accounts={accounts}
+        accountId={rulesDialog?.accountId ?? null}
+        prefill={rulesDialog?.prefill}
+      />
       <NewMailFolderDialog
         open={!!newFolder}
         onClose={() => setNewFolder(null)}

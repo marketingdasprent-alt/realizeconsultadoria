@@ -10,6 +10,7 @@ import {
   Star,
   Trash2,
   Users,
+  Workflow,
   type LucideIcon,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -49,6 +50,8 @@ interface MailSidebarProps {
   onConnect: () => void;
   onSettings: (account: MailAccount) => void;
   onLists: () => void;
+  /** Regras automáticas (não existem na pré-visualização). */
+  onRules?: () => void;
   onReorder: (ids: string[]) => void;
   className?: string;
   style?: React.CSSProperties;
@@ -131,6 +134,16 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
       >
         <Users className="h-4 w-4" /> <span className="flex-1 text-left">Listas de contactos</span>
       </button>
+      {props.onRules && (
+        <button
+          type="button"
+          onClick={props.onRules}
+          className={cn(SIDEBAR_ROW, 'hover:bg-white/70')}
+        >
+          <Workflow className="h-4 w-4" />{' '}
+          <span className="flex-1 text-left">Regras automáticas</span>
+        </button>
+      )}
     </section>
   </aside>
 );

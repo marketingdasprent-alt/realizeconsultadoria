@@ -13,6 +13,21 @@ export type MailFolder =
   | 'spam'
   | 'trash';
 /** Pasta criada pela pessoa no Outlook/Gmail/servidor (fora das fixas do Webmail). */
+/** Regra de uma caixa: o que for de X / tiver a palavra Y vai para a pasta Z. */
+export interface MailRule {
+  id: string;
+  accountId: string;
+  name: string;
+  fromContains: string | null;
+  keyword: string | null;
+  folderId: string;
+  folderName: string;
+  markRead: boolean;
+  isActive: boolean;
+  /** Porque é que a última aplicação falhou (ex.: a pasta foi apagada). */
+  lastError: string | null;
+}
+
 export interface MailCustomFolder {
   accountId: string;
   id: string;

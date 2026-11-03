@@ -10,6 +10,7 @@ import type {
   MailAccount,
   MailAddress,
   MailCustomFolder,
+  MailRule,
   MailFolder,
   MailMessage,
   MailSignature,
@@ -362,6 +363,57 @@ export const mailService = {
       account_id: accountId,
       name,
       parent_id: parentId ?? undefined,
+    }),
+
+  /** Regras desta caixa (partilhadas por quem a usa). */
+  rules: async (accountId: string) => {
+    const { data, error } = await call<Row[]>('mail-api', {
+      action: 'rules',
+      account_id: accountId,
+    });
+    const rules: MailRule[] = (data ?? []).map(row => ({
+      id: str(row.id),
+      accountId,
+      name: str(row.name),
+      fromContains: row.from_contains ? str(row.from_contains) : null,
+      keyword: row.keyword ? str(row.keyword) : null,
+      folderId: str(row.folder_id),
+      folderName: str(row.folder_name),
+      markRead: row.mark_read === true,
+      isActive: row.is_active !== false,
+      lastError: row.last_error ? str(row.last_error) : null,
+    }));
+    return { data: rules, error };
+  },
+
+  /** Cria (ou, com `id`, altera) uma regra. */
+  saveRule: (
+    accountId: string,
+    rule: Pick<MailRule, 'name' | 'fromContains' | 'keyword' | 'folderId' | 'folderName'> &
+      Partial<Pick<MailRule, 'id' | 'markRead' | 'isActive'>>
+  ) =>
+    call<{ id: string }>('mail-api', {
+      action: 'rule-save',
+      account_id: accountId,
+      rule_id: rule.id,
+      name: rule.name,
+      from_contains: rule.fromContains,
+      keyword: rule.keyword,
+      folder_id: rule.folderId,
+      folder_name: rule.folderName,
+      mark_read: rule.markRead ?? false,
+      is_active: rule.isActive ?? true,
+    }),
+
+  deleteRule: (accountId: string, ruleId: string) =>
+    call('mail-api', { action: 'rule-delete', account_id: accountId, rule_id: ruleId }),
+
+  /** Aplica a regra aos emails que já estão na Entrada; devolve quantos foram movidos. */
+  runRule: (accountId: string, ruleId: string) =>
+    call<{ moved: number }>('mail-api', {
+      action: 'rule-run',
+      account_id: accountId,
+      rule_id: ruleId,
     }),
 
   /** Move o email para uma pasta da pessoa (id da lista de pastas). */

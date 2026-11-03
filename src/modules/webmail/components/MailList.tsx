@@ -29,6 +29,8 @@ interface MailListProps {
   onBulk: (mails: MailSummary[], kind: MailChange) => void;
   /** Mover emails (todos da mesma caixa) para uma pasta da pessoa. */
   onMove: (mails: MailSummary[], target: MoveTarget) => void;
+  /** Criar regra para o remetente deste email. */
+  onRule?: (mail: MailSummary) => void;
   onHover?: (mail: MailSummary | null) => void;
   onRefresh: () => void;
   onMenu: () => void;
@@ -145,6 +147,7 @@ export const MailList: React.FC<MailListProps> = props => {
                   onOpen={props.onOpen}
                   onChange={onBulkOf}
                   onMove={moveMails}
+                  onRule={props.onRule}
                 >
                   {row}
                 </MailContextMenu>

@@ -8,6 +8,7 @@ import {
   MailOpen,
   Star,
   Trash2,
+  Workflow,
 } from 'lucide-react';
 import {
   ContextMenu,
@@ -35,6 +36,8 @@ interface MailContextMenuProps {
   onOpen: (mail: MailSummary) => void;
   onChange: (mails: MailSummary[], kind: MailChange) => void;
   onMove: (mails: MailSummary[], target: MoveTarget) => void;
+  /** "Criar regra para este remetente…". */
+  onRule?: (mail: MailSummary) => void;
   /** O <li> da linha. */
   children: React.ReactElement;
 }
@@ -47,6 +50,7 @@ export const MailContextMenu: React.FC<MailContextMenuProps> = ({
   onOpen,
   onChange,
   onMove,
+  onRule,
   children,
 }) => {
   const { isPreview } = useWorkspace();
@@ -116,6 +120,11 @@ export const MailContextMenu: React.FC<MailContextMenuProps> = ({
                   </ContextMenuItem>
                 </ContextMenuSubContent>
               </ContextMenuSub>
+              {onRule && mail.from && !many && (
+                <ContextMenuItem onSelect={() => onRule(mail)} className="gap-2">
+                  <Workflow className="h-4 w-4" /> Criar regra para este remetente…
+                </ContextMenuItem>
+              )}
             </>
           )}
           <ContextMenuSeparator />

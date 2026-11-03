@@ -9,6 +9,7 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { MailDriver, MailSummary } from '../_shared/mail/types.ts';
 import { ACCOUNT_COLUMNS, type MailAccountRow } from '../_shared/mail-server/accounts.ts';
 import { errorMessage } from '../_shared/mail-server/http.ts';
+import { activeRulesByAccount, applyRules, type MailRule } from './rules.ts';
 
 const PER_ACCOUNT = 10;
 /** Intervalo mínimo entre leituras da mesma caixa (as IMAP limitam logins: 2 em 2 minutos). */
@@ -65,8 +66,11 @@ const notify = async (db: SupabaseClient, userId: string, title: string, body: s
 const pollAccount = async (
   db: SupabaseClient,
   account: PollAccount,
-  driver: MailDriver
+  driver: MailDriver,
+  rules: MailRule[]
 ): Promise<number> => {
+  // As regras (mover para pastas) correm primeiro: o que sai da Entrada não gera aviso
+  const ruled = rules.length ? await applyRules(db, driver, rules, false) : null;
   const { messages } = await driver.list({
     folder: 'inbox',
     query: null,
@@ -83,7 +87,10 @@ const pollAccount = async (
     since === null
       ? []
       : messages
-          .filter(mail => mail.unread && (Date.parse(mail.date) || 0) > since)
+          .filter(
+            mail =>
+              mail.unread && !ruled?.moved.has(mail.id) && (Date.parse(mail.date) || 0) > since
+          )
           .sort((a, b) => a.date.localeCompare(b.date));
 
   if (fresh.length) {
@@ -141,13 +148,24 @@ export const pollNewMail = async (
     .eq('status', 'active');
   if (error) throw error;
   const accounts = (data ?? []) as PollAccount[];
+  // Uma falha a ler as regras não pára os avisos
+  const rules = await activeRulesByAccount(db).catch(error => {
+    console.error('mail-api poll: regras', errorMessage(error));
+    return new Map<string, MailRule[]>();
+  });
   const results = await Promise.all(
     accounts.map(async account => {
       try {
         if (!(await claim(db, account))) return 0;
         // Uma caixa lenta (ex.: servidor IMAP pendurado) não atrasa as outras.
         return await withTimeout(
-          (async () => pollAccount(db, account, await createDriver(db, account)))(),
+          (async () =>
+            pollAccount(
+              db,
+              account,
+              await createDriver(db, account),
+              rules.get(account.id) ?? []
+            ))(),
           ACCOUNT_TIMEOUT_MS
         );
       } catch (err) {

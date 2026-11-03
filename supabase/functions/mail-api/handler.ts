@@ -64,6 +64,7 @@ import { createGmailDriver } from './drivers/gmail.ts';
 import { createGraphDriver } from './drivers/graph.ts';
 import { createImapDriver, testImapLogin, type ImapAccountConfig } from './drivers/imap.ts';
 import { pollNewMail } from './poll.ts';
+import { MAX_RULES_PER_ACCOUNT, applyRules, listRules } from './rules.ts';
 import { OAuthSession } from './session.ts';
 import { shareAccess, shareAccessById } from './share.ts';
 import { unreadCounts } from './unread.ts';
@@ -241,6 +242,10 @@ const ACTIONS = [
   'folders',
   'create-folder',
   'move',
+  'rules',
+  'rule-save',
+  'rule-delete',
+  'rule-run',
 ] as const;
 type Action = (typeof ACTIONS)[number];
 
@@ -335,6 +340,73 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       return ok(
         await (await createDriver(db, account, pendingSecret)).createFolder(name, parentId)
       );
+    }
+    case 'rules':
+      return ok(await listRules(db, account.id));
+    case 'rule-save': {
+      const text = (value: unknown, max: number) => optionalString(value, max)?.trim() || null;
+      const fromContains = text(body.from_contains, 200);
+      const keyword = text(body.keyword, 200);
+      const folderId = text(body.folder_id, 1000);
+      const folderName = text(body.folder_name, 200);
+      if ((!fromContains && !keyword) || !folderId || !folderName) return badRequest();
+      if (/[\r\n\0]/.test(folderId)) return badRequest();
+      const driver = await createDriver(db, account, pendingSecret);
+      // A pasta tem de existir mesmo nesta caixa
+      if (!(await driver.folders()).some(folder => folder.id === folderId)) return badRequest();
+      const row = {
+        name: text(body.name, 100) ?? '',
+        from_contains: fromContains,
+        keyword,
+        folder_id: folderId,
+        folder_name: folderName,
+        mark_read: body.mark_read === true,
+        is_active: body.is_active !== false,
+        last_error: null,
+      };
+      const ruleId = isUuid(body.rule_id) ? body.rule_id : null;
+      if (ruleId) {
+        const { data, error } = await db
+          .from('mail_rules')
+          .update(row)
+          .eq('id', ruleId)
+          .eq('account_id', account.id)
+          .select('id');
+        if (error) throw error;
+        return (data ?? []).length ? ok({ id: ruleId }) : badRequest();
+      }
+      if ((await listRules(db, account.id)).length >= MAX_RULES_PER_ACCOUNT)
+        return json({
+          ok: false,
+          code: 'bad_request',
+          message: 'Esta caixa já tem o máximo de regras (' + MAX_RULES_PER_ACCOUNT + ').',
+        });
+      const { data, error } = await db
+        .from('mail_rules')
+        .insert({ ...row, account_id: account.id, created_by: userId })
+        .select('id')
+        .single();
+      if (error) throw error;
+      return ok({ id: data.id });
+    }
+    case 'rule-delete': {
+      if (!isUuid(body.rule_id)) return badRequest();
+      const { error } = await db
+        .from('mail_rules')
+        .delete()
+        .eq('id', body.rule_id)
+        .eq('account_id', account.id);
+      if (error) throw error;
+      return ok();
+    }
+    case 'rule-run': {
+      // Aplica uma regra aos emails que já estão na Entrada (ao criá-la)
+      if (!isUuid(body.rule_id)) return badRequest();
+      const rules = (await listRules(db, account.id)).filter(rule => rule.id === body.rule_id);
+      if (!rules.length) return badRequest();
+      const driver = await createDriver(db, account, pendingSecret);
+      const result = await applyRules(db, driver, rules, true);
+      return ok({ moved: result.count });
     }
     case 'move': {
       const folderId = optionalString(body.folder_id, 1000);

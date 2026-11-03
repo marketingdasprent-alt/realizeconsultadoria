@@ -1,5 +1,5 @@
 import React from 'react';
-import { Copy, Download, ExternalLink, FolderOpen, Link2, Trash2 } from 'lucide-react';
+import { AppWindow, Copy, Download, ExternalLink, FolderOpen, Link2, Trash2 } from 'lucide-react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -61,6 +61,12 @@ export const EntryContextMenu: React.FC<EntryContextMenuProps> = ({
         <ContextMenuItem onSelect={() => onOpen(entry)} className="gap-2">
           {isFolder ? <FolderOpen className="h-4 w-4" /> : <ExternalLink className="h-4 w-4" />}
           {isFolder ? 'Abrir pasta' : 'Abrir'}
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={() => window.open(linkFor(entry), '_blank', 'noopener')}
+          className="gap-2"
+        >
+          <AppWindow className="h-4 w-4" /> Abrir em nova aba
         </ContextMenuItem>
         {!isFolder && (
           <ContextMenuItem onSelect={() => onDownload(entry)} className="gap-2">

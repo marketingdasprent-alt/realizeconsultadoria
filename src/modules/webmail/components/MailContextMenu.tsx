@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import {
+  AppWindow,
   ExternalLink,
   Folder,
   FolderInput,
@@ -25,6 +26,7 @@ import { useAccountFolders } from '../hooks/useAccountFolders';
 import { useFolderActions, type MoveTarget } from '../hooks/useFolderActions';
 import type { MailChange } from '../hooks/useMailChanges';
 import { flattenFolders } from '../lib/folderTree';
+import { mailLink } from '../lib/mailLink';
 import type { MailAccount, MailSummary } from '../types';
 import { NewMailFolderDialog } from './NewMailFolderDialog';
 
@@ -71,6 +73,14 @@ export const MailContextMenu: React.FC<MailContextMenuProps> = ({
           {!many && (
             <ContextMenuItem onSelect={() => onOpen(mail)} className="gap-2">
               <ExternalLink className="h-4 w-4" /> Abrir
+            </ContextMenuItem>
+          )}
+          {!many && (
+            <ContextMenuItem
+              onSelect={() => window.open(mailLink(mail), '_blank', 'noopener')}
+              className="gap-2"
+            >
+              <AppWindow className="h-4 w-4" /> Abrir em nova janela
             </ContextMenuItem>
           )}
           <ContextMenuItem

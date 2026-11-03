@@ -143,6 +143,26 @@ const WebmailPage: React.FC = () => {
     return () => window.clearTimeout(timer);
   }, [search]);
 
+  // "Abrir em nova janela": ?conta=…&email=… abre o Webmail já com esse email aberto.
+  const viewAccount = params.get('conta');
+  const viewMail = params.get('email');
+  useEffect(() => {
+    if (!viewAccount || !viewMail || mail.isLoading) return;
+    setParams({}, { replace: true });
+    if (!accounts.some(a => a.id === viewAccount)) return;
+    void mailService.get(viewAccount, viewMail).then(({ data }) => {
+      if (!data) {
+        toast({ title: 'Não foi possível abrir o email', variant: 'destructive' });
+        return;
+      }
+      setScope(viewAccount);
+      setFolder('inbox');
+      setCustom(null);
+      setActive(data);
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao chegar com ?conta=&email=
+  }, [viewAccount, viewMail, mail.isLoading]);
+
   // Regresso da autorização do Google/Microsoft (?mail=ligada | erro).
   const result = params.get('mail');
   useEffect(() => {

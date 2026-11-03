@@ -113,3 +113,6 @@ export const previewKind = (entry: Pick<CompanyEntry, 'name' | 'type'>): Preview
 /** Ficheiros com miniatura na grelha (documentos, PDF e imagens). */
 export const hasThumbnail = (entry: Pick<CompanyEntry, 'name' | 'type'>): boolean =>
   entry.type === 'file' && (opensInEditor(entry) || previewKind(entry) === 'image');
+
+/** Pasta de topo do servidor (sem pasta-mãe): o servidor nunca a elimina. */
+export const isServerRoot = (entry: { path: string }) => !entry.path.includes('/');

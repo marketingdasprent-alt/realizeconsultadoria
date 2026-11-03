@@ -3,7 +3,7 @@ import { Download, LayoutGrid, List, Trash2 } from 'lucide-react';
 import { formatFileSize } from '@/lib/documents';
 import { cn } from '@/lib/utils';
 import { useFolderThumbs } from '../../hooks/useFolderThumbs';
-import { fileKind } from '../../lib/companyFiles';
+import { fileKind, isServerRoot } from '../../lib/companyFiles';
 import type { CompanyEntry } from '../../services/companyFilesService';
 import { EntryContextMenu } from './EntryContextMenu';
 import { KIND_STYLES } from './fileKindStyles';
@@ -130,7 +130,7 @@ export const CompanyFileGrid: React.FC<CompanyFileGridProps> = ({
                   <Download className="h-4 w-4" />
                 </button>
               )}
-              {onDelete && (
+              {onDelete && !isServerRoot(entry) && (
                 <button
                   type="button"
                   onClick={() => onDelete(entry)}

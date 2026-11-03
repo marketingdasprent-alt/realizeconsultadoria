@@ -459,11 +459,23 @@ serve(async (req: Request) => {
         });
       }
       case 'delete': {
-        // Nunca uma raiz do servidor nem a própria pasta atribuída (só o que está dentro dela)
-        if (!parentPath(path) || folders.some(folder => folder.path === path))
-          return fail('Esta pasta não pode ser eliminada.');
-        // Admin elimina logo; quem tem edição faz um pedido que um admin aprova.
-        if (await isAdmin()) return ok({ path, trash: await trash(path), requested: false });
+        // Nunca uma raiz do servidor (DASPRENT, RAZÃO DINÂMICA…)
+        if (!parentPath(path)) return fail('Esta pasta não pode ser eliminada.');
+        // Admin elimina logo (também uma pasta atribuída); quem tem edição faz um pedido que
+        // um admin aprova, e nunca de uma pasta atribuída.
+        if (await isAdmin()) {
+          const trashPath = await trash(path);
+          // As atribuições a esta pasta (e às de dentro) deixam de fazer sentido
+          const { data: assigned } = await db.from('folder_assignments').select('id, path');
+          const stale = (assigned ?? [])
+            .filter(row => row.path === path || row.path.startsWith(`${path}/`))
+            .map(row => row.id as string);
+          if (stale.length) await db.from('folder_assignments').delete().in('id', stale);
+          folderCache.clear();
+          return ok({ path, trash: trashPath, requested: false });
+        }
+        if (folders.some(folder => folder.path === path))
+          return fail('Esta pasta só um administrador pode eliminar.');
         if (permission !== 'edit') return fail(READ_ONLY);
         await requestDelete(db, {
           userId,

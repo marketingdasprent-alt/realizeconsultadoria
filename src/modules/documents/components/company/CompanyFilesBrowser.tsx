@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { ChevronRight, Eye, FolderOpen, Loader2, Upload } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
+import { useIsAdmin } from '@/modules/workspace/hooks/useIsAdmin';
 import { useCompanyFolder } from '../../hooks/useCompanyFolder';
 import { useCompanyUploads } from '../../hooks/useCompanyUploads';
 import { breadcrumbsFor, filterEntries } from '../../lib/companyFiles';
@@ -70,8 +71,10 @@ export const CompanyFilesBrowser: React.FC<CompanyFilesBrowserProps> = ({
   const { isDragging, dropProps } = useFileDrop(uploads.upload, canEdit);
   // Dentro de uma pasta: admins eliminam logo; quem tem edição pede (um admin aprova).
   const [toDelete, setToDelete] = useState<CompanyEntry | null>(null);
-  const direct = !!listing.data?.canDelete;
-  const onDelete = path && (direct || canEdit) ? setToDelete : undefined;
+  // Na lista das pastas atribuídas só os admins eliminam (a pasta toda vai para o lixo).
+  const isAdmin = useIsAdmin();
+  const direct = !!listing.data?.canDelete || (!path && isAdmin);
+  const onDelete = (path && (direct || canEdit)) || (!path && isAdmin) ? setToDelete : undefined;
 
   const open = (entry: CompanyEntry) =>
     entry.type === 'dir' ? onNavigate(entry.path) : onOpenFile(entry);

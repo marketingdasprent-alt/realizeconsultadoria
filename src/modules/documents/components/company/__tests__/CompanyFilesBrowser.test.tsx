@@ -4,6 +4,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { companyFilesService } from '../../../services/companyFilesService';
 import { CompanyFilesBrowser } from '../CompanyFilesBrowser';
 
+vi.mock('@/modules/workspace/hooks/useIsAdmin', () => ({ useIsAdmin: () => false }));
+
 vi.mock('../../../services/companyFilesService', () => ({
   companyFilesService: {
     folders: vi.fn(async () => ({

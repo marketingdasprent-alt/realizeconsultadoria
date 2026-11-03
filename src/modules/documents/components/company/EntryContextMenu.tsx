@@ -9,7 +9,7 @@ import {
 } from '@/components/ui/context-menu';
 import { useToast } from '@/hooks/use-toast';
 import { parentPath } from '../../../../../supabase/functions/_shared/company-files';
-import { opensInEditor, previewKind } from '../../lib/companyFiles';
+import { isServerRoot, opensInEditor, previewKind } from '../../lib/companyFiles';
 import type { CompanyEntry } from '../../services/companyFilesService';
 
 interface EntryContextMenuProps {
@@ -83,12 +83,19 @@ export const EntryContextMenu: React.FC<EntryContextMenuProps> = ({
         {onDelete && (
           <>
             <ContextMenuSeparator />
-            <ContextMenuItem
-              onSelect={() => onDelete(entry)}
-              className="gap-2 text-rose-600 focus:bg-rose-50 focus:text-rose-700"
-            >
-              <Trash2 className="h-4 w-4" /> Eliminar
-            </ContextMenuItem>
+            {isServerRoot(entry) ? (
+              // As pastas de topo do servidor (DASPRENT, _SAAS_TESTE…) nunca se eliminam
+              <ContextMenuItem disabled className="gap-2">
+                <Trash2 className="h-4 w-4" /> Pasta raiz do servidor: não se elimina
+              </ContextMenuItem>
+            ) : (
+              <ContextMenuItem
+                onSelect={() => onDelete(entry)}
+                className="gap-2 text-rose-600 focus:bg-rose-50 focus:text-rose-700"
+              >
+                <Trash2 className="h-4 w-4" /> Eliminar
+              </ContextMenuItem>
+            )}
           </>
         )}
       </ContextMenuContent>

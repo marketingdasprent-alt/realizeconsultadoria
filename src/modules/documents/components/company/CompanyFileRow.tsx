@@ -2,7 +2,7 @@ import React from 'react';
 import { ChevronRight, Download, Trash2 } from 'lucide-react';
 import { formatFileSize } from '@/lib/documents';
 import { cn } from '@/lib/utils';
-import { fileKind } from '../../lib/companyFiles';
+import { fileKind, isServerRoot } from '../../lib/companyFiles';
 import type { CompanyEntry } from '../../services/companyFilesService';
 import { EntryContextMenu } from './EntryContextMenu';
 import { KIND_STYLES } from './fileKindStyles';
@@ -74,7 +74,7 @@ export const CompanyFileRow: React.FC<CompanyFileRowProps> = ({
             <Download className="h-4 w-4" />
           </button>
         )}
-        {onDelete && (
+        {onDelete && !isServerRoot(entry) && (
           <button
             type="button"
             onClick={() => onDelete(entry)}

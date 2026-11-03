@@ -272,6 +272,30 @@ const loadEmployeeFolders = async (
   return value;
 };
 
+/**
+ * Pode eliminar: administrador (papel admin ou grupo de admin ativo), pela conta com que entrou
+ * ou pela conta de admin ligada à ficha (employees.admin_user_id) — nos Documentos a pessoa
+ * está quase sempre com a conta de colaborador.
+ */
+const canDeleteFiles = async (db: ReturnType<typeof serviceClient>, userId: string) => {
+  const { data: linked } = await db
+    .from('employees')
+    .select('admin_user_id')
+    .eq('user_id', userId)
+    .not('admin_user_id', 'is', null);
+  const ids = [userId, ...(linked ?? []).map(row => row.admin_user_id as string)];
+  const [role, groups] = await Promise.all([
+    db.from('user_roles').select('role').in('user_id', ids).eq('role', 'admin').limit(1),
+    db
+      .from('admin_group_members')
+      .select('admin_groups!inner(is_active)')
+      .in('user_id', ids)
+      .eq('admin_groups.is_active', true)
+      .limit(1),
+  ]);
+  return (role.data?.length ?? 0) > 0 || (groups.data?.length ?? 0) > 0;
+};
+
 /** Nomes do que já existe numa pasta (para não substituir nada). */
 const namesIn = async (secret: string, path: string) =>
   (await callAgent<AgentListing>(secret, 'list', '/api/list', path)).entries.map(
@@ -411,8 +435,7 @@ serve(async (req: Request) => {
   const permission = accessFor(body.action === 'mkdir' ? parentPath(path) : path, folders);
   if (!permission) return fail('Não tem acesso a esta pasta.');
 
-  const isAdmin = async () =>
-    (await db.rpc('has_role', { _user_id: userId, _role: 'admin' })).data === true;
+  const isAdmin = () => canDeleteFiles(db, userId);
 
   try {
     switch (body.action) {

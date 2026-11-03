@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { useFolderThumbs } from '../../hooks/useFolderThumbs';
 import { fileKind } from '../../lib/companyFiles';
 import type { CompanyEntry } from '../../services/companyFilesService';
+import { EntryContextMenu } from './EntryContextMenu';
 import { KIND_STYLES } from './fileKindStyles';
 
 export type FilesView = 'list' | 'grid';
@@ -88,53 +89,61 @@ export const CompanyFileGrid: React.FC<CompanyFileGridProps> = ({
   return (
     <ul className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {entries.map(entry => (
-        <li key={entry.path} className="group relative">
-          <button
-            type="button"
-            onClick={() => onOpen(entry)}
-            className="flex w-full flex-col overflow-hidden rounded-2xl bg-white text-left ring-1 ring-rz-line transition hover:shadow-rz-soft hover:ring-rz-primary/40"
-          >
-            <span className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-rz-canvas">
-              <Thumb entry={entry} url={thumbs[entry.path]} />
-            </span>
-            <span className="min-w-0 px-3 py-2">
-              <span className="line-clamp-2 text-[13px] font-semibold leading-snug text-rz-ink">
-                {entry.name}
+        <EntryContextMenu
+          key={entry.path}
+          entry={entry}
+          onOpen={onOpen}
+          onDownload={onDownload}
+          onDelete={onDelete}
+        >
+          <li className="group relative">
+            <button
+              type="button"
+              onClick={() => onOpen(entry)}
+              className="flex w-full flex-col overflow-hidden rounded-2xl bg-white text-left ring-1 ring-rz-line transition hover:shadow-rz-soft hover:ring-rz-primary/40"
+            >
+              <span className="flex aspect-[4/3] items-center justify-center overflow-hidden bg-rz-canvas">
+                <Thumb entry={entry} url={thumbs[entry.path]} />
               </span>
-              <span className="block truncate text-[11.5px] text-rz-muted">
-                {entry.type === 'dir'
-                  ? 'Pasta'
-                  : entry.size !== undefined
-                    ? formatFileSize(entry.size)
-                    : ''}
+              <span className="min-w-0 px-3 py-2">
+                <span className="line-clamp-2 text-[13px] font-semibold leading-snug text-rz-ink">
+                  {entry.name}
+                </span>
+                <span className="block truncate text-[11.5px] text-rz-muted">
+                  {entry.type === 'dir'
+                    ? 'Pasta'
+                    : entry.size !== undefined
+                      ? formatFileSize(entry.size)
+                      : ''}
+                </span>
               </span>
+            </button>
+            <span className="absolute right-2 top-2 hidden gap-1 group-hover:flex">
+              {entry.type === 'file' && (
+                <button
+                  type="button"
+                  onClick={() => onDownload(entry)}
+                  aria-label={`Descarregar ${entry.name}`}
+                  title="Descarregar"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-rz-muted shadow-sm hover:text-rz-primary"
+                >
+                  <Download className="h-4 w-4" />
+                </button>
+              )}
+              {onDelete && (
+                <button
+                  type="button"
+                  onClick={() => onDelete(entry)}
+                  aria-label={`Eliminar ${entry.name}`}
+                  title="Eliminar"
+                  className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-rz-muted shadow-sm hover:text-rose-600"
+                >
+                  <Trash2 className="h-4 w-4" />
+                </button>
+              )}
             </span>
-          </button>
-          <span className="absolute right-2 top-2 hidden gap-1 group-hover:flex">
-            {entry.type === 'file' && (
-              <button
-                type="button"
-                onClick={() => onDownload(entry)}
-                aria-label={`Descarregar ${entry.name}`}
-                title="Descarregar"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-rz-muted shadow-sm hover:text-rz-primary"
-              >
-                <Download className="h-4 w-4" />
-              </button>
-            )}
-            {onDelete && (
-              <button
-                type="button"
-                onClick={() => onDelete(entry)}
-                aria-label={`Eliminar ${entry.name}`}
-                title="Eliminar"
-                className="flex h-8 w-8 items-center justify-center rounded-full bg-white/90 text-rz-muted shadow-sm hover:text-rose-600"
-              >
-                <Trash2 className="h-4 w-4" />
-              </button>
-            )}
-          </span>
-        </li>
+          </li>
+        </EntryContextMenu>
       ))}
     </ul>
   );

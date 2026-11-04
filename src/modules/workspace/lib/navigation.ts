@@ -270,10 +270,11 @@ export const SETTINGS_MODULE: WorkspaceModule = {
   planned: ['Tema claro ou escuro', 'Notificações', 'Sessões e segurança'],
 };
 
-export const ALL_MODULES: WorkspaceModule[] = [
+// Os módulos do Workspace têm sempre uma ModuleKey (as chaves "admin:…" são só do menu Gestão)
+export const ALL_MODULES = [
   ...WORKSPACE_GROUPS.flatMap(group => group.modules),
   SETTINGS_MODULE,
-];
+] as (WorkspaceModule & { key: ModuleKey })[];
 
 export const getModule = (key: ModuleKey): WorkspaceModule =>
   ALL_MODULES.find(module => module.key === key) as WorkspaceModule;

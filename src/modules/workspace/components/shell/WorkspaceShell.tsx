@@ -7,6 +7,7 @@ import { PushPrompt } from '../PushPrompt';
 import { MobileTabBar } from './MobileTabBar';
 import { WorkspaceSidebar } from './WorkspaceSidebar';
 import { WorkspaceTabs } from './WorkspaceTabs';
+import { SectionTabs } from './SectionTabs';
 import { WorkspaceTabsProvider } from './WorkspaceTabsProvider';
 
 // Ficheiros abertos dos Documentos (cada um na sua aba); carrega à parte da estrutura.
@@ -46,6 +47,8 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ value, children 
               <PushPrompt className="mx-3 mt-3 md:mx-4" />
               {/* Abas como no Chrome (no telemóvel há a barra inferior). */}
               {isDesktop && <WorkspaceTabs />}
+              {/* Férias, Colaboradores, Tickets, Definições: separadores de gestão para admins */}
+              <SectionTabs />
               <div className="relative min-h-0 flex-1">
                 {children}
                 <Suspense fallback={null}>

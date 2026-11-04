@@ -1,9 +1,10 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
+import { cn } from '@/lib/utils';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { useWorkspace } from '../../context/workspaceContext';
 import { useSupportDesk } from '@/modules/support/hooks/useSupportDesk';
-import { useManagementGroup } from '../../hooks/useManagementGroup';
+import { MANAGEMENT_LABEL, useAdminMenu } from '../../hooks/useManagementGroup';
 import { SETTINGS_MODULE, modulePath, visibleGroups } from '../../lib/navigation';
 import { ModuleIcon } from '../ModuleIcon';
 
@@ -16,10 +17,8 @@ interface MobileMenuSheetProps {
 export const MobileMenuSheet: React.FC<MobileMenuSheetProps> = ({ open, onOpenChange }) => {
   const { basePath } = useWorkspace();
   const { isAgent } = useSupportDesk();
-  const management = useManagementGroup();
   const groups = [
-    ...visibleGroups({ supportDesk: isAgent }),
-    ...(management ? [management] : []),
+    ...useAdminMenu(visibleGroups({ supportDesk: isAgent })),
     { label: 'Conta', modules: [SETTINGS_MODULE] },
   ];
 
@@ -33,9 +32,16 @@ export const MobileMenuSheet: React.FC<MobileMenuSheetProps> = ({ open, onOpenCh
         <SheetTitle className="mb-4 px-1 text-xl font-extrabold">Todas as ferramentas</SheetTitle>
         <div className="space-y-5">
           {groups.map(group => (
-            <section key={group.label}>
+            <section
+              key={group.label}
+              className={cn(
+                group.label === MANAGEMENT_LABEL &&
+                  'rounded-[24px] bg-amber-50 p-2 ring-1 ring-amber-200 dark:bg-amber-300/[0.08] dark:ring-amber-200/20'
+              )}
+            >
               <p className="mb-2 px-1 text-[11px] font-bold uppercase tracking-[0.14em] text-rz-muted">
                 {group.label}
+                {group.label === MANAGEMENT_LABEL && ' · só administradores'}
               </p>
               <div className="grid grid-cols-4 gap-2">
                 {group.modules.map(module => (

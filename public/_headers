@@ -1,12 +1,15 @@
 # Cabeçalhos no Cloudflare Pages (equivalente aos "headers" do vercel.json).
-# Rotas da SPA: sem 404.html o Pages devolve o index.html em qualquer caminho.
+# Rotas da SPA: sem 404.html na raiz o Pages devolve o index.html em qualquer caminho.
+# Em /assets há um 404.html: um ficheiro que não existe dá 404 e nunca a página HTML.
 
 /.well-known/assetlinks.json
   Content-Type: application/json
   Cache-Control: no-cache
 
+# Sem "immutable" de 1 ano: se o browser apanhar uma resposta errada (ex.: a meio de um deploy)
+# volta a confirmar com o servidor (304, barato) em vez de a guardar para sempre.
 /assets/*
-  Cache-Control: public, max-age=31536000, immutable
+  Cache-Control: public, max-age=0, must-revalidate
 
 /sw.js
   Cache-Control: no-cache

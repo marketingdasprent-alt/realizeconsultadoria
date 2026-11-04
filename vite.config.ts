@@ -93,6 +93,18 @@ export default defineConfig(({ mode }) => ({
       },
     }),
   ].filter(Boolean),
+  build: {
+    rollupOptions: {
+      output: {
+        // "-r2": nomes novos para todos os ficheiros. A 04/11 vários browsers guardaram a página
+        // HTML no lugar de um .js (pedido durante um deploy) e a app não arrancava; com nomes novos
+        // essas cópias estragadas deixam de ser pedidas. Mudar o sufixo se voltar a acontecer.
+        entryFileNames: 'assets/[name]-[hash]-r2.js',
+        chunkFileNames: 'assets/[name]-[hash]-r2.js',
+        assetFileNames: 'assets/[name]-[hash]-r2[extname]',
+      },
+    },
+  },
   resolve: {
     alias: {
       '@': path.resolve(__dirname, './src'),

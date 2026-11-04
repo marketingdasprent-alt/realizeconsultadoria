@@ -139,7 +139,12 @@ const WebmailPage: React.FC = () => {
   const selected = active
     ? (list.messages.find(m => mailKey(m) === mailKey(active)) ?? active)
     : null;
-  const { message, isLoading: messageLoading } = useMailMessage(active);
+  const {
+    message,
+    isLoading: messageLoading,
+    isError: messageError,
+    retry: retryMessage,
+  } = useMailMessage(active);
   // Marca como lido só depois de o email abrir: nas caixas IMAP as operações vão em fila na
   // mesma ligação, e marcar primeiro atrasava a abertura.
   const readMarked = useRef<string | null>(null);
@@ -447,6 +452,8 @@ const WebmailPage: React.FC = () => {
             summary={selected}
             message={message}
             isLoading={messageLoading}
+            isError={messageError}
+            onRetry={retryMessage}
             onBack={() => setActive(null)}
             onAction={onAction}
             onDownload={(mail, id) => void actions.download(mail, id)}

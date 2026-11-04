@@ -40,6 +40,11 @@ import {
   utf8Decode,
 } from '../../_shared/mail/mime.ts';
 import type { MailDriver, MailListResult, MailSendParams } from '../../_shared/mail/types.ts';
+import {
+  PART_ATTACHMENT_PREFIX,
+  buildLightMessage,
+  planLightMessage,
+} from '../../_shared/mail/imap-light.ts';
 import { errorMessage } from '../../_shared/mail-server/http.ts';
 
 // ---------------------------------------------------------------- tipos mínimos dos pacotes
@@ -51,6 +56,8 @@ interface ImapFetchMessage {
   bodyStructure?: ImapBodyNode;
   internalDate?: Date | string;
   source?: Uint8Array;
+  /** RFC822.SIZE (fetch com size: true). */
+  size?: number;
   bodyParts?: Map<string, Uint8Array>;
   headers?: Uint8Array;
 }
@@ -247,6 +254,20 @@ const isConnectPhase = (error: unknown) => {
   return e.command === 'CONN' || ['ECONNREFUSED', 'EDNS', 'ETIMEDOUT'].includes(String(e.code));
 };
 
+/** Emails maiores que isto abrem sem descarregar os anexos (só texto, HTML e imagens pequenas). */
+const LIGHT_OPEN_ABOVE = 1_500_000;
+
+/** Nó da estrutura com este número de parte. */
+const findPart = (root: ImapBodyPart | undefined, part: string): ImapBodyPart | null => {
+  if (!root) return null;
+  if (root.part === part) return root;
+  for (const child of root.childNodes ?? []) {
+    const found = findPart(child, part);
+    if (found) return found;
+  }
+  return null;
+};
+
 /** Testa as credenciais (connect-imap). */
 export const testImapLogin = async (cfg: ImapAccountConfig): Promise<void> => {
   let client: ImapClient;
@@ -426,6 +447,64 @@ export const createImapDriver = (
     });
   };
 
+  const downloadBytes = async (client: ImapClient, uid: number, part: string) => {
+    const download = await client.download(String(uid), part, { uid: true });
+    const chunks: Uint8Array[] = [];
+    for await (const chunk of download.content) chunks.push(chunk);
+    const bytes = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
+    let offset = 0;
+    for (const chunk of chunks) {
+      bytes.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return bytes;
+  };
+
+  /**
+   * Email grande (normalmente por causa dos anexos): só o texto, o HTML e as imagens pequenas
+   * da assinatura; os anexos ficam na lista e descarregam-se ao abrir. null = email pequeno
+   * (lê-se inteiro, como sempre).
+   */
+  const loadLight = (client: ImapClient, messageId: string) => {
+    const { path, uid } = ref(messageId);
+    return withMailbox(client, path, true, async () => {
+      const head = await client.fetchOne(
+        String(uid),
+        {
+          uid: true,
+          size: true,
+          flags: true,
+          envelope: true,
+          bodyStructure: true,
+          internalDate: true,
+          headers: ['references'],
+        },
+        { uid: true }
+      );
+      if (!head) throw mailError('message_not_found');
+      if ((head.size ?? 0) <= LIGHT_OPEN_ABOVE || !head.bodyStructure) return null;
+      const plan = planLightMessage(head.bodyStructure);
+      const parts = [plan.text, plan.html, ...plan.inline]
+        .filter((item): item is NonNullable<typeof item> => !!item)
+        .map(item => item.part);
+      const bodies = parts.length
+        ? await client.fetchOne(String(uid), { uid: true, bodyParts: parts }, { uid: true })
+        : null;
+      const read = (part: string) =>
+        (bodies && (bodies.bodyParts?.get(part) ?? bodies.bodyParts?.get(part.toLowerCase()))) ||
+        undefined;
+      return buildLightMessage({
+        id: messageId,
+        plan,
+        envelope: head.envelope,
+        flags: head.flags,
+        internalDate: head.internalDate,
+        references: head.headers ? extractHeader(utf8Decode(head.headers), 'References') : null,
+        read,
+      });
+    });
+  };
+
   /**
    * Só a parte do anexo (sem descarregar e ler o email inteiro): procura na estrutura a única
    * parte com esse nome de ficheiro. Nome repetido, sem nome ou erro: null (usa-se o caminho
@@ -452,15 +531,7 @@ export const createImapDriver = (
         node => (node.dispositionParameters?.filename ?? node.parameters?.name) === filename
       );
       if (named.length !== 1 || !named[0].part) return null;
-      const download = await client.download(String(uid), named[0].part, { uid: true });
-      const chunks: Uint8Array[] = [];
-      for await (const chunk of download.content) chunks.push(chunk);
-      const bytes = new Uint8Array(chunks.reduce((total, chunk) => total + chunk.length, 0));
-      let offset = 0;
-      for (const chunk of chunks) {
-        bytes.set(chunk, offset);
-        offset += chunk.length;
-      }
+      const bytes = await downloadBytes(client, uid, named[0].part);
       return {
         filename,
         mime: (named[0].type ?? 'application/octet-stream').toLowerCase(),
@@ -544,6 +615,8 @@ export const createImapDriver = (
 
     get(messageId) {
       return withClient(async client => {
+        const light = await loadLight(client, messageId);
+        if (light) return light;
         const { parsed, msg } = await loadParsed(client, messageId);
         return parsedMailToMessage(parsed, {
           id: messageId,
@@ -555,6 +628,29 @@ export const createImapDriver = (
 
     attachment(messageId, attachmentId, filename) {
       return withClient(async client => {
+        // Email aberto pelo caminho leve: o id é a parte do anexo
+        if (attachmentId.startsWith(PART_ATTACHMENT_PREFIX)) {
+          const part = attachmentId.slice(PART_ATTACHMENT_PREFIX.length);
+          if (!/^[\d.]+$/.test(part)) throw mailError('bad_request');
+          const { path, uid } = ref(messageId);
+          return withMailbox(client, path, true, async () => {
+            const msg = await client.fetchOne(
+              String(uid),
+              { uid: true, bodyStructure: true },
+              { uid: true }
+            );
+            const node = findPart(msg ? msg.bodyStructure : undefined, part);
+            if (!node) throw mailError('message_not_found', 'Anexo não encontrado.');
+            return {
+              filename:
+                (node.dispositionParameters?.filename ?? node.parameters?.name)?.trim() ||
+                filename ||
+                'anexo',
+              mime: (node.type ?? 'application/octet-stream').toLowerCase(),
+              base64: bytesToBase64(await downloadBytes(client, uid, part)),
+            };
+          });
+        }
         if (filename) {
           const quick = await quickAttachment(client, messageId, filename).catch(error => {
             console.warn('mail-api imap: anexo por partes falhou', errorMessage(error));

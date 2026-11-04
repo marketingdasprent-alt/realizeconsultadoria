@@ -194,14 +194,23 @@ export const useMailMessage = (summary: MailSummary | null) => {
     queryFn: () => fetchMessage(summary!),
     enabled: !isPreview && !!summary,
     staleTime: 5 * 60_000,
+    // Uma repetição no máximo (o pedido já tenta duas vezes): depois mostra o erro e o
+    // "Tentar outra vez", em vez de ficar minutos em "A abrir o email…".
+    retry: 1,
   });
   if (isPreview)
     return {
       message: summary ? (demo.mails.find(m => m.id === summary.id) ?? null) : null,
       isLoading: false,
       isError: false,
+      retry: () => undefined,
     };
-  return { message: query.data ?? null, isLoading: query.isLoading, isError: query.isError };
+  return {
+    message: query.data ?? null,
+    isLoading: query.isLoading,
+    isError: query.isError,
+    retry: () => void query.refetch(),
+  };
 };
 
 /**

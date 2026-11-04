@@ -49,6 +49,9 @@ interface MailReaderProps {
   summary: MailSummary;
   message: MailMessage | null;
   isLoading: boolean;
+  /** Não abriu (rede, servidor de email lento): mostra o aviso e o botão para repetir. */
+  isError?: boolean;
+  onRetry?: () => void;
   onBack: () => void;
   onAction: (action: ReaderAction) => void;
   onDownload: (message: MailMessage, attachmentId: string) => void;
@@ -71,6 +74,8 @@ export const MailReader: React.FC<MailReaderProps> = ({
   summary,
   message,
   isLoading,
+  isError = false,
+  onRetry,
   onBack,
   onAction,
   onDownload,
@@ -117,7 +122,29 @@ export const MailReader: React.FC<MailReaderProps> = ({
         </time>
       </div>
 
-      {isLoading || !message ? (
+      {isError && !message ? (
+        <div className="mt-5 space-y-3">
+          {summary.snippet && (
+            <p className="whitespace-pre-wrap text-[14px] leading-relaxed text-rz-ink/80">
+              {summary.snippet}
+            </p>
+          )}
+          <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-[13px] text-amber-900 ring-1 ring-amber-200">
+            <span className="flex-1">
+              Não foi possível abrir este email (o servidor de email está lento a responder).
+            </span>
+            {onRetry && (
+              <button
+                type="button"
+                onClick={onRetry}
+                className="h-9 rounded-full bg-rz-primary px-4 text-[13px] font-bold text-white"
+              >
+                Tentar outra vez
+              </button>
+            )}
+          </div>
+        </div>
+      ) : isLoading || !message ? (
         // Enquanto o corpo chega, o início do email (já conhecido da lista) e um indicador.
         <div className="mt-5 space-y-3">
           {summary.snippet && (

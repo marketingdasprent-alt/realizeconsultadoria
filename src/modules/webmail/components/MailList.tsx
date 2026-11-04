@@ -8,6 +8,7 @@ import { mailErrorText, type MailError } from '../services/mailService';
 import type { MailAccount, MailSummary } from '../types';
 import { MailBulkBar } from './MailBulkBar';
 import { MailContextMenu, type ListMailAction } from './MailContextMenu';
+import { findDoneLabel } from '../lib/doneLabel';
 import { LabelChips } from './LabelChips';
 import { LabelPicker } from './LabelPicker';
 import { MailListItem } from './MailListItem';
@@ -162,6 +163,18 @@ export const MailList: React.FC<MailListProps> = props => {
           return (
             <MailListItem
               key={key}
+              quickDone={(() => {
+                const done = props.onLabel
+                  ? findDoneLabel(props.labelsByAccount?.[mail.accountId])
+                  : undefined;
+                return done
+                  ? {
+                      done: !!mail.labelIds?.includes(done.id),
+                      name: done.name,
+                      onToggle: () => props.onLabel?.([mail], done),
+                    }
+                  : undefined;
+              })()}
               chips={
                 props.labelsById ? (
                   <LabelChips labelIds={mail.labelIds} byId={props.labelsById} />

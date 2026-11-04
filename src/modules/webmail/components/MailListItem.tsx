@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, Paperclip, Star, Trash2 } from 'lucide-react';
+import { Check, CheckCircle2, Paperclip, Star, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { formatMailDate, nameOf } from '../lib/mailFormat';
@@ -26,11 +26,16 @@ interface MailListItemProps {
   wrap?: (row: React.ReactElement) => React.ReactElement;
   /** Marcadores do email (etiquetas coloridas). */
   chips?: React.ReactNode;
+  /** ✓ de um clique ("Tratado"): já está tratado? e o que fazer ao carregar. */
+  quickDone?: { done: boolean; name: string; onToggle: () => void };
 }
 
 // No rato, o lixo e a caixa de seleção só aparecem ao passar por cima; no toque estão sempre.
 const ON_HOVER =
   'focus-visible:opacity-100 [@media(hover:hover)]:opacity-0 [@media(hover:hover)]:group-hover:opacity-100';
+
+const doneLabel = (quick: { done: boolean; name: string }) =>
+  quick.done ? `Tirar “${quick.name}”` : `Marcar como ${quick.name.toLowerCase()}`;
 
 /** Uma linha da lista: seleção, remetente, assunto, excerto, data, lixo, estrela e anexos. */
 export const MailListItem: React.FC<MailListItemProps> = ({ mail, ...props }) => {
@@ -131,6 +136,22 @@ export const MailListItem: React.FC<MailListItemProps> = ({ mail, ...props }) =>
             {mail.subject || '(sem assunto)'}
           </span>
           {mail.hasAttachments && <Paperclip className="h-3.5 w-3.5 shrink-0 text-rz-muted" />}
+          {props.quickDone && (
+            <button
+              type="button"
+              onClick={event => stop(event, props.quickDone?.onToggle ?? (() => undefined))}
+              className={cn(
+                'shrink-0',
+                props.quickDone.done
+                  ? 'text-emerald-600'
+                  : cn('text-rz-muted hover:text-emerald-600', ON_HOVER)
+              )}
+              aria-label={doneLabel(props.quickDone)}
+              title={doneLabel(props.quickDone)}
+            >
+              <CheckCircle2 className={cn('h-4 w-4', props.quickDone.done && 'fill-emerald-100')} />
+            </button>
+          )}
           <button
             type="button"
             onClick={event => stop(event, () => props.onTrash(mail))}

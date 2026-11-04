@@ -9,7 +9,12 @@ import {
   type LabelAutomation,
   type LabelColor,
 } from '../_shared/mail/labels.ts';
-import type { MailDriver, MailSummary } from '../_shared/mail/types.ts';
+import type {
+  MailDriver,
+  MailListParams,
+  MailListResult,
+  MailSummary,
+} from '../_shared/mail/types.ts';
 import { errorMessage } from '../_shared/mail-server/http.ts';
 
 export interface MailLabel {
@@ -65,6 +70,67 @@ export const cleanAutomation = (raw: unknown, knownLabelIds: Set<string>): Label
 
 export const isLabelColor = (value: unknown): value is LabelColor =>
   typeof value === 'string' && (LABEL_COLORS as readonly string[]).includes(value);
+
+const ROWS_PER_PAGE = 1000;
+const MAX_ROW_PAGES = 10;
+
+/** Todas as linhas (marcador, email) de uma caixa; opcionalmente só as de um marcador. */
+const labelRows = async (db: SupabaseClient, accountId: string, labelId: string | null) => {
+  const rows: { message_key: string; label_id: string }[] = [];
+  for (let page = 0; page < MAX_ROW_PAGES; page++) {
+    let query = db
+      .from('mail_message_labels')
+      .select('message_key, label_id')
+      .eq('account_id', accountId)
+      .order('message_key', { ascending: true })
+      .range(page * ROWS_PER_PAGE, (page + 1) * ROWS_PER_PAGE - 1);
+    if (labelId) query = query.eq('label_id', labelId);
+    const { data, error } = await query;
+    if (error) throw error;
+    rows.push(...((data ?? []) as { message_key: string; label_id: string }[]));
+    if ((data ?? []).length < ROWS_PER_PAGE) break;
+  }
+  return rows;
+};
+
+/** Quantos emails tem cada marcador da caixa (para os números ao lado dos marcadores). */
+export const labelCounts = async (
+  db: SupabaseClient,
+  accountId: string
+): Promise<Record<string, number>> => {
+  const counts: Record<string, number> = {};
+  for (const row of await labelRows(db, accountId, null))
+    counts[row.label_id] = (counts[row.label_id] ?? 0) + 1;
+  return counts;
+};
+
+/** Páginas da pasta vistas, no máximo, à procura de emails com o marcador (por pedido). */
+const MAX_SCAN_PAGES = 6;
+
+/**
+ * Lista só os emails da pasta que têm o marcador: o servidor lê páginas da pasta e fica com os
+ * que têm a chave guardada. Pára ao juntar uma página cheia, ao acabar a pasta ou ao fim de
+ * MAX_SCAN_PAGES páginas (o "carregar mais" continua dali).
+ */
+export const listWithLabel = async (
+  db: SupabaseClient,
+  accountId: string,
+  labelId: string,
+  params: MailListParams,
+  listPage: (params: MailListParams) => Promise<MailListResult>
+): Promise<MailListResult> => {
+  const keys = new Set((await labelRows(db, accountId, labelId)).map(row => row.message_key));
+  if (!keys.size) return { messages: [], next_page_token: null };
+  const messages: MailSummary[] = [];
+  let next: string | null = params.pageToken ?? null;
+  for (let i = 0; i < MAX_SCAN_PAGES; i++) {
+    const result = await listPage({ ...params, pageToken: next });
+    messages.push(...result.messages.filter(mail => keys.has(labelKeyOf(mail))));
+    next = result.next_page_token;
+    if (!next || messages.length >= (params.limit ?? 25)) break;
+  }
+  return { messages, next_page_token: next };
+};
 
 /** Acrescenta `label_ids` a cada email (uma só consulta por lista). */
 export const attachLabels = async <T extends MailSummary>(

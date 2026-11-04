@@ -1,5 +1,14 @@
 import React, { useEffect, useState } from 'react';
-import { AlertTriangle, ArrowRight, Folder, Loader2, Plus, Trash2, Workflow } from 'lucide-react';
+import {
+  AlertTriangle,
+  ArrowRight,
+  Folder,
+  Loader2,
+  Pencil,
+  Plus,
+  Trash2,
+  Workflow,
+} from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
@@ -38,6 +47,8 @@ export const MailRulesDialog: React.FC<MailRulesDialogProps> = ({
 }) => {
   const [account, setAccount] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  /** Regra aberta para editar (o formulário vem preenchido). */
+  const [editing, setEditing] = useState<MailRule | null>(null);
   const { rules, save, toggle, remove } = useMailRules(account);
   const labelsById = new Map(
     (useAccountLabels(account).data ?? []).map(label => [label.id, label])
@@ -49,6 +60,7 @@ export const MailRulesDialog: React.FC<MailRulesDialogProps> = ({
       accountId && accounts.some(a => a.id === accountId) ? accountId : (accounts[0]?.id ?? null)
     );
     setCreating(!!prefill);
+    setEditing(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao abrir
   }, [open]);
 
@@ -73,6 +85,7 @@ export const MailRulesDialog: React.FC<MailRulesDialogProps> = ({
                 onClick={() => {
                   setAccount(item.id);
                   setCreating(false);
+                  setEditing(null);
                 }}
                 className={cn(
                   'inline-flex h-8 items-center gap-1.5 rounded-full px-3 text-[12.5px] font-semibold ring-1',
@@ -127,6 +140,18 @@ export const MailRulesDialog: React.FC<MailRulesDialogProps> = ({
                 />
                 <button
                   type="button"
+                  onClick={() => {
+                    setCreating(false);
+                    setEditing(rule);
+                  }}
+                  aria-label="Editar regra"
+                  title="Editar regra"
+                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-primary"
+                >
+                  <Pencil className="h-4 w-4" />
+                </button>
+                <button
+                  type="button"
                   onClick={() => remove.mutate(rule)}
                   aria-label="Apagar regra"
                   title="Apagar regra"
@@ -139,17 +164,34 @@ export const MailRulesDialog: React.FC<MailRulesDialogProps> = ({
           ))}
         </ul>
 
-        {account && creating ? (
+        {account && (creating || editing) ? (
           <MailRuleForm
+            key={editing?.id ?? 'new'}
             accountId={account}
-            initial={prefill ?? undefined}
+            initial={
+              editing
+                ? {
+                    fromContains: editing.fromContains ?? '',
+                    keyword: editing.keyword ?? '',
+                    folderId: editing.folderId ?? '',
+                    labelIds: editing.labelIds,
+                    markRead: editing.markRead,
+                    applyNow: false,
+                  }
+                : (prefill ?? undefined)
+            }
             isSaving={save.isPending}
-            onCancel={() => setCreating(false)}
+            onCancel={() => {
+              setCreating(false);
+              setEditing(null);
+            }}
             onSave={(draft, folderName) =>
               save.mutate(
                 {
                   rule: {
-                    name: '',
+                    id: editing?.id,
+                    isActive: editing?.isActive,
+                    name: editing?.name ?? '',
                     fromContains: draft.fromContains.trim() || null,
                     keyword: draft.keyword.trim() || null,
                     folderId: draft.folderId || null,
@@ -159,7 +201,12 @@ export const MailRulesDialog: React.FC<MailRulesDialogProps> = ({
                   },
                   applyNow: draft.applyNow,
                 },
-                { onSuccess: () => setCreating(false) }
+                {
+                  onSuccess: () => {
+                    setCreating(false);
+                    setEditing(null);
+                  },
+                }
               )
             }
           />

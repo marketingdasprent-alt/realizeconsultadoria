@@ -308,6 +308,49 @@ export const createGmailDriver = (
       return { id: label.id };
     },
 
+    async renameFolder(folderId, name) {
+      const all = await session.json<{ labels?: { id: string; name: string }[] }>(
+        `${GMAIL}/labels`
+      );
+      const labels = all.labels ?? [];
+      const current = labels.find(l => l.id === folderId);
+      if (!current) throw mailError('bad_request', 'A pasta já não existe.');
+      const cut = current.name.lastIndexOf('/');
+      const base = cut >= 0 ? current.name.slice(0, cut + 1) : '';
+      const next = base + name;
+      if (next === current.name) return { id: folderId, moved: [] as [string, string][] };
+      if (labels.some(l => l.name.toLowerCase() === next.toLowerCase()))
+        throw mailError('bad_request', 'Já existe uma pasta com esse nome.');
+      // As subetiquetas são "Mãe/Filha": mudam também de nome (os ids ficam)
+      const affected = labels.filter(
+        l => l.id === folderId || l.name.startsWith(current.name + '/')
+      );
+      for (const label of affected) {
+        await session.json(`${GMAIL}/labels/${enc(label.id)}`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: next + label.name.slice(current.name.length) }),
+        });
+      }
+      return { id: folderId, moved: [] as [string, string][] };
+    },
+
+    async deleteFolder(folderId) {
+      const all = await session.json<{ labels?: { id: string; name: string }[] }>(
+        `${GMAIL}/labels`
+      );
+      const labels = all.labels ?? [];
+      const current = labels.find(l => l.id === folderId);
+      if (!current) return { removed: [] as string[] };
+      const doomed = labels.filter(l => l.id === folderId || l.name.startsWith(current.name + '/'));
+      for (const label of doomed) {
+        const res = await session.fetch(`${GMAIL}/labels/${enc(label.id)}`, { method: 'DELETE' });
+        await session.ensureOk(res);
+        await res.body?.cancel();
+      }
+      return { removed: doomed.map(l => l.id) };
+    },
+
     async move(messageId, folderId) {
       await session.json(`${GMAIL}/messages/${enc(messageId)}/modify`, {
         method: 'POST',

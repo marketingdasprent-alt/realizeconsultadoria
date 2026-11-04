@@ -156,6 +156,13 @@ export interface MailDriver {
   folders(): Promise<MailFolderInfo[]>;
   /** Cria uma pasta (ou uma subpasta de `parentId`); devolve o id da nova. */
   createFolder(name: string, parentId: string | null): Promise<{ id: string }>;
+  /**
+   * Muda o nome da pasta. `id` é o id novo (nas caixas IMAP o id é o caminho, por isso muda);
+   * `moved` lista os pares [antigo, novo] de todas as pastas afetadas (a própria e as subpastas).
+   */
+  renameFolder(folderId: string, name: string): Promise<{ id: string; moved: [string, string][] }>;
+  /** Apaga a pasta e as subpastas; os emails vão para o Lixo (no Gmail ficam sem a etiqueta). */
+  deleteFolder(folderId: string): Promise<{ removed: string[] }>;
   /** Move o email para uma pasta da pessoa (`folderId`, da lista de folders). */
   move(messageId: string, folderId: string): Promise<void>;
 }

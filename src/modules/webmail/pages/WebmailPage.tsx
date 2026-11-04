@@ -5,6 +5,7 @@ import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ConnectMailDialog } from '../components/ConnectMailDialog';
+import { FolderManageDialogs, type FolderEdit } from '../components/FolderManageDialogs';
 import { NewMailFolderDialog } from '../components/NewMailFolderDialog';
 import { ContactListsDialog } from '../components/ContactListsDialog';
 import { AttachmentPreview, type PreviewTarget } from '../components/AttachmentPreview';
@@ -13,6 +14,7 @@ import { MailRulesDialog } from '../components/MailRulesDialog';
 import { ManageLabelsDialog } from '../components/ManageLabelsDialog';
 import type { LabelFilter } from '../components/MailLabelsSection';
 import { useLabelActions } from '../hooks/useLabelActions';
+import { useLabelCounts } from '../hooks/useLabelCounts';
 import { useAllMailLabels } from '../hooks/useMailLabels';
 import type { ListMailAction } from '../components/MailContextMenu';
 import { printMail } from '../lib/printMail';
@@ -90,6 +92,7 @@ const WebmailPage: React.FC = () => {
   const accounts = mail.accounts;
   const customFolders = useMailFolders(accounts);
   const labels = useAllMailLabels(accounts);
+  const labelCounts = useLabelCounts(accounts);
   const [labelFilter, setLabelFilter] = useState<LabelFilter | null>(null);
   const [manageLabels, setManageLabels] = useState<{ accountId: string | null } | null>(null);
   const people = useContacts(accounts);
@@ -107,11 +110,12 @@ const WebmailPage: React.FC = () => {
     accountId: string | null;
     prefill: Partial<RuleDraft> | null;
   } | null>(null);
+  const [folderEdit, setFolderEdit] = useState<FolderEdit | null>(null);
   const [newFolder, setNewFolder] = useState<{
     accountId: string | null;
     parentId: string | null;
   } | null>(null);
-  const box = useMailbox(accounts, current, folder, query, customOpen?.id ?? null);
+  const box = useMailbox(accounts, current, folder, query, customOpen?.id ?? null, labelFilter);
   // Em "Não lidos" o email aberto fica na lista até se sair da pasta ou atualizar.
   const list = useKeptUnread(folder, current, query, box.messages);
   usePrefetchTop(list.messages);
@@ -305,13 +309,52 @@ const WebmailPage: React.FC = () => {
       onRules={
         isPreview
           ? undefined
-          : () => {
+          : accountId => {
               setMenuOpen(false);
-              setRulesDialog({ accountId: current === 'all' ? null : current, prefill: null });
+              setRulesDialog({
+                accountId: accountId ?? (current === 'all' ? null : current),
+                prefill: null,
+              });
             }
+      }
+      onDropToFolder={
+        isPreview
+          ? undefined
+          : (mails, folder) => moveMails(mails, { id: folder.id, name: folder.name })
+      }
+      onDropToLabel={
+        isPreview
+          ? undefined
+          : (mails, label) => {
+              const missing = mails.filter(mail => !mail.labelIds?.includes(label.id));
+              if (missing.length) void labelActions.toggle(missing, label);
+            }
+      }
+      onRenameFolder={
+        isPreview
+          ? undefined
+          : folder =>
+              setFolderEdit({
+                kind: 'rename',
+                accountId: folder.accountId,
+                folderId: folder.id,
+                name: folder.name,
+              })
+      }
+      onDeleteFolder={
+        isPreview
+          ? undefined
+          : folder =>
+              setFolderEdit({
+                kind: 'delete',
+                accountId: folder.accountId,
+                folderId: folder.id,
+                name: folder.name,
+              })
       }
       labels={isPreview ? undefined : labels.byAccount}
       labelFilter={labelFilter}
+      labelCounts={labelCounts}
       onLabelFilter={isPreview ? undefined : setLabelFilter}
       onManageLabels={isPreview ? undefined : accountId => setManageLabels({ accountId })}
       onNewFolder={
@@ -448,6 +491,22 @@ const WebmailPage: React.FC = () => {
         accounts={accounts}
         accountId={rulesDialog?.accountId ?? null}
         prefill={rulesDialog?.prefill}
+      />
+      <FolderManageDialogs
+        edit={folderEdit}
+        onClose={() => setFolderEdit(null)}
+        onRename={async (edit, name) => {
+          const error = await folderActions.rename(edit.accountId, edit.folderId, name);
+          // Nas caixas IMAP o id da pasta é o caminho: muda com o nome, a vista volta à Entrada
+          if (!error && custom?.accountId === edit.accountId && custom.id === edit.folderId)
+            setCustom(null);
+          return error;
+        }}
+        onDelete={async edit => {
+          const error = await folderActions.remove(edit.accountId, edit.folderId);
+          if (!error && custom?.accountId === edit.accountId) setCustom(null);
+          return error;
+        }}
       />
       <NewMailFolderDialog
         open={!!newFolder}

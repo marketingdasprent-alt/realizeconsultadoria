@@ -198,6 +198,7 @@ export const MailList: React.FC<MailListProps> = props => {
                 </MailContextMenu>
               )}
               mail={mail}
+              dragGroup={group}
               isActive={props.activeKey === mailKey(mail)}
               isSelected={selection.isSelected(mailKey(mail))}
               selecting={selection.count > 0}

@@ -3,6 +3,7 @@ import { Check, CheckCircle2, Paperclip, Star, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { formatMailDate, nameOf } from '../lib/mailFormat';
+import { endMailDrag, startMailDrag } from '../lib/mailDrag';
 import type { MailSummary } from '../types';
 
 interface MailListItemProps {
@@ -26,6 +27,8 @@ interface MailListItemProps {
   wrap?: (row: React.ReactElement) => React.ReactElement;
   /** Marcadores do email (etiquetas coloridas). */
   chips?: React.ReactNode;
+  /** Emails que se arrastam com esta linha (ela, ou todos os selecionados se for um deles). */
+  dragGroup?: MailSummary[];
   /** ✓ de um clique ("Tratado"): já está tratado? e o que fazer ao carregar. */
   quickDone?: { done: boolean; name: string; onToggle: () => void };
 }
@@ -54,6 +57,9 @@ export const MailListItem: React.FC<MailListItemProps> = ({ mail, ...props }) =>
     <div
       role="button"
       tabIndex={0}
+      draggable={!!props.dragGroup}
+      onDragStart={event => props.dragGroup && startMailDrag(event, props.dragGroup)}
+      onDragEnd={endMailDrag}
       onClick={() => props.onOpen(mail)}
       onMouseEnter={() => props.onHover?.(mail)}
       onMouseLeave={() => props.onHover?.(null)}

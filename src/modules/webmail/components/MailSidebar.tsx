@@ -15,7 +15,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { FOLDERS, SIDEBAR_ROW } from '../lib/mailFormat';
-import type { MailAccount, MailCustomFolder, MailFolder, MailLabel } from '../types';
+import type { MailAccount, MailCustomFolder, MailFolder, MailLabel, MailSummary } from '../types';
 import { MailAccountList } from './MailAccountList';
 import { MailCustomFolders, type CustomFolderRef } from './MailCustomFolders';
 import { MailLabelsSection, type LabelFilter } from './MailLabelsSection';
@@ -47,9 +47,15 @@ interface MailSidebarProps {
   onCustomFolder: (folder: CustomFolderRef) => void;
   /** Nova pasta/subpasta (não existe na pré-visualização). */
   onNewFolder?: (accountId: string | null, parentId: string | null) => void;
+  /** Arrastar emails da lista para uma pasta ou marcador; mudar o nome / apagar pasta. */
+  onDropToFolder?: (mails: MailSummary[], folder: CustomFolderRef) => void;
+  onDropToLabel?: (mails: MailSummary[], label: MailLabel) => void;
+  onRenameFolder?: (folder: CustomFolderRef) => void;
+  onDeleteFolder?: (folder: CustomFolderRef) => void;
   /** Marcadores por caixa, o filtro ativo e a gestão (não existe na pré-visualização). */
   labels?: Record<string, MailLabel[]>;
   labelFilter?: LabelFilter | null;
+  labelCounts?: Record<string, number>;
   onLabelFilter?: (filter: LabelFilter | null) => void;
   onManageLabels?: (accountId: string | null) => void;
   onCompose: () => void;
@@ -57,7 +63,7 @@ interface MailSidebarProps {
   onSettings: (account: MailAccount) => void;
   onLists: () => void;
   /** Regras automáticas (não existem na pré-visualização). */
-  onRules?: () => void;
+  onRules?: (accountId?: string) => void;
   onReorder: (ids: string[]) => void;
   className?: string;
   style?: React.CSSProperties;
@@ -87,6 +93,9 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
       unreadTotal={props.unreadTotal}
       onScope={props.onScope}
       onSettings={props.onSettings}
+      onNewFolder={props.onNewFolder && (accountId => props.onNewFolder?.(accountId, null))}
+      onLabels={props.onManageLabels}
+      onRules={props.onRules}
       onConnect={props.onConnect}
       onReorder={props.onReorder}
     />
@@ -127,6 +136,9 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
       selected={props.customFolder}
       onPick={props.onCustomFolder}
       onNew={props.onNewFolder}
+      onDropMails={props.onDropToFolder}
+      onRename={props.onRenameFolder}
+      onDelete={props.onDeleteFolder}
     />
 
     {props.onLabelFilter && (
@@ -135,8 +147,10 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
         scope={props.scope}
         byAccount={props.labels ?? {}}
         selected={props.labelFilter ?? null}
+        counts={props.labelCounts}
         onPick={props.onLabelFilter}
         onManage={props.onManageLabels}
+        onDropMails={props.onDropToLabel}
       />
     )}
 
@@ -154,7 +168,7 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
       {props.onRules && (
         <button
           type="button"
-          onClick={props.onRules}
+          onClick={() => props.onRules?.()}
           className={cn(SIDEBAR_ROW, 'hover:bg-white/70')}
         >
           <Workflow className="h-4 w-4" />{' '}

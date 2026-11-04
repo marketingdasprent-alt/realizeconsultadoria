@@ -26,11 +26,14 @@ export const useMailbox = (
   folder: MailFolder,
   search: string,
   /** Pasta criada pela pessoa (manda sobre `folder`; só a caixa dessa pasta). */
-  folderId: string | null = null
+  folderId: string | null = null,
+  /** Só emails com este marcador (o servidor filtra; só da caixa do marcador). */
+  labelFilter: { accountId: string; labelId: string } | null = null
 ) => {
   const { isPreview, user } = useWorkspace();
   const demo = useDemoMail();
   const ids = (scope === 'all' ? accounts : accounts.filter(a => a.id === scope))
+    .filter(a => !labelFilter || a.id === labelFilter.accountId)
     .filter(a => a.status !== 'reauth')
     .map(a => a.id);
 
@@ -39,7 +42,7 @@ export const useMailbox = (
   // Na cache do browser, cada pasta da pessoa tem a sua lista.
   const cacheFolder = folderId ? `custom:${folderId}` : folder;
   // Última lista de cada caixa guardada no browser: aparece já, e a nova chega a seguir.
-  const useCache = !search.trim() && !isPreview;
+  const useCache = !search.trim() && !isPreview && !labelFilter;
   const cached = useMemo(
     () =>
       useCache
@@ -49,13 +52,28 @@ export const useMailbox = (
   );
 
   const query = useInfiniteQuery({
-    queryKey: ['mail', 'list', scope, cacheFolder, search.trim(), idsKey],
+    queryKey: [
+      'mail',
+      'list',
+      scope,
+      cacheFolder,
+      search.trim(),
+      idsKey,
+      labelFilter?.labelId ?? '',
+    ],
     initialPageParam: null as PageTokens,
     queryFn: async ({ pageParam }): Promise<MailboxPage> => {
       const targets = pageParam ? Object.keys(pageParam) : ids;
       const results = await Promise.all(
         targets.map(id =>
-          mailService.list(id, folder, search.trim(), pageParam?.[id] ?? null, folderId)
+          mailService.list(
+            id,
+            folder,
+            search.trim(),
+            pageParam?.[id] ?? null,
+            folderId,
+            labelFilter?.labelId
+          )
         )
       );
       const page: MailboxPage = { messages: [], next: {}, errors: {} };

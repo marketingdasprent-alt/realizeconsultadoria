@@ -1,9 +1,17 @@
 import React from 'react';
-import { Settings2 } from 'lucide-react';
+import { Filter, Settings2 } from 'lucide-react';
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from '@/components/ui/context-menu';
 import { cn } from '@/lib/utils';
+import { useMailDrop } from '../hooks/useMailDrop';
 import { labelStyle } from '../lib/labelColors';
 import { ACCOUNT_DOTS, SIDEBAR_ROW, accountName } from '../lib/mailFormat';
-import type { MailAccount, MailLabel } from '../types';
+import type { MailAccount, MailLabel, MailSummary } from '../types';
 
 export interface LabelFilter {
   accountId: string;
@@ -16,8 +24,12 @@ interface MailLabelsSectionProps {
   scope: string;
   byAccount: Record<string, MailLabel[]>;
   selected: LabelFilter | null;
+  /** Quantos emails tem cada marcador (id → número). */
+  counts?: Record<string, number>;
   onPick: (filter: LabelFilter | null) => void;
   onManage?: (accountId: string | null) => void;
+  /** Emails largados em cima de um marcador (arrastar da lista). */
+  onDropMails?: (mails: MailSummary[], label: MailLabel) => void;
 }
 
 /** Marcadores na barra lateral: carregar num deixa só os emails com essa cor (na pasta à vista). */
@@ -26,9 +38,12 @@ export const MailLabelsSection: React.FC<MailLabelsSectionProps> = ({
   scope,
   byAccount,
   selected,
+  counts,
   onPick,
   onManage,
+  onDropMails,
 }) => {
+  const drop = useMailDrop();
   const shown = accounts.filter(
     a => (scope === 'all' || a.id === scope) && byAccount[a.id]?.length
   );
@@ -70,25 +85,56 @@ export const MailLabelsSection: React.FC<MailLabelsSectionProps> = ({
               const active = selected?.labelId === label.id;
               return (
                 <li key={label.id}>
-                  <button
-                    type="button"
-                    onClick={() =>
-                      onPick(active ? null : { accountId: account.id, labelId: label.id })
-                    }
-                    aria-pressed={active}
-                    className={cn(
-                      SIDEBAR_ROW,
-                      active ? 'bg-rz-primary-soft text-rz-primary' : 'hover:bg-white/70'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'ml-0.5 h-3 w-3 shrink-0 rounded-full',
-                        labelStyle(label.color).dot
+                  <ContextMenu>
+                    <ContextMenuTrigger asChild>
+                      <button
+                        type="button"
+                        onClick={() =>
+                          onPick(active ? null : { accountId: account.id, labelId: label.id })
+                        }
+                        aria-pressed={active}
+                        className={cn(
+                          SIDEBAR_ROW,
+                          active ? 'bg-rz-primary-soft text-rz-primary' : 'hover:bg-white/70',
+                          drop.overKey === label.id && 'bg-rz-primary-soft ring-2 ring-rz-primary'
+                        )}
+                        {...(onDropMails
+                          ? drop.bind(label.id, account.id, mails => onDropMails(mails, label))
+                          : {})}
+                      >
+                        <span
+                          className={cn(
+                            'ml-0.5 h-3 w-3 shrink-0 rounded-full',
+                            labelStyle(label.color).dot
+                          )}
+                        />
+                        <span className="min-w-0 flex-1 truncate text-left">{label.name}</span>
+                        {!!counts?.[label.id] && (
+                          <span className="shrink-0 text-[11.5px] font-semibold tabular-nums text-rz-muted">
+                            {counts[label.id]}
+                          </span>
+                        )}
+                      </button>
+                    </ContextMenuTrigger>
+                    <ContextMenuContent className="w-52">
+                      <ContextMenuItem
+                        onSelect={() =>
+                          onPick(active ? null : { accountId: account.id, labelId: label.id })
+                        }
+                      >
+                        <Filter className="mr-2 h-4 w-4" />{' '}
+                        {active ? 'Mostrar todos os emails' : 'Ver só este marcador'}
+                      </ContextMenuItem>
+                      {onManage && (
+                        <>
+                          <ContextMenuSeparator />
+                          <ContextMenuItem onSelect={() => onManage(account.id)}>
+                            <Settings2 className="mr-2 h-4 w-4" /> Editar ou apagar…
+                          </ContextMenuItem>
+                        </>
                       )}
-                    />
-                    <span className="min-w-0 flex-1 truncate text-left">{label.name}</span>
-                  </button>
+                    </ContextMenuContent>
+                  </ContextMenu>
                 </li>
               );
             })}

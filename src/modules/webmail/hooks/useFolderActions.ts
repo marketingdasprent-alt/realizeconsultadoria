@@ -1,4 +1,4 @@
-import { useQueryClient } from '@tanstack/react-query';
+import { useQueryClient, type QueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { mapPerGroup } from '../lib/concurrency';
@@ -14,6 +14,16 @@ export interface MoveTarget {
   id: string;
   name: string;
 }
+
+/** Pastas, listas, regras e marcadores guardam o id/nome da pasta: voltam a ler-se. */
+const refreshAfterFolderChange = async (qc: QueryClient, accountId: string) => {
+  await Promise.all([
+    qc.invalidateQueries({ queryKey: ['mail', 'folders', accountId] }),
+    qc.invalidateQueries({ queryKey: ['mail', 'rules', accountId] }),
+    qc.invalidateQueries({ queryKey: ['mail', 'labels'] }),
+    qc.invalidateQueries({ queryKey: ['mail', 'list'] }),
+  ]);
+};
 
 const UNAVAILABLE: MailError = { code: 'unavailable', message: '' };
 
@@ -38,6 +48,22 @@ export const useFolderActions = (folder?: MailFolder) => {
       }
       await qc.invalidateQueries({ queryKey: ['mail', 'folders', accountId] });
       return { id: data.id, error: null };
+    },
+
+    /** Muda o nome; devolve a mensagem de erro ou null. As regras e marcadores acompanham-na. */
+    rename: async (accountId: string, folderId: string, name: string): Promise<string | null> => {
+      const { error } = await mailService.renameFolder(accountId, folderId, name);
+      if (error) return mailErrorText(error) || 'Não foi possível mudar o nome.';
+      await refreshAfterFolderChange(qc, accountId);
+      return null;
+    },
+
+    /** Apaga a pasta (e as subpastas); devolve a mensagem de erro ou null. */
+    remove: async (accountId: string, folderId: string): Promise<string | null> => {
+      const { error } = await mailService.deleteFolder(accountId, folderId);
+      if (error) return mailErrorText(error) || 'Não foi possível apagar a pasta.';
+      await refreshAfterFolderChange(qc, accountId);
+      return null;
     },
 
     /** Move os emails (todos da mesma caixa) para a pasta: saem já da lista; o que falhar volta. */

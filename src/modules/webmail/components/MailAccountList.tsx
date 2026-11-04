@@ -21,6 +21,10 @@ interface MailAccountListProps {
   unreadTotal: number;
   onScope: (scope: string) => void;
   onSettings: (account: MailAccount) => void;
+  /** Atalhos do botão direito numa caixa. */
+  onNewFolder?: (accountId: string) => void;
+  onLabels?: (accountId: string) => void;
+  onRules?: (accountId: string) => void;
   onConnect: () => void;
   onReorder: (ids: string[]) => void;
 }
@@ -84,6 +88,9 @@ export const MailAccountList: React.FC<MailAccountListProps> = props => {
               rowRef={sortable.rowRef(id)}
               onScope={props.onScope}
               onSettings={props.onSettings}
+              onNewFolder={props.onNewFolder}
+              onLabels={props.onLabels}
+              onRules={props.onRules}
             />
           ) : null;
         })}

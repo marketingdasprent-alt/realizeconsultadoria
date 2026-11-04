@@ -78,6 +78,8 @@ interface ImapClient {
   messageMove(range: string, destination: string, options: UidOption): Promise<unknown>;
   mailboxCreate(path: string): Promise<unknown>;
   mailboxSubscribe(path: string): Promise<unknown>;
+  mailboxRename(path: string, newPath: string): Promise<unknown>;
+  mailboxDelete(path: string): Promise<unknown>;
   append(path: string, content: string, flags?: string[]): Promise<{ uid?: number } | false>;
   messageDelete(range: string, options: UidOption): Promise<boolean>;
   download(
@@ -760,6 +762,49 @@ export const createImapDriver = (
         // Sem subscrever, alguns servidores não a mostram noutros programas
         await client.mailboxSubscribe(path).catch(() => undefined);
         return { id: path };
+      });
+    },
+
+    renameFolder(folderId, name) {
+      return withClient(async client => {
+        const mailboxes = await client.list();
+        const box = mailboxes.find(m => m.path === folderId);
+        if (!box) throw mailError('bad_request', 'A pasta já não existe.');
+        const delimiter = box.delimiter || '/';
+        const cut = folderId.lastIndexOf(delimiter);
+        const path = (cut >= 0 ? folderId.slice(0, cut + delimiter.length) : '') + name;
+        if (path === folderId) return { id: folderId, moved: [] as [string, string][] };
+        if (mailboxes.some(m => m.path.toLowerCase() === path.toLowerCase()))
+          throw mailError('bad_request', 'Já existe uma pasta com esse nome.');
+        await client.mailboxRename(folderId, path);
+        await client.mailboxSubscribe(path).catch(() => undefined);
+        const moved = mailboxes
+          .filter(m => m.path === folderId || m.path.startsWith(folderId + delimiter))
+          .map((m): [string, string] => [m.path, path + m.path.slice(folderId.length)]);
+        return { id: path, moved };
+      });
+    },
+
+    deleteFolder(folderId) {
+      return withClient(async client => {
+        const mailboxes = await client.list();
+        const box = mailboxes.find(m => m.path === folderId);
+        if (!box) return { removed: [] as string[] };
+        const trash = resolveImapFolder('trash', mailboxes);
+        if (!trash) throw mailError('not_supported', 'Esta caixa não tem pasta de Lixo.');
+        const delimiter = box.delimiter || '/';
+        // Subpastas primeiro; os emails vão para o Lixo (nunca se apagam de vez)
+        const doomed = mailboxes
+          .filter(m => m.path === folderId || m.path.startsWith(folderId + delimiter))
+          .map(m => m.path)
+          .sort((a, b) => b.length - a.length);
+        for (const path of doomed) {
+          await withMailbox(client, path, false, async () => {
+            await client.messageMove('1:*', trash, { uid: true }).catch(() => undefined);
+          }).catch(() => undefined);
+          await client.mailboxDelete(path);
+        }
+        return { removed: doomed };
       });
     },
 

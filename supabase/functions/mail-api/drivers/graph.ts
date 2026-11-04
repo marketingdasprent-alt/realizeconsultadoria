@@ -376,6 +376,23 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
       return { id: folder.id };
     },
 
+    async renameFolder(folderId, name) {
+      await session.json(`${ME}/mailFolders/${enc(folderId)}`, {
+        method: 'PATCH',
+        headers: JSON_HEADERS,
+        body: JSON.stringify({ displayName: name }),
+      });
+      return { id: folderId, moved: [] as [string, string][] };
+    },
+
+    async deleteFolder(folderId) {
+      // O Outlook põe a pasta (e o que tem dentro) em "Itens eliminados"
+      const res = await session.fetch(`${ME}/mailFolders/${enc(folderId)}`, { method: 'DELETE' });
+      await session.ensureOk(res);
+      await res.body?.cancel();
+      return { removed: [folderId] };
+    },
+
     async move(messageId, folderId) {
       await session.json(`${messageUrl(messageId)}/move`, {
         method: 'POST',

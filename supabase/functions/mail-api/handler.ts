@@ -37,7 +37,7 @@ import {
   parseListLimit,
   parseSendRequest,
 } from '../_shared/mail/request.ts';
-import type { MailDriver } from '../_shared/mail/types.ts';
+import type { MailDriver, MailListParams } from '../_shared/mail/types.ts';
 import {
   ACCOUNT_COLUMNS,
   deleteMailAccount,
@@ -70,8 +70,11 @@ import {
   attachLabels,
   cleanAutomation,
   isLabelColor,
+  labelCounts,
   listLabels,
+  listWithLabel,
 } from './labels.ts';
+import { dropFolderRefs, renameFolderRefs } from './folderRefs.ts';
 import { MAX_RULES_PER_ACCOUNT, applyRules, listRules } from './rules.ts';
 import { OAuthSession } from './session.ts';
 import { shareAccess, shareAccessById } from './share.ts';
@@ -249,12 +252,15 @@ const ACTIONS = [
   'unread-counts',
   'folders',
   'create-folder',
+  'rename-folder',
+  'delete-folder',
   'move',
   'rules',
   'rule-save',
   'rule-delete',
   'rule-run',
   'labels',
+  'label-counts',
   'label-save',
   'label-delete',
   'label-apply',
@@ -311,11 +317,16 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       try {
         // Uma falha de ligação passageira (ex.: servidor partilhado a recusar várias ligações
         // ao mesmo tempo) tenta-se outra vez antes de desistir.
-        const result = await driver.list(params).catch(async error => {
-          if (!isMailError(error) || error.code !== 'provider_error') throw error;
-          await new Promise(resolve => setTimeout(resolve, 1500));
-          return driver.list(params);
-        });
+        const listPage = (page: MailListParams) =>
+          driver.list(page).catch(async error => {
+            if (!isMailError(error) || error.code !== 'provider_error') throw error;
+            await new Promise(resolve => setTimeout(resolve, 1500));
+            return driver.list(page);
+          });
+        // Com um marcador escolhido, só vêm os emails da pasta que o têm
+        const result = isUuid(body.label_id)
+          ? await listWithLabel(db, account.id, body.label_id, params, listPage)
+          : await listPage(params);
         await updateAccountStatus(db, account.id, {
           status: 'active',
           last_error: null,
@@ -355,6 +366,26 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       return ok(
         await (await createDriver(db, account, pendingSecret)).createFolder(name, parentId)
       );
+    }
+    case 'rename-folder': {
+      const folderId = optionalString(body.folder_id, 1000);
+      const name = optionalString(body.name, 100)?.trim();
+      if (!folderId || /[\r\n\0]/.test(folderId) || !name || /[\\/.\r\n\0]/.test(name))
+        return badRequest();
+      const renamed = await (
+        await createDriver(db, account, pendingSecret)
+      ).renameFolder(folderId, name);
+      await renameFolderRefs(db, account.id, folderId, renamed.id, name, renamed.moved);
+      return ok({ id: renamed.id });
+    }
+    case 'delete-folder': {
+      const folderId = optionalString(body.folder_id, 1000);
+      if (!folderId || /[\r\n\0]/.test(folderId)) return badRequest();
+      const { removed } = await (
+        await createDriver(db, account, pendingSecret)
+      ).deleteFolder(folderId);
+      await dropFolderRefs(db, account.id, removed);
+      return ok({ removed: removed.length });
     }
     case 'rules':
       return ok(await listRules(db, account.id));
@@ -437,6 +468,8 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
     }
     case 'labels':
       return ok(await listLabels(db, account.id));
+    case 'label-counts':
+      return ok(await labelCounts(db, account.id));
     case 'label-save': {
       const name = optionalString(body.name, 40)?.trim();
       if (!name || !isLabelColor(body.color)) return badRequest();

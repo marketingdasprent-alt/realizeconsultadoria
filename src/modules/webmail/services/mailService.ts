@@ -320,7 +320,9 @@ export const mailService = {
     folder: MailFolder,
     query: string,
     pageToken: string | null,
-    folderId?: string | null
+    folderId?: string | null,
+    /** Só os emails com este marcador (o servidor filtra a pasta). */
+    labelId?: string | null
   ) => {
     const { data, error } = await call<{ messages: Row[]; next_page_token: string | null }>(
       'mail-api',
@@ -329,6 +331,7 @@ export const mailService = {
         account_id: accountId,
         folder,
         folder_id: folderId ?? undefined,
+        label_id: labelId ?? undefined,
         query,
         page_token: pageToken ?? undefined,
       }
@@ -367,6 +370,27 @@ export const mailService = {
       account_id: accountId,
       name,
       parent_id: parentId ?? undefined,
+    }),
+
+  /** Quantos emails tem cada marcador da caixa (id do marcador → número). */
+  labelCounts: (accountId: string) =>
+    call<Record<string, number>>('mail-api', { action: 'label-counts', account_id: accountId }),
+
+  /** Muda o nome da pasta; devolve o id (nas caixas IMAP muda com o nome). */
+  renameFolder: (accountId: string, folderId: string, name: string) =>
+    call<{ id: string }>('mail-api', {
+      action: 'rename-folder',
+      account_id: accountId,
+      folder_id: folderId,
+      name,
+    }),
+
+  /** Apaga a pasta e as subpastas (os emails vão para o Lixo). */
+  deleteFolder: (accountId: string, folderId: string) =>
+    call<{ removed: number }>('mail-api', {
+      action: 'delete-folder',
+      account_id: accountId,
+      folder_id: folderId,
     }),
 
   /** Regras desta caixa (partilhadas por quem a usa). */

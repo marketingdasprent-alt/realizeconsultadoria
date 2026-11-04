@@ -2,6 +2,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { mailErrorText, mailService } from '../services/mailService';
+import { labelCountsKey } from './useLabelCounts';
 import type { MailFolder, MailLabel, MailSummary } from '../types';
 import { patchLists } from './useMailChanges';
 import { bumpUnread, refreshUnreadSoon } from './useUnreadCounts';
@@ -31,6 +32,7 @@ export const useLabelActions = (folder?: MailFolder) => {
       });
     });
     const { data, error } = await mailService.applyLabel(label.accountId, label.id, targets, on);
+    void qc.invalidateQueries({ queryKey: labelCountsKey(label.accountId) });
     if (error || !data) {
       void qc.invalidateQueries({ queryKey: ['mail', 'list'] });
       toast({

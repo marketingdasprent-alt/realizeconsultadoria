@@ -1,6 +1,7 @@
 // Acessos de uma pessoa dados por um administrador a partir do Workspace (edge function
 // person-access): pastas da empresa e caixas de email partilhadas.
 import { supabase } from '@/integrations/supabase/client';
+import type { MailSignature } from '@/modules/webmail/types';
 
 export type AccessPermission = 'read' | 'edit';
 
@@ -16,6 +17,14 @@ export interface PersonMailbox {
   email: string;
   name: string | null;
   assigned: boolean;
+}
+
+/** Caixa de email da pessoa e as assinaturas dela nessa caixa. */
+export interface PersonSignatureAccount {
+  id: string;
+  email: string;
+  name: string | null;
+  signatures: MailSignature[];
 }
 
 export interface PersonAccess {
@@ -48,4 +57,15 @@ export const personAccessService = {
 
   setMailbox: (userId: string, accessId: string, on: boolean) =>
     call<{ accessId: string }>({ action: 'mailbox-set', user_id: userId, access_id: accessId, on }),
+
+  signatures: (userId: string) =>
+    call<PersonSignatureAccount[]>({ action: 'signatures', user_id: userId }),
+
+  saveSignatures: (userId: string, accountId: string, list: MailSignature[]) =>
+    call<{ accountId: string }>({
+      action: 'signatures-save',
+      user_id: userId,
+      account_id: accountId,
+      list,
+    }),
 };

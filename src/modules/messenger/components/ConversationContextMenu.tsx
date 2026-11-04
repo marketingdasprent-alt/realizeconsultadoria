@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Pin,
   PinOff,
+  PenLine,
 } from 'lucide-react';
 import {
   ContextMenu,
@@ -127,6 +128,9 @@ export const ConversationContextMenu: React.FC<ConversationContextMenuProps> = (
               </ContextMenuItem>
               <ContextMenuItem onSelect={() => setAccess('folders')} className="gap-2">
                 <Folder className={ICON} /> Dar acesso a pasta…
+              </ContextMenuItem>
+              <ContextMenuItem onSelect={() => setAccess('signatures')} className="gap-2">
+                <PenLine className={ICON} /> Assinaturas de email…
               </ContextMenuItem>
             </>
           )}

@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { Folder, FolderPlus, Loader2, Mail, Search, Trash2 } from 'lucide-react';
+import { Folder, FolderPlus, Loader2, Mail, PenLine, Search, Trash2 } from 'lucide-react';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
@@ -8,13 +8,14 @@ import { PermissionToggle } from '@/modules/admin/components/employee/folders/Pe
 import { ServerFolderPicker } from '@/modules/admin/components/employee/folders/ServerFolderPicker';
 import { matchesText } from '@/lib/text';
 import { accessKey, fetchAccess } from '../lib/personAccessQuery';
+import { PersonSignaturesTab } from './PersonSignaturesTab';
 import {
   personAccessService,
   type AccessPermission,
   type PersonAccess,
 } from '../services/personAccessService';
 
-export type PersonAccessTab = 'folders' | 'mail';
+export type PersonAccessTab = 'folders' | 'mail' | 'signatures';
 
 interface PersonAccessDialogProps {
   /** A pessoa (conta de colaborador); null = fechado. */
@@ -105,7 +106,13 @@ export const PersonAccessDialog: React.FC<PersonAccessDialogProps> = ({
 
   return (
     <Dialog open onOpenChange={next => !next && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto overflow-x-hidden rounded-[28px] sm:max-w-2xl sm:rounded-[28px] [&>*]:min-w-0">
+      <DialogContent
+        className={cn(
+          'max-h-[90vh] overflow-y-auto overflow-x-hidden rounded-[28px] sm:rounded-[28px] [&>*]:min-w-0',
+          // O editor de assinaturas precisa de mais espaço
+          tab === 'signatures' ? 'sm:max-w-4xl' : 'sm:max-w-2xl'
+        )}
+      >
         <DialogTitle className="text-[18px] font-extrabold">Acessos de {person.name}</DialogTitle>
         <DialogDescription className="text-[13px]">
           Só administradores. As alterações aplicam-se logo.
@@ -115,6 +122,7 @@ export const PersonAccessDialog: React.FC<PersonAccessDialogProps> = ({
             [
               ['folders', 'Pastas', Folder],
               ['mail', 'Caixas de email', Mail],
+              ['signatures', 'Assinaturas', PenLine],
             ] as const
           ).map(([value, label, Icon]) => (
             <button
@@ -133,10 +141,10 @@ export const PersonAccessDialog: React.FC<PersonAccessDialogProps> = ({
           ))}
         </div>
 
-        {access.isLoading && (
+        {access.isLoading && tab !== 'signatures' && (
           <Loader2 className="mx-auto my-6 h-6 w-6 animate-spin text-rz-primary" />
         )}
-        {access.error && (
+        {access.error && tab !== 'signatures' && (
           <p className="text-[13.5px] text-rose-600">
             {access.error.message || 'Não foi possível ler os acessos.'}
           </p>
@@ -191,6 +199,8 @@ export const PersonAccessDialog: React.FC<PersonAccessDialogProps> = ({
             </button>
           </div>
         )}
+
+        {tab === 'signatures' && <PersonSignaturesTab userId={person.userId} />}
 
         {data && tab === 'mail' && (
           <div className="space-y-2">

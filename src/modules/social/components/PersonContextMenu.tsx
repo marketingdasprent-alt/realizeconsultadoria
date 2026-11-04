@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { AppWindow, Folder, Mail, MessageCircle, User } from 'lucide-react';
+import { AppWindow, Folder, Mail, MessageCircle, User, PenLine } from 'lucide-react';
 import {
   ContextMenu,
   ContextMenuContent,
@@ -70,6 +70,9 @@ export const PersonContextMenu: React.FC<PersonContextMenuProps> = ({
               </ContextMenuItem>
               <ContextMenuItem onSelect={() => setAccess('folders')} className="gap-2">
                 <Folder className={ICON} /> Dar acesso a pasta…
+              </ContextMenuItem>
+              <ContextMenuItem onSelect={() => setAccess('signatures')} className="gap-2">
+                <PenLine className={ICON} /> Assinaturas de email…
               </ContextMenuItem>
             </>
           )}

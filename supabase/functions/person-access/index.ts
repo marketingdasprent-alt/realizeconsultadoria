@@ -6,6 +6,8 @@
 // POST { action: 'folder-set', user_id, path, permission }     → dá (ou muda) o acesso a uma pasta
 // POST { action: 'folder-remove', user_id, id }                → retira o acesso a uma pasta
 // POST { action: 'mailbox-set', user_id, access_id, on }       → dá ou retira uma caixa de email
+// POST { action: 'signatures', user_id }                       → caixas da pessoa e as assinaturas
+// POST { action: 'signatures-save', user_id, account_id, list } → grava as assinaturas numa caixa
 //
 // verify_jwt = false: a sessão valida-se aqui e só administradores (isAdminAccount) passam.
 // Respostas { ok: true, data } ou { ok: false, message }.
@@ -14,6 +16,7 @@ import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { isAdminAccount } from '../_shared/admin-account.ts';
 import { cleanPath } from '../_shared/company-files.ts';
 import { corsHeaders, json, serviceClient } from '../_shared/mail-server/http.ts';
+import { listPersonSignatures, savePersonSignatures } from './signatures.ts';
 
 type Db = ReturnType<typeof serviceClient>;
 
@@ -127,6 +130,12 @@ serve(async (req: Request) => {
           if (error) throw error;
         }
         return ok({ accessId: body.access_id, on: body.on === true });
+      }
+      case 'signatures':
+        return ok(await listPersonSignatures(db, body.user_id));
+      case 'signatures-save': {
+        const message = await savePersonSignatures(db, body.user_id, body.account_id, body.list);
+        return message ? fail(message) : ok({ accountId: body.account_id });
       }
       default:
         return fail('Ação desconhecida.');

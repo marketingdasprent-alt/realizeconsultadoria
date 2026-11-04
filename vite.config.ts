@@ -94,14 +94,16 @@ export default defineConfig(({ mode }) => ({
     }),
   ].filter(Boolean),
   build: {
+    // Pasta /a2 (antes /assets): a cache do Cloudflare em app. guardou HTML no lugar de alguns .js de
+    // /assets a 04/11; numa pasta nova esses pedidos estragados deixam de existir.
+    assetsDir: 'a2',
     rollupOptions: {
       output: {
-        // "-r2": nomes novos para todos os ficheiros. A 04/11 vários browsers guardaram a página
-        // HTML no lugar de um .js (pedido durante um deploy) e a app não arrancava; com nomes novos
-        // essas cópias estragadas deixam de ser pedidas. Mudar o sufixo se voltar a acontecer.
-        entryFileNames: 'assets/[name]-[hash]-r2.js',
-        chunkFileNames: 'assets/[name]-[hash]-r2.js',
-        assetFileNames: 'assets/[name]-[hash]-r2[extname]',
+        // Se voltar a acontecer (HTML guardado no lugar de um .js), mudar a pasta (a3, a4…) em
+        // dois deploys: primeiro public/<pasta>/404.html e o _headers, depois esta mudança.
+        entryFileNames: 'a2/[name]-[hash].js',
+        chunkFileNames: 'a2/[name]-[hash].js',
+        assetFileNames: 'a2/[name]-[hash][extname]',
       },
     },
   },

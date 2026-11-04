@@ -146,6 +146,16 @@ const isAuthFailure = (error: unknown): boolean => {
   return /AUTHENTICATIONFAILED|invalid credentials|authentication failed|LOGIN failed/i.test(text);
 };
 
+/** A causa curta de uma falha de ligação (código, resposta do servidor), para o aviso e o registo. */
+const connectCause = (error: unknown): string => {
+  const e = (error ?? {}) as { code?: unknown; responseText?: unknown; message?: unknown };
+  const text = String(e.responseText ?? e.code ?? e.message ?? '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .slice(0, 80);
+  return text ? ` (${text})` : '';
+};
+
 const openClient = async (cfg: ImapAccountConfig): Promise<ImapClient> => {
   const client = new ImapFlowClient({
     host: cfg.imapHost,
@@ -307,7 +317,10 @@ export const createImapDriver = (
     } catch (error) {
       if (isAuthFailure(error)) throw await onAuthFailure();
       console.error('mail-api imap: sem ligação', errorMessage(error));
-      throw mailError('provider_error', `Não foi possível ligar a ${cfg.imapHost}.`);
+      throw mailError(
+        'provider_error',
+        `Não foi possível ligar a ${cfg.imapHost}${connectCause(error)}.`
+      );
     }
     const entry: PooledClient = { client, queue: Promise.resolve(), idle: null };
     POOL.set(key, entry);

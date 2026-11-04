@@ -11,6 +11,9 @@
 /assets/*
   Cache-Control: public, max-age=0, must-revalidate
 
+/a2/*
+  Cache-Control: public, max-age=0, must-revalidate
+
 /sw.js
   Cache-Control: no-cache
 

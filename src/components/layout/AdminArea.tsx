@@ -12,39 +12,50 @@ import { useAdminAccess } from '@/modules/workspace/hooks/useIsAdmin';
 import AdminLayout from './AdminLayout';
 import './admin-theme.css';
 
-const Loading = () => (
-  <div className="flex min-h-screen items-center justify-center">
-    <Loader2 className="h-8 w-8 animate-spin text-primary" />
-  </div>
-);
+const ShellByRole: React.FC = () => {
+  const { role } = useAuth();
+  const { pathname } = useLocation();
+  const inAdmin = pathname === ROUTES.ADMIN.DASHBOARD || pathname.startsWith('/admin/');
 
-/**
- * Área de administração (/admin/…). Quem entra com a conta de colaborador e é administrador
- * (conta unificada) vê as páginas do admin dentro do Workspace, com o mesmo menu (secção
- * Gestão). As contas só de admin continuam no painel de administração de sempre.
- */
-export const AdminArea: React.FC = () => {
-  const { role, isLoading, isAuthenticated } = useAuth();
-  const access = useAdminAccess();
-  const location = useLocation();
-
-  if (isLoading) return <Loading />;
-  if (!isAuthenticated)
-    return <Navigate to={ROUTES.AUTH.LOGIN} state={{ from: location }} replace />;
-  if (role === 'employee') {
-    if (access.isLoading) return <Loading />;
-    if (!access.isAdmin) return <Navigate to={ROUTES.EMPLOYEE.DASHBOARD} replace />;
+  // Colaborador (também com a conta de admin ligada): o Workspace, sempre o mesmo, para o
+  // /colaborador/… e o /admin/… (o menu e as mensagens não se voltam a montar)
+  if (role === 'employee')
     return (
       <WorkdayProvider>
         <WorkspaceLayout />
       </WorkdayProvider>
     );
-  }
-  return (
-    <ProtectedRoute requiredRole="admin">
-      <AdminLayout />
-    </ProtectedRoute>
-  );
+  // Conta só de admin: o painel de administração (no Workspace não tem ficha de colaborador)
+  if (role === 'admin')
+    return inAdmin ? <AdminLayout /> : <Navigate to={ROUTES.ADMIN.DASHBOARD} replace />;
+  return <Navigate to={ROUTES.AUTH.LOGIN} replace />;
+};
+
+/**
+ * Estrutura única das áreas com sessão (/colaborador/… e /admin/…): a sessão valida-se uma vez
+ * e a estrutura certa (Workspace ou painel de admin) fica montada enquanto se navega.
+ */
+export const AppShell: React.FC = () => (
+  <ProtectedRoute>
+    <ShellByRole />
+  </ProtectedRoute>
+);
+
+/**
+ * Páginas do admin: as contas só de admin passam; os colaboradores só se forem administradores
+ * (conta unificada) — os outros voltam ao Workspace. O servidor volta a verificar tudo (RLS).
+ */
+export const AdminGate: React.FC = () => {
+  const { role } = useAuth();
+  const access = useAdminAccess();
+  if (role === 'admin') return <Outlet />;
+  if (access.isLoading)
+    return (
+      <div className="flex h-full items-center justify-center">
+        <Loader2 className="h-6 w-6 animate-spin text-rz-primary" />
+      </div>
+    );
+  return access.isAdmin ? <Outlet /> : <Navigate to={ROUTES.EMPLOYEE.DASHBOARD} replace />;
 };
 
 /**

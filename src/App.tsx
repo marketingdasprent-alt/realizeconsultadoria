@@ -12,9 +12,13 @@ import { AppManifestSync } from '@/components/AppManifestSync';
 import { ROUTES } from '@/lib/constants';
 import { persistQueries, restoreQueries } from '@/lib/query-persist';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
-import { AdminArea, AdminPageFrame, AdminTimeClockRoute } from './components/layout/AdminArea';
+import {
+  AdminGate,
+  AdminPageFrame,
+  AdminTimeClockRoute,
+  AppShell,
+} from './components/layout/AdminArea';
 import { WorkdayProvider } from './modules/timeclock/context/WorkdayProvider';
-import WorkspaceLayout from './modules/workspace/components/WorkspaceLayout';
 import { ALL_MODULES, type ModuleKey } from './modules/workspace/lib/navigation';
 import MessengerPage from './modules/messenger/pages/MessengerPage';
 import RequestsRedirect from './modules/admin/pages/RequestsRedirect';
@@ -117,51 +121,43 @@ const App = () => (
                   <Route path="/auth/set-password" element={<SetPasswordPage />} />
                   <Route path={ROUTES.AUTH.SWITCH} element={<AccountSwitchPage />} />
 
-                  {/* Admin Routes */}
                   <Route path="/admin/login" element={<LoginAlias />} />
-                  {/* Admin: as contas unificadas (colaborador + admin) veem-no dentro do
-                  Workspace, com o mesmo menu (secção Gestão); as só de admin no painel. */}
-                  <Route element={<AdminArea />}>
-                    <Route element={<AdminPageFrame />}>
-                      <Route path="/admin" element={<AdminDashboard />} />
-                      <Route path="/admin/juridico" element={<LegalPage />} />
-                      <Route path="/admin/empresas" element={<CompaniesPage />} />
-                      <Route path="/admin/colaboradores" element={<EmployeesPage />} />
-                      <Route path="/admin/colaboradores/novo" element={<EmployeeFormPage />} />
-                      <Route path="/admin/colaboradores/:id" element={<EmployeeFormPage />} />
-                      <Route path="/admin/calendario" element={<CalendarPage />} />
-                      {/* Pedidos passou para Férias e Ausências (aba Pedidos) */}
-                      <Route path="/admin/pedidos" element={<RequestsRedirect />} />
-                      <Route path="/admin/suporte" element={<SupportTicketsPage />} />
-                      <Route path="/admin/acessos" element={<AccessesPage />} />
-                      <Route
-                        path="/admin/ponto"
-                        element={<AdminTimeClockRoute page={<TimeClockAdminPage />} />}
-                      />
-                      {/* Documentos passou para Colaboradores (aprovar, importar recibos, validades) */}
-                      <Route
-                        path="/admin/documentos"
-                        element={<Navigate to="/admin/colaboradores" replace />}
-                      />
-                      <Route path="/admin/financeiro" element={<FinancePage />} />
-                      <Route path="/admin/configuracoes" element={<SettingsPage />} />
-                      <Route path={ROUTES.ADMIN.BROADCASTS} element={<BroadcastsPage />} />
-                    </Route>
-                  </Route>
-
-                  {/* Employee Routes */}
                   <Route path="/colaborador/login" element={<LoginAlias />} />
-                  <Route
-                    element={
-                      <ProtectedRoute requiredRole="employee">
-                        {/* Realize 2.0: jornada (relógio da barra superior) partilhada por toda a
-                        área; menu lateral + barra superior, as páginas renderizam no Outlet */}
-                        <WorkdayProvider>
-                          <WorkspaceLayout />
-                        </WorkdayProvider>
-                      </ProtectedRoute>
-                    }
-                  >
+
+                  {/* Uma só estrutura para o Workspace e o admin: ao passar de /colaborador/…
+                  para /admin/… (contas unificadas) o menu, as mensagens e a jornada ficam
+                  montados — nada recarrega. As contas só de admin ficam no painel antigo. */}
+                  <Route element={<AppShell />}>
+                    {/* Admin: só administradores (as contas unificadas também) */}
+                    <Route element={<AdminGate />}>
+                      <Route element={<AdminPageFrame />}>
+                        <Route path="/admin" element={<AdminDashboard />} />
+                        <Route path="/admin/juridico" element={<LegalPage />} />
+                        <Route path="/admin/empresas" element={<CompaniesPage />} />
+                        <Route path="/admin/colaboradores" element={<EmployeesPage />} />
+                        <Route path="/admin/colaboradores/novo" element={<EmployeeFormPage />} />
+                        <Route path="/admin/colaboradores/:id" element={<EmployeeFormPage />} />
+                        <Route path="/admin/calendario" element={<CalendarPage />} />
+                        {/* Pedidos passou para Férias e Ausências (aba Pedidos) */}
+                        <Route path="/admin/pedidos" element={<RequestsRedirect />} />
+                        <Route path="/admin/suporte" element={<SupportTicketsPage />} />
+                        <Route path="/admin/acessos" element={<AccessesPage />} />
+                        <Route
+                          path="/admin/ponto"
+                          element={<AdminTimeClockRoute page={<TimeClockAdminPage />} />}
+                        />
+                        {/* Documentos passou para Colaboradores (aprovar, importar recibos, validades) */}
+                        <Route
+                          path="/admin/documentos"
+                          element={<Navigate to="/admin/colaboradores" replace />}
+                        />
+                        <Route path="/admin/financeiro" element={<FinancePage />} />
+                        <Route path="/admin/configuracoes" element={<SettingsPage />} />
+                        <Route path={ROUTES.ADMIN.BROADCASTS} element={<BroadcastsPage />} />
+                      </Route>
+                    </Route>
+
+                    {/* Workspace (colaborador) */}
                     {/* O Messenger é a página inicial (briefing §2) */}
                     <Route path="/colaborador" element={<MessengerPage />} />
                     <Route path="/colaborador/perfil" element={<ProfilePage />} />

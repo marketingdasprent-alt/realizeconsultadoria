@@ -13,7 +13,7 @@ export const useAccountFolders = (accountId: string | null) => {
       if (error) throw error;
       return data;
     },
-    staleTime: 5 * 60_000,
+    staleTime: 30 * 60_000,
     retry: 1,
   });
 };

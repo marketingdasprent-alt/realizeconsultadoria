@@ -21,8 +21,10 @@ export const useMailFolders = (accounts: MailAccount[]) => {
         if (error) throw error;
         return data;
       },
-      staleTime: 5 * 60_000,
-      refetchInterval: 5 * 60_000,
+      // As pastas quase nunca mudam e cada leitura abre uma ligação ao servidor de email (o
+      // alojamento partilhado bloqueia ligações a mais): só se releem quando o Realize as muda
+      // (criar, mudar o nome, apagar, mover) ou ao fim de 30 minutos.
+      staleTime: 30 * 60_000,
       retry: 1,
     })),
   });

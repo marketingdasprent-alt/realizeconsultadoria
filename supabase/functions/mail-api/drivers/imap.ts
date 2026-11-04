@@ -165,7 +165,8 @@ const openClient = async (cfg: ImapAccountConfig): Promise<ImapClient> => {
     auth: { user: cfg.username, pass: cfg.password },
     logger: false,
     disableAutoIdle: true,
-    connectionTimeout: 15_000,
+    // 8 s: quando o alojamento deixa a ligação sem resposta, a 2.ª tentativa vem mais cedo
+    connectionTimeout: 8_000,
     greetingTimeout: 10_000,
     socketTimeout: 60_000,
   });
@@ -316,7 +317,7 @@ export const createImapDriver = (
       client = await openClientPaced(cfg);
     } catch (error) {
       if (isAuthFailure(error)) throw await onAuthFailure();
-      console.error('mail-api imap: sem ligação', errorMessage(error));
+      console.error(`mail-api imap: sem ligação ${cfg.imapHost}:`, errorMessage(error));
       throw mailError(
         'provider_error',
         `Não foi possível ligar a ${cfg.imapHost}${connectCause(error)}.`

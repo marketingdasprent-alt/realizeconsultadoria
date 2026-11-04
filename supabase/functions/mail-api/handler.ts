@@ -635,8 +635,12 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
   const systemToken = Deno.env.get('MAIL_SYSTEM_TOKEN');
   if (systemToken && req.headers.get('x-mail-system-token') === systemToken) {
     const body: unknown = await req.json().catch(() => null);
-    if (isRecord(body) && body.action === 'poll-new')
-      return ok(await pollNewMail(db, createDriver));
+    if (isRecord(body) && body.action === 'poll-new') {
+      const started = Date.now();
+      const result = await pollNewMail(db, createDriver);
+      logIfSlow('poll-new', '-', started);
+      return ok(result);
+    }
     // Diagnóstico da lentidão ao abrir emails: cronometra cada passo numa caixa (sem conteúdo).
     if (isRecord(body) && body.action === 'probe-open' && isUuid(body.account_id))
       return ok(await probeOpen(db, body.account_id));
@@ -661,6 +665,7 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
   }
   if (!isRecord(body)) return badRequest();
 
+  const started = Date.now();
   try {
     return await handle(db, userId, body);
   } catch (error) {
@@ -670,5 +675,13 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
       { ok: false, code: 'server_error', message: 'Erro inesperado. Tente novamente.' },
       500
     );
+  } finally {
+    logIfSlow(String(body.action), String(body.account_id ?? '-'), started);
   }
+};
+
+/** Pedidos lentos (mais de 5 s) ficam no registo com a ação e a caixa, para se ver o que pesa. */
+const logIfSlow = (action: string, accountId: string, started: number) => {
+  const ms = Date.now() - started;
+  if (ms > 5000) console.warn(`mail-api lento: ${action} conta=${accountId} ${ms}ms`);
 };

@@ -1,11 +1,12 @@
 import React, { useMemo, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Loader2, MessageCircle, Search } from 'lucide-react';
 import { canonicalLabels, compareText, matchesText, sameText } from '@/lib/text';
 import { useOptionalMessenger } from '@/modules/messenger/context/useMessengerApi';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { WorkspacePage } from '@/modules/workspace/components/WorkspacePage';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
+import { PersonContextMenu } from '../components/PersonContextMenu';
 import { useDirectory } from '../hooks/useDirectory';
 import { useOpenChat } from '../hooks/useOpenChat';
 
@@ -15,6 +16,7 @@ const PeoplePage: React.FC = () => {
   const { colleagues, isLoading } = useDirectory();
   const messenger = useOptionalMessenger();
   const openChat = useOpenChat();
+  const navigate = useNavigate();
   const [query, setQuery] = useState('');
   const [department, setDepartment] = useState<string | null>(null);
 
@@ -75,37 +77,42 @@ const PeoplePage: React.FC = () => {
       ) : (
         <ul className="mt-5 grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
           {visible.map(person => (
-            <li
+            <PersonContextMenu
               key={person.userId}
-              className="rz-rise flex items-center gap-3 rounded-[24px] bg-white p-4 shadow-rz-soft ring-1 ring-rz-line"
+              person={person}
+              profilePath={`${basePath}/pessoas/${person.userId}`}
+              onOpenProfile={() => navigate(`${basePath}/pessoas/${person.userId}`)}
+              onMessage={() => openChat(person.userId)}
             >
-              <Link
-                to={`${basePath}/pessoas/${person.userId}`}
-                className="flex min-w-0 flex-1 items-center gap-3"
-              >
-                <UserAvatar
-                  name={person.name}
-                  userId={person.userId}
-                  size="lg"
-                  status={messenger?.isOnline(person.userId) ? 'online' : undefined}
-                />
-                <span className="min-w-0">
-                  <span className="block truncate text-[15px] font-bold">{person.name}</span>
-                  <span className="block truncate text-[13px] text-rz-muted">
-                    {[person.position, person.department].filter(Boolean).join(' · ') ||
-                      'Colaborador'}
+              <li className="rz-rise flex items-center gap-3 rounded-[24px] bg-white p-4 shadow-rz-soft ring-1 ring-rz-line">
+                <Link
+                  to={`${basePath}/pessoas/${person.userId}`}
+                  className="flex min-w-0 flex-1 items-center gap-3"
+                >
+                  <UserAvatar
+                    name={person.name}
+                    userId={person.userId}
+                    size="lg"
+                    status={messenger?.isOnline(person.userId) ? 'online' : undefined}
+                  />
+                  <span className="min-w-0">
+                    <span className="block truncate text-[15px] font-bold">{person.name}</span>
+                    <span className="block truncate text-[13px] text-rz-muted">
+                      {[person.position, person.department].filter(Boolean).join(' · ') ||
+                        'Colaborador'}
+                    </span>
                   </span>
-                </span>
-              </Link>
-              <button
-                type="button"
-                onClick={() => openChat(person.userId)}
-                className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rz-primary-soft text-rz-primary transition-colors hover:bg-rz-primary hover:text-white"
-                aria-label={`Mensagem para ${person.name}`}
-              >
-                <MessageCircle className="h-[18px] w-[18px]" />
-              </button>
-            </li>
+                </Link>
+                <button
+                  type="button"
+                  onClick={() => openChat(person.userId)}
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-rz-primary-soft text-rz-primary transition-colors hover:bg-rz-primary hover:text-white"
+                  aria-label={`Mensagem para ${person.name}`}
+                >
+                  <MessageCircle className="h-[18px] w-[18px]" />
+                </button>
+              </li>
+            </PersonContextMenu>
           ))}
         </ul>
       )}

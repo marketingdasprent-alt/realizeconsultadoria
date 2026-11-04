@@ -1,6 +1,7 @@
 import { useMemo } from 'react';
 import { ADMIN_SETTINGS_ITEM, visibleAdminGroups } from '@/components/layout/adminNavigation';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { ROUTES } from '@/lib/constants';
 import type { WorkspaceGroup, WorkspaceModule } from '../lib/navigation';
 import { useAdminAccess } from './useIsAdmin';
 
@@ -14,7 +15,10 @@ export const useManagementGroup = (): WorkspaceGroup | null => {
 
   return useMemo(() => {
     if (!isAdmin || isLoading) return null;
-    const items = visibleAdminGroups(canView).flatMap(group => group.items);
+    // O Ponto do admin está na página Ponto do Workspace (separadores de gestão): não se repete
+    const items = visibleAdminGroups(canView)
+      .flatMap(group => group.items)
+      .filter(item => item.href !== ROUTES.ADMIN.TIMECLOCK);
     if (isSuperAdmin || canView('settings')) items.push(ADMIN_SETTINGS_ITEM);
     const modules: WorkspaceModule[] = items.map(item => ({
       key: `admin:${item.moduleKey}:${item.href}`,

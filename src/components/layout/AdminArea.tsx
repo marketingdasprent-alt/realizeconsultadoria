@@ -48,6 +48,18 @@ export const AdminArea: React.FC = () => {
 };
 
 /**
+ * /admin/ponto: no Workspace o ponto da equipa está na página Ponto (mesmos separadores e o
+ * mesmo ?tab=, ex.: o link "revisao" dos emails); no painel de administração fica a página dele.
+ */
+export const AdminTimeClockRoute: React.FC<{ page: React.ReactElement }> = ({ page }) => {
+  const { role } = useAuth();
+  const { search } = useLocation();
+  if (role !== 'employee') return page;
+  const tab = new URLSearchParams(search).get('tab') || 'hoje';
+  return <Navigate to={`${ROUTES.EMPLOYEE.TIMECLOCK}?tab=${encodeURIComponent(tab)}`} replace />;
+};
+
+/**
  * Moldura das páginas do admin: dentro do Workspace dá-lhes o deslocamento, as margens e os
  * retoques visuais do admin; no painel de administração (que já os tem) não faz nada.
  */

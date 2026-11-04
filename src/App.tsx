@@ -12,7 +12,7 @@ import { AppManifestSync } from '@/components/AppManifestSync';
 import { ROUTES } from '@/lib/constants';
 import { persistQueries, restoreQueries } from '@/lib/query-persist';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
-import { AdminArea, AdminPageFrame } from './components/layout/AdminArea';
+import { AdminArea, AdminPageFrame, AdminTimeClockRoute } from './components/layout/AdminArea';
 import { WorkdayProvider } from './modules/timeclock/context/WorkdayProvider';
 import WorkspaceLayout from './modules/workspace/components/WorkspaceLayout';
 import { ALL_MODULES, type ModuleKey } from './modules/workspace/lib/navigation';
@@ -134,7 +134,10 @@ const App = () => (
                       <Route path="/admin/pedidos" element={<RequestsRedirect />} />
                       <Route path="/admin/suporte" element={<SupportTicketsPage />} />
                       <Route path="/admin/acessos" element={<AccessesPage />} />
-                      <Route path="/admin/ponto" element={<TimeClockAdminPage />} />
+                      <Route
+                        path="/admin/ponto"
+                        element={<AdminTimeClockRoute page={<TimeClockAdminPage />} />}
+                      />
                       {/* Documentos passou para Colaboradores (aprovar, importar recibos, validades) */}
                       <Route
                         path="/admin/documentos"

@@ -7,6 +7,7 @@ import { useFeedUnread } from '@/modules/social/hooks/useFeedUnread';
 import { useNotices } from '@/modules/social/hooks/useNotices';
 import { useSupportDesk } from '@/modules/support/hooks/useSupportDesk';
 import { useMailUnreadTotal } from '@/modules/webmail/hooks/useMailUnreadTotal';
+import { useManagementGroup } from '../../hooks/useManagementGroup';
 import { SETTINGS_MODULE, visibleGroups } from '../../lib/navigation';
 import { BrandMark } from '../BrandMark';
 import { SidebarNavItem } from './SidebarNavItem';
@@ -35,6 +36,9 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
   // Emails por ler na Entrada de todas as caixas.
   const mailUnread = useMailUnreadTotal();
   const { isAgent } = useSupportDesk();
+  // Administradores: as páginas do admin na secção Gestão, no mesmo menu
+  const management = useManagementGroup();
+  const groups = [...visibleGroups({ supportDesk: isAgent }), ...(management ? [management] : [])];
   return (
     <aside
       className={cn(
@@ -52,7 +56,7 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       </Link>
 
       <nav className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-3 pb-3 pt-2">
-        {visibleGroups({ supportDesk: isAgent }).map(group => (
+        {groups.map(group => (
           <div key={group.label}>
             {collapsed ? (
               <div className="mx-auto mb-2 h-px w-8 bg-white/15" aria-hidden />

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
 import { AccountSwitchButton } from '@/modules/auth/components/AccountSwitchButton';
+import { useIsAdmin } from '../../hooks/useIsAdmin';
 import { useWorkspace } from '../../context/workspaceContext';
 import { BrandMark } from '../BrandMark';
 import { GlobalSearch } from './GlobalSearch';
@@ -14,6 +15,7 @@ import { WorkspaceClock } from './WorkspaceClock';
  */
 export const WorkspaceTopBar: React.FC = () => {
   const { basePath, isPreview } = useWorkspace();
+  const isAdmin = useIsAdmin();
   return (
     <header className="flex h-16 shrink-0 items-center gap-3 px-3 md:pl-1 md:pr-4">
       <Link to={basePath} className="md:hidden" aria-label="Realize — Mensagens">
@@ -32,10 +34,13 @@ export const WorkspaceTopBar: React.FC = () => {
         <div className="md:hidden">
           <GlobalSearch compact />
         </div>
-        <AccountSwitchButton
-          current="workspace"
-          className="rz-glass text-white hover:bg-white/20"
-        />
+        {/* Contas unificadas têm o admin aqui mesmo (secção Gestão): sem trocar de conta */}
+        {!isAdmin && (
+          <AccountSwitchButton
+            current="workspace"
+            className="rz-glass text-white hover:bg-white/20"
+          />
+        )}
         <NotificationsButton />
         <WorkspaceClock />
         <ProfileMenu />

@@ -36,8 +36,11 @@ export type ModuleKey =
   | 'ai'
   | 'settings';
 
+/** Página do admin na secção Gestão (admin:<permissão>:<caminho>). */
+export type ManagementKey = `admin:${string}`;
+
 export interface WorkspaceModule {
-  key: ModuleKey;
+  key: ModuleKey | ManagementKey;
   label: string;
   /** Caminho relativo à base da área ('' = página inicial). */
   path: string;
@@ -277,7 +280,8 @@ export const getModule = (key: ModuleKey): WorkspaceModule =>
 
 /** Caminho absoluto de um módulo a partir da base da área. */
 export const modulePath = (basePath: string, module: Pick<WorkspaceModule, 'path'>): string =>
-  module.path ? `${basePath}/${module.path}` : basePath;
+  // A começar por "/" é um caminho absoluto (páginas do admin na secção Gestão)
+  module.path.startsWith('/') ? module.path : module.path ? `${basePath}/${module.path}` : basePath;
 
 /** Atalhos da barra inferior no telemóvel (o resto fica no Menu). */
 export const MOBILE_TABS: ModuleKey[] = ['messenger', 'timeclock', 'absences', 'documents'];

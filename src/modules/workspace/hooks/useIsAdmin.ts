@@ -7,13 +7,15 @@ import { accountSwitchService } from '@/modules/auth/services/accountSwitchServi
  * de admin ligada à ficha. Serve para mostrar opções de admin no Workspace (a função do servidor
  * volta a verificar sempre).
  */
-export const useIsAdmin = (): boolean => {
+export const useAdminAccess = (): { isAdmin: boolean; isLoading: boolean } => {
   const user = useAuthOptional()?.user;
-  const { data: targets = [] } = useQuery({
+  const { data: targets, isLoading } = useQuery({
     queryKey: ['auth', 'switch-targets', user?.id],
     queryFn: async () => (await accountSwitchService.targets()).data,
     enabled: !!user?.id,
     staleTime: 10 * 60_000,
   });
-  return targets.includes('admin');
+  return { isAdmin: (targets ?? []).includes('admin'), isLoading: !!user?.id && isLoading };
 };
+
+export const useIsAdmin = (): boolean => useAdminAccess().isAdmin;

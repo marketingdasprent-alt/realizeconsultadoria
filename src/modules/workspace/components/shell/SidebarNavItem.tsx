@@ -22,7 +22,8 @@ export const SidebarNavItem: React.FC<SidebarNavItemProps> = ({
   const link = (
     <NavLink
       to={modulePath(basePath, module)}
-      end={module.path === ''}
+      // A página inicial e o Painel do admin só ficam ativos no próprio endereço
+      end={module.path === '' || module.path === '/admin'}
       className={({ isActive }) =>
         cn(
           'group relative flex items-center gap-3 rounded-2xl px-2.5 py-2 text-[14px] font-medium transition-all duration-200',

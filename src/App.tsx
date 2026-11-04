@@ -12,10 +12,10 @@ import { AppManifestSync } from '@/components/AppManifestSync';
 import { ROUTES } from '@/lib/constants';
 import { persistQueries, restoreQueries } from '@/lib/query-persist';
 import { GlobalErrorBoundary } from '@/components/GlobalErrorBoundary';
-import AdminLayout from './components/layout/AdminLayout';
+import { AdminArea, AdminPageFrame } from './components/layout/AdminArea';
 import { WorkdayProvider } from './modules/timeclock/context/WorkdayProvider';
 import WorkspaceLayout from './modules/workspace/components/WorkspaceLayout';
-import { ALL_MODULES } from './modules/workspace/lib/navigation';
+import { ALL_MODULES, type ModuleKey } from './modules/workspace/lib/navigation';
 import MessengerPage from './modules/messenger/pages/MessengerPage';
 import RequestsRedirect from './modules/admin/pages/RequestsRedirect';
 
@@ -119,33 +119,31 @@ const App = () => (
 
                   {/* Admin Routes */}
                   <Route path="/admin/login" element={<LoginAlias />} />
-                  <Route
-                    element={
-                      <ProtectedRoute requiredRole="admin">
-                        <AdminLayout />
-                      </ProtectedRoute>
-                    }
-                  >
-                    <Route path="/admin" element={<AdminDashboard />} />
-                    <Route path="/admin/juridico" element={<LegalPage />} />
-                    <Route path="/admin/empresas" element={<CompaniesPage />} />
-                    <Route path="/admin/colaboradores" element={<EmployeesPage />} />
-                    <Route path="/admin/colaboradores/novo" element={<EmployeeFormPage />} />
-                    <Route path="/admin/colaboradores/:id" element={<EmployeeFormPage />} />
-                    <Route path="/admin/calendario" element={<CalendarPage />} />
-                    {/* Pedidos passou para Férias e Ausências (aba Pedidos) */}
-                    <Route path="/admin/pedidos" element={<RequestsRedirect />} />
-                    <Route path="/admin/suporte" element={<SupportTicketsPage />} />
-                    <Route path="/admin/acessos" element={<AccessesPage />} />
-                    <Route path="/admin/ponto" element={<TimeClockAdminPage />} />
-                    {/* Documentos passou para Colaboradores (aprovar, importar recibos, validades) */}
-                    <Route
-                      path="/admin/documentos"
-                      element={<Navigate to="/admin/colaboradores" replace />}
-                    />
-                    <Route path="/admin/financeiro" element={<FinancePage />} />
-                    <Route path="/admin/configuracoes" element={<SettingsPage />} />
-                    <Route path={ROUTES.ADMIN.BROADCASTS} element={<BroadcastsPage />} />
+                  {/* Admin: as contas unificadas (colaborador + admin) veem-no dentro do
+                  Workspace, com o mesmo menu (secção Gestão); as só de admin no painel. */}
+                  <Route element={<AdminArea />}>
+                    <Route element={<AdminPageFrame />}>
+                      <Route path="/admin" element={<AdminDashboard />} />
+                      <Route path="/admin/juridico" element={<LegalPage />} />
+                      <Route path="/admin/empresas" element={<CompaniesPage />} />
+                      <Route path="/admin/colaboradores" element={<EmployeesPage />} />
+                      <Route path="/admin/colaboradores/novo" element={<EmployeeFormPage />} />
+                      <Route path="/admin/colaboradores/:id" element={<EmployeeFormPage />} />
+                      <Route path="/admin/calendario" element={<CalendarPage />} />
+                      {/* Pedidos passou para Férias e Ausências (aba Pedidos) */}
+                      <Route path="/admin/pedidos" element={<RequestsRedirect />} />
+                      <Route path="/admin/suporte" element={<SupportTicketsPage />} />
+                      <Route path="/admin/acessos" element={<AccessesPage />} />
+                      <Route path="/admin/ponto" element={<TimeClockAdminPage />} />
+                      {/* Documentos passou para Colaboradores (aprovar, importar recibos, validades) */}
+                      <Route
+                        path="/admin/documentos"
+                        element={<Navigate to="/admin/colaboradores" replace />}
+                      />
+                      <Route path="/admin/financeiro" element={<FinancePage />} />
+                      <Route path="/admin/configuracoes" element={<SettingsPage />} />
+                      <Route path={ROUTES.ADMIN.BROADCASTS} element={<BroadcastsPage />} />
+                    </Route>
                   </Route>
 
                   {/* Employee Routes */}
@@ -198,7 +196,7 @@ const App = () => (
                       <Route
                         key={module.key}
                         path={`/colaborador/${module.path}`}
-                        element={<ModuleComingSoonPage moduleKey={module.key} />}
+                        element={<ModuleComingSoonPage moduleKey={module.key as ModuleKey} />}
                       />
                     ))}
                   </Route>

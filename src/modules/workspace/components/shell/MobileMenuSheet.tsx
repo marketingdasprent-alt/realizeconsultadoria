@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { useWorkspace } from '../../context/workspaceContext';
 import { useSupportDesk } from '@/modules/support/hooks/useSupportDesk';
+import { useManagementGroup } from '../../hooks/useManagementGroup';
 import { SETTINGS_MODULE, modulePath, visibleGroups } from '../../lib/navigation';
 import { ModuleIcon } from '../ModuleIcon';
 
@@ -15,8 +16,10 @@ interface MobileMenuSheetProps {
 export const MobileMenuSheet: React.FC<MobileMenuSheetProps> = ({ open, onOpenChange }) => {
   const { basePath } = useWorkspace();
   const { isAgent } = useSupportDesk();
+  const management = useManagementGroup();
   const groups = [
     ...visibleGroups({ supportDesk: isAgent }),
+    ...(management ? [management] : []),
     { label: 'Conta', modules: [SETTINGS_MODULE] },
   ];
 

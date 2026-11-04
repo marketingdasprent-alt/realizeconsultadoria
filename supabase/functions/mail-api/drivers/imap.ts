@@ -199,6 +199,41 @@ const openClientPaced = (cfg: ImapAccountConfig): Promise<ImapClient> =>
     }
   });
 
+/** Erro de envio SMTP → mensagem que diz o motivo (em vez de um "recusou o envio" genérico). */
+const smtpFailure = (error: unknown): MailError => {
+  const e = (error ?? {}) as {
+    code?: unknown;
+    response?: unknown;
+    responseCode?: unknown;
+    message?: unknown;
+  };
+  const code = typeof e.code === 'string' ? e.code : '';
+  if (code === 'EAUTH')
+    return mailError(
+      'smtp_failed',
+      'O servidor SMTP recusou as credenciais. Confirme a palavra-passe de aplicação.'
+    );
+  if (['ETIMEDOUT', 'ECONNECTION', 'ESOCKET', 'ECONNREFUSED', 'ECONNRESET', 'EDNS'].includes(code))
+    return mailError(
+      'smtp_failed',
+      `Não foi possível ligar ao servidor de envio (${code}). Tente outra vez dentro de instantes.`
+    );
+  const reason = String(e.response ?? e.message ?? '')
+    .replace(/\s+/g, ' ')
+    .slice(0, 160);
+  const status = typeof e.responseCode === 'number' ? ` (${e.responseCode})` : '';
+  return mailError(
+    'smtp_failed',
+    `O servidor SMTP recusou o envio${status}${reason ? `: ${reason}` : ''}.`
+  );
+};
+
+/** Falha ao ligar (antes de qualquer envio): pode repetir-se sem duplicar o email. */
+const isConnectPhase = (error: unknown) => {
+  const e = (error ?? {}) as { command?: unknown; code?: unknown };
+  return e.command === 'CONN' || ['ECONNREFUSED', 'EDNS', 'ETIMEDOUT'].includes(String(e.code));
+};
+
 /** Testa as credenciais (connect-imap). */
 export const testImapLogin = async (cfg: ImapAccountConfig): Promise<void> => {
   let client: ImapClient;
@@ -581,23 +616,33 @@ export const createImapDriver = (
         greetingTimeout: 10_000,
         socketTimeout: 60_000,
       });
+      const mailToSend = {
+        envelope: {
+          from: cfg.email,
+          to: [...params.to, ...params.cc, ...params.bcc].map(a => a.email),
+        },
+        raw: buildRawMessage({ ...base, includeBcc: false }),
+      };
       try {
-        await transport.sendMail({
-          envelope: {
-            from: cfg.email,
-            to: [...params.to, ...params.cc, ...params.bcc].map(a => a.email),
-          },
-          raw: buildRawMessage({ ...base, includeBcc: false }),
+        // No máximo 3 ligações em simultâneo ao mesmo servidor e, se a ligação falhar, mais uma
+        // tentativa passado um instante (o alojamento partilhado recusa por vezes).
+        await withOpenSlot(`smtp:${cfg.smtpHost}`, async () => {
+          try {
+            await transport.sendMail(mailToSend);
+          } catch (error) {
+            if (!isConnectPhase(error)) throw error;
+            await new Promise(resolve => setTimeout(resolve, 1200));
+            await transport.sendMail(mailToSend);
+          }
         });
       } catch (error) {
-        console.error('mail-api smtp: envio falhou', errorMessage(error));
-        const code = (error as { code?: unknown } | null)?.code;
-        throw mailError(
-          'smtp_failed',
-          code === 'EAUTH'
-            ? 'O servidor SMTP recusou as credenciais. Confirme a palavra-passe de aplicação.'
-            : undefined
+        console.error(
+          'mail-api smtp: envio falhou',
+          errorMessage(error),
+          (error as { code?: unknown } | null)?.code ?? '',
+          (error as { response?: unknown } | null)?.response ?? ''
         );
+        throw smtpFailure(error);
       } finally {
         transport.close();
       }

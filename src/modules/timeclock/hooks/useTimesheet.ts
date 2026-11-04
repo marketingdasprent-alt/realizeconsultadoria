@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { addDays, endOfMonth, startOfMonth } from 'date-fns';
 import { summarizeDays, type DaySummary, type TimeClockEntryWithRelations } from '@/lib/timeclock';
 import { timeClockService } from '../services/timeClockService';
+import type { MonthBank } from '../lib/hourBank';
+import { useHourBank } from './useHourBank';
 
 export interface TimesheetFilters {
   month: Date;
@@ -17,6 +19,8 @@ export interface EmployeeTimesheet {
   totalMinutes: number;
   flaggedCount: number;
   incompleteDays: number;
+  /** Banco de horas do mês (até ontem); null enquanto carrega. */
+  bank: MonthBank | null;
 }
 
 interface UseTimesheetResult {
@@ -40,6 +44,7 @@ export const useTimesheet = ({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const monthKey = month.toISOString();
+  const { bankFor } = useHourBank(month, employeeId);
 
   const fetchEntries = useCallback(async () => {
     setIsLoading(true);
@@ -78,11 +83,12 @@ export const useTimesheet = ({
           totalMinutes: days.reduce((sum, d) => sum + d.workedMinutes, 0),
           flaggedCount: list.filter(e => e.status === 'flagged').length,
           incompleteDays: days.filter(d => d.incomplete).length,
+          bank: bankFor(id, days),
         };
       })
       .filter(sheet => !onlyFlagged || sheet.flaggedCount > 0 || sheet.incompleteDays > 0)
       .sort((a, b) => a.employeeName.localeCompare(b.employeeName, 'pt'));
-  }, [entries, onlyFlagged]);
+  }, [entries, onlyFlagged, bankFor]);
 
   return { sheets, entries, isLoading, error, refetch: fetchEntries };
 };

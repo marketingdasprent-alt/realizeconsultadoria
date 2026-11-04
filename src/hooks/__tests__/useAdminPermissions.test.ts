@@ -8,6 +8,8 @@ vi.mock('@/integrations/supabase/client', () => ({
     auth: {
       getSession: vi.fn(),
     },
+    // Conta unificada: por omissão só a própria conta
+    rpc: vi.fn(async (_fn: string, args: { _user_id: string }) => ({ data: [args._user_id] })),
     from: vi.fn(() => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -120,7 +122,7 @@ describe('useAdminPermissions', () => {
 
     const mockAdminGroupQuery = {
       select: vi.fn().mockReturnThis(),
-      eq: vi.fn().mockResolvedValue({
+      in: vi.fn().mockResolvedValue({
         data: [
           {
             group_id: 'superadmin-group',
@@ -137,6 +139,28 @@ describe('useAdminPermissions', () => {
     await waitFor(() => {
       expect(result.current.isSuperAdmin).toBe(true);
     });
+  });
+
+  it('conta de colaborador ligada a uma conta de admin herda os grupos dela', async () => {
+    vi.mocked(supabase.auth.getSession).mockResolvedValue({
+      data: { session: { user: { id: 'colaborador-1' } } },
+      error: null,
+    } as any);
+    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: ['colaborador-1', 'admin-1'] } as any);
+    const inGroups = vi.fn().mockResolvedValue({
+      data: [{ group_id: 'g', admin_groups: { is_super_admin: true, is_active: true } }],
+    });
+    vi.mocked(supabase.from).mockReturnValueOnce({
+      select: vi.fn().mockReturnThis(),
+      in: inGroups,
+    } as any);
+
+    const { result } = renderHook(() => useAdminPermissions());
+
+    await waitFor(() => {
+      expect(result.current.isSuperAdmin).toBe(true);
+    });
+    expect(inGroups).toHaveBeenCalledWith('user_id', ['colaborador-1', 'admin-1']);
   });
 
   it('should have canView method', async () => {

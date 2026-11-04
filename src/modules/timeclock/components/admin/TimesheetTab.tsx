@@ -8,6 +8,7 @@ import { useTimesheet, type TimesheetFilters as Filters } from '../../hooks/useT
 import { useTimesheetPrint, type ReportAction } from '../../hooks/useTimesheetPrint';
 import { EmployeeTimesheetCard } from './EmployeeTimesheetCard';
 import { EntryDialogs, type EntryDialogState } from './EntryDialogs';
+import { HourBankSettingsCard } from './HourBankSettingsCard';
 import { TimesheetFilters } from './TimesheetFilters';
 
 interface TimesheetTabProps {
@@ -56,6 +57,7 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
 
   return (
     <div className="space-y-4">
+      <HourBankSettingsCard canEdit={canEdit} />
       <TimesheetFilters
         filters={filters}
         companies={companies.map(c => ({ id: c.id, name: c.name }))}

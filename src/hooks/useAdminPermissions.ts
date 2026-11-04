@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { PERMISSIONS_CONFIG, MODULE_LABELS, ALL_MODULE_KEYS } from '@/lib/permissions-config';
 
@@ -37,6 +38,15 @@ export const useAdminPermissions = (): AdminPermissions => {
         return;
       }
 
+      // Conta unificada: a conta de colaborador conta também com os grupos da conta de admin
+      // ligada à ficha (employees.admin_user_id); a BD decide quais são (rz_identity_ids).
+      const untyped: SupabaseClient = supabase;
+      const { data: identity } = await untyped.rpc('rz_identity_ids', {
+        _user_id: session.user.id,
+      });
+      const userIds: string[] =
+        Array.isArray(identity) && identity.length ? (identity as string[]) : [session.user.id];
+
       // Check if user is in a super admin group
       const { data: superAdminCheck } = await supabase
         .from('admin_group_members')
@@ -46,7 +56,7 @@ export const useAdminPermissions = (): AdminPermissions => {
           admin_groups!inner(is_super_admin, is_active)
         `
         )
-        .eq('user_id', session.user.id);
+        .in('user_id', userIds);
 
       const inSuperAdminGroup = superAdminCheck?.some(
         (m: any) => m.admin_groups?.is_super_admin && m.admin_groups?.is_active
@@ -101,7 +111,7 @@ export const useAdminPermissions = (): AdminPermissions => {
       const { data: memberships } = await supabase
         .from('admin_group_members')
         .select('group_id')
-        .eq('user_id', session.user.id);
+        .in('user_id', userIds);
 
       if (memberships && memberships.length > 0) {
         const groupIds = memberships.map(m => m.group_id);

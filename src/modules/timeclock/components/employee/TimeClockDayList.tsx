@@ -5,15 +5,47 @@ import { AlertTriangle, Coffee } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatMinutes, type DaySummary } from '@/lib/timeclock';
 import { getEntryAction, getEntryLabel } from '@/lib/workday';
+import { absenceTypeLabels } from '@/lib/absence-types';
+import { formatBalance, type BankDay } from '../../lib/hourBank';
 import { ACTION_BUBBLE_CLASSES } from './workdayStyles';
 
 interface TimeClockDayListProps {
   days: DaySummary[];
+  /** Saldo de cada dia (banco de horas); sem isto, só as horas feitas. */
+  bank?: Map<string, BankDay>;
   emptyMessage: string;
 }
 
+/** "Previsto 8h00 · Consultas (justificada 2h00) · saldo −1h00". */
+const BankLine: React.FC<{ day: BankDay }> = ({ day }) => {
+  const parts = [
+    day.holiday ? `Feriado: ${day.holiday}` : null,
+    day.expected ? `Previsto ${formatMinutes(day.expected)}` : 'Dia de folga',
+    day.absenceType
+      ? `${absenceTypeLabels[day.absenceType] ?? 'Ausência'}${
+          day.justified ? ` (justificada ${formatMinutes(day.justified)})` : ''
+        }${day.toCompensate ? ` (a compensar ${formatMinutes(day.toCompensate)})` : ''}`
+      : null,
+  ].filter(Boolean);
+  return (
+    <p className="mt-2 flex flex-wrap items-center gap-x-1.5 text-[12px] text-rz-muted">
+      {parts.join(' · ')}
+      <span
+        className={cn(
+          'ml-auto rounded-full px-2 py-0.5 font-bold tabular-nums',
+          day.balance > 0 && 'bg-emerald-50 text-emerald-700',
+          day.balance < 0 && 'bg-rose-50 text-rose-700',
+          day.balance === 0 && 'bg-rz-canvas text-rz-muted'
+        )}
+      >
+        saldo {formatBalance(day.balance)}
+      </span>
+    </p>
+  );
+};
+
 /** Dias do mês com os registos, horas trabalhadas, pausas e dias incompletos. */
-export const TimeClockDayList: React.FC<TimeClockDayListProps> = ({ days, emptyMessage }) => {
+export const TimeClockDayList: React.FC<TimeClockDayListProps> = ({ days, bank, emptyMessage }) => {
   if (days.length === 0) {
     return <p className="py-8 text-center text-sm text-rz-muted">{emptyMessage}</p>;
   }
@@ -38,6 +70,9 @@ export const TimeClockDayList: React.FC<TimeClockDayListProps> = ({ days, emptyM
               {day.pausedSince && <span className="font-semibold text-amber-600"> · em pausa</span>}
             </span>
           </div>
+          {day.entries.length === 0 && (
+            <p className="mt-1 text-[12.5px] text-rz-muted">Sem registos de ponto.</p>
+          )}
           <div className="mt-2 flex flex-wrap gap-1.5">
             {[...day.entries]
               .sort((a, b) => a.punched_at.localeCompare(b.punched_at))
@@ -61,6 +96,7 @@ export const TimeClockDayList: React.FC<TimeClockDayListProps> = ({ days, emptyM
               contam como trabalho)
             </p>
           )}
+          {bank?.get(day.date) && <BankLine day={bank.get(day.date)!} />}
           {day.incomplete && (
             <p className="mt-2 flex items-center gap-1.5 text-[12px] font-semibold text-amber-700">
               <AlertTriangle className="h-3.5 w-3.5" /> Dia com registo incompleto — use o ✎ no

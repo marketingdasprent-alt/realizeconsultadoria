@@ -3751,6 +3751,36 @@ export type Database = {
           },
         ];
       };
+      time_clock_settings: {
+        Row: {
+          id: boolean;
+          daily_minutes: number;
+          workdays: number[];
+          absence_rules: Json;
+          starts_on: string;
+          updated_by: string | null;
+          updated_at: string;
+        };
+        Insert: {
+          id?: boolean;
+          daily_minutes?: number;
+          workdays?: number[];
+          absence_rules?: Json;
+          starts_on?: string;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Update: {
+          id?: boolean;
+          daily_minutes?: number;
+          workdays?: number[];
+          absence_rules?: Json;
+          starts_on?: string;
+          updated_by?: string | null;
+          updated_at?: string;
+        };
+        Relationships: [];
+      };
       time_clock_tags: {
         Row: {
           created_at: string;

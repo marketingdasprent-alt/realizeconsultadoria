@@ -50,6 +50,33 @@ export const fetchWithTimeout = async (
 };
 
 /** Corre `fn` sobre os itens com no máximo `limit` pedidos em simultâneo (mantém a ordem). */
+/**
+ * Como mapWithConcurrency, mas com o limite aplicado a cada grupo (ex.: as caixas do mesmo servidor
+ * IMAP): os servidores de alojamento partilhado recusam muitas ligações ao mesmo tempo do mesmo IP.
+ * Os grupos correm em paralelo; os resultados vêm pela ordem dos itens.
+ */
+export const mapWithGroupLimit = async <T, R>(
+  items: T[],
+  groupOf: (item: T) => string,
+  limit: number,
+  fn: (item: T, index: number) => Promise<R>
+): Promise<R[]> => {
+  const results = new Array<R>(items.length);
+  const groups = new Map<string, number[]>();
+  items.forEach((item, index) => {
+    const key = groupOf(item);
+    groups.set(key, [...(groups.get(key) ?? []), index]);
+  });
+  await Promise.all(
+    [...groups.values()].map(indexes =>
+      mapWithConcurrency(indexes, limit, async index => {
+        results[index] = await fn(items[index], index);
+      })
+    )
+  );
+  return results;
+};
+
 export const mapWithConcurrency = async <T, R>(
   items: T[],
   limit: number,

@@ -9,9 +9,10 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { isMailError, mailError } from '../_shared/mail/errors.ts';
 import type { MailDriver } from '../_shared/mail/types.ts';
 import { loadUserAccounts, type MailAccountRow } from '../_shared/mail-server/accounts.ts';
-import { errorMessage, mapWithConcurrency } from '../_shared/mail-server/http.ts';
+import { errorMessage, mapWithGroupLimit } from '../_shared/mail-server/http.ts';
 
-const CONCURRENCY = 4;
+/** Ligações em simultâneo a cada servidor IMAP (o alojamento partilhado recusa mais). */
+const CONCURRENCY = 2;
 const TIMEOUT_MS = 12_000;
 
 const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
@@ -40,14 +41,20 @@ export const unreadCounts = async (
   // As caixas a precisar de nova autorização falhavam sempre: ficam de fora.
   const accounts = (await loadUserAccounts(db, userId)).filter(a => a.status !== 'reauth');
   const result: UnreadCounts = { counts: {}, errors: {} };
-  await mapWithConcurrency(accounts, CONCURRENCY, async account => {
-    try {
-      const driver = await createDriver(db, account);
-      result.counts[account.id] = await withTimeout(driver.unreadCount(), TIMEOUT_MS);
-    } catch (error) {
-      result.errors[account.id] = isMailError(error) ? error.code : 'server_error';
-      if (!isMailError(error)) console.error(`mail-api unread ${account.id}:`, errorMessage(error));
+  await mapWithGroupLimit(
+    accounts,
+    account => account.imap_host ?? account.id,
+    CONCURRENCY,
+    async account => {
+      try {
+        const driver = await createDriver(db, account);
+        result.counts[account.id] = await withTimeout(driver.unreadCount(), TIMEOUT_MS);
+      } catch (error) {
+        result.errors[account.id] = isMailError(error) ? error.code : 'server_error';
+        if (!isMailError(error))
+          console.error(`mail-api unread ${account.id}:`, errorMessage(error));
+      }
     }
-  });
+  );
   return result;
 };

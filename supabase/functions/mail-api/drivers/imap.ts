@@ -163,6 +163,42 @@ const openClient = async (cfg: ImapAccountConfig): Promise<ImapClient> => {
   return client;
 };
 
+/**
+ * Aberturas de ligação em curso por servidor: o alojamento partilhado recusa muitas ligações do
+ * mesmo IP ao mesmo tempo ("Não foi possível ligar"), por isso abrem-se no máximo 3 de cada vez
+ * por servidor (nesta instância) e uma falha de ligação (não de palavra-passe) tenta-se uma vez
+ * mais, passado um instante.
+ */
+const OPENING = new Map<string, number>();
+const OPEN_WAITING = new Map<string, (() => void)[]>();
+const MAX_OPENING_PER_HOST = 3;
+
+const withOpenSlot = async <T>(host: string, task: () => Promise<T>): Promise<T> => {
+  while ((OPENING.get(host) ?? 0) >= MAX_OPENING_PER_HOST) {
+    await new Promise<void>(resolve =>
+      OPEN_WAITING.set(host, [...(OPEN_WAITING.get(host) ?? []), resolve])
+    );
+  }
+  OPENING.set(host, (OPENING.get(host) ?? 0) + 1);
+  try {
+    return await task();
+  } finally {
+    OPENING.set(host, (OPENING.get(host) ?? 1) - 1);
+    OPEN_WAITING.get(host)?.shift()?.();
+  }
+};
+
+const openClientPaced = (cfg: ImapAccountConfig): Promise<ImapClient> =>
+  withOpenSlot(cfg.imapHost, async () => {
+    try {
+      return await openClient(cfg);
+    } catch (error) {
+      if (isAuthFailure(error)) throw error;
+      await new Promise(resolve => setTimeout(resolve, 800));
+      return await openClient(cfg);
+    }
+  });
+
 /** Testa as credenciais (connect-imap). */
 export const testImapLogin = async (cfg: ImapAccountConfig): Promise<void> => {
   let client: ImapClient;
@@ -230,7 +266,7 @@ export const createImapDriver = (
     if (pooled) dropPooled(key);
     let client: ImapClient;
     try {
-      client = await openClient(cfg);
+      client = await openClientPaced(cfg);
     } catch (error) {
       if (isAuthFailure(error)) throw await onAuthFailure();
       console.error('mail-api imap: sem ligação', errorMessage(error));

@@ -8,7 +8,7 @@
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import type { MailDriver, MailSummary } from '../_shared/mail/types.ts';
 import { ACCOUNT_COLUMNS, type MailAccountRow } from '../_shared/mail-server/accounts.ts';
-import { errorMessage } from '../_shared/mail-server/http.ts';
+import { errorMessage, mapWithGroupLimit } from '../_shared/mail-server/http.ts';
 import { activeRulesByAccount, applyRules, type MailRule } from './rules.ts';
 
 const PER_ACCOUNT = 10;
@@ -153,8 +153,12 @@ export const pollNewMail = async (
     console.error('mail-api poll: regras', errorMessage(error));
     return new Map<string, MailRule[]>();
   });
-  const results = await Promise.all(
-    accounts.map(async account => {
+  // No máximo 2 caixas do mesmo servidor IMAP de cada vez (senão o alojamento recusa ligações)
+  const results = await mapWithGroupLimit(
+    accounts,
+    account => account.imap_host ?? account.id,
+    2,
+    async account => {
       try {
         if (!(await claim(db, account))) return 0;
         // Uma caixa lenta (ex.: servidor IMAP pendurado) não atrasa as outras.
@@ -172,7 +176,7 @@ export const pollNewMail = async (
         console.error(`mail-api poll ${account.id}:`, errorMessage(err));
         return 0;
       }
-    })
+    }
   );
   return { accounts: accounts.length, notified: results.reduce((sum, n) => sum + n, 0) };
 };

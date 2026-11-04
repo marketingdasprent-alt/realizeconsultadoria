@@ -3,12 +3,8 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
   ArrowLeft,
-  CalendarPlus,
   Forward,
-  ListChecks,
   Loader2,
-  MailOpen,
-  Printer,
   Reply,
   ReplyAll,
   Star,
@@ -27,6 +23,7 @@ import { MailBody } from './MailBody';
 import { LabelChips } from './LabelChips';
 import { LabelPicker } from './LabelPicker';
 import { MoveToFolder } from './MoveToFolder';
+import { ReaderMoreMenu } from './ReaderMoreMenu';
 import { AddressChip, MailRecipients } from './MailRecipients';
 import { ThreadItem } from './ThreadItem';
 
@@ -45,10 +42,6 @@ const TOOLBAR: { action: ReaderAction; label: string; icon: LucideIcon }[] = [
   { action: 'reply', label: 'Responder', icon: Reply },
   { action: 'replyAll', label: 'Responder a todos', icon: ReplyAll },
   { action: 'forward', label: 'Reencaminhar', icon: Forward },
-  { action: 'task', label: 'Criar tarefa', icon: ListChecks },
-  { action: 'event', label: 'Criar evento', icon: CalendarPlus },
-  { action: 'unread', label: 'Marcar como não lido', icon: MailOpen },
-  { action: 'print', label: 'Imprimir', icon: Printer },
   { action: 'trash', label: 'Lixo', icon: Trash2 },
 ];
 
@@ -153,16 +146,12 @@ export const MailReader: React.FC<MailReaderProps> = ({
         >
           <ArrowLeft className="h-5 w-5" />
         </button>
-        <div className="scrollbar-hide flex flex-1 items-center gap-0.5 overflow-x-auto">
+        <div className="flex min-w-0 flex-1 flex-wrap items-center gap-0.5">
           {TOOLBAR.map(({ action, label, icon: Icon }) => (
             <button
               key={action}
               type="button"
-              onClick={() =>
-                // Imprimir trata-se aqui (só precisa do email aberto).
-                action === 'print' ? message && printMail(message) : onAction(action)
-              }
-              disabled={action === 'print' && !message}
+              onClick={() => onAction(action)}
               title={label}
               aria-label={label}
               className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
@@ -187,6 +176,14 @@ export const MailReader: React.FC<MailReaderProps> = ({
             onMove={onMove}
             withLabel
             className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
+          />
+          <ReaderMoreMenu
+            canPrint={!!message}
+            // Imprimir trata-se aqui (só precisa do email aberto).
+            onAction={action =>
+              action === 'print' ? message && printMail(message) : onAction(action)
+            }
+            className="flex h-9 shrink-0 items-center gap-1.5 rounded-full px-2.5 text-[13px] font-semibold text-rz-muted outline-none hover:bg-rz-canvas hover:text-rz-ink"
           />
         </div>
         <button

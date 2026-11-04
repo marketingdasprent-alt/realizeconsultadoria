@@ -11,7 +11,9 @@ import {
   PersonAccessDialog,
   type PersonAccessTab,
 } from '@/modules/workspace/components/PersonAccessDialog';
+import { prefetchPersonAccess } from '@/modules/workspace/lib/personAccessQuery';
 import { useIsAdmin } from '@/modules/workspace/hooks/useIsAdmin';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface PersonContextMenuProps {
   person: { userId: string; name: string };
@@ -34,11 +36,16 @@ export const PersonContextMenu: React.FC<PersonContextMenuProps> = ({
   children,
 }) => {
   const isAdmin = useIsAdmin();
+  const qc = useQueryClient();
   const [access, setAccess] = useState<PersonAccessTab | null>(null);
 
   return (
     <>
-      <ContextMenu>
+      <ContextMenu
+        onOpenChange={open =>
+          open && isAdmin && person.userId && prefetchPersonAccess(qc, person.userId)
+        }
+      >
         <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
         <ContextMenuContent className="w-60 rounded-xl">
           <ContextMenuItem onSelect={onOpenProfile} className="gap-2">

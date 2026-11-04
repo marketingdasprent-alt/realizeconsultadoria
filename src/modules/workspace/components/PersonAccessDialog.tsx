@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { PermissionToggle } from '@/modules/admin/components/employee/folders/PermissionToggle';
 import { ServerFolderPicker } from '@/modules/admin/components/employee/folders/ServerFolderPicker';
 import { matchesText } from '@/lib/text';
+import { accessKey, fetchAccess } from '../lib/personAccessQuery';
 import {
   personAccessService,
   type AccessPermission,
@@ -25,6 +26,14 @@ interface PersonAccessDialogProps {
 const fail = (description: string) =>
   toast({ title: 'Não foi possível', description, variant: 'destructive' });
 
+/** Pasta: o nome em destaque e o caminho até ela por baixo. */
+const splitPath = (path: string) => {
+  const cut = path.lastIndexOf('/');
+  return cut < 0
+    ? { name: path, parent: '' }
+    : { name: path.slice(cut + 1), parent: path.slice(0, cut) };
+};
+
 /** Dar acesso a pastas da empresa e a caixas de email a uma pessoa (só administradores). */
 export const PersonAccessDialog: React.FC<PersonAccessDialogProps> = ({
   person,
@@ -35,7 +44,7 @@ export const PersonAccessDialog: React.FC<PersonAccessDialogProps> = ({
   const [tab, setTab] = useState<PersonAccessTab>(initialTab);
   const [picking, setPicking] = useState(false);
   const [search, setSearch] = useState('');
-  const key = ['person-access', person?.userId] as const;
+  const key = accessKey(person?.userId);
 
   useEffect(() => {
     if (!person) return;
@@ -46,11 +55,8 @@ export const PersonAccessDialog: React.FC<PersonAccessDialogProps> = ({
   const access = useQuery({
     queryKey: key,
     enabled: !!person,
-    queryFn: async () => {
-      const { data, error } = await personAccessService.overview(person?.userId ?? '');
-      if (error || !data) throw new Error(error ?? '');
-      return data;
-    },
+    queryFn: () => fetchAccess(person?.userId ?? ''),
+    staleTime: 30_000,
   });
   const patch = (change: (current: PersonAccess) => PersonAccess) =>
     qc.setQueryData<PersonAccess>(key, current => (current ? change(current) : current));
@@ -63,14 +69,25 @@ export const PersonAccessDialog: React.FC<PersonAccessDialogProps> = ({
   );
 
   const setPermission = async (path: string, permission: AccessPermission) => {
+    patch(current => ({
+      ...current,
+      folders: current.folders.map(folder =>
+        folder.path === path ? { ...folder, permission } : folder
+      ),
+    }));
     const { error } = await personAccessService.setFolder(person.userId, path, permission);
-    if (error) fail(error);
-    await refresh();
+    if (error) {
+      fail(error);
+      void refresh();
+    }
   };
   const removeFolder = async (id: string) => {
+    patch(current => ({ ...current, folders: current.folders.filter(folder => folder.id !== id) }));
     const { error } = await personAccessService.removeFolder(person.userId, id);
-    if (error) fail(error);
-    await refresh();
+    if (error) {
+      fail(error);
+      void refresh();
+    }
   };
   const toggleMailbox = async (accessId: string, on: boolean) => {
     patch(current => ({
@@ -80,13 +97,15 @@ export const PersonAccessDialog: React.FC<PersonAccessDialogProps> = ({
       ),
     }));
     const { error } = await personAccessService.setMailbox(person.userId, accessId, on);
-    if (error) fail(error);
-    await refresh();
+    if (error) {
+      fail(error);
+      void refresh();
+    }
   };
 
   return (
     <Dialog open onOpenChange={next => !next && onClose()}>
-      <DialogContent className="max-h-[90vh] overflow-y-auto rounded-[28px] sm:max-w-lg sm:rounded-[28px]">
+      <DialogContent className="max-h-[90vh] overflow-y-auto overflow-x-hidden rounded-[28px] sm:max-w-2xl sm:rounded-[28px] [&>*]:min-w-0">
         <DialogTitle className="text-[18px] font-extrabold">Acessos de {person.name}</DialogTitle>
         <DialogDescription className="text-[13px]">
           Só administradores. As alterações aplicam-se logo.
@@ -137,11 +156,15 @@ export const PersonAccessDialog: React.FC<PersonAccessDialogProps> = ({
                   className="flex items-center gap-2 rounded-2xl p-2 hover:bg-rz-canvas"
                 >
                   <Folder className="h-4 w-4 shrink-0 text-amber-600" />
-                  <span
-                    className="min-w-0 flex-1 truncate text-[13.5px] font-semibold"
-                    title={folder.path}
-                  >
-                    {folder.path}
+                  <span className="min-w-0 flex-1" title={folder.path}>
+                    <span className="block truncate text-[14px] font-semibold">
+                      {splitPath(folder.path).name}
+                    </span>
+                    {splitPath(folder.path).parent && (
+                      <span className="block truncate text-[12px] text-rz-muted">
+                        {splitPath(folder.path).parent}
+                      </span>
+                    )}
                   </span>
                   <PermissionToggle
                     size="sm"
@@ -152,7 +175,7 @@ export const PersonAccessDialog: React.FC<PersonAccessDialogProps> = ({
                     type="button"
                     onClick={() => void removeFolder(folder.id)}
                     aria-label={`Retirar acesso a ${folder.path}`}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-rz-muted hover:bg-rose-50 hover:text-rose-600"
+                    className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-rz-muted hover:bg-rose-50 hover:text-rose-600"
                   >
                     <Trash2 className="h-4 w-4" />
                   </button>

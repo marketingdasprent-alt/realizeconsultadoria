@@ -25,7 +25,9 @@ import {
   PersonAccessDialog,
   type PersonAccessTab,
 } from '@/modules/workspace/components/PersonAccessDialog';
+import { prefetchPersonAccess } from '@/modules/workspace/lib/personAccessQuery';
 import { useIsAdmin } from '@/modules/workspace/hooks/useIsAdmin';
+import { useQueryClient } from '@tanstack/react-query';
 import { useMessengerApi } from '../context/useMessengerApi';
 import type { ConversationSummary } from '../types';
 
@@ -50,6 +52,7 @@ export const ConversationContextMenu: React.FC<ConversationContextMenuProps> = (
 }) => {
   const api = useMessengerApi();
   const isAdmin = useIsAdmin();
+  const qc = useQueryClient();
   const [access, setAccess] = useState<PersonAccessTab | null>(null);
   // Opções de admin: numa conversa privada, dar acessos à pessoa do outro lado
   const person =
@@ -67,7 +70,9 @@ export const ConversationContextMenu: React.FC<ConversationContextMenuProps> = (
 
   return (
     <>
-      <ContextMenu>
+      <ContextMenu
+        onOpenChange={open => open && person?.userId && prefetchPersonAccess(qc, person?.userId)}
+      >
         <ContextMenuTrigger asChild>{children}</ContextMenuTrigger>
         <ContextMenuContent className="w-60 rounded-xl">
           <ContextMenuItem onSelect={() => onOpen(conversation.id)} className="gap-2">

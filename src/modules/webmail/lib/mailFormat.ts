@@ -84,6 +84,7 @@ export const draftFrom = (
       body: forwardedText(message, message.text ?? htmlToText(message.html ?? '')),
       forward: {
         messageId: message.id,
+        messageKey: message.messageKey ?? null,
         accountId: message.accountId,
         html: forwardedHtml(message),
         attachments: message.attachments,

@@ -84,6 +84,7 @@ const toSummary = (accountId: string, row: Row): MailSummary => ({
   hasAttachments: !!row.has_attachments,
   messageKey: (row.message_key as string | null) ?? null,
   labelIds: Array.isArray(row.label_ids) ? (row.label_ids as string[]) : [],
+  forwarded: row.forwarded === true,
 });
 
 const toMessage = (accountId: string, row: Row): MailMessage => ({
@@ -554,6 +555,9 @@ export const mailService = {
       html,
       in_reply_to: input.inReplyTo,
       attachments: input.attachments,
+      forward_of_key: input.forwardOf
+        ? input.forwardOf.messageKey || `id:${input.forwardOf.messageId}`
+        : undefined,
     }),
 
   /** Guarda (ou substitui `draftId`) o rascunho na pasta Rascunhos; devolve o id novo. */

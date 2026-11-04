@@ -132,6 +132,44 @@ export const listWithLabel = async (
   return { messages, next_page_token: next };
 };
 
+/** Das chaves dadas, as dos emails que já foram reencaminhados pelo Webmail. */
+const forwardedKeys = async (
+  db: SupabaseClient,
+  accountId: string,
+  keys: string[]
+): Promise<Set<string>> => {
+  const found = new Set<string>();
+  for (let i = 0; i < keys.length; i += KEY_CHUNK) {
+    const { data, error } = await db
+      .from('mail_forwarded')
+      .select('message_key')
+      .eq('account_id', accountId)
+      .in('message_key', keys.slice(i, i + KEY_CHUNK));
+    if (error) {
+      console.error('mail-api reencaminhados:', errorMessage(error));
+      break;
+    }
+    for (const row of data ?? []) found.add(row.message_key as string);
+  }
+  return found;
+};
+
+/** Regista que o email foi reencaminhado (a marca aparece na lista). */
+export const markForwarded = async (
+  db: SupabaseClient,
+  accountId: string,
+  messageKey: string,
+  userId: string | null
+): Promise<void> => {
+  const { error } = await db
+    .from('mail_forwarded')
+    .upsert(
+      { account_id: accountId, message_key: messageKey, forwarded_by: userId },
+      { onConflict: 'account_id,message_key' }
+    );
+  if (error) console.error('mail-api reencaminhado:', errorMessage(error));
+};
+
 /** Acrescenta `label_ids` a cada email (uma só consulta por lista). */
 export const attachLabels = async <T extends MailSummary>(
   db: SupabaseClient,
@@ -157,7 +195,12 @@ export const attachLabels = async <T extends MailSummary>(
         row.label_id as string,
       ]);
   }
-  return messages.map(mail => ({ ...mail, label_ids: byKey.get(labelKeyOf(mail)) ?? [] }));
+  const forwarded = await forwardedKeys(db, accountId, keys);
+  return messages.map(mail => ({
+    ...mail,
+    label_ids: byKey.get(labelKeyOf(mail)) ?? [],
+    forwarded: forwarded.has(labelKeyOf(mail)),
+  }));
 };
 
 /**

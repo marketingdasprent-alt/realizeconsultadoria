@@ -124,6 +124,8 @@ export interface MailSummary {
   messageKey?: string | null;
   /** Marcadores do email (ids). */
   labelIds?: string[];
+  /** Já foi reencaminhado pelo Webmail. */
+  forwarded?: boolean;
 }
 
 export interface MailAttachmentInfo {
@@ -163,6 +165,8 @@ export interface ComposeInput {
   attachments: OutgoingAttachment[];
   /** Rascunho guardado deste email (apaga-se depois de enviado). */
   draft?: { id: string; accountId: string };
+  /** Reencaminhar: o email original (fica com a marca "reencaminhado"). */
+  forwardOf?: { messageId: string; messageKey: string | null };
 }
 
 /** Rascunho inicial do compositor (responder, reencaminhar, novo). */
@@ -204,6 +208,7 @@ export interface ComposeDraft {
   /** Reencaminhar: o HTML original e os anexos a voltar a anexar. */
   forward?: {
     messageId: string;
+    messageKey?: string | null;
     accountId: string;
     html: string;
     attachments: MailAttachmentInfo[];

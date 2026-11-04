@@ -71,6 +71,7 @@ import {
   cleanAutomation,
   isLabelColor,
   labelCounts,
+  markForwarded,
   listLabels,
   listWithLabel,
 } from './labels.ts';
@@ -580,7 +581,12 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const driver = await createDriver(db, account, pendingSecret);
       // Imagens da assinatura dentro do email (o Outlook bloqueia as que vêm por link)
       const embedded = await embedSignatureImages(parsed.value.html);
-      return ok(await driver.send({ ...parsed.value, ...embedded }));
+      const sent = await driver.send({ ...parsed.value, ...embedded });
+      // Reencaminhar: o email original fica com a marca "reencaminhado"
+      const forwardKey = optionalString(body.forward_of_key, 1000);
+      if (forwardKey && !/[\r\n\0]/.test(forwardKey))
+        await markForwarded(db, account.id, forwardKey, userId);
+      return ok(sent);
     }
     case 'save-draft': {
       const parsed = parseSendRequest(body, { draft: true });

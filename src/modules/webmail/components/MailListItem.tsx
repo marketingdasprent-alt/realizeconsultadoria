@@ -1,5 +1,5 @@
 import React from 'react';
-import { Check, CheckCircle2, Paperclip, Star, Trash2 } from 'lucide-react';
+import { Check, CheckCircle2, Forward, Paperclip, Star, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { formatMailDate, nameOf } from '../lib/mailFormat';
@@ -141,6 +141,11 @@ export const MailListItem: React.FC<MailListItemProps> = ({ mail, ...props }) =>
           >
             {mail.subject || '(sem assunto)'}
           </span>
+          {mail.forwarded && (
+            <span title="Reencaminhado" className="shrink-0 text-rz-primary">
+              <Forward className="h-3.5 w-3.5" aria-label="Reencaminhado" />
+            </span>
+          )}
           {mail.hasAttachments && <Paperclip className="h-3.5 w-3.5 shrink-0 text-rz-muted" />}
           {props.quickDone && (
             <button

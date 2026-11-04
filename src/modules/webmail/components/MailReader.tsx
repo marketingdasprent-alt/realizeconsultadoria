@@ -208,6 +208,11 @@ export const MailReader: React.FC<MailReaderProps> = ({
         <h2 className="text-[21px] font-extrabold leading-tight">
           {summary.subject || '(sem assunto)'}
         </h2>
+        {summary.forwarded && (
+          <p className="mt-1.5 inline-flex items-center gap-1.5 text-[12.5px] font-semibold text-rz-primary">
+            <Forward className="h-3.5 w-3.5" /> Reencaminhado
+          </p>
+        )}
         {labelsById && (
           <LabelChips labelIds={summary.labelIds} byId={labelsById} max={8} className="mt-2" />
         )}

@@ -337,7 +337,13 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     // Se estava a guardar, espera: senão esse rascunho ficava esquecido depois de enviar.
     await saver.settled();
     const saved = saver.current();
-    const input: ComposeInput = { ...(await buildInput()), draft: saved ?? undefined };
+    const input: ComposeInput = {
+      ...(await buildInput()),
+      draft: saved ?? undefined,
+      forwardOf: draft.forward
+        ? { messageId: draft.forward.messageId, messageKey: draft.forward.messageKey ?? null }
+        : undefined,
+    };
     setBusy(false);
     // Fecha logo; o envio continua em segundo plano (se falhar, o rascunho volta a abrir).
     onClose();

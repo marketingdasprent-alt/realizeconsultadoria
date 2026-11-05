@@ -128,6 +128,14 @@ export interface MailSendParams {
 export interface MailDriver {
   list(params: MailListParams): Promise<MailListResult>;
   get(messageId: string): Promise<MailMessage>;
+  /**
+   * Vários anexos do mesmo email de uma vez (opcional): no IMAP lê o email uma só vez em vez de
+   * um pedido por anexo. Devolve-os pela ordem pedida.
+   */
+  attachmentsMany?(
+    messageId: string,
+    items: { id: string; filename: string | null }[]
+  ): Promise<{ filename: string; mime: string; base64: string }[]>;
   /** `filename` (opcional) deixa o IMAP descarregar só essa parte em vez do email todo. */
   attachment(
     messageId: string,

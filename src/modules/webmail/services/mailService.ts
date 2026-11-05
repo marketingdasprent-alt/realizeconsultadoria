@@ -555,6 +555,16 @@ export const mailService = {
       html,
       in_reply_to: input.inReplyTo,
       attachments: input.attachments,
+      remote_attachments: input.remoteAttachments?.items.length
+        ? {
+            account_id: input.remoteAttachments.accountId,
+            message_id: input.remoteAttachments.messageId,
+            items: input.remoteAttachments.items.map(item => ({
+              id: item.id,
+              filename: item.filename,
+            })),
+          }
+        : undefined,
       forward_of_key: input.forwardOf
         ? input.forwardOf.messageKey || `id:${input.forwardOf.messageId}`
         : undefined,

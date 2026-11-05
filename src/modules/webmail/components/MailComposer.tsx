@@ -19,13 +19,15 @@ import { useAiRewrite } from '../hooks/useAiRewrite';
 import { composeSession } from '../lib/composeSession';
 import type { ContactEntry, ContactList } from '../lib/recipients';
 import { draftHasContent, stripSavedSignature } from '../lib/savedDraft';
-import type { ComposeDraft, ComposeInput, MailAccount } from '../types';
+import type { ComposeDraft, ComposeInput, MailAccount, RemoteAttachments } from '../types';
 import { AutoTextarea } from './AutoTextarea';
 import { RecipientField } from './RecipientField';
 import { SendCheckDialog } from './SendCheckDialog';
 import { RzSelect } from '@/modules/workspace/components/RzSelect';
 
 const MAX_BYTES = 10 * 1024 * 1024;
+/** Total com os anexos do email original (juntos pelo servidor ao enviar). */
+const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
 const FIELD = 'h-10 w-full bg-transparent text-[14px] outline-none placeholder:text-rz-muted';
 
 interface MailComposerProps {
@@ -108,6 +110,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   // Reencaminhar: anexos do original a ser buscados (e os que não vieram).
   const [loadingFiles, setLoadingFiles] = useState(0);
   const [missingFiles, setMissingFiles] = useState<string[]>([]);
+  // Reencaminhar: anexos do original, que ficam na caixa e o servidor junta ao enviar
+  const [remote, setRemote] = useState<RemoteAttachments | null>(null);
   const accountsRef = useRef(accounts);
   accountsRef.current = accounts;
 
@@ -130,6 +134,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       setShowCc(draft.resume.showCc);
       setSigChoice(draft.resume.signature);
       setFiles(draft.resume.files);
+      setRemote(draft.resume.remote ?? null);
       setMissingFiles([]);
       setLoadingFiles(0);
       setBusy(false);
@@ -159,11 +164,24 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     setShowCc(!!draft.cc || !!draft.bcc);
     setSigChoice(choice);
     setFiles([]);
+    setRemote(null);
     setMissingFiles([]);
     setBusy(false);
 
-    // Reencaminhar o email todo: os anexos do original voltam a anexar-se (um a um, em fundo).
-    const forward = draft.forward ?? draft.saved ?? draft.attach;
+    // Reencaminhar (ou "Novo email com anexo"): os anexos do original ficam na caixa e o
+    // servidor junta-os ao enviar — o compositor abre logo, sem os descarregar um a um.
+    const source = draft.forward ?? draft.attach;
+    if (source?.attachments.length) {
+      setRemote({
+        accountId: source.accountId,
+        messageId: source.messageId,
+        items: source.attachments,
+      });
+      setLoadingFiles(0);
+      return;
+    }
+    // Rascunho reaberto: os anexos voltam a anexar-se (um a um, em fundo).
+    const forward = draft.saved;
     if (!forward?.attachments.length) {
       setLoadingFiles(0);
       return;
@@ -201,6 +219,10 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       toast({ title: 'A IA terminou o email', description: 'Abra a mensagem para rever.' });
   });
   const size = files.reduce((total, file) => total + file.size, 0);
+  const remoteItems = remote?.items ?? [];
+  const remoteSize = remoteItems.reduce((total, item) => total + item.size, 0);
+  const attachmentCount = files.length + remoteItems.length;
+  const totalSize = size + remoteSize;
   const to = parseRecipients(fields.to);
   const sender = accounts.find(a => a.id === (accountId || fallback?.id));
   const signatures = sender?.signatures ?? [];
@@ -224,6 +246,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           ? draft.replyHtml
           : null,
     inReplyTo: draft?.inReplyTo,
+    remoteAttachments: remote && remote.items.length ? remote : undefined,
     attachments: await Promise.all(
       files.map(async file => ({
         filename: file.name,
@@ -234,13 +257,14 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   });
 
   // Rascunho: guarda sozinho depois de cada alteração, e já ao fechar ou minimizar.
-  const hasContent = draftHasContent(fields, files.length);
+  const hasContent = draftHasContent(fields, attachmentCount);
   const snapshot = JSON.stringify([
     fields,
     quote,
     accountId,
     sigChoice,
     files.map(file => [file.name, file.size]),
+    remoteItems.map(item => item.id),
   ]);
   const initialSaved = useMemo(
     () =>
@@ -279,10 +303,11 @@ export const MailComposer: React.FC<MailComposerProps> = ({
         signature: sigChoice,
         showCc,
         files,
+        remote,
         saved: saverRef.current.current(),
       },
     });
-  }, [draft, hasContent, accountId, fields, quote, sigChoice, showCc, files, saver.status]);
+  }, [draft, hasContent, accountId, fields, quote, sigChoice, showCc, files, remote, saver.status]);
 
   const close = async () => {
     // Fechar sem mexer em nada (ex.: abriu uma resposta e desistiu) não cria rascunho.
@@ -594,13 +619,36 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               </button>
             </div>
           )}
-          {files.length > 0 && (
+          {attachmentCount > 0 && (
             // Muitos anexos: a lista desliza dentro de uma altura fixa, para os botões (Enviar)
             // ficarem sempre à vista no fundo da janela
             <ul
               className="rz-scroll flex max-h-[7.5rem] shrink-0 flex-wrap gap-2 overflow-y-auto border-t border-rz-line px-5 py-2"
-              aria-label={`${files.length} anexos`}
+              aria-label={`${attachmentCount} anexos`}
             >
+              {remoteItems.map(item => (
+                <li
+                  key={`remote-${item.id}`}
+                  className="flex items-center gap-1.5 rounded-full bg-rz-canvas py-1 pl-3 pr-1 text-[12.5px] font-semibold"
+                  title="Anexo do email original (junta-se ao enviar)"
+                >
+                  <span className="max-w-[180px] truncate">{item.filename}</span>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setRemote(current =>
+                        current
+                          ? { ...current, items: current.items.filter(i => i.id !== item.id) }
+                          : current
+                      )
+                    }
+                    className="flex h-6 w-6 items-center justify-center rounded-full hover:bg-white"
+                    aria-label={`Remover ${item.filename}`}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </button>
+                </li>
+              ))}
               {files.map((file, index) => (
                 <li
                   key={`${file.name}-${index}`}
@@ -652,20 +700,26 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               <Trash2 className="h-5 w-5" />
             </button>
             <span className="truncate text-[12px] text-rz-muted">{savedLabel}</span>
-            {files.length > 0 && (
+            {attachmentCount > 0 && (
               <span className="shrink-0 text-[12px] font-semibold text-rz-muted">
-                {files.length === 1 ? '1 anexo' : `${files.length} anexos`} ·{' '}
-                {(size / (1024 * 1024)).toFixed(1).replace('.', ',')} MB
+                {attachmentCount === 1 ? '1 anexo' : `${attachmentCount} anexos`} ·{' '}
+                {(totalSize / (1024 * 1024)).toFixed(1).replace('.', ',')} MB
               </span>
             )}
-            {size > MAX_BYTES && (
+            {(size > MAX_BYTES || totalSize > MAX_TOTAL_BYTES) && (
               <span className="text-[12.5px] font-semibold text-rose-600">
-                Anexos acima de 10 MB.
+                {size > MAX_BYTES ? 'Anexos novos acima de 10 MB.' : 'Anexos acima de 25 MB.'}
               </span>
             )}
             <button
               type="button"
-              disabled={busy || loadingFiles > 0 || size > MAX_BYTES || !accounts.length}
+              disabled={
+                busy ||
+                loadingFiles > 0 ||
+                size > MAX_BYTES ||
+                totalSize > MAX_TOTAL_BYTES ||
+                !accounts.length
+              }
               onClick={send}
               className="ml-auto inline-flex h-11 shrink-0 items-center gap-2 rounded-full bg-rz-primary px-6 text-[14px] font-bold text-white disabled:opacity-50"
             >

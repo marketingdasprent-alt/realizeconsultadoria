@@ -626,6 +626,31 @@ export const createImapDriver = (
       });
     },
 
+    attachmentsMany(messageId, items) {
+      return withClient(async client => {
+        const { parsed } = await loadParsed(client, messageId);
+        const all = parsed.attachments ?? [];
+        const used = new Set<number>();
+        return items.map(item => {
+          // Índice do mailparser (caminho normal) ou, nos abertos pelo caminho leve, pelo nome
+          let index = /^\d+$/.test(item.id) ? Number(item.id) : -1;
+          if (index < 0 || !all[index])
+            index = all.findIndex(
+              (a, i) =>
+                !used.has(i) && (a.filename?.trim() || 'anexo') === (item.filename ?? 'anexo')
+            );
+          const found = index >= 0 ? all[index] : undefined;
+          if (!found?.content) throw mailError('message_not_found', 'Anexo não encontrado.');
+          used.add(index);
+          return {
+            filename: found.filename?.trim() || item.filename || 'anexo',
+            mime: (found.contentType ?? 'application/octet-stream').toLowerCase(),
+            base64: bytesToBase64(found.content),
+          };
+        });
+      });
+    },
+
     attachment(messageId, attachmentId, filename) {
       return withClient(async client => {
         // Email aberto pelo caminho leve: o id é a parte do anexo

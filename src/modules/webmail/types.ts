@@ -167,6 +167,15 @@ export interface ComposeInput {
   draft?: { id: string; accountId: string };
   /** Reencaminhar: o email original (fica com a marca "reencaminhado"). */
   forwardOf?: { messageId: string; messageKey: string | null };
+  /** Anexos de outro email que o servidor junta ao enviar (sem passarem pelo browser). */
+  remoteAttachments?: RemoteAttachments;
+}
+
+/** Anexos que ficam na caixa de origem e o servidor junta ao enviar (reencaminhar). */
+export interface RemoteAttachments {
+  accountId: string;
+  messageId: string;
+  items: MailAttachmentInfo[];
 }
 
 /** Rascunho inicial do compositor (responder, reencaminhar, novo). */
@@ -203,6 +212,8 @@ export interface ComposeDraft {
     signature: string;
     showCc: boolean;
     files: File[];
+    /** Anexos do email original (reencaminhar), ainda na caixa de origem. */
+    remote?: RemoteAttachments | null;
     saved: { id: string; accountId: string } | null;
   };
   /** Reencaminhar: o HTML original e os anexos a voltar a anexar. */

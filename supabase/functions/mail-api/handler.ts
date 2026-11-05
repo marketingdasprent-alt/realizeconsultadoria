@@ -76,6 +76,7 @@ import {
   listWithLabel,
 } from './labels.ts';
 import { dropFolderRefs, renameFolderRefs } from './folderRefs.ts';
+import { fetchRemoteAttachments, parseRemoteAttachments } from './remoteAttachments.ts';
 import { MAX_RULES_PER_ACCOUNT, applyRules, listRules } from './rules.ts';
 import { OAuthSession } from './session.ts';
 import { shareAccess, shareAccessById } from './share.ts';
@@ -579,6 +580,26 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
           : json({ ok: false, code: parsed.code, message: MAIL_ERROR_MESSAGES[parsed.code] });
       }
       const driver = await createDriver(db, account, pendingSecret);
+      // Reencaminhar: os anexos do original vêm da caixa dele (sem passar pelo browser)
+      const remote = parseRemoteAttachments(body.remote_attachments);
+      if (body.remote_attachments && !remote) return badRequest();
+      if (remote) {
+        const source =
+          remote.accountId === account.id
+            ? driver
+            : await createDriver(
+                db,
+                await requireAccount(db, userId, { account_id: remote.accountId }),
+                readSecret(db, remote.accountId)
+              );
+        const already =
+          parsed.value.attachmentBytes.reduce((total, item) => total + item.length, 0) +
+          parsed.value.html.length +
+          parsed.value.text.length;
+        const extra = await fetchRemoteAttachments(source, remote, already);
+        parsed.value.attachments.push(...extra.attachments);
+        parsed.value.attachmentBytes.push(...extra.bytes);
+      }
       // Imagens da assinatura dentro do email (o Outlook bloqueia as que vêm por link)
       const embedded = await embedSignatureImages(parsed.value.html);
       const sent = await driver.send({ ...parsed.value, ...embedded });

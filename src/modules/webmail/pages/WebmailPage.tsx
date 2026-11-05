@@ -552,6 +552,14 @@ const WebmailPage: React.FC = () => {
               saved: input.draft
                 ? { messageId: input.draft.id, accountId: input.draft.accountId, attachments: [] }
                 : undefined,
+              // Os anexos do email original (reencaminhar) voltam a ficar no email
+              attach: input.remoteAttachments
+                ? {
+                    accountId: input.remoteAttachments.accountId,
+                    messageId: input.remoteAttachments.messageId,
+                    attachments: input.remoteAttachments.items,
+                  }
+                : undefined,
             });
           return ok;
         }}

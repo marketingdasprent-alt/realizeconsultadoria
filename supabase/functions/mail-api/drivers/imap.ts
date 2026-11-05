@@ -847,7 +847,12 @@ export const createImapDriver = (
             console.warn(`mail-api imap: sem pasta de Enviados em ${cfg.imapHost}`);
             return;
           }
-          await client.append(sent, buildRawMessage({ ...base, includeBcc: true }), ['\\Seen']);
+          // Sem Bcc a cópia é igual ao que saiu: reutiliza-se (montar outra vez um email com
+          // muitos anexos gastava o CPU da função, que era cortada a meio do envio)
+          const copy = params.bcc.length
+            ? buildRawMessage({ ...base, includeBcc: true })
+            : mailToSend.raw;
+          await client.append(sent, copy, ['\\Seen']);
         }).catch(error =>
           console.warn('mail-api imap: cópia nos Enviados falhou', errorMessage(error))
         );

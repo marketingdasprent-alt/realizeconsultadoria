@@ -77,6 +77,7 @@ import {
 } from './labels.ts';
 import { dropFolderRefs, renameFolderRefs } from './folderRefs.ts';
 import { fetchRemoteAttachments, parseRemoteAttachments } from './remoteAttachments.ts';
+import { inBackground, readCached, writeCached } from './messageCache.ts';
 import { MAX_RULES_PER_ACCOUNT, applyRules, listRules } from './rules.ts';
 import { OAuthSession } from './session.ts';
 import { shareAccess, shareAccessById } from './share.ts';
@@ -560,7 +561,13 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       return ok();
     }
     case 'get': {
+      // Caixas IMAP (alojamento lento): abre da cópia local, se houver; senão do servidor e
+      // guarda a cópia para a próxima vez (depois de responder)
+      const imap = account.auth_method === 'imap';
+      const cached = imap ? await readCached(db, account.id, messageId) : null;
+      if (cached) return ok((await attachLabels(db, account.id, [cached]))[0]);
       const message = await (await createDriver(db, account, pendingSecret)).get(messageId);
+      if (imap) inBackground(writeCached(db, account.id, message));
       return ok((await attachLabels(db, account.id, [message]))[0]);
     }
     case 'attachment': {
@@ -575,6 +582,11 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
     case 'send': {
       const parsed = parseSendRequest(body);
       if (!parsed.ok) {
+        console.warn(
+          'mail-api send: pedido recusado',
+          parsed.code,
+          `anexos=${Array.isArray(body.attachments) ? body.attachments.length : typeof body.attachments}`
+        );
         return parsed.code === 'bad_request'
           ? badRequest()
           : json({ ok: false, code: parsed.code, message: MAIL_ERROR_MESSAGES[parsed.code] });
@@ -582,7 +594,25 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const driver = await createDriver(db, account, pendingSecret);
       // Reencaminhar: os anexos do original vêm da caixa dele (sem passar pelo browser)
       const remote = parseRemoteAttachments(body.remote_attachments);
-      if (body.remote_attachments && !remote) return badRequest();
+      if (body.remote_attachments && !remote) {
+        const raw = body.remote_attachments as Record<string, unknown>;
+        const items = Array.isArray(raw?.items) ? (raw.items as Record<string, unknown>[]) : [];
+        console.warn(
+          'mail-api send: anexos do original recusados',
+          `conta=${isUuid(raw?.account_id)}`,
+          `msg=${typeof raw?.message_id}:${String(raw?.message_id ?? '').length}`,
+          `itens=${items.length}`,
+          `ids=${items
+            .slice(0, 3)
+            .map(item => `${typeof item?.id}:${String(item?.id ?? '').length}`)
+            .join(',')}`
+        );
+        return json({
+          ok: false,
+          code: 'bad_request',
+          message: 'Não foi possível juntar os anexos do email original (pedido inválido).',
+        });
+      }
       if (remote) {
         const source =
           remote.accountId === account.id
@@ -690,7 +720,16 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
   try {
     return await handle(db, userId, body);
   } catch (error) {
-    if (isMailError(error)) return json({ ok: false, code: error.code, message: error.message });
+    if (isMailError(error)) {
+      // Envios e rascunhos que falham ficam no registo (com o motivo), para se ver logo o porquê
+      if (body.action === 'send' || body.action === 'save-draft')
+        console.warn(
+          `mail-api ${String(body.action)} falhou: conta=${String(body.account_id)}`,
+          error.code,
+          error.message
+        );
+      return json({ ok: false, code: error.code, message: error.message });
+    }
     console.error(`mail-api ${String(body.action)}:`, errorMessage(error));
     return json(
       { ok: false, code: 'server_error', message: 'Erro inesperado. Tente novamente.' },

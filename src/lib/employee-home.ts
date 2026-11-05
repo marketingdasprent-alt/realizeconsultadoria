@@ -7,6 +7,8 @@ export interface HomeNotice {
   title: string;
   message: string;
   created_at: string;
+  /** Quem enviou (comunicados novos); null nos antigos. */
+  sender_name?: string | null;
   read: boolean;
 }
 

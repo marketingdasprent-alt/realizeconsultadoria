@@ -18,7 +18,8 @@ const inBatches = async <T, R>(items: T[], limit: number, fn: (item: T) => Promi
 
 /** Máximo do email inteiro (anexos novos + do original): o que a maioria dos servidores aceita. */
 export const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
-const MAX_ITEMS = 100;
+/** Anexos do original por email (há reencaminhamentos com mais de 100, ex.: movimentos do mês). */
+const MAX_ITEMS = 300;
 
 export interface RemoteAttachments {
   accountId: string;

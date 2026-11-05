@@ -15,7 +15,7 @@ interface NoticeCardProps {
   onReact: (emoji: string) => void;
 }
 
-/** Comunicado dos RH no Feed, com reações e confirmação de leitura (briefing §12). */
+/** Comunicado no Feed (com quem o enviou), com reações e confirmação de leitura (briefing §12). */
 export const NoticeCard: React.FC<NoticeCardProps> = ({
   notice,
   onConfirm,
@@ -36,7 +36,7 @@ export const NoticeCard: React.FC<NoticeCardProps> = ({
       </span>
       <div className="min-w-0 flex-1">
         <p className="text-[11px] font-bold uppercase tracking-[0.14em] text-amber-700">
-          Comunicado dos RH
+          {notice.senderName ? `Comunicado · ${notice.senderName}` : 'Comunicado'}
         </p>
         <p className="text-[12.5px] text-rz-muted">
           {format(new Date(notice.createdAt), "d 'de' MMMM 'às' HH:mm", { locale: pt })}

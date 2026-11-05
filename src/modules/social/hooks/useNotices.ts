@@ -35,6 +35,7 @@ export const useNotices = () => {
             title: n.title,
             message: n.message,
             createdAt: n.created_at,
+            senderName: n.sender_name ?? null,
             read: n.read,
           })),
     [isPreview, demo, live.data]

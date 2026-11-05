@@ -36,16 +36,10 @@ export const adminCaller = async (
   const db = createClient(url, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!, {
     auth: { autoRefreshToken: false, persistSession: false },
   });
-  const [role, groups] = await Promise.all([
-    db.from('user_roles').select('role').eq('user_id', userId).eq('role', 'admin').limit(1),
-    db
-      .from('admin_group_members')
-      .select('admin_groups!inner(is_active)')
-      .eq('user_id', userId)
-      .eq('admin_groups.is_active', true)
-      .limit(1),
-  ]);
-  if ((role.data?.length ?? 0) > 0 || (groups.data?.length ?? 0) > 0) {
+  // Papel admin ou grupo de admin ativo, na conta da sessão ou na conta de admin ligada à ficha
+  // (contas unificadas colaborador + admin: ver rz_identity_ids na BD)
+  const { data: isAdmin } = await db.rpc('is_admin_account', { _user_id: userId });
+  if (isAdmin === true) {
     const email = typeof data.claims.email === 'string' ? data.claims.email : null;
     return { userId, email };
   }

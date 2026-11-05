@@ -46,6 +46,8 @@ export interface Notice {
   title: string;
   message: string;
   createdAt: string;
+  /** Quem enviou (ex.: "Thiago Sousa · Desenvolvimento"); vazio nos comunicados antigos. */
+  senderName?: string | null;
   read: boolean;
 }
 

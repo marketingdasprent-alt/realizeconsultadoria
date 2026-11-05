@@ -10,6 +10,7 @@ import type { MailDriver, MailSummary } from '../_shared/mail/types.ts';
 import { ACCOUNT_COLUMNS, type MailAccountRow } from '../_shared/mail-server/accounts.ts';
 import { errorMessage, mapWithGroupLimit } from '../_shared/mail-server/http.ts';
 import { activeRulesByAccount, applyRules, type MailRule } from './rules.ts';
+import { inBackground, pruneCached, writeCached } from './messageCache.ts';
 
 const PER_ACCOUNT = 10;
 /** Intervalo mínimo entre leituras da mesma caixa (as IMAP limitam logins: 2 em 2 minutos). */
@@ -113,11 +114,34 @@ const pollAccount = async (
     }
   }
 
+  // Caixas IMAP: guarda já a cópia dos emails novos (abrem na hora), depois de avisar
+  if (account.auth_method === 'imap') inBackground(precache(db, account.id, driver, fresh));
+
   const until = new Date(newest || Date.now()).toISOString();
   if (until !== account.notified_until) {
     await db.from('mail_accounts').update({ notified_until: until }).eq('id', account.id);
   }
   return fresh.length;
+};
+
+/** Emails novos guardados por caixa em cada passagem (os outros ficam para a primeira abertura). */
+const PRECACHE_PER_ACCOUNT = 5;
+
+const precache = async (
+  db: SupabaseClient,
+  accountId: string,
+  driver: MailDriver,
+  fresh: MailSummary[]
+) => {
+  for (const mail of fresh.slice(-PRECACHE_PER_ACCOUNT)) {
+    try {
+      await writeCached(db, accountId, await driver.get(mail.id));
+    } catch (error) {
+      console.warn(`mail-api cópia ${accountId}:`, errorMessage(error));
+    }
+  }
+  // De vez em quando (1 em 30 passagens) apaga as cópias com mais de 30 dias
+  if (Math.random() < 1 / 30) await pruneCached(db, accountId);
 };
 
 /**

@@ -221,7 +221,14 @@ serve(async (req: Request) => {
   let notices = 0;
   if (body?.publishInApp && (people ?? []).length) {
     const mode = body.audience?.mode;
-    const base = { title: subject, message, created_by: caller.userId, is_active: true };
+    const base = {
+      title: subject,
+      message,
+      created_by: caller.userId,
+      is_active: true,
+      // Quem enviou (aparece no Feed em vez de "Comunicado dos RH")
+      sender_name: senderName || null,
+    };
     type NoticeRow = typeof base & { company_id: string | null; employee_id: string | null };
     const rows: NoticeRow[] =
       mode === 'all'

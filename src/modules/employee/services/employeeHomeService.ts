@@ -8,6 +8,7 @@ interface NoticeRow {
   title: string;
   message: string;
   created_at: string;
+  sender_name: string | null;
 }
 
 const noticesFilter = (companyId: string, employeeId: string) =>
@@ -21,14 +22,14 @@ export const employeeHomeService = {
     const [noticesRes, readsRes] = await Promise.all([
       supabase
         .from('notifications')
-        .select('id, title, message, created_at')
+        .select('id, title, message, created_at, sender_name')
         .eq('is_active', true)
         .or(noticesFilter(companyId, employeeId))
         .order('created_at', { ascending: false }),
       supabase.from('notification_reads').select('notification_id').eq('employee_id', employeeId),
     ]);
     const read = new Set((readsRes.data ?? []).map(r => r.notification_id));
-    const notices: HomeNotice[] = ((noticesRes.data ?? []) as NoticeRow[]).map(n => ({
+    const notices: HomeNotice[] = ((noticesRes.data ?? []) as unknown as NoticeRow[]).map(n => ({
       ...n,
       read: read.has(n.id),
     }));

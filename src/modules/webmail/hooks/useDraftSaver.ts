@@ -7,6 +7,11 @@ import type { ComposeInput } from '../types';
 
 /** Espera depois da última alteração antes de guardar no fornecedor. */
 const AUTOSAVE_MS = 4000;
+/**
+ * Com anexos acima disto não se guarda sozinho a cada alteração: cada gravação mandava os anexos
+ * todos outra vez para o servidor de email (lento no alojamento partilhado). O botão guarda.
+ */
+const AUTOSAVE_MAX_ATTACHMENT_BYTES = 3 * 1024 * 1024;
 
 export type DraftStatus = 'idle' | 'saving' | 'saved' | 'error';
 
@@ -22,6 +27,8 @@ interface DraftSaverOptions {
   snapshot: string;
   /** Há algo que valha a pena guardar (texto, assunto, destinatários ou anexos). */
   hasContent: boolean;
+  /** Tamanho total dos anexos (acima de 3 MB não há gravação automática). */
+  attachmentBytes?: number;
   /** Rascunho já guardado com que o compositor abriu (aberto da pasta Rascunhos). */
   initial: SavedDraftRef | null;
   build: () => Promise<ComposeInput>;
@@ -35,6 +42,7 @@ export const useDraftSaver = ({
   open,
   snapshot,
   hasContent,
+  attachmentBytes = 0,
   initial,
   build,
 }: DraftSaverOptions) => {
@@ -114,10 +122,11 @@ export const useDraftSaver = ({
   // Guarda sozinho alguns segundos depois da última alteração.
   useEffect(() => {
     if (!open || isPreview || !hasContent || snapshot === savedSnapshot.current) return;
+    if (attachmentBytes > AUTOSAVE_MAX_ATTACHMENT_BYTES) return;
     cancel();
     timer.current = setTimeout(() => void save(), AUTOSAVE_MS);
     return cancel;
-  }, [open, isPreview, hasContent, snapshot, save]);
+  }, [open, isPreview, hasContent, snapshot, save, attachmentBytes]);
 
   return {
     status,

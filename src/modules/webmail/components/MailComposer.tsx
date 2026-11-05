@@ -14,6 +14,7 @@ import { AiRewriteBar } from './AiRewriteBar';
 import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import { useDraftSaver } from '../hooks/useDraftSaver';
+import { mailService } from '../services/mailService';
 import { useAiRewrite } from '../hooks/useAiRewrite';
 import { composeSession } from '../lib/composeSession';
 import type { ContactEntry, ContactList } from '../lib/recipients';
@@ -254,6 +255,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     open: !!draft,
     snapshot,
     hasContent,
+    attachmentBytes: size,
     initial: initialSaved,
     build: buildInput,
   });
@@ -334,9 +336,16 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     if (!draft) return;
     setBusy(true);
     saver.stop();
-    // Se estava a guardar, espera: senão esse rascunho ficava esquecido depois de enviar.
-    await saver.settled();
+    // Se estava a guardar o rascunho, espera no máximo 2 s: com anexos grandes num servidor
+    // lento a gravação pode demorar minutos e o envio não fica preso atrás dela.
+    const pending = saver.settled();
+    await Promise.race([pending, new Promise(resolve => setTimeout(resolve, 2000))]);
     const saved = saver.current();
+    // Se a gravação acabar depois do envio, o rascunho que ela criou é apagado (não fica lixo)
+    void pending.then(() => {
+      const late = saver.current();
+      if (late && late.id !== saved?.id) void mailService.deleteDraft(late.accountId, late.id);
+    });
     const input: ComposeInput = {
       ...(await buildInput()),
       draft: saved ?? undefined,

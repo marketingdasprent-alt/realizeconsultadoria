@@ -57,8 +57,9 @@ export const parseRecipients = (value: string) =>
   value
     .split(/[,;\n]/)
     .map(part => part.match(/<([^>]+)>/)?.[1] ?? part)
-    .map(part => part.trim())
-    .filter(part => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(part));
+    // Copiado entre aspas ('a@b.pt'): o servidor SMTP recusa o endereço com as aspas
+    .map(part => part.trim().replace(/^['"`‘’“”]+|['"`‘’“”]+$/g, ''))
+    .filter(part => /^[^\s@'"]+@[^\s@'"]+\.[^\s@'"]+$/.test(part));
 
 const prefixed = (prefix: string, subject: string) =>
   new RegExp(`^${prefix}:`, 'i').test(subject.trim()) ? subject.trim() : `${prefix}: ${subject}`;

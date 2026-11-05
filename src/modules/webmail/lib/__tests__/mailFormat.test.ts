@@ -93,3 +93,13 @@ describe('ligações no email enviado', () => {
     expect(html).toContain('</a>.');
   });
 });
+
+describe('parseRecipients: aspas', () => {
+  it('tira as aspas de um endereço copiado', () => {
+    expect(parseRecipients('\'gestao@urbango.pt\'; "ana@x.pt", ‘rui@y.pt’')).toEqual([
+      'gestao@urbango.pt',
+      'ana@x.pt',
+      'rui@y.pt',
+    ]);
+  });
+});

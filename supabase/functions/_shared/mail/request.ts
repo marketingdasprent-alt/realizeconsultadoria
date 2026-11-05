@@ -54,8 +54,11 @@ export const parseRecipients = (value: unknown): MailAddress[] | null => {
     if (typeof item !== 'string') return null;
     const parsed = item.includes(',') ? parseAddressList(item) : [parseAddress(item)];
     for (const address of parsed) {
-      if (!address || !isValidEmail(address.email)) return null;
-      out.push(address);
+      if (!address) return null;
+      // Copiado de outro sítio entre aspas ('a@b.pt'): o servidor SMTP recusa (501), tiram-se
+      const email = address.email.replace(/^['"`‘’“”\s]+|['"`‘’“”\s]+$/g, '');
+      if (!isValidEmail(email)) return null;
+      out.push({ ...address, email });
     }
   }
   return out;

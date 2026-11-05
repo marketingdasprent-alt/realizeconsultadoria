@@ -595,7 +595,12 @@ export const MailComposer: React.FC<MailComposerProps> = ({
             </div>
           )}
           {files.length > 0 && (
-            <ul className="flex flex-wrap gap-2 px-5 pb-2">
+            // Muitos anexos: a lista desliza dentro de uma altura fixa, para os botões (Enviar)
+            // ficarem sempre à vista no fundo da janela
+            <ul
+              className="rz-scroll flex max-h-[7.5rem] shrink-0 flex-wrap gap-2 overflow-y-auto border-t border-rz-line px-5 py-2"
+              aria-label={`${files.length} anexos`}
+            >
               {files.map((file, index) => (
                 <li
                   key={`${file.name}-${index}`}
@@ -614,7 +619,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               ))}
             </ul>
           )}
-          <div className="flex items-center gap-2 border-t border-rz-line px-5 py-3">
+          <div className="flex shrink-0 items-center gap-2 border-t border-rz-line px-5 py-3">
             <label
               className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas"
               aria-label="Anexar ficheiros"
@@ -647,6 +652,12 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               <Trash2 className="h-5 w-5" />
             </button>
             <span className="truncate text-[12px] text-rz-muted">{savedLabel}</span>
+            {files.length > 0 && (
+              <span className="shrink-0 text-[12px] font-semibold text-rz-muted">
+                {files.length === 1 ? '1 anexo' : `${files.length} anexos`} ·{' '}
+                {(size / (1024 * 1024)).toFixed(1).replace('.', ',')} MB
+              </span>
+            )}
             {size > MAX_BYTES && (
               <span className="text-[12.5px] font-semibold text-rose-600">
                 Anexos acima de 10 MB.

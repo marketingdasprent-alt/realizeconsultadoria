@@ -6,7 +6,7 @@ import { base64ToBytes, utf8Encode } from './mime.ts';
 import type { MailAddress, MailProviderKey, OutgoingAttachment } from './types.ts';
 
 export const MAX_SEND_BYTES = 10 * 1024 * 1024;
-export const MAX_ATTACHMENTS = 20;
+export const MAX_ATTACHMENTS = 100;
 export const DEFAULT_LIST_LIMIT = 25;
 export const MAX_LIST_LIMIT = 50;
 

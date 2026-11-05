@@ -35,6 +35,8 @@ import {
 import {
   buildRawMessage,
   bytesToBase64,
+  bytesToLatin1,
+  decodeTransferEncoding,
   extractHeader,
   generateMessageId,
   utf8Decode,
@@ -627,26 +629,75 @@ export const createImapDriver = (
     },
 
     attachmentsMany(messageId, items) {
+      // Sem ler o email inteiro (o analisador de MIME num email com 100+ anexos passava o limite
+      // de CPU da função): pela estrutura acham-se as partes dos anexos e descarregam-se em bruto,
+      // já em base64 como estão no servidor — entram assim no email novo, sem recodificar.
       return withClient(async client => {
-        const { parsed } = await loadParsed(client, messageId);
-        const all = parsed.attachments ?? [];
-        const used = new Set<number>();
-        return items.map(item => {
-          // Índice do mailparser (caminho normal) ou, nos abertos pelo caminho leve, pelo nome
-          let index = /^\d+$/.test(item.id) ? Number(item.id) : -1;
-          if (index < 0 || !all[index])
-            index = all.findIndex(
-              (a, i) =>
-                !used.has(i) && (a.filename?.trim() || 'anexo') === (item.filename ?? 'anexo')
-            );
-          const found = index >= 0 ? all[index] : undefined;
-          if (!found?.content) throw mailError('message_not_found', 'Anexo não encontrado.');
-          used.add(index);
-          return {
-            filename: found.filename?.trim() || item.filename || 'anexo',
-            mime: (found.contentType ?? 'application/octet-stream').toLowerCase(),
-            base64: bytesToBase64(found.content),
+        const { path, uid } = ref(messageId);
+        return withMailbox(client, path, true, async () => {
+          const head = await client.fetchOne(
+            String(uid),
+            { uid: true, bodyStructure: true },
+            { uid: true }
+          );
+          const leaves: ImapBodyPart[] = [];
+          const walk = (node?: ImapBodyPart) => {
+            if (!node) return;
+            if (node.childNodes?.length) node.childNodes.forEach(walk);
+            else leaves.push(node);
           };
+          walk(head ? (head.bodyStructure as ImapBodyPart | undefined) : undefined);
+          const nameOf = (node: ImapBodyPart) =>
+            (node.dispositionParameters?.filename ?? node.parameters?.name)?.trim() || null;
+          const used = new Set<string>();
+          const picked = items.map(item => {
+            const wanted = item.id.startsWith(PART_ATTACHMENT_PREFIX)
+              ? item.id.slice(PART_ATTACHMENT_PREFIX.length)
+              : null;
+            const node =
+              (wanted ? leaves.find(n => (n.part ?? '1') === wanted) : undefined) ??
+              leaves.find(
+                n => !used.has(n.part ?? '1') && nameOf(n) === (item.filename?.trim() || null)
+              );
+            if (!node)
+              throw mailError(
+                'message_not_found',
+                `Anexo não encontrado: ${item.filename ?? 'anexo'}`
+              );
+            used.add(node.part ?? '1');
+            return { node, item };
+          });
+          const out: { filename: string; mime: string; base64: string }[] = [];
+          for (let i = 0; i < picked.length; i += 25) {
+            const batch = picked.slice(i, i + 25);
+            const parts = batch.map(({ node }) => node.part ?? '1');
+            const msg = await client.fetchOne(
+              String(uid),
+              { uid: true, bodyParts: parts },
+              { uid: true }
+            );
+            for (const { node, item } of batch) {
+              const part = node.part ?? '1';
+              const raw = msg
+                ? (msg.bodyParts?.get(part) ?? msg.bodyParts?.get(part.toLowerCase()))
+                : undefined;
+              if (!raw)
+                throw mailError(
+                  'message_not_found',
+                  `Anexo não encontrado: ${item.filename ?? 'anexo'}`
+                );
+              const encoding = ((node as { encoding?: string }).encoding ?? '').toLowerCase();
+              out.push({
+                filename: nameOf(node) ?? item.filename ?? 'anexo',
+                mime: (node.type ?? 'application/octet-stream').toLowerCase(),
+                base64:
+                  encoding === 'base64'
+                    ? bytesToLatin1(raw).replace(/\s+/g, '')
+                    : bytesToBase64(decodeTransferEncoding(raw, encoding)),
+              });
+            }
+          }
+          return out;
         });
       });
     },
@@ -732,10 +783,11 @@ export const createImapDriver = (
         text: params.text,
         html: params.html,
         inline: params.inline,
-        attachments: params.attachments.map((a, i) => ({
+        // Já em base64 (do pedido ou da caixa de origem): não se volta a codificar
+        attachments: params.attachments.map(a => ({
           filename: a.filename,
           mime: a.mime,
-          content: params.attachmentBytes[i],
+          base64: a.base64,
         })),
         inReplyTo,
         references,
@@ -810,10 +862,11 @@ export const createImapDriver = (
         subject: params.subject,
         text: params.text,
         html: params.html,
-        attachments: params.attachments.map((a, i) => ({
+        // Já em base64 (do pedido ou da caixa de origem): não se volta a codificar
+        attachments: params.attachments.map(a => ({
           filename: a.filename,
           mime: a.mime,
-          content: params.attachmentBytes[i],
+          base64: a.base64,
         })),
         inReplyTo: null,
         references: null,

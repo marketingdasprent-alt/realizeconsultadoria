@@ -59,7 +59,9 @@ export const parseRemoteAttachments = (raw: unknown): RemoteAttachments | null =
 export const fetchRemoteAttachments = async (
   driver: MailDriver,
   remote: RemoteAttachments,
-  alreadyBytes: number
+  alreadyBytes: number,
+  /** O envio precisa dos bytes (Gmail, Outlook); nas caixas IMAP vai o base64 tal e qual. */
+  needBytes = true
 ): Promise<{ attachments: OutgoingAttachment[]; bytes: Uint8Array[] }> => {
   // Vários anexos e o fornecedor sabe dá-los de uma vez (IMAP: o email é lido uma só vez)
   const many =
@@ -86,8 +88,9 @@ export const fetchRemoteAttachments = async (
   const bytes: Uint8Array[] = [];
   let total = alreadyBytes;
   for (const file of loaded) {
-    const content = base64ToBytes(file.base64);
-    total += content.length;
+    // Tamanho pelo base64 (descodificar 100+ anexos gastava o CPU da função)
+    const content = needBytes ? base64ToBytes(file.base64) : new Uint8Array();
+    total += needBytes ? content.length : Math.floor((file.base64.length * 3) / 4);
     if (total > MAX_TOTAL_BYTES)
       throw mailError(
         'too_large',

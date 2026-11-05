@@ -68,6 +68,16 @@ export const writeCached = async (
   if (error) throw error;
 };
 
+/** Nomes (sem ".json") das cópias já guardadas desta caixa (até 1000, as mais recentes). */
+export const cachedNames = async (db: SupabaseClient, accountId: string): Promise<Set<string>> => {
+  const { data } = await db.storage
+    .from(BUCKET)
+    .list(accountId, { limit: 1000, sortBy: { column: 'created_at', order: 'desc' } });
+  return new Set(
+    ((data ?? []) as { name: string }[]).map(file => file.name.replace(/\.json$/, ''))
+  );
+};
+
 /** Apaga as cópias com mais de 30 dias de uma caixa (até 100 de cada vez). */
 export const pruneCached = async (db: SupabaseClient, accountId: string): Promise<number> => {
   const { data, error } = await db.storage

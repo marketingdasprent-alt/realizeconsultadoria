@@ -4,6 +4,8 @@ import { cn } from '@/lib/utils';
 import { fileTypeLabel, formatBytes } from '@/modules/messenger/lib/files';
 import { useFileUrl } from '../../hooks/useFileUrl';
 import type { FeedAttachment } from '../../types';
+import { toast } from '@/hooks/use-toast';
+import { downloadFile } from '../../lib/downloadFile';
 import { ImageLightbox } from './ImageLightbox';
 
 const ImageTile: React.FC<{ file: FeedAttachment; tall: boolean; onOpen: () => void }> = ({
@@ -45,6 +47,14 @@ const FileChip: React.FC<{ file: FeedAttachment }> = ({ file }) => {
       target="_blank"
       rel="noreferrer"
       download={file.name}
+      // Descarrega com o nome certo (o link sozinho só abria o ficheiro noutro separador)
+      onClick={async event => {
+        if (!url) return;
+        event.preventDefault();
+        const ok = await downloadFile(url, file.name);
+        if (!ok) toast({ title: 'Não foi possível guardar o ficheiro', variant: 'destructive' });
+      }}
+      title={`Guardar ${file.name}`}
       className="flex items-center gap-3 rounded-2xl bg-rz-canvas p-3 transition-colors hover:bg-rz-primary-soft"
     >
       <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 text-white">

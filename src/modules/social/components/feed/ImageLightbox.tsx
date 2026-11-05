@@ -1,6 +1,8 @@
 import React, { useEffect } from 'react';
 import * as Dialog from '@radix-ui/react-dialog';
-import { ChevronLeft, ChevronRight, Loader2, X } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Download, Loader2, X } from 'lucide-react';
+import { toast } from '@/hooks/use-toast';
+import { downloadFile } from '../../lib/downloadFile';
 import { useFileUrl } from '../../hooks/useFileUrl';
 import type { FeedAttachment } from '../../types';
 
@@ -69,6 +71,20 @@ export const ImageLightbox: React.FC<ImageLightboxProps> = ({
             />
           ) : (
             <Loader2 className="h-8 w-8 animate-spin text-white/70" />
+          )}
+          {url && (
+            <button
+              type="button"
+              onClick={async () => {
+                const ok = await downloadFile(url, current.name);
+                if (!ok)
+                  toast({ title: 'Não foi possível guardar a imagem', variant: 'destructive' });
+              }}
+              className="absolute right-[4.25rem] top-4 z-10 inline-flex h-11 items-center gap-2 rounded-full bg-white/15 px-4 text-[13px] font-bold text-white backdrop-blur hover:bg-white/30"
+              aria-label={`Guardar ${current.name}`}
+            >
+              <Download className="h-4 w-4" /> Guardar
+            </button>
           )}
           <Dialog.Close
             className="absolute right-4 top-4 z-10 flex h-11 w-11 items-center justify-center rounded-full bg-white/15 text-white backdrop-blur hover:bg-white/30"

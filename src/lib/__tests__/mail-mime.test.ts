@@ -141,6 +141,27 @@ describe('buildRawMessage', () => {
     date: new Date(Date.UTC(2026, 9, 15, 9, 30)),
   };
 
+  it('anexo já em base64 sai igual ao anexo em bytes (sem recodificar)', () => {
+    const bytes = new TextEncoder().encode('conteúdo do PDF'.repeat(20));
+    const fromBytes = buildRawMessage({
+      ...base,
+      attachments: [{ filename: 'a.pdf', mime: 'application/pdf', content: bytes }],
+    });
+    const fromBase64 = buildRawMessage({
+      ...base,
+      attachments: [
+        {
+          filename: 'a.pdf',
+          mime: 'application/pdf',
+          base64: Buffer.from(bytes).toString('base64'),
+        },
+      ],
+    });
+    // A fronteira MIME é aleatória: compara-se o corpo do anexo
+    const body = (raw: string) => raw.slice(raw.indexOf('Content-Disposition: attachment'));
+    expect(body(fromBase64).split('--')[0]).toBe(body(fromBytes).split('--')[0]);
+  });
+
   it('monta multipart/alternative com texto e HTML em base64 UTF-8', () => {
     const raw = buildRawMessage(base);
     expect(raw).toContain('From: Ana Silva <ana@realize.pt>\r\n');

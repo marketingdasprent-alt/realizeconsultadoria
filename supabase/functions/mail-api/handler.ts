@@ -78,6 +78,7 @@ import {
 import { dropFolderRefs, renameFolderRefs } from './folderRefs.ts';
 import { fetchRemoteAttachments, parseRemoteAttachments } from './remoteAttachments.ts';
 import { inBackground, readCached, writeCached } from './messageCache.ts';
+import { patchCachedLists, preloadBodies, readCachedList, writeCachedList } from './listCache.ts';
 import { MAX_RULES_PER_ACCOUNT, applyRules, listRules } from './rules.ts';
 import { OAuthSession } from './session.ts';
 import { shareAccess, shareAccessById } from './share.ts';
@@ -326,10 +327,38 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
             await new Promise(resolve => setTimeout(resolve, 1500));
             return driver.list(page);
           });
+        // Caixas IMAP, primeira página sem pesquisa nem marcador: mostra já a lista guardada e
+        // vai buscar a nova em fundo (como o Outlook); os primeiros emails ficam já guardados.
+        const cacheable =
+          account.auth_method === 'imap' &&
+          !params.query &&
+          !params.pageToken &&
+          !isUuid(body.label_id);
+        const folderKey = `${folder}|${folderId ?? ''}|${params.limit}`;
+        if (cacheable) {
+          const cached = await readCachedList(db, account.id, folderKey);
+          if (cached) {
+            inBackground(
+              (async () => {
+                const fresh = await listPage(params);
+                await writeCachedList(db, account.id, folderKey, fresh);
+                await preloadBodies(db, account.id, driver, fresh.messages);
+              })()
+            );
+            return ok({ ...cached, messages: await attachLabels(db, account.id, cached.messages) });
+          }
+        }
         // Com um marcador escolhido, só vêm os emails da pasta que o têm
         const result = isUuid(body.label_id)
           ? await listWithLabel(db, account.id, body.label_id, params, listPage)
           : await listPage(params);
+        if (cacheable)
+          inBackground(
+            (async () => {
+              await writeCachedList(db, account.id, folderKey, result);
+              await preloadBodies(db, account.id, driver, result.messages);
+            })()
+          );
         await updateAccountStatus(db, account.id, {
           status: 'active',
           last_error: null,
@@ -558,6 +587,8 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const folderId = optionalString(body.folder_id, 1000);
       if (!folderId || /[\r\n\0]/.test(folderId)) return badRequest();
       await (await createDriver(db, account, pendingSecret)).move(messageId, folderId);
+      if (account.auth_method === 'imap')
+        inBackground(patchCachedLists(db, account.id, messageId, null));
       return ok();
     }
     case 'get': {
@@ -626,7 +657,12 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
           parsed.value.attachmentBytes.reduce((total, item) => total + item.length, 0) +
           parsed.value.html.length +
           parsed.value.text.length;
-        const extra = await fetchRemoteAttachments(source, remote, already);
+        const extra = await fetchRemoteAttachments(
+          source,
+          remote,
+          already,
+          account.auth_method !== 'imap'
+        );
         parsed.value.attachments.push(...extra.attachments);
         parsed.value.attachmentBytes.push(...extra.bytes);
       }
@@ -661,13 +697,19 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
     case 'set-read':
       if (typeof body.read !== 'boolean') return badRequest();
       await (await createDriver(db, account, pendingSecret)).setRead(messageId, body.read);
+      if (account.auth_method === 'imap')
+        inBackground(patchCachedLists(db, account.id, messageId, { unread: !body.read }));
       return ok();
     case 'set-starred':
       if (typeof body.starred !== 'boolean') return badRequest();
       await (await createDriver(db, account, pendingSecret)).setStarred(messageId, body.starred);
+      if (account.auth_method === 'imap')
+        inBackground(patchCachedLists(db, account.id, messageId, { starred: body.starred }));
       return ok();
     case 'trash':
       await (await createDriver(db, account, pendingSecret)).trash(messageId);
+      if (account.auth_method === 'imap')
+        inBackground(patchCachedLists(db, account.id, messageId, null));
       return ok();
     default:
       return badRequest();

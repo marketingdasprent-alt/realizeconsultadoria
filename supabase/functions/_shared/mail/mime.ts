@@ -353,7 +353,9 @@ const filenameParams = (param: 'name' | 'filename', filename: string): string =>
 export interface RawAttachment {
   filename: string;
   mime: string;
-  content: Uint8Array;
+  content?: Uint8Array;
+  /** O ficheiro já em base64 (do pedido ou do servidor de origem): entra tal e qual. */
+  base64?: string;
 }
 
 /** Imagem dentro do HTML (src="cid:…"), ex.: a da assinatura. */
@@ -483,7 +485,7 @@ export const buildRawMessage = (input: RawMessageInput): string => {
             `Content-Disposition: attachment; ${filenameParams('filename', filename)}`,
             'Content-Transfer-Encoding: base64',
             '',
-            wrapBase64(bytesToBase64(a.content)),
+            wrapBase64(a.base64 ?? bytesToBase64(a.content ?? new Uint8Array())),
           ].join(CRLF);
         }),
       ])

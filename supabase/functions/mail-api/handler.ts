@@ -77,6 +77,7 @@ import {
 } from './labels.ts';
 import { dropFolderRefs, renameFolderRefs } from './folderRefs.ts';
 import { fetchRemoteAttachments, parseRemoteAttachments } from './remoteAttachments.ts';
+import { bundleIfTooMany } from './bundleAttachments.ts';
 import { inBackground, readCached, writeCached } from './messageCache.ts';
 import { patchCachedLists, preloadBodies, readCachedList, writeCachedList } from './listCache.ts';
 import { MAX_RULES_PER_ACCOUNT, applyRules, listRules } from './rules.ts';
@@ -666,6 +667,10 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
         parsed.value.attachments.push(...extra.attachments);
         parsed.value.attachmentBytes.push(...extra.bytes);
       }
+      // Mais de 90 anexos: vão num anexos.zip (muitos servidores recusam 100+ partes MIME)
+      const bundled = bundleIfTooMany(parsed.value.attachments, parsed.value.attachmentBytes);
+      parsed.value.attachments = bundled.attachments;
+      parsed.value.attachmentBytes = bundled.attachmentBytes;
       // Imagens da assinatura dentro do email (o Outlook bloqueia as que vêm por link)
       const embedded = await embedSignatureImages(parsed.value.html);
       const sent = await driver.send({ ...parsed.value, ...embedded });

@@ -4,6 +4,7 @@ import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { loadAttachment } from '../lib/attachments';
 import { DEMO_MAIL_ACCOUNTS } from '../lib/demoData';
 import { setDemoMail } from '../lib/demoStore';
+import { QUEUE_MAX_BYTES, waitForOutbox } from '../lib/outbox';
 import { composeWithSignature } from '../lib/signature';
 import { contactService } from '../services/contactService';
 import { mailErrorText, mailService, type MailError } from '../services/mailService';
@@ -103,15 +104,35 @@ export const useMailActions = (folder?: MailFolder) => {
         input.signatureHtml ?? null,
         input.quotedHtml ?? null
       );
-      const { error } = await mailService.send({ ...input, text: composed.text }, composed.html);
+      const outgoing = { ...input, text: composed.text };
+      // Caixa de saída (como o Outlook): o servidor envia num pedido próprio e repete se não
+      // conseguir ligar; emails muito pesados continuam a ir direto.
+      const bytes = input.attachments.reduce((total, a) => total + a.base64.length, 0);
+      const queued = bytes + composed.html.length < QUEUE_MAX_BYTES;
+      const { data, error } = await mailService.send(outgoing, composed.html, queued);
+      let failure: MailError | null = error;
+      if (!failure && queued && data?.id) {
+        const result = await waitForOutbox(data.id);
+        if (result.status === 'failed') failure = result.error;
+        if (result.status === 'pending') {
+          progress.dismiss();
+          toast({
+            title: 'Na caixa de saída',
+            description:
+              'O servidor de email está lento. O email sai sozinho; se falhar, recebe um aviso.',
+          });
+          return true;
+        }
+      }
       progress.dismiss();
-      if (error) {
-        fail(error, 'O email não foi enviado. O rascunho voltou a abrir.');
+      if (failure) {
+        fail(failure, 'O email não foi enviado. O rascunho voltou a abrir.');
         return false;
       }
       toast({ title: 'Email enviado' });
-      // Enviado: o rascunho guardado sozinho sai da pasta Rascunhos.
-      if (input.draft) void mailService.deleteDraft(input.draft.accountId, input.draft.id);
+      // Enviado: o rascunho guardado sozinho sai da pasta Rascunhos (na fila, apaga-o o servidor).
+      if (input.draft && !(queued && input.draft.accountId === input.accountId))
+        void mailService.deleteDraft(input.draft.accountId, input.draft.id);
       // Sem esperar: as listas atualizam-se em segundo plano e quem recebeu passa a ser sugerido.
       void qc.invalidateQueries({ queryKey: ['mail', 'list'] });
       void contactService

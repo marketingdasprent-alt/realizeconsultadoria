@@ -80,6 +80,14 @@ import { fetchRemoteAttachments, parseRemoteAttachments } from './remoteAttachme
 import { bundleIfTooMany } from './bundleAttachments.ts';
 import { logSend, sendDailyReport } from './sendLog.ts';
 import { backfillCache } from './backfill.ts';
+import {
+  MAX_QUEUE_BYTES,
+  outboxStatus,
+  processOutbox,
+  queueSend,
+  retryOutbox,
+  triggerProcess,
+} from './outbox.ts';
 import { inBackground, readCached, writeCached } from './messageCache.ts';
 import {
   clearCachedLists,
@@ -277,6 +285,8 @@ const ACTIONS = [
   'label-save',
   'label-delete',
   'label-apply',
+  'queue-send',
+  'outbox-status',
 ] as const;
 type Action = (typeof ACTIONS)[number];
 
@@ -286,6 +296,7 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
   if (action === 'connect-imap') return connectImap(db, userId, body);
   if (action === 'share-access') return ok(await shareAccess(db, userId, body.access_id));
   if (action === 'unread-counts') return ok(await unreadCounts(db, userId, createDriver));
+  if (action === 'outbox-status') return ok(await outboxStatus(db, userId, body.ids));
   if (action === 'discover') {
     const email = optionalString(body.email, 320);
     return email ? ok(await discoverDomain(domainOfEmail(email), denoResolver)) : badRequest();
@@ -694,10 +705,29 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
         ms: Date.now() - sendStarted,
         ...sendCounts(body),
       });
+      // Enviado pela caixa de saída: o rascunho guardado sai da pasta Rascunhos aqui
+      const draftToDelete = optionalString(body.delete_draft_id, 2000);
+      if (draftToDelete)
+        await driver
+          .deleteDraft(draftToDelete)
+          .catch(err => console.warn('mail-api send: rascunho não apagado', errorMessage(err)));
       // Os Enviados mudaram: a lista guardada da caixa volta a ler-se do servidor
       if (account.auth_method === 'imap')
         await clearCachedLists(db, account.id).catch(() => undefined);
       return ok(sent);
+    }
+    case 'queue-send': {
+      // Caixa de saída: valida já (destinatários, assunto) e envia num pedido próprio
+      const check = parseSendRequest({ ...body, attachments: [] });
+      if (!check.ok)
+        return check.code === 'bad_request'
+          ? badRequest()
+          : json({ ok: false, code: check.code, message: MAIL_ERROR_MESSAGES[check.code] });
+      if (JSON.stringify(body).length > MAX_QUEUE_BYTES)
+        return json({ ok: false, code: 'too_large', message: 'Email grande demais para a fila.' });
+      const id = await queueSend(db, userId, account.id, body);
+      inBackground(triggerProcess(id));
+      return ok({ id });
     }
     case 'save-draft': {
       const parsed = parseSendRequest(body, { draft: true });
@@ -761,6 +791,10 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
       logIfSlow('poll-new', '-', started);
       return ok(result);
     }
+    // Caixa de saída: envia um email da fila (pedido próprio) / repete os que esperam
+    if (isRecord(body) && body.action === 'outbox-process' && isUuid(body.id))
+      return ok(await processOutbox(db, body.id, (uid, payload) => runAction(db, uid, payload)));
+    if (isRecord(body) && body.action === 'outbox-retry') return ok(await retryOutbox(db));
     if (isRecord(body) && body.action === 'cache-backfill')
       return ok(await backfillCache(db, createDriver));
     if (isRecord(body) && body.action === 'daily-report')
@@ -788,7 +822,11 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
     return badRequest();
   }
   if (!isRecord(body)) return badRequest();
+  return runAction(db, userId, body);
+};
 
+/** Corre a ação de quem chama, com os erros tratados (também a usa a caixa de saída). */
+const runAction = async (db: SupabaseClient, userId: string, body: Body): Promise<Response> => {
   const started = Date.now();
   try {
     return await handle(db, userId, body);

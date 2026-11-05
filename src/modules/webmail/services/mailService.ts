@@ -543,9 +543,22 @@ export const mailService = {
       attachment_id: attachmentId,
     }),
 
-  send: (input: ComposeInput, html: string) =>
+  /** Estado dos emails na caixa de saída (queued | sending | sent | failed). */
+  outboxStatus: (ids: string[]) =>
+    call<{ id: string; status: string; last_error: string | null }[]>('mail-api', {
+      action: 'outbox-status',
+      ids,
+    }),
+
+  /**
+   * `queued`: vai para a caixa de saída (o servidor envia num pedido próprio, repete se não
+   * conseguir ligar e apaga o rascunho) e devolve o id na fila.
+   */
+  send: (input: ComposeInput, html: string, queued = false) =>
     call<{ id: string | null }>('mail-api', {
-      action: 'send',
+      action: queued ? 'queue-send' : 'send',
+      delete_draft_id:
+        queued && input.draft?.accountId === input.accountId ? input.draft.id : undefined,
       account_id: input.accountId,
       to: input.to,
       cc: input.cc,

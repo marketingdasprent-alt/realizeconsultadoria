@@ -38,7 +38,14 @@ export const SendCheckDialog: React.FC<SendCheckDialogProps> = ({ check, onSend,
               ? `Não é um email válido: ${check.invalid.join(', ')}. Corrija ou apague antes de enviar.`
               : check?.blocked
                 ? 'Escreva pelo menos um email em "Para" (ou em Cc/Bcc) antes de enviar.'
-                : `Este email vai sem ${check?.missing.join(' e sem ')}.`}
+                : [
+                    ...(check?.warnings ?? []),
+                    check?.missing.length
+                      ? `Este email vai sem ${check.missing.join(' e sem ')}.`
+                      : '',
+                  ]
+                    .filter(Boolean)
+                    .join(' ')}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

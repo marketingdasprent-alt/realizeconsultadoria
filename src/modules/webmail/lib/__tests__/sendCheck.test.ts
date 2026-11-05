@@ -12,7 +12,12 @@ const base = {
 
 describe('checkBeforeSend', () => {
   it('lets a complete email go without asking', () => {
-    expect(checkBeforeSend(base)).toEqual({ blocked: false, missing: [], invalid: [] });
+    expect(checkBeforeSend(base)).toEqual({
+      blocked: false,
+      missing: [],
+      invalid: [],
+      warnings: [],
+    });
   });
 
   it('blocks when there is nobody to send to', () => {
@@ -27,6 +32,7 @@ describe('checkBeforeSend', () => {
       blocked: false,
       missing: ['ninguém no campo "Para" (só Cc/Bcc)'],
       invalid: [],
+      warnings: [],
     });
   });
 
@@ -36,5 +42,33 @@ describe('checkBeforeSend', () => {
       { label: 'Cc', text: 'rui@x ' },
     ];
     expect(checkBeforeSend({ ...base, unparsed }).invalid).toEqual(['"rui@x" (Cc)']);
+  });
+});
+
+describe('checkBeforeSend: avisos', () => {
+  const base = { to: ['a@cliente.pt'], cc: [], bcc: [], subject: 'Proposta', attachments: 0 };
+
+  it('fala em anexo sem anexo', () => {
+    const r = checkBeforeSend({ ...base, written: 'Bom dia, segue em anexo a proposta.' });
+    expect(r.warnings[0]).toMatch(/fala num anexo/);
+    expect(
+      checkBeforeSend({ ...base, attachments: 1, written: 'Segue em anexo.' }).warnings
+    ).toEqual([]);
+  });
+
+  it('domínio mal escrito', () => {
+    const r = checkBeforeSend({
+      ...base,
+      to: ['joao@gmial.com', 'ana@empresa.con'],
+      written: 'Olá',
+    });
+    expect(r.warnings).toEqual([
+      '"joao@gmial.com" — queria dizer @gmail.com?',
+      '"ana@empresa.con" — queria dizer @empresa.com?',
+    ]);
+  });
+
+  it('sem avisos num email normal', () => {
+    expect(checkBeforeSend({ ...base, written: 'Obrigado pela reunião.' }).warnings).toEqual([]);
   });
 });

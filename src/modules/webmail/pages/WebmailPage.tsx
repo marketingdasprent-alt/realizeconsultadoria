@@ -535,8 +535,14 @@ const WebmailPage: React.FC = () => {
         minimized={composerMinimized}
         onMinimize={() => setComposerMinimized(true)}
         onRestore={() => setComposerMinimized(false)}
-        onSend={async input => {
-          const ok = await actions.send(input);
+        onSend={async (input, asItWas) => {
+          const result = await actions.send(input);
+          // Anulou nos 10 s: o email volta a abrir exatamente como estava (com os anexos)
+          if (result === 'undone') {
+            setDraftState(asItWas);
+            return false;
+          }
+          const ok = result;
           // Falhou: o rascunho volta a abrir como estava (os anexos têm de ser escolhidos outra vez).
           if (!ok)
             setDraftState({

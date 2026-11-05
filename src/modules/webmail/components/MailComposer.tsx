@@ -41,7 +41,8 @@ interface MailComposerProps {
   minimized?: boolean;
   onMinimize?: () => void;
   onRestore?: () => void;
-  onSend: (input: ComposeInput) => Promise<boolean>;
+  /** `asItWas`: o email como estava, para reabrir se o envio for anulado. */
+  onSend: (input: ComposeInput, asItWas: ComposeDraft) => Promise<boolean>;
   toBase64: (file: File) => Promise<string>;
 }
 
@@ -346,14 +347,15 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       bcc: parseRecipients(fields.bcc),
       subject: fields.subject,
       written: writtenPart(fields.body),
-      attachments: files.length,
+      attachments: attachmentCount,
       unparsed: [
         { label: 'Para', text: unparsed.to },
         { label: 'Cc', text: unparsed.cc },
         { label: 'Bcc', text: unparsed.bcc },
       ],
     });
-    if (result.blocked || result.invalid.length || result.missing.length) return setCheck(result);
+    if (result.blocked || result.invalid.length || result.missing.length || result.warnings.length)
+      return setCheck(result);
     void sendNow();
   };
 
@@ -378,10 +380,21 @@ export const MailComposer: React.FC<MailComposerProps> = ({
         ? { messageId: draft.forward.messageId, messageKey: draft.forward.messageKey ?? null }
         : undefined,
     };
+    // O email tal como está (com os anexos), para voltar a abrir se a pessoa anular o envio
+    const asItWas: ComposeDraft = {
+      ...draft,
+      accountId: accountId || draft.accountId,
+      to: fields.to,
+      cc: fields.cc,
+      bcc: fields.bcc,
+      subject: fields.subject,
+      body: fields.body,
+      resume: { quote, signature: sigChoice, showCc, files, remote, saved },
+    };
     setBusy(false);
     // Fecha logo; o envio continua em segundo plano (se falhar, o rascunho volta a abrir).
     onClose();
-    void onSend(input);
+    void onSend(input, asItWas);
   };
 
   const title = draft?.inReplyTo ? 'Responder' : 'Nova mensagem';

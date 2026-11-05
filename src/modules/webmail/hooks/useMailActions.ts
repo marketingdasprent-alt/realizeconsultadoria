@@ -5,6 +5,7 @@ import { loadAttachment } from '../lib/attachments';
 import { DEMO_MAIL_ACCOUNTS } from '../lib/demoData';
 import { setDemoMail } from '../lib/demoStore';
 import { QUEUE_MAX_BYTES, waitForOutbox } from '../lib/outbox';
+import { waitForUndo } from '../lib/undoSend';
 import { composeWithSignature } from '../lib/signature';
 import { contactService } from '../services/contactService';
 import { mailErrorText, mailService, type MailError } from '../services/mailService';
@@ -64,7 +65,8 @@ export const useMailActions = (folder?: MailFolder) => {
       });
     },
 
-    send: async (input: ComposeInput) => {
+    /** true enviado · false falhou (avisado) · 'undone' a pessoa anulou nos 10 s. */
+    send: async (input: ComposeInput): Promise<boolean | 'undone'> => {
       if (isPreview) {
         const account = DEMO_MAIL_ACCOUNTS.find(a => a.id === input.accountId);
         setDemoMail(s => ({
@@ -97,6 +99,8 @@ export const useMailActions = (folder?: MailFolder) => {
         if (input.draft) void mailService.deleteDraft(input.draft.accountId, input.draft.id);
         return true;
       }
+      // 10 s para anular (o email volta a abrir tal como estava, com os anexos)
+      if (await waitForUndo(input.subject)) return 'undone';
       // O compositor já fechou: o aviso mostra o progresso e o resultado.
       const progress = toast({ title: 'A enviar…', description: input.subject || undefined });
       const composed = composeWithSignature(

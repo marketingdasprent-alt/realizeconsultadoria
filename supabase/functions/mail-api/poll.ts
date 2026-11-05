@@ -11,6 +11,7 @@ import { ACCOUNT_COLUMNS, type MailAccountRow } from '../_shared/mail-server/acc
 import { errorMessage, mapWithGroupLimit } from '../_shared/mail-server/http.ts';
 import { activeRulesByAccount, applyRules, type MailRule } from './rules.ts';
 import { inBackground, pruneCached, writeCached } from './messageCache.ts';
+import { bounceNotice, explainBounce, isBounce } from '../_shared/mail/bounce.ts';
 
 const PER_ACCOUNT = 10;
 /** Intervalo mínimo entre leituras da mesma caixa (as IMAP limitam logins: 2 em 2 minutos). */
@@ -94,20 +95,39 @@ const pollAccount = async (
           )
           .sort((a, b) => a.date.localeCompare(b.date));
 
-  if (fresh.length) {
+  // Emails devolvidos: aviso à parte, com o motivo em português (lê-se o texto do aviso)
+  const bounces = fresh.filter(mail => isBounce(mail.from?.email, mail.subject));
+  const normal = fresh.filter(mail => !bounces.includes(mail));
+  if (bounces.length) {
+    const recipients = await recipientsOf(db, account);
+    for (const mail of bounces.slice(0, 5)) {
+      let text: string | null = null;
+      try {
+        const full = await driver.get(mail.id);
+        text = full.text ?? full.html?.replace(/<[^>]+>/g, ' ') ?? null;
+      } catch (err) {
+        console.warn('mail-api poll: aviso de devolução ilegível', errorMessage(err));
+      }
+      const body = bounceNotice(explainBounce(text, account.email), mail.subject);
+      for (const userId of recipients)
+        await notify(db, userId, 'Email devolvido', `${body} · ${account.email}`);
+    }
+  }
+
+  if (normal.length) {
     const recipients = await recipientsOf(db, account);
     const shared = !account.user_id;
     for (const userId of recipients) {
-      if (fresh.length > MAX_SINGLE) {
+      if (normal.length > MAX_SINGLE) {
         await notify(
           db,
           userId,
-          `${fresh.length} emails novos`,
-          `${account.email} · último de ${sender(fresh[fresh.length - 1])}`
+          `${normal.length} emails novos`,
+          `${account.email} · último de ${sender(normal[normal.length - 1])}`
         );
         continue;
       }
-      for (const mail of fresh) {
+      for (const mail of normal) {
         const subject = mail.subject?.trim() || '(sem assunto)';
         await notify(db, userId, sender(mail), shared ? `${subject} · ${account.email}` : subject);
       }

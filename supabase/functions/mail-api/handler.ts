@@ -79,7 +79,13 @@ import { dropFolderRefs, renameFolderRefs } from './folderRefs.ts';
 import { fetchRemoteAttachments, parseRemoteAttachments } from './remoteAttachments.ts';
 import { bundleIfTooMany } from './bundleAttachments.ts';
 import { inBackground, readCached, writeCached } from './messageCache.ts';
-import { patchCachedLists, preloadBodies, readCachedList, writeCachedList } from './listCache.ts';
+import {
+  clearCachedLists,
+  patchCachedLists,
+  preloadBodies,
+  readCachedList,
+  writeCachedList,
+} from './listCache.ts';
 import { MAX_RULES_PER_ACCOUNT, applyRules, listRules } from './rules.ts';
 import { OAuthSession } from './session.ts';
 import { shareAccess, shareAccessById } from './share.ts';
@@ -678,6 +684,9 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const forwardKey = optionalString(body.forward_of_key, 1000);
       if (forwardKey && !/[\r\n\0]/.test(forwardKey))
         await markForwarded(db, account.id, forwardKey, userId);
+      // Os Enviados mudaram: a lista guardada da caixa volta a ler-se do servidor
+      if (account.auth_method === 'imap')
+        await clearCachedLists(db, account.id).catch(() => undefined);
       return ok(sent);
     }
     case 'save-draft': {
@@ -689,7 +698,10 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       }
       const draftId = optionalString(body.draft_id, 2000) ?? null;
       const driver = await createDriver(db, account, pendingSecret);
-      return ok(await driver.saveDraft(parsed.value, draftId));
+      const savedDraft = await driver.saveDraft(parsed.value, draftId);
+      if (account.auth_method === 'imap')
+        await clearCachedLists(db, account.id).catch(() => undefined);
+      return ok(savedDraft);
     }
     case 'thread': {
       const threadId = optionalString(body.thread_id, 2000);

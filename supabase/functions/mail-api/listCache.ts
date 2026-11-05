@@ -98,6 +98,13 @@ export const patchCachedLists = async (
   }
 };
 
+/** Apaga as listas guardadas da caixa (ex.: depois de enviar, os Enviados mudaram). */
+export const clearCachedLists = async (db: SupabaseClient, accountId: string) => {
+  const { data } = await db.storage.from(BUCKET).list(`lists/${accountId}`, { limit: 100 });
+  const names = ((data ?? []) as { name: string }[]).map(file => `lists/${accountId}/${file.name}`);
+  if (names.length) await db.storage.from(BUCKET).remove(names);
+};
+
 /** Última vez que se pré-carregou cada caixa (nesta instância): no máximo a cada 2 minutos. */
 const PRELOADED = new Map<string, number>();
 const PRELOAD_COUNT = 8;

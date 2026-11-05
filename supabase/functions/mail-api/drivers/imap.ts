@@ -836,18 +836,20 @@ export const createImapDriver = (
         transport.close();
       }
 
-      // Cópia nos Enviados (melhor esforço; aqui o Bcc fica, como nos clientes de email).
-      // Corre depois da resposta: quem envia não fica à espera de mais uma ligação IMAP.
+      // Cópia nos Enviados (aqui o Bcc fica, como nos clientes de email). Grava-se antes de
+      // responder: em fundo a tarefa era cortada pela Supabase e o email ficava fora dos Enviados.
+      // Uma falha não desfaz o envio (o email já saiu), mas fica no registo.
       if (!AUTO_SAVES_SENT.test(cfg.smtpHost)) {
-        const saveCopy = withClient(async client => {
+        await withClient(async client => {
           const sent = resolveImapFolder('sent', await client.list());
-          if (sent)
-            await client.append(sent, buildRawMessage({ ...base, includeBcc: true }), ['\\Seen']);
+          if (!sent) {
+            console.warn(`mail-api imap: sem pasta de Enviados em ${cfg.imapHost}`);
+            return;
+          }
+          await client.append(sent, buildRawMessage({ ...base, includeBcc: true }), ['\\Seen']);
         }).catch(error =>
           console.warn('mail-api imap: cópia nos Enviados falhou', errorMessage(error))
         );
-        if (typeof EdgeRuntime !== 'undefined') EdgeRuntime.waitUntil(saveCopy);
-        else await saveCopy;
       }
       return { id: null };
     },

@@ -78,6 +78,8 @@ import {
 import { dropFolderRefs, renameFolderRefs } from './folderRefs.ts';
 import { fetchRemoteAttachments, parseRemoteAttachments } from './remoteAttachments.ts';
 import { bundleIfTooMany } from './bundleAttachments.ts';
+import { logSend, sendDailyReport } from './sendLog.ts';
+import { backfillCache } from './backfill.ts';
 import { inBackground, readCached, writeCached } from './messageCache.ts';
 import {
   clearCachedLists,
@@ -618,6 +620,7 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       );
     }
     case 'send': {
+      const sendStarted = Date.now();
       const parsed = parseSendRequest(body);
       if (!parsed.ok) {
         console.warn(
@@ -684,6 +687,13 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const forwardKey = optionalString(body.forward_of_key, 1000);
       if (forwardKey && !/[\r\n\0]/.test(forwardKey))
         await markForwarded(db, account.id, forwardKey, userId);
+      await logSend(db, {
+        accountId: account.id,
+        userId,
+        ok: true,
+        ms: Date.now() - sendStarted,
+        ...sendCounts(body),
+      });
       // Os Enviados mudaram: a lista guardada da caixa volta a ler-se do servidor
       if (account.auth_method === 'imap')
         await clearCachedLists(db, account.id).catch(() => undefined);
@@ -751,6 +761,10 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
       logIfSlow('poll-new', '-', started);
       return ok(result);
     }
+    if (isRecord(body) && body.action === 'cache-backfill')
+      return ok(await backfillCache(db, createDriver));
+    if (isRecord(body) && body.action === 'daily-report')
+      return ok(await sendDailyReport(db, { dry: body.dry === true }));
     // Diagnóstico da lentidão ao abrir emails: cronometra cada passo numa caixa (sem conteúdo).
     if (isRecord(body) && body.action === 'probe-open' && isUuid(body.account_id))
       return ok(await probeOpen(db, body.account_id));
@@ -781,6 +795,16 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
   } catch (error) {
     if (isMailError(error)) {
       // Envios e rascunhos que falham ficam no registo (com o motivo), para se ver logo o porquê
+      if (body.action === 'send' && isUuid(body.account_id))
+        await logSend(db, {
+          accountId: body.account_id,
+          userId,
+          ok: false,
+          code: error.code,
+          message: error.message,
+          ms: Date.now() - started,
+          ...sendCounts(body),
+        });
       if (body.action === 'send' || body.action === 'save-draft')
         console.warn(
           `mail-api ${String(body.action)} falhou: conta=${String(body.account_id)}`,
@@ -797,6 +821,16 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
   } finally {
     logIfSlow(String(body.action), String(body.account_id ?? '-'), started);
   }
+};
+
+/** Anexos e destinatários de um pedido de envio (para o registo). */
+const sendCounts = (body: Record<string, unknown>) => {
+  const count = (value: unknown) => (Array.isArray(value) ? value.length : 0);
+  const remote = body.remote_attachments as { items?: unknown } | undefined;
+  return {
+    attachments: count(body.attachments) + count(remote?.items),
+    recipients: count(body.to) + count(body.cc) + count(body.bcc),
+  };
 };
 
 /** Pedidos lentos (mais de 5 s) ficam no registo com a ação e a caixa, para se ver o que pesa. */

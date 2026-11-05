@@ -107,7 +107,7 @@ export const clearCachedLists = async (db: SupabaseClient, accountId: string) =>
 
 /** Última vez que se pré-carregou cada caixa (nesta instância): no máximo a cada 2 minutos. */
 const PRELOADED = new Map<string, number>();
-const PRELOAD_COUNT = 8;
+const PRELOAD_COUNT = 3;
 
 /** Guarda a cópia dos primeiros emails da lista que ainda não a têm (para abrirem na hora). */
 export const preloadBodies = async (

@@ -256,8 +256,9 @@ const isConnectPhase = (error: unknown) => {
   return e.command === 'CONN' || ['ECONNREFUSED', 'EDNS', 'ETIMEDOUT'].includes(String(e.code));
 };
 
-/** Emails maiores que isto abrem sem descarregar os anexos (só texto, HTML e imagens pequenas). */
-const LIGHT_OPEN_ABOVE = 1_500_000;
+/** Emails maiores que isto abrem sem descarregar os anexos (só texto, HTML e imagens pequenas):
+ * analisar o email inteiro gasta CPU (a função tem um limite) e a maioria do peso são anexos. */
+const LIGHT_OPEN_ABOVE = 300_000;
 
 /** Nó da estrutura com este número de parte. */
 const findPart = (root: ImapBodyPart | undefined, part: string): ImapBodyPart | null => {

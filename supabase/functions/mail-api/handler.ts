@@ -167,7 +167,7 @@ const createDriver = async (
 };
 
 /** Tempos (ms) de abrir o primeiro email da Entrada: driver, lista, abrir a frio e outra vez. */
-const probeOpen = async (db: SupabaseClient, accountId: string) => {
+const probeOpen = async (db: SupabaseClient, accountId: string, probeFolder: unknown = 'inbox') => {
   const { data } = await db
     .from('mail_accounts')
     .select(ACCOUNT_COLUMNS)
@@ -187,14 +187,30 @@ const probeOpen = async (db: SupabaseClient, accountId: string) => {
   try {
     const driver = await time('driver', () => createDriver(db, account));
     const list = await time('list', () =>
-      driver.list({ folder: 'inbox', query: null, pageToken: null, limit: 25 })
+      driver.list({
+        folder: isMailFolder(probeFolder) ? probeFolder : 'inbox',
+        query: null,
+        pageToken: null,
+        limit: 25,
+      })
     );
     const first = list.messages[0];
     if (first) {
       await time('get_first', () => driver.get(first.id));
       await time('get_again', () => driver.get(first.id));
     }
-    return { found: true, provider: account.auth_method, times, messages: list.messages.length };
+    return {
+      found: true,
+      provider: account.auth_method,
+      times,
+      messages: list.messages.length,
+      // Só as datas (sem conteúdo): para ver se chegam emails novos à caixa
+      newest: list.messages
+        .map(mail => mail.date)
+        .sort()
+        .reverse()
+        .slice(0, 5),
+    };
   } catch (error) {
     return { found: true, provider: account.auth_method, times, error: errorMessage(error) };
   }
@@ -801,7 +817,7 @@ export const mailApiHandler = async (req: Request): Promise<Response> => {
       return ok(await sendDailyReport(db, { dry: body.dry === true }));
     // Diagnóstico da lentidão ao abrir emails: cronometra cada passo numa caixa (sem conteúdo).
     if (isRecord(body) && body.action === 'probe-open' && isUuid(body.account_id))
-      return ok(await probeOpen(db, body.account_id));
+      return ok(await probeOpen(db, body.account_id, body.folder));
     if (!isRecord(body) || !isUuid(body.access_id)) return badRequest();
     try {
       return ok(await shareAccessById(db, body.access_id));

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { identityIds } from '@/lib/identityIds';
 
 export interface SupportDepartment {
   id: string;
@@ -45,6 +46,9 @@ export const useSupportDepartments = (): UseSupportDepartmentsResult => {
 
       setDepartments(allDepartments || []);
 
+      // Conta unificada: os grupos podem estar na conta de admin ligada à ficha
+      const userIds = await identityIds(session.user.id);
+
       // Check if user is in a super admin group
       const { data: superAdminCheck } = await supabase
         .from('admin_group_members')
@@ -54,7 +58,7 @@ export const useSupportDepartments = (): UseSupportDepartmentsResult => {
           admin_groups!inner(is_super_admin, is_active)
         `
         )
-        .eq('user_id', session.user.id);
+        .in('user_id', userIds);
 
       const inSuperAdminGroup = superAdminCheck?.some(
         (m: any) => m.admin_groups?.is_super_admin && m.admin_groups?.is_active
@@ -71,7 +75,7 @@ export const useSupportDepartments = (): UseSupportDepartmentsResult => {
         const { data: memberships } = await supabase
           .from('admin_group_members')
           .select('group_id')
-          .eq('user_id', session.user.id);
+          .in('user_id', userIds);
 
         if (!memberships || memberships.length === 0) {
           setUserDepartmentIds([]);

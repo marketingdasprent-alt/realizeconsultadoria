@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { supabase } from '@/integrations/supabase/client';
+import { identityIds } from '@/lib/identityIds';
 
 /**
  * Devolve `true` se o utilizador autenticado pertence ao grupo "RH"
@@ -27,10 +28,11 @@ export const useIsRhMember = () => {
           return;
         }
 
+        const userIds = await identityIds(session.user.id);
         const { data, error } = await supabase
           .from('admin_group_members')
           .select('admin_groups!inner(name, is_active)')
-          .eq('user_id', session.user.id);
+          .in('user_id', userIds);
 
         if (!active) return;
 

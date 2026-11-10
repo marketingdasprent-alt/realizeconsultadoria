@@ -57,13 +57,11 @@ export const toPost = (
 ): FeedPost => ({
   id: row.id,
   authorId: row.author_id,
-  // Aniversário: não tem autor; o cabeçalho mostra o aniversariante
-  authorName: nameOf(row.kind === 'birthday' ? row.subject_id : row.author_id),
+  // Aniversário: publicação automática, assinada pela Realize IA
+  authorName: row.kind === 'birthday' ? REALIZE_AI_NAME : nameOf(row.author_id),
   authorRole:
     row.kind === 'birthday'
-      ? row.subject_id
-        ? roleOf(byId.get(row.subject_id))
-        : null
+      ? 'Assistente da empresa'
       : row.author_id
         ? roleOf(byId.get(row.author_id))
         : null,
@@ -80,7 +78,11 @@ export const toPost = (
   reactions: Array.isArray(row.reactions) ? (row.reactions as unknown as FeedReaction[]) : [],
   kind: row.kind === 'birthday' ? 'birthday' : 'post',
   subjectId: row.subject_id ?? null,
+  subjectName: row.subject_id ? nameOf(row.subject_id) : null,
 });
+
+/** Quem assina as publicações automáticas (aniversários). */
+export const REALIZE_AI_NAME = 'Realize IA';
 
 /** Junta/retira a minha reação (para a pré-visualização e atualizações otimistas). */
 /** Agrupa quem reagiu por emoji, pela ordem em que cada emoji apareceu. */

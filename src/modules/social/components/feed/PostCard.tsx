@@ -7,6 +7,7 @@ import {
   MessageCircle,
   MoreHorizontal,
   SmilePlus,
+  Sparkles,
   Trash2,
   Users,
 } from 'lucide-react';
@@ -52,7 +53,7 @@ export const PostCard: React.FC<PostCardProps> = ({
       id={`post-${post.id}`}
       className={cn(
         'rz-rise rounded-[28px] bg-white p-5 shadow-rz-soft ring-1 ring-rz-line',
-        isBirthday && 'bg-gradient-to-br from-pink-50 via-white to-amber-50 ring-pink-200',
+        isBirthday && 'bg-pink-50 ring-pink-200',
         isFocused && 'ring-2 ring-rz-primary/50'
       )}
     >
@@ -62,16 +63,15 @@ export const PostCard: React.FC<PostCardProps> = ({
         </p>
       )}
       <header className="flex items-start gap-3">
-        <UserAvatar
-          name={post.authorName}
-          userId={isBirthday ? (post.subjectId ?? null) : post.authorId}
-          size="md"
-        />
+        {isBirthday ? (
+          <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-violet-500 via-fuchsia-500 to-amber-400 text-white">
+            <Sparkles className="h-5 w-5" />
+          </span>
+        ) : (
+          <UserAvatar name={post.authorName} userId={post.authorId} size="md" />
+        )}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-bold">
-            {post.authorName}
-            {isBirthday && ' 🎂'}
-          </p>
+          <p className="truncate text-[15px] font-bold">{post.authorName}</p>
           <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-rz-muted">
             {post.authorRole && <span className="truncate">{post.authorRole}</span>}
             <span>
@@ -112,6 +112,12 @@ export const PostCard: React.FC<PostCardProps> = ({
           onHashtag={onHashtag}
           className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-relaxed"
         />
+      )}
+      {isBirthday && post.subjectId && (
+        <div className="mt-3 flex items-center gap-3 rounded-2xl bg-white p-3 ring-1 ring-pink-200">
+          <UserAvatar name={post.subjectName ?? ''} userId={post.subjectId} size="md" />
+          <p className="min-w-0 truncate text-[15px] font-bold">{post.subjectName} 🎂</p>
+        </div>
       )}
       <PostAttachments attachments={post.attachments} />
 

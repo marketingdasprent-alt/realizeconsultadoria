@@ -31,6 +31,8 @@ export interface FeedPost {
   /** 'birthday': publicação automática do aniversário de `subjectId` (sem autor). */
   kind?: 'post' | 'birthday';
   subjectId?: string | null;
+  /** Nome do aniversariante (a publicação é assinada pela Realize IA). */
+  subjectName?: string | null;
 }
 
 export interface FeedComment {

@@ -51,6 +51,8 @@ export const useMailbox = (
     [useCache, user.userId, idsKey, cacheFolder]
   );
 
+  // Atualizar (botão, ou chegou email novo): o servidor não pode responder com a lista guardada
+  const freshRef = useRef(false);
   const query = useInfiniteQuery({
     queryKey: [
       'mail',
@@ -64,6 +66,8 @@ export const useMailbox = (
     initialPageParam: null as PageTokens,
     queryFn: async ({ pageParam }): Promise<MailboxPage> => {
       const targets = pageParam ? Object.keys(pageParam) : ids;
+      const fresh = freshRef.current && !pageParam;
+      if (!pageParam) freshRef.current = false;
       const results = await Promise.all(
         targets.map(id =>
           mailService.list(
@@ -72,7 +76,8 @@ export const useMailbox = (
             search.trim(),
             pageParam?.[id] ?? null,
             folderId,
-            labelFilter?.labelId
+            labelFilter?.labelId,
+            fresh
           )
         )
       );
@@ -141,7 +146,10 @@ export const useMailbox = (
     loadMore: () => query.fetchNextPage(),
     isLoadingMore: query.isFetchingNextPage,
     errors,
-    refetch: () => query.refetch(),
+    refetch: () => {
+      freshRef.current = true;
+      return query.refetch();
+    },
   };
 };
 

@@ -3,11 +3,16 @@
 
 const BOUNCE_SENDER = /^(mailer-daemon|postmaster|mail-daemon|mailerdaemon)@/i;
 const BOUNCE_SUBJECT =
-  /(undeliver|returned mail|mail delivery (failed|failure|system)|delivery (status notification|has failed|failure)|failure notice|não entregue|nao entregue|não foi possível entregar|entrega falhou|devolvid|non remis|unzustellbar)/i;
+  /(undeliver|returned mail|mail delivery (failed|failure|system)|delivery (status notification \((failure|delay)\)|has failed|failure)|failure notice|não entregue|nao entregue|não foi possível entregar|entrega falhou|non remis|unzustellbar)/i;
+// Respostas/reencaminhamentos de um aviso ("Re: Undeliverable…") e avisos de sucesso não contam;
+// "devolvid" saiu: "Encomenda devolvida" / "Viatura devolvida" são emails normais.
+const NOT_BOUNCE_SUBJECT =
+  /^\s*(re|res|fwd?|enc|tr|aw|sv)\s*:|\((relay|delivered|expanded)\)|success/i;
 
 /** É um aviso de email devolvido? (remetente do sistema de correio ou assunto típico) */
 export const isBounce = (from: string | null | undefined, subject: string | null | undefined) =>
-  (!!from && BOUNCE_SENDER.test(from.trim())) || (!!subject && BOUNCE_SUBJECT.test(subject));
+  (!!from && BOUNCE_SENDER.test(from.trim())) ||
+  (!!subject && BOUNCE_SUBJECT.test(subject) && !NOT_BOUNCE_SUBJECT.test(subject));
 
 const REASONS: [RegExp, string][] = [
   [/too many mime parts|too many attachments/i, 'tinha demasiados anexos'],

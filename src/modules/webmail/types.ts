@@ -209,6 +209,8 @@ export interface ComposeDraft {
    */
   resume?: {
     quote: string;
+    /** A citação tal como abriu (se mudou, envia-se o texto editado e não o HTML original). */
+    originalQuote?: string;
     signature: string;
     showCc: boolean;
     files: File[];

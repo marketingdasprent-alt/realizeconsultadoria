@@ -32,6 +32,10 @@ interface DraftSaverOptions {
   /** Rascunho já guardado com que o compositor abriu (aberto da pasta Rascunhos). */
   initial: SavedDraftRef | null;
   build: () => Promise<ComposeInput>;
+  /** Muda a cada mensagem aberta (o ponto de partida volta a ser medido). */
+  resetKey?: unknown;
+  /** Sem gravação automática (ex.: anexos de um rascunho ainda a chegar). */
+  paused?: boolean;
 }
 
 /**
@@ -45,6 +49,8 @@ export const useDraftSaver = ({
   attachmentBytes = 0,
   initial,
   build,
+  resetKey,
+  paused = false,
 }: DraftSaverOptions) => {
   const { isPreview } = useWorkspace();
   const qc = useQueryClient();
@@ -58,14 +64,23 @@ export const useDraftSaver = ({
   const buildRef = useRef(build);
   buildRef.current = build;
 
-  // Cada compositor novo começa do zero (ou do rascunho com que abriu).
+  // Cada compositor novo começa do zero (ou do rascunho com que abriu). Os campos da mensagem
+  // nova só chegam no render seguinte: o ponto de partida é o primeiro retrato depois disso
+  // (antes ficava o da mensagem anterior e abrir/fechar uma resposta criava um rascunho).
+  const measuring = useRef(false);
   useEffect(() => {
     saved.current = initial;
     savedSnapshot.current = snapshot;
+    measuring.current = true;
     setStatus('idle');
     setSavedAt(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao abrir outro rascunho
-  }, [open, initial?.id]);
+  }, [open, initial?.id, resetKey]);
+  useEffect(() => {
+    if (!measuring.current) return;
+    measuring.current = false;
+    savedSnapshot.current = snapshot;
+  }, [snapshot]);
 
   const cancel = () => {
     if (timer.current) clearTimeout(timer.current);
@@ -121,12 +136,12 @@ export const useDraftSaver = ({
 
   // Guarda sozinho alguns segundos depois da última alteração.
   useEffect(() => {
-    if (!open || isPreview || !hasContent || snapshot === savedSnapshot.current) return;
+    if (!open || isPreview || paused || !hasContent || snapshot === savedSnapshot.current) return;
     if (attachmentBytes > AUTOSAVE_MAX_ATTACHMENT_BYTES) return;
     cancel();
     timer.current = setTimeout(() => void save(), AUTOSAVE_MS);
     return cancel;
-  }, [open, isPreview, hasContent, snapshot, save, attachmentBytes]);
+  }, [open, isPreview, paused, hasContent, snapshot, save, attachmentBytes]);
 
   return {
     status,

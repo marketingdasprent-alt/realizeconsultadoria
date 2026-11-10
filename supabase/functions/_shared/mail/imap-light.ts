@@ -36,8 +36,16 @@ export interface LightPlan {
 
 type Node = ImapBodyNode & { id?: string };
 
+const isEmbeddedMail = (node: Node) => (node.type ?? '').toLowerCase() === 'message/rfc822';
+
+// Um email dentro do email (aviso de devolução, "reencaminhar como anexo") é um anexo: não se
+// entra nele — antes o leitor mostrava o HTML do email embebido em vez do aviso.
 const leaves = (root: Node | undefined): Node[] =>
-  !root ? [] : root.childNodes?.length ? root.childNodes.flatMap(leaves) : [root];
+  !root
+    ? []
+    : root.childNodes?.length && !isEmbeddedMail(root)
+      ? root.childNodes.flatMap(leaves)
+      : [root];
 
 const toPart = (node: Node): LightPart => ({
   // Numa mensagem sem multipart o corpo é a parte "1".
@@ -64,6 +72,13 @@ export const planLightMessage = (root: ImapBodyNode | undefined): LightPlan => {
       plan.text = toPart(node);
     } else if (disposition !== 'attachment' && !filename && mime === 'text/html' && !plan.html) {
       plan.html = toPart(node);
+    } else if (isEmbeddedMail(node)) {
+      plan.attachments.push({
+        id: `${PART_ATTACHMENT_PREFIX}${node.part ?? '1'}`,
+        filename: filename?.trim() || 'mensagem.eml',
+        mime: 'message/rfc822',
+        size: node.size ?? 0,
+      });
     } else if (
       cid &&
       mime.startsWith('image/') &&
@@ -73,6 +88,18 @@ export const planLightMessage = (root: ImapBodyNode | undefined): LightPlan => {
     ) {
       inlineTotal += node.size ?? 0;
       plan.inline.push({ ...toPart(node), cid });
+      // Fotografia com nome (iPhone/Apple Mail): também se pode descarregar e reencaminhar.
+      // Só as grandes: os logótipos das assinaturas (image001.png, poucos KB) não são anexos.
+      if (filename && (node.size ?? 0) > 150 * 1024)
+        plan.attachments.push({
+          id: `${PART_ATTACHMENT_PREFIX}${node.part ?? '1'}`,
+          filename: filename.trim(),
+          mime,
+          size:
+            node.encoding?.toLowerCase() === 'base64'
+              ? Math.floor(((node.size ?? 0) * 3) / 4)
+              : (node.size ?? 0),
+        });
     } else if (!mime.startsWith('multipart/') && (filename || disposition === 'attachment')) {
       plan.attachments.push({
         id: `${PART_ATTACHMENT_PREFIX}${node.part ?? '1'}`,
@@ -104,9 +131,16 @@ const hasFlag = (flags: Iterable<string> | undefined, flag: string): boolean => 
   return false;
 };
 
-const toIso = (value: Date | string | undefined | null): string => {
-  const ms = value instanceof Date ? value.getTime() : value ? Date.parse(value) : NaN;
-  return new Date(Number.isFinite(ms) ? ms : 0).toISOString();
+/**
+ * Primeira data válida (cabeçalho Date, depois a chegada ao servidor): um Date mal escrito vem
+ * como texto e antes dava 01/01/1970 em vez de usar a hora de chegada.
+ */
+const toIso = (...values: (Date | string | undefined | null)[]): string => {
+  for (const value of values) {
+    const ms = value instanceof Date ? value.getTime() : value ? Date.parse(value) : NaN;
+    if (Number.isFinite(ms) && ms > 0) return new Date(ms).toISOString();
+  }
+  return new Date(0).toISOString();
 };
 
 const decodePart = (bytes: Uint8Array | undefined, part: LightPart) =>
@@ -141,7 +175,7 @@ export const buildLightMessage = (input: {
     to: imapAddresses(env?.to),
     subject: env?.subject?.trim() ?? '',
     snippet: makeSnippet(text ?? (html ? htmlToText(html) : '')),
-    date: toIso(env?.date ?? input.internalDate),
+    date: toIso(env?.date, input.internalDate),
     unread: !hasFlag(input.flags, '\\Seen'),
     starred: hasFlag(input.flags, '\\Flagged'),
     has_attachments: plan.attachments.length > 0,

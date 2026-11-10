@@ -235,10 +235,18 @@ const smtpFailure = (error: unknown): MailError => {
       'smtp_failed',
       'O servidor SMTP recusou as credenciais. Confirme a palavra-passe de aplicação.'
     );
-  if (['ETIMEDOUT', 'ECONNECTION', 'ESOCKET', 'ECONNREFUSED', 'ECONNRESET', 'EDNS'].includes(code))
+  // Só "Não foi possível ligar" quando falhou antes de enviar (a caixa de saída repete esses).
+  // Ligação que caiu a meio (ex.: o servidor demorou >60 s a confirmar um email grande) pode já
+  // ter entregue o email: não se repete, senão o destinatário recebia várias cópias.
+  if (isConnectPhase(error))
     return mailError(
       'smtp_failed',
       `Não foi possível ligar ao servidor de envio (${code}). Tente outra vez dentro de instantes.`
+    );
+  if (['ETIMEDOUT', 'ECONNECTION', 'ESOCKET', 'ECONNRESET'].includes(code))
+    return mailError(
+      'smtp_failed',
+      `A ligação ao servidor de envio caiu a meio (${code}). O email pode ter sido enviado: veja os Enviados antes de o enviar outra vez.`
     );
   const reason = String(e.response ?? e.message ?? '')
     .replace(/\s+/g, ' ')
@@ -250,11 +258,16 @@ const smtpFailure = (error: unknown): MailError => {
   );
 };
 
-/** Falha ao ligar (antes de qualquer envio): pode repetir-se sem duplicar o email. */
-const isConnectPhase = (error: unknown) => {
-  const e = (error ?? {}) as { command?: unknown; code?: unknown };
-  return e.command === 'CONN' || ['ECONNREFUSED', 'EDNS', 'ETIMEDOUT'].includes(String(e.code));
-};
+/**
+ * Falha ao ligar (antes de qualquer envio): pode repetir-se sem duplicar o email. O nodemailer
+ * marca todos os erros de ligação com command 'CONN', também os que acontecem depois do DATA
+ * (timeout do socket), por isso conta só a recusa/DNS e os timeouts da ligação e da saudação.
+ */
+function isConnectPhase(error: unknown): boolean {
+  const e = (error ?? {}) as { code?: unknown; message?: unknown };
+  if (['ECONNREFUSED', 'EDNS'].includes(String(e.code))) return true;
+  return /connection timeout|greeting never received/i.test(String(e.message ?? ''));
+}
 
 /** Emails maiores que isto abrem sem descarregar os anexos (só texto, HTML e imagens pequenas):
  * analisar o email inteiro gasta CPU (a função tem um limite) e a maioria do peso são anexos. */
@@ -542,6 +555,25 @@ export const createImapDriver = (
       };
     });
   };
+
+  /**
+   * Apaga de vez só se for mesmo um rascunho (marca Draft ou está na pasta de rascunhos): um id
+   * trocado nunca pode apagar sem volta um email verdadeiro.
+   */
+  const deleteIfDraft = (client: ImapClient, path: string, uid: number) =>
+    withMailbox(client, path, false, async () => {
+      const draftsPath = resolveImapFolder('drafts', await client.list());
+      const msg = await client.fetchOne(String(uid), { uid: true, flags: true }, { uid: true });
+      if (!msg) return;
+      const isDraft =
+        [...(msg.flags ?? [])].some(flag => flag.toLowerCase() === '\\draft') ||
+        (!!draftsPath && draftsPath === path);
+      if (!isDraft) {
+        console.warn('mail-api imap: recusado apagar um email que não é rascunho', path, uid);
+        return;
+      }
+      await client.messageDelete(String(uid), { uid: true });
+    });
 
   const setFlag = (messageId: string, flag: string, on: boolean) =>
     withClient(async client => {
@@ -888,9 +920,7 @@ export const createImapDriver = (
         // O anterior só sai depois de o novo estar guardado.
         const previous = draftId ? decodeImapMessageId(draftId) : null;
         if (previous) {
-          await withMailbox(client, previous.path, false, () =>
-            client.messageDelete(String(previous.uid), { uid: true })
-          ).catch(() => undefined);
+          await deleteIfDraft(client, previous.path, previous.uid).catch(() => undefined);
         }
         const uid = appended && appended.uid;
         return { id: uid ? encodeImapMessageId(drafts, uid) : '' };
@@ -900,11 +930,7 @@ export const createImapDriver = (
     async deleteDraft(messageId: string) {
       const target = decodeImapMessageId(messageId);
       if (!target) return;
-      await withClient(client =>
-        withMailbox(client, target.path, false, () =>
-          client.messageDelete(String(target.uid), { uid: true })
-        )
-      );
+      await withClient(client => deleteIfDraft(client, target.path, target.uid));
     },
 
     setRead(messageId, read) {

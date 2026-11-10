@@ -51,7 +51,7 @@ describe('webmail', () => {
     expect(draft.inReplyTo).toBe('m1');
     expect(draft.body).toContain('escreveu:\nOlá!\nSegue o plano.');
     expect(draft.body).not.toContain('> ');
-    expect(draftFrom({ ...message, subject: 'RE: x' }, 'reply', '').subject).toBe('RE: x');
+    expect(draftFrom({ ...message, subject: 'RE: x' }, 'reply', '').subject).toBe('Re: x');
   });
 
   it('reencaminhar não tem destinatários', () => {

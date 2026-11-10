@@ -93,6 +93,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const [fields, setFields] = useState({ to: '', cc: '', bcc: '', subject: '', body: '' });
   // Resposta/reencaminhamento: a citação fica à parte, depois da assinatura (como sai no email).
   const [quote, setQuote] = useState('');
+  // A citação como abriu: o HTML original (replyHtml / forward.html) só vai se não mudou.
+  const [originalQuote, setOriginalQuote] = useState('');
   const [showCc, setShowCc] = useState(false);
   // Texto por passar a etiqueta em cada campo (um endereço mal escrito não pode sumir calado).
   const [unparsed, setUnparsed] = useState({ to: '', cc: '', bcc: '' });
@@ -132,6 +134,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
         body: draft.body ?? '',
       });
       setQuote(draft.resume.quote);
+      setOriginalQuote(draft.resume.originalQuote ?? draft.resume.quote);
       setShowCc(draft.resume.showCc);
       setSigChoice(draft.resume.signature);
       setFiles(draft.resume.files);
@@ -148,8 +151,10 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       const signatures = account?.signatures ?? [];
       const found = stripSavedSignature(written, signatures);
       written = found.body;
+      // Não encontrada no texto (ex.: assinatura só com imagem, que não tem texto): fica a
+      // predefinida — antes reabria "Sem assinatura" e o email saía sem ela.
       choice = !found.signatureId
-        ? 'none'
+        ? 'default'
         : signatures.find(sig => sig.id === found.signatureId)?.isDefault
           ? 'default'
           : found.signatureId;
@@ -161,7 +166,9 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       subject: draft.subject ?? '',
       body: written,
     });
-    setQuote((draft.body ?? '').slice(writtenPart(draft.body ?? '').length));
+    const opened = (draft.body ?? '').slice(writtenPart(draft.body ?? '').length);
+    setQuote(opened);
+    setOriginalQuote(opened);
     setShowCc(!!draft.cc || !!draft.bcc);
     setSigChoice(choice);
     setFiles([]);
@@ -238,15 +245,22 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     subject: fields.subject.trim(),
     text: fields.body + quote,
     signatureHtml: signatureHtml || null,
-    // Só enquanto a citação do reencaminhamento ainda lá está (se a apagou, vai o que escreveu).
+    // O original em HTML (com imagens) só se a citação ficou como abriu: se a pessoa escreveu
+    // no meio dela ou a cortou, vai o texto tal como está (senão as respostas perdiam-se).
     quotedHtml:
-      draft?.forward && quote.includes(FORWARD_MARKER)
-        ? draft.forward.html
-        : // Resposta: o original em HTML, enquanto a citação lá estiver.
-          draft?.replyHtml && /escreveu:/.test(quote)
-          ? draft.replyHtml
-          : null,
-    inReplyTo: draft?.inReplyTo,
+      quote.trim() && quote === originalQuote
+        ? draft?.forward && quote.includes(FORWARD_MARKER)
+          ? draft.forward.html
+          : draft?.replyHtml && /escreveu:/.test(quote)
+            ? draft.replyHtml
+            : null
+        : null,
+    // Só com a mesma caixa do original: o id é dessa caixa (noutra conta respondia ao email
+    // errado ou o Microsoft recusava o envio)
+    inReplyTo:
+      draft?.inReplyTo && (accountId || fallback?.id) === draft.accountId
+        ? draft.inReplyTo
+        : undefined,
     remoteAttachments: remote && remote.items.length ? remote : undefined,
     attachments: await Promise.all(
       files.map(async file => ({
@@ -283,6 +297,9 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     attachmentBytes: size,
     initial: initialSaved,
     build: buildInput,
+    resetKey: draft,
+    // Rascunho reaberto: só grava depois de os anexos voltarem todos (senão perdia os que faltavam)
+    paused: loadingFiles > 0,
   });
   // Guarda a mensagem como está, para não se perder ao ir a outra página da app e voltar.
   const saverRef = useRef(saver);
@@ -301,6 +318,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       body: fields.body,
       resume: {
         quote,
+        originalQuote,
         signature: sigChoice,
         showCc,
         files,
@@ -389,7 +407,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       bcc: fields.bcc,
       subject: fields.subject,
       body: fields.body,
-      resume: { quote, signature: sigChoice, showCc, files, remote, saved },
+      resume: { quote, originalQuote, signature: sigChoice, showCc, files, remote, saved },
     };
     setBusy(false);
     // Fecha logo; o envio continua em segundo plano (se falhar, o rascunho volta a abrir).

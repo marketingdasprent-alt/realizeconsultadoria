@@ -69,7 +69,8 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
         ? { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(body) }
         : { method: 'POST' }
     );
-    if (allowNotFound && res.status === 404) {
+    // 400 também: id de outra caixa (respondeu com outra conta) → segue como email novo
+    if (allowNotFound && (res.status === 404 || res.status === 400)) {
       await res.body?.cancel();
       return false;
     }
@@ -319,8 +320,33 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
       };
 
       // Caso normal: um só pedido (reply mantém a conversa e os cabeçalhos In-Reply-To).
-      if (fitsInlineGraphRequest(params.attachments, params.html.length + params.text.length)) {
-        const message = buildGraphMessage({ ...outgoing, attachments: params.attachments });
+      // Imagens da assinatura (o html refere-as por cid:): também vão neste pedido, senão
+      // chegavam partidas a quem recebe. Contam para o limite do pedido (em base64).
+      const inline = (params.inline ?? []).map((image, index) => ({
+        '@odata.type': '#microsoft.graph.fileAttachment',
+        name: `assinatura-${index + 1}.${image.mime.split('/')[1] || 'png'}`,
+        contentType: image.mime,
+        contentBytes: bytesToBase64(image.content),
+        contentId: image.cid,
+        isInline: true,
+      }));
+      const inlineChars = inline.reduce((total, item) => total + item.contentBytes.length, 0);
+      if (
+        fitsInlineGraphRequest(
+          params.attachments,
+          params.html.length + params.text.length + inlineChars
+        )
+      ) {
+        const built = buildGraphMessage({ ...outgoing, attachments: params.attachments });
+        const message = inline.length
+          ? {
+              ...built,
+              attachments: [
+                ...((built as { attachments?: unknown[] }).attachments ?? []),
+                ...inline,
+              ],
+            }
+          : built;
         const replied =
           !!params.inReplyTo &&
           (await postAccepted(`${messageUrl(params.inReplyTo)}/reply`, { message }, true));

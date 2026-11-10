@@ -61,8 +61,15 @@ export const parseRecipients = (value: string) =>
     .map(part => part.trim().replace(/^['"`‘’“”]+|['"`‘’“”]+$/g, ''))
     .filter(part => /^[^\s@'"]+@[^\s@'"]+\.[^\s@'"]+$/.test(part));
 
-const prefixed = (prefix: string, subject: string) =>
-  new RegExp(`^${prefix}:`, 'i').test(subject.trim()) ? subject.trim() : `${prefix}: ${subject}`;
+// Prefixos que já lá estão (também os do Outlook em português e outras línguas): saem antes de
+// pôr o nosso, senão ficava "Re: RES: …" ou "Fwd: FW: Enc: …".
+const REPLY_PREFIXES = /^(?:(?:re|res|aw|sv)(?:\[\d+\])?\s*:\s*)+/i;
+const FORWARD_PREFIXES = /^(?:(?:fwd?|enc|tr|wg|rv)(?:\[\d+\])?\s*:\s*)+/i;
+
+const prefixed = (prefix: 'Re' | 'Fwd', subject: string) => {
+  const clean = subject.trim().replace(prefix === 'Re' ? REPLY_PREFIXES : FORWARD_PREFIXES, '');
+  return `${prefix}: ${clean}`;
+};
 
 const quote = (message: MailMessage) => {
   const when = format(new Date(message.date), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: pt });
@@ -92,15 +99,29 @@ export const draftFrom = (
         attachments: message.attachments,
       },
     };
-  const replyTo = message.replyTo.length ? message.replyTo : message.from ? [message.from] : [];
-  const others =
-    mode === 'replyAll'
-      ? [...message.to, ...message.cc].filter(a => a.email.toLowerCase() !== myEmail.toLowerCase())
-      : [];
+  const isMe = (address: MailAddress) => address.email.toLowerCase() === myEmail.toLowerCase();
+  // Responder a um email que eu enviei (Enviados): vai para quem o recebeu, não para mim.
+  const fromMe = !!message.from && isMe(message.from) && !message.replyTo.length;
+  const replyTo = fromMe
+    ? message.to.filter(a => !isMe(a))
+    : message.replyTo.length
+      ? message.replyTo
+      : message.from
+        ? [message.from]
+        : [];
+  const others = mode === 'replyAll' ? (fromMe ? message.cc : [...message.to, ...message.cc]) : [];
+  // Sem repetidos (maiúsculas não contam) e sem o meu endereço
+  const seen = new Set(replyTo.map(a => a.email.toLowerCase()));
+  const cc = others.filter(a => {
+    const key = a.email.toLowerCase();
+    if (isMe(a) || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
   return {
     accountId: message.accountId,
     to: formatAddressList(replyTo),
-    cc: formatAddressList(others.filter(a => !replyTo.some(r => r.email === a.email))),
+    cc: formatAddressList(cc),
     subject: prefixed('Re', message.subject),
     body: quote(message),
     replyHtml: repliedHtml(message),
@@ -137,7 +158,9 @@ const escapeHtml = (text: string) =>
 export const MAIL_FONT = "'Open Sans',Arial,Helvetica,sans-serif";
 
 // Endereços no texto já escapado (https://…, www.…); a pontuação no fim fica fora da ligação.
-const URL_IN_TEXT = /\b(https?:\/\/[^\s<]+[^\s<.,;:!?)\]'"]|www\.[^\s<]+[^\s<.,;:!?)\]'"])/g;
+// O texto já vem escapado: "&amp;" faz parte do endereço, mas "&quot;", "&gt;", "&lt;" e "&#39;"
+// (aspas e <…> à volta dele) não — senão a ligação ficava com 'https://x.pt"'.
+const URL_IN_TEXT = /\b((?:https?:\/\/|www\.)(?:[^\s<&]|&amp;)*(?:[^\s<&.,;:!?)\]'"]|&amp;))/g;
 
 /** Endereços passam a ligações clicáveis no email enviado. */
 export const linkifyHtml = (escaped: string) =>

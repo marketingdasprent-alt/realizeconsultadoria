@@ -92,9 +92,16 @@ export const imapSnippet = (bytes: Uint8Array, info: ImapSnippetPart): string =>
   return makeSnippet(info.html ? htmlToText(text) : text);
 };
 
-const toIso = (value: Date | string | undefined | null): string => {
-  const ms = value instanceof Date ? value.getTime() : value ? Date.parse(value) : NaN;
-  return new Date(Number.isFinite(ms) ? ms : 0).toISOString();
+/**
+ * Primeira data válida (cabeçalho Date, depois a chegada ao servidor): um Date mal escrito vem
+ * como texto e antes dava 01/01/1970 em vez de usar a hora de chegada.
+ */
+const toIso = (...values: (Date | string | undefined | null)[]): string => {
+  for (const value of values) {
+    const ms = value instanceof Date ? value.getTime() : value ? Date.parse(value) : NaN;
+    if (Number.isFinite(ms) && ms > 0) return new Date(ms).toISOString();
+  }
+  return new Date(0).toISOString();
 };
 
 const hasFlag = (flags: Iterable<string> | undefined, flag: string): boolean => {
@@ -118,7 +125,7 @@ export const imapSummary = (input: {
     to: imapAddresses(input.envelope?.to),
     subject: input.envelope?.subject?.trim() ?? '',
     snippet: input.snippet ?? '',
-    date: toIso(input.envelope?.date ?? input.internalDate),
+    date: toIso(input.envelope?.date, input.internalDate),
     unread: !hasFlag(input.flags, '\\Seen'),
     starred: hasFlag(input.flags, '\\Flagged'),
     has_attachments: imapHasAttachments(input.bodyStructure),
@@ -187,7 +194,7 @@ export const parsedMailToMessage = (
     to: parsedAddresses(parsed.to),
     subject: parsed.subject?.trim() ?? '',
     snippet: makeSnippet(text ?? (html ? htmlToText(html) : '')),
-    date: toIso(parsed.date ?? meta.internalDate),
+    date: toIso(parsed.date, meta.internalDate),
     unread: !hasFlag(meta.flags, '\\Seen'),
     starred: hasFlag(meta.flags, '\\Flagged'),
     has_attachments: attachments.length > 0,

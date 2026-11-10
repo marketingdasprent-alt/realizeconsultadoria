@@ -543,30 +543,9 @@ const WebmailPage: React.FC = () => {
             return false;
           }
           const ok = result;
-          // Falhou: o rascunho volta a abrir como estava (os anexos têm de ser escolhidos outra vez).
-          if (!ok)
-            setDraftState({
-              accountId: input.accountId,
-              to: input.to.join(', '),
-              cc: input.cc.join(', '),
-              bcc: input.bcc.join(', '),
-              subject: input.subject,
-              body: input.text,
-              inReplyTo: input.inReplyTo,
-              restored: true,
-              // Continua o mesmo rascunho guardado (os anexos voltam a juntar-se).
-              saved: input.draft
-                ? { messageId: input.draft.id, accountId: input.draft.accountId, attachments: [] }
-                : undefined,
-              // Os anexos do email original (reencaminhar) voltam a ficar no email
-              attach: input.remoteAttachments
-                ? {
-                    accountId: input.remoteAttachments.accountId,
-                    messageId: input.remoteAttachments.messageId,
-                    attachments: input.remoteAttachments.items,
-                  }
-                : undefined,
-            });
+          // Falhou: o email volta a abrir exatamente como estava (texto, citação, assinatura
+          // escolhida e anexos), como no "Anular" — antes reabria sem assinatura e sem anexos.
+          if (!ok) setDraftState({ ...asItWas, restored: true });
           return ok;
         }}
         toBase64={actions.toBase64}

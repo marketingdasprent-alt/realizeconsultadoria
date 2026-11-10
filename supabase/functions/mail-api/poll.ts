@@ -80,20 +80,32 @@ const pollAccount = async (
     limit: PER_ACCOUNT,
     withoutSnippets: true,
   });
-  const newest = messages.reduce(
-    (max, mail) => Math.max(max, Date.parse(mail.date) || 0),
-    account.notified_until ? Date.parse(account.notified_until) : 0
-  );
-  const since = account.notified_until ? Date.parse(account.notified_until) : null;
+  // Datas no futuro (relógio errado ou spam com "Date: 2030") contam como "agora": senão o
+  // notified_until saltava para lá e esta caixa deixava de dar avisos de vez.
+  const cap = Date.now() + 5 * 60_000;
+  const dateOf = (mail: { date: string }) => Math.min(Date.parse(mail.date) || 0, cap);
+  const stored = account.notified_until ? Math.min(Date.parse(account.notified_until), cap) : null;
+  const newest = messages.reduce((max, mail) => Math.max(max, dateOf(mail)), stored ?? 0);
+  const since = stored;
   const fresh =
     since === null
       ? []
       : messages
-          .filter(
-            mail =>
-              mail.unread && !ruled?.moved.has(mail.id) && (Date.parse(mail.date) || 0) > since
-          )
+          .filter(mail => mail.unread && !ruled?.moved.has(mail.id) && dateOf(mail) > since)
           .sort((a, b) => a.date.localeCompare(b.date));
+
+  // Marca primeiro até onde se avisou (só se ninguém o mudou entretanto) e só depois avisa: se
+  // a função for cortada a meio, ou correrem duas passagens, os mesmos emails não avisam 2 vezes.
+  const until = new Date(newest || Date.now()).toISOString();
+  if (until !== account.notified_until) {
+    const claim = db.from('mail_accounts').update({ notified_until: until }).eq('id', account.id);
+    const { data: claimed } = await (
+      account.notified_until
+        ? claim.eq('notified_until', account.notified_until)
+        : claim.is('notified_until', null)
+    ).select('id');
+    if (!claimed?.length) return 0;
+  }
 
   // Emails devolvidos: aviso à parte, com o motivo em português (lê-se o texto do aviso)
   const bounces = fresh.filter(mail => isBounce(mail.from?.email, mail.subject));
@@ -137,10 +149,6 @@ const pollAccount = async (
   // Caixas IMAP: guarda já a cópia dos emails novos (abrem na hora), depois de avisar
   if (account.auth_method === 'imap') inBackground(precache(db, account.id, driver, fresh));
 
-  const until = new Date(newest || Date.now()).toISOString();
-  if (until !== account.notified_until) {
-    await db.from('mail_accounts').update({ notified_until: until }).eq('id', account.id);
-  }
   return fresh.length;
 };
 

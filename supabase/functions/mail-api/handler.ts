@@ -371,7 +371,8 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
           !params.pageToken &&
           !isUuid(body.label_id);
         const folderKey = `${folder}|${folderId ?? ''}|${params.limit}`;
-        if (cacheable) {
+        // "fresh" (Atualizar / chegou email novo): lê já do servidor, sem a lista guardada
+        if (cacheable && body.fresh !== true) {
           const cached = await readCachedList(db, account.id, folderKey);
           if (cached) {
             inBackground(

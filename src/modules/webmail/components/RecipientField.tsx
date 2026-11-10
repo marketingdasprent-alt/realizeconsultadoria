@@ -99,8 +99,13 @@ export const RecipientField: React.FC<RecipientFieldProps> = ({
       const step = event.key === 'ArrowDown' ? 1 : -1;
       setHighlight(index => (index + step + suggestions.length) % suggestions.length);
     } else if (event.key === 'Enter' || event.key === 'Tab') {
-      // Escolhe a sugestão marcada só se se escreveu algo; senão deixa seguir.
-      if (picked && draft.trim()) {
+      // Um endereço completo escrito à mão ganha à sugestão (que só "contém" o texto: escrever
+      // ana@x.pt não pode juntar joana@x.pt), a não ser que a sugestão seja esse endereço.
+      const typed = parseRecipients(draft);
+      const typedWins =
+        typed.length > 0 &&
+        !(picked?.kind === 'person' && picked.email.toLowerCase() === typed[0].toLowerCase());
+      if (picked && draft.trim() && !typedWins) {
         event.preventDefault();
         choose(picked);
       } else if (parseRecipients(draft).length) {
@@ -154,6 +159,12 @@ export const RecipientField: React.FC<RecipientFieldProps> = ({
           if (!/[,;\n]/.test(text)) return;
           event.preventDefault();
           onChange(addRecipients(value, parseRecipients(text)));
+          // Os bocados que não são endereços válidos ficam escritos no campo (não somem calados)
+          const rest = text
+            .split(/[,;\n]/)
+            .map(part => part.trim())
+            .filter(part => part && parseRecipients(part).length === 0);
+          if (rest.length) setDraft(rest.join(', '));
         }}
         autoFocus={autoFocus}
         placeholder={emails.length ? undefined : placeholder}

@@ -323,7 +323,9 @@ export const mailService = {
     pageToken: string | null,
     folderId?: string | null,
     /** Só os emails com este marcador (o servidor filtra a pasta). */
-    labelId?: string | null
+    labelId?: string | null,
+    /** Lista acabada de ler do servidor de email (sem a guardada). */
+    fresh = false
   ) => {
     const { data, error } = await call<{ messages: Row[]; next_page_token: string | null }>(
       'mail-api',
@@ -335,6 +337,7 @@ export const mailService = {
         label_id: labelId ?? undefined,
         query,
         page_token: pageToken ?? undefined,
+        fresh: fresh || undefined,
       }
     );
     return {

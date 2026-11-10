@@ -8,9 +8,12 @@ import { messageKey } from './labels.ts';
 import { bytesToBase64, decodeBytes, decodeTransferEncoding } from './mime.ts';
 import type { MailAttachmentInfo, MailMessage } from './types.ts';
 
-/** Imagens embebidas (cid:) que se descarregam já: cada uma e no total. */
-const INLINE_MAX = 300 * 1024;
-const INLINE_TOTAL_MAX = 1024 * 1024;
+/**
+ * Imagens embebidas (cid:) que se descarregam já: cada uma e no total (tamanho em base64).
+ * Assinaturas com imagens de 1–2 MB ficavam em branco nos Enviados com o limite de 300 KB.
+ */
+const INLINE_MAX = 2.5 * 1024 * 1024;
+const INLINE_TOTAL_MAX = 4 * 1024 * 1024;
 
 /** Prefixo do id dos anexos de um email aberto pelo caminho leve. */
 export const PART_ATTACHMENT_PREFIX = 'p:';

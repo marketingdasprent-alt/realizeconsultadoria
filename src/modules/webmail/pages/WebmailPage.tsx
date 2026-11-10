@@ -46,6 +46,7 @@ import { FOLDERS, draftFrom, mailKey } from '../lib/mailFormat';
 import { draftFromSaved } from '../lib/savedDraft';
 import { composeSession } from '../lib/composeSession';
 import { mailService } from '../services/mailService';
+import { draftMetaService } from '../services/draftMetaService';
 import { readSidebarWidth, saveSidebarWidth } from '../lib/sidebarWidth';
 import { providerOf, type MailProvider } from '../lib/providers';
 import type { ComposeDraft, MailAccount, MailFolder, MailSummary } from '../types';
@@ -81,6 +82,39 @@ const WebmailPage: React.FC = () => {
     setComposerMinimized(false);
     setDraftState(next);
   };
+  // Anulado ou falhou: o email volta a abrir — mas nunca por cima de outro que se esteja a
+  // escrever (fica à espera) nem perdido se a pessoa já saiu do Email (fica na sessão).
+  const draftRef = useRef(draft);
+  draftRef.current = draft;
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
+  const waiting = useRef<ComposeDraft[]>([]);
+  const reopen = (back: ComposeDraft) => {
+    if (!mountedRef.current) {
+      if (!composeSession.get()) composeSession.set(back);
+      return;
+    }
+    if (draftRef.current) {
+      waiting.current.push(back);
+      toast({
+        title: 'O email voltou para trás',
+        description: 'Abre outra vez quando fechar a mensagem que está a escrever.',
+      });
+      return;
+    }
+    setComposerMinimized(false);
+    setDraftState(back);
+  };
+  useEffect(() => {
+    if (draft || !waiting.current.length) return;
+    const next = waiting.current.shift();
+    if (next) setDraftState(next);
+  }, [draft]);
   const [connect, setConnect] = useState<MailProvider | null>(null);
   const [settings, setSettings] = useState<MailAccount | null>(null);
   const [conversion, setConversion] = useState<MailConversion | null>(null);
@@ -201,11 +235,40 @@ const WebmailPage: React.FC = () => {
   // Na pasta Rascunhos, abrir um email continua-o no compositor.
   const openSavedDraft = async (summary: MailSummary) => {
     const loading = toast({ title: 'A abrir o rascunho…' });
-    const { data, error } = await mailService.get(summary.accountId, summary.id);
+    const [{ data, error }, meta] = await Promise.all([
+      mailService.get(summary.accountId, summary.id),
+      draftMetaService.get(summary.accountId, summary.id),
+    ]);
     loading.dismiss();
     if (error || !data)
       return void toast({ title: 'O rascunho não abriu', variant: 'destructive' });
-    setDraft(draftFromSaved(data));
+    // Volta com o que o servidor de email não guarda: Bcc, conversa, citação e anexos remotos
+    const base = draftFromSaved(data);
+    setDraft(
+      meta
+        ? {
+            ...base,
+            bcc: meta.bcc ?? base.bcc,
+            inReplyTo: meta.inReplyTo,
+            replyHtml: meta.replyHtml,
+            forward: meta.forward?.html ? meta.forward : undefined,
+            attach: meta.remote?.items.length
+              ? {
+                  accountId: meta.remote.accountId,
+                  messageId: meta.remote.messageId,
+                  attachments: meta.remote.items,
+                }
+              : !meta.forward?.html && meta.forward?.attachments.length
+                ? {
+                    accountId: meta.forward.accountId,
+                    messageId: meta.forward.messageId,
+                    attachments: meta.forward.attachments,
+                  }
+                : undefined,
+            saved: base.saved ? { ...base.saved, signature: meta.signature } : base.saved,
+          }
+        : base
+    );
   };
 
   const open = (summary: MailSummary) => {
@@ -539,13 +602,13 @@ const WebmailPage: React.FC = () => {
           const result = await actions.send(input);
           // Anulou nos 10 s: o email volta a abrir exatamente como estava (com os anexos)
           if (result === 'undone') {
-            setDraftState(asItWas);
+            reopen(asItWas);
             return false;
           }
           const ok = result;
           // Falhou: o email volta a abrir exatamente como estava (texto, citação, assinatura
           // escolhida e anexos), como no "Anular" — antes reabria sem assinatura e sem anexos.
-          if (!ok) setDraftState({ ...asItWas, restored: true });
+          if (!ok) reopen({ ...asItWas, restored: true });
           return ok;
         }}
         toBase64={actions.toBase64}

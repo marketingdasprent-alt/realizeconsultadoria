@@ -38,6 +38,7 @@ import {
   mapWithConcurrency,
 } from '../../_shared/mail-server/http.ts';
 import type { OAuthSession } from '../session.ts';
+import { SEND_TIMEOUT_MS } from '../session.ts';
 
 const INLINE_IMAGE_MAX = 512 * 1024;
 const INLINE_IMAGE_COUNT = 10;
@@ -63,11 +64,18 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
     body?: Record<string, unknown>,
     allowNotFound = false
   ): Promise<boolean> => {
+    // Envios (reply, sendMail, send do rascunho): mais tempo, e sem resposta pode ter saído
     const res = await session.fetch(
       url,
       body
-        ? { method: 'POST', headers: JSON_HEADERS, body: JSON.stringify(body) }
-        : { method: 'POST' }
+        ? {
+            method: 'POST',
+            headers: JSON_HEADERS,
+            body: JSON.stringify(body),
+            timeoutMs: SEND_TIMEOUT_MS,
+            mayHaveSent: true,
+          }
+        : { method: 'POST', timeoutMs: SEND_TIMEOUT_MS, mayHaveSent: true }
     );
     // 400 também: id de outra caixa (respondeu com outra conta) → segue como email novo
     if (allowNotFound && (res.status === 404 || res.status === 400)) {
@@ -430,11 +438,31 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
     async thread(threadId: string) {
       // Todas as pastas (Entrada, Enviados…); ordena-se aqui (o Graph recusa ordenar com este filtro).
       const filter = encodeURIComponent(`conversationId eq '${threadId.replace(/'/g, "''")}'`);
-      const data = await session.json<{ value?: GraphMessage[] }>(
-        `${ME}/messages?$filter=${filter}&$top=50&$select=${GRAPH_SUMMARY_FIELDS.join(',')}`
+      // Os ids do Lixo e do Spam: as respostas já apagadas não voltam a aparecer na conversa
+      const hidden = new Set<string>();
+      await Promise.all(
+        ['deleteditems', 'junkemail'].map(async name => {
+          const folder = await session
+            .json<{ id?: string }>(`${ME}/mailFolders/${name}?$select=id`)
+            .catch(() => null);
+          if (folder?.id) hidden.add(folder.id);
+        })
       );
-      return (data.value ?? [])
-        .filter(m => !m.isDraft)
+      // Conversas longas: segue as páginas seguintes (até 200 emails)
+      const all: (GraphMessage & { parentFolderId?: string })[] = [];
+      let url: string | null =
+        `${ME}/messages?$filter=${filter}&$top=50&$select=${[...GRAPH_SUMMARY_FIELDS, 'parentFolderId'].join(',')}`;
+      for (let page = 0; url && page < 4; page += 1) {
+        const data: {
+          value?: (GraphMessage & { parentFolderId?: string })[];
+          '@odata.nextLink'?: string;
+        } = await session.json(url);
+        all.push(...(data.value ?? []));
+        const next = data['@odata.nextLink'];
+        url = next && next.startsWith(GRAPH_BASE) ? next : null;
+      }
+      return all
+        .filter(m => !m.isDraft && !(m.parentFolderId && hidden.has(m.parentFolderId)))
         .map(parseGraphSummary)
         .sort((a, b) => a.date.localeCompare(b.date));
     },

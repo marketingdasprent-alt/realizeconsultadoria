@@ -111,9 +111,16 @@ export const useMailActions = (folder?: MailFolder) => {
       const outgoing = { ...input, text: composed.text };
       // Caixa de saída (como o Outlook): o servidor envia num pedido próprio e repete se não
       // conseguir ligar; emails muito pesados continuam a ir direto.
+      // Conta tudo o que vai no pedido (anexos, HTML e o texto, que repete a conversa citada)
+      // com folga para o JSON; antes ficava de fora o texto e o servidor recusava a fila.
       const bytes = input.attachments.reduce((total, a) => total + a.base64.length, 0);
-      const queued = bytes + composed.html.length < QUEUE_MAX_BYTES;
-      const { data, error } = await mailService.send(outgoing, composed.html, queued);
+      let queued = (bytes + composed.html.length + composed.text.length) * 1.05 < QUEUE_MAX_BYTES;
+      let { data, error } = await mailService.send(outgoing, composed.html, queued);
+      // A fila não o aceitou por ser grande: vai direto, como os pesados
+      if (queued && error?.code === 'too_large') {
+        queued = false;
+        ({ data, error } = await mailService.send(outgoing, composed.html, false));
+      }
       let failure: MailError | null = error;
       if (!failure && queued && data?.id) {
         const result = await waitForOutbox(data.id);

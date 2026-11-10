@@ -248,6 +248,17 @@ const smtpFailure = (error: unknown): MailError => {
       'smtp_failed',
       `A ligação ao servidor de envio caiu a meio (${code}). O email pode ter sido enviado: veja os Enviados antes de o enviar outra vez.`
     );
+  // 552 / "size": o servidor de envio (ou o de quem recebe) não aceita um email tão grande
+  if (
+    e.responseCode === 552 ||
+    /message (size|too (big|large))|exceeds.{0,40}size|size limit|too large/i.test(
+      String(e.response ?? e.message ?? '')
+    )
+  )
+    return mailError(
+      'too_large',
+      'O servidor de envio recusou o email por ser grande demais. Envie menos anexos (ou reduza-os) e tente outra vez.'
+    );
   const reason = String(e.response ?? e.message ?? '')
     .replace(/\s+/g, ' ')
     .slice(0, 160);
@@ -500,7 +511,7 @@ export const createImapDriver = (
       if (!head) throw mailError('message_not_found');
       if ((head.size ?? 0) <= LIGHT_OPEN_ABOVE || !head.bodyStructure) return null;
       const plan = planLightMessage(head.bodyStructure);
-      const parts = [plan.text, plan.html, ...plan.inline]
+      const parts = [plan.text, plan.html, ...plan.htmlMore, ...plan.inline]
         .filter((item): item is NonNullable<typeof item> => !!item)
         .map(item => item.part);
       const bodies = parts.length

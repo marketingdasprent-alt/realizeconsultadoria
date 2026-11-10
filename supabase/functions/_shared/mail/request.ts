@@ -45,6 +45,26 @@ export const parseListLimit = (value: unknown): number => {
   return Math.min(MAX_LIST_LIMIT, Math.max(1, Math.floor(n)));
 };
 
+/**
+ * Endereço que os servidores aceitam: domínio com acentos (joao@exämple.pt) passa a punycode
+ * (xn--…); acentos antes do @ não (os servidores comuns recusam — 553): null.
+ */
+export const asciiEmail = (email: string): string | null => {
+  const at = email.lastIndexOf('@');
+  if (at < 1) return email;
+  const local = email.slice(0, at);
+  const domain = email.slice(at + 1);
+  // eslint-disable-next-line no-control-regex -- só ASCII
+  if (/[^\x00-\x7f]/.test(local)) return null;
+  // eslint-disable-next-line no-control-regex -- só ASCII
+  if (!/[^\x00-\x7f]/.test(domain)) return email;
+  try {
+    return `${local}@${new URL(`http://${domain}`).hostname}`;
+  } catch {
+    return null;
+  }
+};
+
 /** Lista de destinatários (strings "Nome <a@b>" ou "a@b, c@d"); null se algum for inválido. */
 export const parseRecipients = (value: unknown): MailAddress[] | null => {
   if (value === undefined || value === null) return [];
@@ -59,8 +79,9 @@ export const parseRecipients = (value: unknown): MailAddress[] | null => {
     for (const address of parsed) {
       if (!address) return null;
       // Copiado de outro sítio entre aspas ('a@b.pt'): o servidor SMTP recusa (501), tiram-se
-      const email = address.email.replace(/^['"`‘’“”\s]+|['"`‘’“”\s]+$/g, '');
-      if (!isValidEmail(email)) return null;
+      const typed = address.email.replace(/^['"`‘’“”\s]+|['"`‘’“”\s]+$/g, '');
+      const email = asciiEmail(typed);
+      if (!email || !isValidEmail(email)) return null;
       out.push({ ...address, email });
     }
   }

@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { composeWithSignature } from '../lib/signature';
 import { mailService } from '../services/mailService';
+import { draftMetaService, type DraftMeta } from '../services/draftMetaService';
 import type { ComposeInput } from '../types';
 
 /** Espera depois da última alteração antes de guardar no fornecedor. */
@@ -36,6 +37,8 @@ interface DraftSaverOptions {
   resetKey?: unknown;
   /** Sem gravação automática (ex.: anexos de um rascunho ainda a chegar). */
   paused?: boolean;
+  /** O que o servidor de email não guarda (Bcc, conversa, citação HTML, anexos remotos). */
+  meta?: () => DraftMeta;
 }
 
 /**
@@ -51,7 +54,10 @@ export const useDraftSaver = ({
   build,
   resetKey,
   paused = false,
+  meta,
 }: DraftSaverOptions) => {
+  const metaRef = useRef(meta);
+  metaRef.current = meta;
   const { isPreview } = useWorkspace();
   const qc = useQueryClient();
   const [status, setStatus] = useState<DraftStatus>('idle');
@@ -94,8 +100,10 @@ export const useDraftSaver = ({
       if (isPreview || !hasContent) return true;
       // Sem alterações desde que abriu (ou desde a última gravação): nada a guardar.
       if (!force && snapshot === savedSnapshot.current) return true;
-      // Um de cada vez: se já está a guardar, espera e volta a ver.
-      if (running.current) await running.current;
+      // Um de cada vez: espera pela que está a correr (e por outra que tenha começado entretanto)
+      // — antes duas gravações à espera arrancavam juntas e ficava um rascunho a mais.
+      while (running.current) await running.current.catch(() => false);
+      if (!force && snapshot === savedSnapshot.current) return true;
       const job = (async () => {
         setStatus('saving');
         const input = await buildRef.current();
@@ -118,6 +126,12 @@ export const useDraftSaver = ({
           return false;
         }
         saved.current = data.id ? { id: data.id, accountId: input.accountId } : null;
+        // Os dados extra acompanham o rascunho novo (o id muda a cada gravação)
+        if (data.id && metaRef.current) {
+          await draftMetaService.save(input.accountId, data.id, metaRef.current());
+          if (previous && previous.id !== data.id)
+            void draftMetaService.remove(previous.accountId, previous.id);
+        }
         savedSnapshot.current = snapshot;
         setStatus('saved');
         setSavedAt(new Date());
@@ -166,6 +180,7 @@ export const useDraftSaver = ({
       const draft = saved.current;
       saved.current = null;
       if (draft && !isPreview) {
+        void draftMetaService.remove(draft.accountId, draft.id);
         await mailService.deleteDraft(draft.accountId, draft.id);
         void qc.invalidateQueries({ queryKey: ['mail', 'list'] });
       }

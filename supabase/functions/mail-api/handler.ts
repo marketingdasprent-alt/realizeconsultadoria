@@ -88,7 +88,7 @@ import {
   retryOutbox,
   triggerProcess,
 } from './outbox.ts';
-import { inBackground, readCached, writeCached } from './messageCache.ts';
+import { clearCachedMessages, inBackground, readCached, writeCached } from './messageCache.ts';
 import {
   clearCachedLists,
   patchCachedLists,
@@ -445,6 +445,9 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
         await createDriver(db, account, pendingSecret)
       ).renameFolder(folderId, name);
       await renameFolderRefs(db, account.id, folderId, renamed.id, name, renamed.moved);
+      // Cópias com o caminho antigo (pasta:UID) deixam de servir: uma pasta nova com esse nome
+      // recomeça os UIDs e abriria o email errado
+      if (account.auth_method === 'imap') inBackground(clearCachedMessages(db, account.id));
       return ok({ id: renamed.id });
     }
     case 'delete-folder': {
@@ -454,6 +457,7 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
         await createDriver(db, account, pendingSecret)
       ).deleteFolder(folderId);
       await dropFolderRefs(db, account.id, removed);
+      if (account.auth_method === 'imap') inBackground(clearCachedMessages(db, account.id));
       return ok({ removed: removed.length });
     }
     case 'rules':
@@ -734,8 +738,9 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       return ok(sent);
     }
     case 'queue-send': {
-      // Caixa de saída: valida já (destinatários, assunto) e envia num pedido próprio
-      const check = parseSendRequest({ ...body, attachments: [] });
+      // Caixa de saída: valida já tudo (destinatários e anexos) e envia num pedido próprio —
+      // um anexo estragado dava depois "o servidor recusou o envio" sem dizer porquê
+      const check = parseSendRequest(body);
       if (!check.ok)
         return check.code === 'bad_request'
           ? badRequest()

@@ -21,7 +21,14 @@ export interface ApiRequestInit {
   method?: string;
   headers?: Record<string, string>;
   body?: string;
+  /** Tempo máximo à espera da resposta (por omissão 20 s; envios grandes precisam de mais). */
+  timeoutMs?: number;
+  /** Envio de um email: sem resposta a tempo, pode ter saído (não dizer que falhou de vez). */
+  mayHaveSent?: boolean;
 }
+
+/** Envios e uploads: um email de 10–25 MB pode levar mais de um minuto a subir. */
+export const SEND_TIMEOUT_MS = 120_000;
 
 export class OAuthSession {
   private refreshed = false;
@@ -89,13 +96,22 @@ export class OAuthSession {
   async fetch(url: string, init: ApiRequestInit = {}): Promise<Response> {
     const sendOnce = async (token: string) => {
       try {
-        return await fetchWithTimeout(url, {
-          method: init.method ?? 'GET',
-          headers: { ...init.headers, Authorization: `Bearer ${token}` },
-          body: init.body,
-        });
+        return await fetchWithTimeout(
+          url,
+          {
+            method: init.method ?? 'GET',
+            headers: { ...init.headers, Authorization: `Bearer ${token}` },
+            body: init.body,
+          },
+          init.timeoutMs
+        );
       } catch (error) {
         console.error(`mail-api ${this.provider}: sem resposta`, errorMessage(error));
+        if (init.mayHaveSent)
+          throw mailError(
+            'provider_error',
+            'O fornecedor não respondeu a tempo. O email pode ter sido enviado: veja os Enviados antes de o enviar outra vez.'
+          );
         throw mailError('provider_error', 'Sem resposta do fornecedor de email.');
       }
     };

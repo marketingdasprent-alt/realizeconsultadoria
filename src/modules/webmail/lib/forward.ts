@@ -20,6 +20,21 @@ export const stripActiveHtml = (html: string): string =>
     .replace(/\son\w+\s*=\s*("[^"]*"|'[^']*'|[^\s>]+)/gi, '')
     .replace(/(href|src)\s*=\s*("|')\s*javascript:[^"']*\2/gi, '$1=$2#$2');
 
+/**
+ * HTML do original para pôr dentro da nossa resposta/reencaminhamento: só o que está dentro do
+ * <body>, sem <head>, <style> nem <title>. As regras de estilo do original (body{font-size:10px},
+ * p{margin:0}…) aplicavam-se ao email inteiro no Outlook/Apple Mail e mudavam o nosso texto e a
+ * assinatura.
+ */
+export const quotableHtml = (html: string): string => {
+  const body = /<body\b[^>]*>([\s\S]*?)(?:<\/body>|$)/i.exec(html);
+  return stripActiveHtml(body ? body[1] : html)
+    .replace(/<!doctype[^>]*>/gi, '')
+    .replace(/<head\b[\s\S]*?<\/head>/gi, '')
+    .replace(/<(style|title)\b[\s\S]*?<\/\1>/gi, '')
+    .replace(/<\/?(html|head|body)\b[^>]*>/gi, '');
+};
+
 const headerLines = (message: MailMessage): { label: string; value: string }[] => {
   const when = format(new Date(message.date), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: pt });
   return [
@@ -59,7 +74,7 @@ export const repliedHtml = (message: MailMessage): string => {
   const when = format(new Date(message.date), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: pt });
   const who = message.from?.name || message.from?.email || 'Desconhecido';
   const body = message.html
-    ? stripHtmlQuoteMarkers(stripActiveHtml(message.html))
+    ? stripHtmlQuoteMarkers(quotableHtml(message.html))
     : `<div style="white-space:pre-wrap">${escapeHtml(stripQuoteMarkers(message.text ?? ''))}</div>`;
   return (
     `<div style="margin-top:16px;color:#64748b">Em ${escapeHtml(when)}, ${escapeHtml(who)} escreveu:</div>` +
@@ -73,7 +88,7 @@ export const forwardedHtml = (message: MailMessage): string => {
     .map(line => `<b>${line.label}:</b> ${escapeHtml(line.value)}`)
     .join('<br>');
   const body = message.html
-    ? stripActiveHtml(message.html)
+    ? quotableHtml(message.html)
     : `<pre style="white-space:pre-wrap;font-family:inherit">${escapeHtml(message.text ?? '')}</pre>`;
   return (
     `<div style="margin-top:16px"><div style="color:#64748b">${escapeHtml(FORWARD_MARKER)}</div>` +

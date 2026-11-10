@@ -345,9 +345,23 @@ const filenameParams = (param: 'name' | 'filename', filename: string): string =>
       ? String.fromCharCode(b)
       : `%${b.toString(16).toUpperCase().padStart(2, '0')}`
   ).join('');
-  return param === 'filename'
-    ? `filename*=UTF-8''${encoded}`
-    : `name="${encodeWords(filename).replace(/ /g, '')}"`;
+  if (param === 'name')
+    // Encoded-words separadas por uma quebra dobrada (CRLF + espaço): juntas sem espaço alguns
+    // leitores não as descodificavam, e numa só linha um nome longo passava os 998 caracteres.
+    return `name="${encodeWords(filename).split(' ').join(`${CRLF} `)}"`;
+  // RFC 2231 com continuações (filename*0*=…; filename*1*=…), sem partir um %XX a meio
+  const pieces: string[] = [];
+  for (let i = 0; i < encoded.length; ) {
+    let end = Math.min(encoded.length, i + 60);
+    const cut = encoded.lastIndexOf('%', end - 1);
+    if (end < encoded.length && cut > end - 3 && cut > i) end = cut;
+    pieces.push(encoded.slice(i, end));
+    i = end;
+  }
+  if (pieces.length === 1) return `filename*=UTF-8''${encoded}`;
+  return pieces
+    .map((piece, index) => `filename*${index}*=${index === 0 ? "UTF-8''" : ''}${piece}`)
+    .join(`;${CRLF} `);
 };
 
 export interface RawAttachment {
@@ -481,8 +495,8 @@ export const buildRawMessage = (input: RawMessageInput): string => {
         ...attachments.map(a => {
           const filename = safeFilename(a.filename);
           return [
-            `Content-Type: ${safeMime(a.mime)}; ${filenameParams('name', filename)}`,
-            `Content-Disposition: attachment; ${filenameParams('filename', filename)}`,
+            `Content-Type: ${safeMime(a.mime)};${CRLF} ${filenameParams('name', filename)}`,
+            `Content-Disposition: attachment;${CRLF} ${filenameParams('filename', filename)}`,
             'Content-Transfer-Encoding: base64',
             '',
             wrapBase64(a.base64 ?? bytesToBase64(a.content ?? new Uint8Array())),

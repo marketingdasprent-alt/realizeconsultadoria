@@ -24,6 +24,7 @@ import {
 import type { MailDriver, MailSendParams, MailSummary } from '../../_shared/mail/types.ts';
 import { mapWithConcurrency } from '../../_shared/mail-server/http.ts';
 import type { OAuthSession } from '../session.ts';
+import { SEND_TIMEOUT_MS } from '../session.ts';
 
 const GMAIL = 'https://gmail.googleapis.com/gmail/v1/users/me';
 const GMAIL_UPLOAD_SEND =
@@ -32,6 +33,27 @@ const METADATA =
   'format=metadata&metadataHeaders=From&metadataHeaders=To&metadataHeaders=Subject&metadataHeaders=Date&metadataHeaders=Message-ID';
 /** Acima disto o JSON { raw } (base64url, +33%) passa o limite do endpoint simples; usa-se o upload. */
 const SIMPLE_SEND_MAX = 3 * 1024 * 1024;
+const GMAIL_UPLOAD_DRAFTS = 'https://gmail.googleapis.com/upload/gmail/v1/users/me/drafts';
+
+/** Corpo multipart do upload: metadados JSON + a mensagem RFC 822 (só ASCII). */
+const multipartUpload = (metadata: Record<string, unknown>, raw: string) => {
+  const boundary = `realize_${randomHex(12)}`;
+  return {
+    contentType: `multipart/related; boundary=${boundary}`,
+    body: [
+      `--${boundary}`,
+      'Content-Type: application/json; charset=UTF-8',
+      '',
+      JSON.stringify(metadata),
+      `--${boundary}`,
+      'Content-Type: message/rfc822',
+      '',
+      raw,
+      `--${boundary}--`,
+      '',
+    ].join('\r\n'),
+  };
+};
 const INLINE_IMAGE_MAX = 512 * 1024;
 const INLINE_IMAGE_COUNT = 10;
 
@@ -211,6 +233,8 @@ export const createGmailDriver = (
       if (raw.length <= SIMPLE_SEND_MAX) {
         sent = await session.json<{ id?: string }>(`${GMAIL}/messages/send`, {
           method: 'POST',
+          timeoutMs: SEND_TIMEOUT_MS,
+          mayHaveSent: true,
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(
             threadId ? { raw: base64UrlEncode(raw), threadId } : { raw: base64UrlEncode(raw) }
@@ -233,6 +257,8 @@ export const createGmailDriver = (
         ].join('\r\n');
         sent = await session.json<{ id?: string }>(GMAIL_UPLOAD_SEND, {
           method: 'POST',
+          timeoutMs: SEND_TIMEOUT_MS,
+          mayHaveSent: true,
           headers: { 'Content-Type': `multipart/related; boundary=${boundary}` },
           body,
         });
@@ -243,6 +269,25 @@ export const createGmailDriver = (
     async saveDraft(params: MailSendParams, draftId: string | null) {
       const { raw, threadId } = await compose(params);
       const existing = draftId ? await draftIdOf(draftId) : null;
+      // Rascunho grande (anexos): o JSON { raw } passa o limite do endpoint simples → upload
+      if (raw.length > SIMPLE_SEND_MAX) {
+        const upload = multipartUpload(
+          existing
+            ? { id: existing, message: threadId ? { threadId } : {} }
+            : { message: threadId ? { threadId } : {} },
+          raw
+        );
+        const big = await session.json<{ id: string; message?: { id?: string } }>(
+          `${GMAIL_UPLOAD_DRAFTS}${existing ? `/${enc(existing)}` : ''}?uploadType=multipart`,
+          {
+            method: existing ? 'PUT' : 'POST',
+            timeoutMs: SEND_TIMEOUT_MS,
+            headers: { 'Content-Type': upload.contentType },
+            body: upload.body,
+          }
+        );
+        return { id: big.message?.id ?? '' };
+      }
       const message = threadId
         ? { raw: base64UrlEncode(raw), threadId }
         : { raw: base64UrlEncode(raw) };

@@ -94,3 +94,20 @@ export const pruneCached = async (db: SupabaseClient, accountId: string): Promis
   if (removeError) throw removeError;
   return old.length;
 };
+
+/**
+ * Apaga todas as cópias de uma caixa. Depois de apagar ou mudar o nome de uma pasta, os UIDs de
+ * uma pasta recriada com o mesmo nome recomeçam em 1 e a cópia antiga (pasta:UID) mostraria
+ * outro email. As cópias voltam a encher-se sozinhas (verificação de email e cópia de 30 dias).
+ */
+export const clearCachedMessages = async (db: SupabaseClient, accountId: string) => {
+  for (let round = 0; round < 20; round += 1) {
+    const { data, error } = await db.storage.from(BUCKET).list(accountId, { limit: 1000 });
+    if (error) throw error;
+    const names = ((data ?? []) as { name: string }[]).map(file => `${accountId}/${file.name}`);
+    if (!names.length) return;
+    const { error: removeError } = await db.storage.from(BUCKET).remove(names);
+    if (removeError) throw removeError;
+    if (names.length < 1000) return;
+  }
+};

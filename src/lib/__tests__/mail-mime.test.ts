@@ -200,7 +200,7 @@ describe('buildRawMessage', () => {
     });
     expect(raw).toMatch(/Content-Type: multipart\/mixed; boundary="([^"]+)"/);
     expect(raw).toContain(
-      "Content-Disposition: attachment; filename*=UTF-8''Relat%C3%B3rio%202026.pdf"
+      "Content-Disposition: attachment;\r\n filename*=UTF-8''Relat%C3%B3rio%202026.pdf"
     );
     for (const line of raw.split('\r\n')) expect(line.length).toBeLessThanOrEqual(998);
 

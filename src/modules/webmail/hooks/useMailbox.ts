@@ -110,12 +110,25 @@ export const useMailbox = (
   }, [useCache, firstPage, query.dataUpdatedAt, cached, user.userId, idsKey, cacheFolder]);
 
   const live = useMemo(() => {
+    const pages = query.data?.pages ?? [];
     const seen = new Set<string>();
-    return (query.data?.pages ?? [])
+    const all = pages
       .flatMap(page => page.messages)
       .filter(m => !seen.has(`${m.accountId}:${m.id}`) && seen.add(`${m.accountId}:${m.id}`))
       .sort((a, b) => b.date.localeCompare(a.date));
-  }, [query.data]);
+    // Várias caixas juntas: uma caixa com mais páginas por carregar só tem os emails até ao
+    // mais antigo que já veio. Os das outras caixas mais antigos do que isso esperam (senão
+    // apareciam por cima de emails que ainda faltam e pareciam faltar emails).
+    const pending = Object.keys(pages[pages.length - 1]?.next ?? {});
+    if (pending.length < 1 || ids.length < 2) return all;
+    const oldestOf = (accountId: string) => {
+      const mine = all.filter(m => m.accountId === accountId);
+      return mine.length ? mine[mine.length - 1].date : '';
+    };
+    const cutoff = pending.map(oldestOf).reduce((max, date) => (date > max ? date : max), '');
+    return cutoff ? all.filter(m => m.date >= cutoff) : all;
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ids resume-se em idsKey
+  }, [query.data, idsKey]);
 
   const demoList = useMemo(
     () =>

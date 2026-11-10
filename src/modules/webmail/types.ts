@@ -194,6 +194,8 @@ export interface ComposeDraft {
     messageId: string;
     accountId: string;
     attachments: MailAttachmentInfo[];
+    /** Assinatura escolhida quando foi guardado (mail_draft_meta). */
+    signature?: string;
   };
   /** Email novo já com anexos de outra mensagem ("Novo email com anexo"). */
   attach?: {

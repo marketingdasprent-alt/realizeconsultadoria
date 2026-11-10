@@ -56,3 +56,35 @@ describe('email dentro do email (aviso de devolução)', () => {
     expect(plan.attachments.some(a => a.mime === 'message/rfc822')).toBe(true);
   });
 });
+
+import { buildRawMessage } from '../../../supabase/functions/_shared/mail/mime';
+import { asciiEmail } from '../../../supabase/functions/_shared/mail/request';
+
+describe('nomes de anexos longos', () => {
+  it('nenhuma linha passa de 998 e o nome fica em continuações RFC 2231', () => {
+    const raw = buildRawMessage({
+      from: { name: 'Eu', email: 'eu@x.pt' },
+      to: [{ name: null, email: 'a@x.pt' }],
+      cc: [],
+      bcc: [],
+      subject: 'x',
+      text: 'x',
+      html: '',
+      attachments: [
+        { filename: 'ç'.repeat(150) + '.pdf', mime: 'application/pdf', content: new Uint8Array(3) },
+      ],
+    } as unknown as Parameters<typeof buildRawMessage>[0]);
+    for (const line of raw.split('\r\n')) expect(line.length).toBeLessThanOrEqual(998);
+    expect(raw).toContain("filename*0*=UTF-8''");
+    expect(raw).toContain('filename*1*=');
+    expect(raw).not.toContain('?==?');
+  });
+});
+
+describe('endereços com acentos', () => {
+  it('domínio passa a punycode; acentos antes do @ são recusados', () => {
+    expect(asciiEmail('joao@exämple.pt')).toBe('joao@xn--exmple-cua.pt');
+    expect(asciiEmail('joão@x.pt')).toBeNull();
+    expect(asciiEmail('ana@x.pt')).toBe('ana@x.pt');
+  });
+});

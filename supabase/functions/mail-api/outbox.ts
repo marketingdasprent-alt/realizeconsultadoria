@@ -5,6 +5,7 @@
 // a pessoa é avisada para confirmar nos Enviados.
 
 import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { MAIL_ERROR_MESSAGES } from '../_shared/mail/errors.ts';
 import { errorMessage } from '../_shared/mail-server/http.ts';
 
 const MAX_ATTEMPTS = 3;
@@ -103,7 +104,9 @@ export const processOutbox = async (
     };
     ok = res.ok && result.ok === true;
     code = result.code ?? (res.ok ? 'error' : 'server_error');
-    message = result.message ?? '';
+    // Sem texto do servidor: a mensagem conhecida para esse código (em português)
+    message =
+      result.message || (MAIL_ERROR_MESSAGES as Record<string, string | undefined>)[code] || '';
   } catch (err) {
     message = errorMessage(err);
   }

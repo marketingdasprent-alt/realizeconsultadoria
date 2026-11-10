@@ -29,6 +29,11 @@ export interface LightPart {
 export interface LightPlan {
   text: LightPart | null;
   html: LightPart | null;
+  /**
+   * Mais pedaços de HTML do mesmo email, pela ordem (iPhone/Apple Mail: texto, fotografia,
+   * texto…). Antes só se mostrava o primeiro e o resto do email (e a assinatura) desaparecia.
+   */
+  htmlMore: LightPart[];
   /** Imagens embebidas no HTML (Content-ID sem <>). */
   inline: (LightPart & { cid: string })[];
   attachments: MailAttachmentInfo[];
@@ -61,7 +66,7 @@ const filenameOf = (node: Node) =>
 
 /** O que descarregar (e o que fica só na lista) a partir da estrutura do email. */
 export const planLightMessage = (root: ImapBodyNode | undefined): LightPlan => {
-  const plan: LightPlan = { text: null, html: null, inline: [], attachments: [] };
+  const plan: LightPlan = { text: null, html: null, htmlMore: [], inline: [], attachments: [] };
   let inlineTotal = 0;
   for (const node of leaves(root as Node)) {
     const mime = (node.type ?? '').toLowerCase();
@@ -72,6 +77,8 @@ export const planLightMessage = (root: ImapBodyNode | undefined): LightPlan => {
       plan.text = toPart(node);
     } else if (disposition !== 'attachment' && !filename && mime === 'text/html' && !plan.html) {
       plan.html = toPart(node);
+    } else if (disposition !== 'attachment' && !filename && mime === 'text/html') {
+      plan.htmlMore.push(toPart(node));
     } else if (isEmbeddedMail(node)) {
       plan.attachments.push({
         id: `${PART_ATTACHMENT_PREFIX}${node.part ?? '1'}`,
@@ -158,7 +165,9 @@ export const buildLightMessage = (input: {
 }): MailMessage => {
   const { plan } = input;
   const text = plan.text ? decodePart(input.read(plan.text.part), plan.text) : null;
-  let html = plan.html ? decodePart(input.read(plan.html.part), plan.html) : null;
+  let html = plan.html
+    ? [plan.html, ...plan.htmlMore].map(part => decodePart(input.read(part.part), part)).join('')
+    : null;
   if (html) {
     for (const image of plan.inline) {
       const bytes = input.read(image.part);

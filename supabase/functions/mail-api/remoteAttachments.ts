@@ -16,8 +16,12 @@ const inBatches = async <T, R>(items: T[], limit: number, fn: (item: T) => Promi
   return results;
 };
 
-/** Máximo do email inteiro (anexos novos + do original): o que a maioria dos servidores aceita. */
-export const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+/**
+ * Máximo dos anexos do email inteiro (novos + do original). Os servidores (Gmail, Outlook, a
+ * maioria dos cPanel) aceitam 25 MB já codificados, e a codificação base64 junta ~37%: 18 MB
+ * de ficheiros dão ~24,6 MB. Com 25 MB de ficheiros o email saía com ~34 MB e era recusado.
+ */
+export const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
 /** Anexos do original por email (há reencaminhamentos com mais de 100, ex.: movimentos do mês). */
 const MAX_ITEMS = 300;
 

@@ -27,7 +27,8 @@ import { RzSelect } from '@/modules/workspace/components/RzSelect';
 
 const MAX_BYTES = 10 * 1024 * 1024;
 /** Total com os anexos do email original (juntos pelo servidor ao enviar). */
-const MAX_TOTAL_BYTES = 25 * 1024 * 1024;
+// Igual ao servidor: 18 MB de ficheiros ficam ~25 MB depois de codificados no email
+const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
 const FIELD = 'h-10 w-full bg-transparent text-[14px] outline-none placeholder:text-rz-muted';
 
 interface MailComposerProps {
@@ -151,13 +152,15 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       const signatures = account?.signatures ?? [];
       const found = stripSavedSignature(written, signatures);
       written = found.body;
-      // Não encontrada no texto (ex.: assinatura só com imagem, que não tem texto): fica a
-      // predefinida — antes reabria "Sem assinatura" e o email saía sem ela.
-      choice = !found.signatureId
-        ? 'default'
-        : signatures.find(sig => sig.id === found.signatureId)?.isDefault
+      // A escolhida quando foi guardado; senão a encontrada no texto. Não encontrada (ex.: só
+      // com imagem, sem texto): fica a predefinida — antes reabria "Sem assinatura".
+      choice = draft.saved.signature
+        ? draft.saved.signature
+        : !found.signatureId
           ? 'default'
-          : found.signatureId;
+          : signatures.find(sig => sig.id === found.signatureId)?.isDefault
+            ? 'default'
+            : found.signatureId;
     }
     setFields({
       to: draft.to ?? '',
@@ -186,7 +189,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
         items: source.attachments,
       });
       setLoadingFiles(0);
-      return;
+      // Rascunho de um reencaminhamento: os anexos que se juntaram à mão também voltam
+      if (!draft.saved?.attachments.length) return;
     }
     // Rascunho reaberto: os anexos voltam a anexar-se (um a um, em fundo).
     const forward = draft.saved;
@@ -298,6 +302,14 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     initial: initialSaved,
     build: buildInput,
     resetKey: draft,
+    meta: () => ({
+      bcc: fields.bcc || undefined,
+      inReplyTo: draft?.inReplyTo,
+      replyHtml: draft?.replyHtml,
+      forward: draft?.forward ? { ...draft.forward, attachments: remote?.items ?? [] } : undefined,
+      remote: draft?.forward ? undefined : remote,
+      signature: sigChoice,
+    }),
     // Rascunho reaberto: só grava depois de os anexos voltarem todos (senão perdia os que faltavam)
     paused: loadingFiles > 0,
   });
@@ -739,7 +751,9 @@ export const MailComposer: React.FC<MailComposerProps> = ({
             )}
             {(size > MAX_BYTES || totalSize > MAX_TOTAL_BYTES) && (
               <span className="text-[12.5px] font-semibold text-rose-600">
-                {size > MAX_BYTES ? 'Anexos novos acima de 10 MB.' : 'Anexos acima de 25 MB.'}
+                {size > MAX_BYTES
+                  ? 'Anexos novos acima de 10 MB.'
+                  : 'Anexos acima de 18 MB (no email ficam com mais de 25 MB, o limite dos servidores).'}
               </span>
             )}
             <button

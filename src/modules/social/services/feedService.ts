@@ -28,6 +28,12 @@ export const feedService = {
     return { data: data ?? [], error };
   },
 
+  /** Aniversários dos colegas de hoje até daqui a `days` dias (sem ano nem idade). */
+  upcomingBirthdays: async (days: number) => {
+    const { data, error } = await supabase.rpc('rz_upcoming_birthdays', { _days: days });
+    return { data: data ?? [], error };
+  },
+
   /** Novidades desde a última visita ao Feed (publicações e reconhecimentos públicos). */
   unreadCount: async () => {
     const { data, error } = await supabase.rpc('feed_unread_count');

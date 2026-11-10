@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/modules/workspace/components/ConfirmDialog';
 import { WorkspacePage } from '@/modules/workspace/components/WorkspacePage';
 import { AppreciationCard } from '../components/AppreciationCard';
+import { BirthdaysCard } from '../components/feed/BirthdaysCard';
 import { FeedSidebar } from '../components/feed/FeedSidebar';
 import { NoticeCard } from '../components/feed/NoticeCard';
 import { PostCard } from '../components/feed/PostCard';
@@ -83,6 +84,8 @@ const FeedPage: React.FC = () => {
               />
             </label>
           </div>
+          {/* No telemóvel a coluna lateral não aparece: os aniversários ficam por cima */}
+          <BirthdaysCard className="lg:hidden" />
           <PostComposer onPublish={feed.publish} isPublishing={feed.isPublishing} />
           <div className="scrollbar-hide flex gap-2 overflow-x-auto">
             {FEED_FILTERS.map(option => (

@@ -69,6 +69,8 @@ export const useFeedPosts = () => {
           editedAt: null,
           commentCount: 0,
           reactions: [],
+          kind: 'post',
+          subjectId: null,
         },
         ...list,
       ]);

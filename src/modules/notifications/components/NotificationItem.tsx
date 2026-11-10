@@ -5,6 +5,7 @@ import {
   AtSign,
   Award,
   Bell,
+  Cake,
   FolderOpen,
   LifeBuoy,
   Mail,
@@ -25,6 +26,7 @@ const KINDS: Record<string, { icon: typeof Bell; tint: string }> = {
   assistant: { icon: Sparkles, tint: 'from-violet-500 via-fuchsia-500 to-amber-400' },
   mail: { icon: Mail, tint: 'from-sky-400 to-blue-600' },
   mention: { icon: AtSign, tint: 'from-violet-500 to-fuchsia-500' },
+  birthday: { icon: Cake, tint: 'from-pink-400 to-fuchsia-500' },
 };
 
 interface NotificationItemProps {

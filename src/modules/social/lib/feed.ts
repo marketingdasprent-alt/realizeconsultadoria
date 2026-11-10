@@ -57,8 +57,16 @@ export const toPost = (
 ): FeedPost => ({
   id: row.id,
   authorId: row.author_id,
-  authorName: nameOf(row.author_id),
-  authorRole: row.author_id ? roleOf(byId.get(row.author_id)) : null,
+  // Aniversário: não tem autor; o cabeçalho mostra o aniversariante
+  authorName: nameOf(row.kind === 'birthday' ? row.subject_id : row.author_id),
+  authorRole:
+    row.kind === 'birthday'
+      ? row.subject_id
+        ? roleOf(byId.get(row.subject_id))
+        : null
+      : row.author_id
+        ? roleOf(byId.get(row.author_id))
+        : null,
   isMine: row.author_id === myUserId,
   body: row.body,
   audience: row.audience === 'department' ? 'department' : 'company',
@@ -70,6 +78,8 @@ export const toPost = (
   editedAt: row.edited_at,
   commentCount: row.comment_count,
   reactions: Array.isArray(row.reactions) ? (row.reactions as unknown as FeedReaction[]) : [],
+  kind: row.kind === 'birthday' ? 'birthday' : 'post',
+  subjectId: row.subject_id ?? null,
 });
 
 /** Junta/retira a minha reação (para a pré-visualização e atualizações otimistas). */

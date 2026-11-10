@@ -28,6 +28,9 @@ export interface FeedPost {
   editedAt: string | null;
   commentCount: number;
   reactions: FeedReaction[];
+  /** 'birthday': publicação automática do aniversário de `subjectId` (sem autor). */
+  kind?: 'post' | 'birthday';
+  subjectId?: string | null;
 }
 
 export interface FeedComment {

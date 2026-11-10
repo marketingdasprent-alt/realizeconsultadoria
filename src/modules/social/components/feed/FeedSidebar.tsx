@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { Award, Hash, Megaphone } from 'lucide-react';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import type { Appreciation, Notice } from '../../types';
+import { BirthdaysCard } from './BirthdaysCard';
 
 interface FeedSidebarProps {
   notices: Notice[];
@@ -26,6 +27,7 @@ export const FeedSidebar: React.FC<FeedSidebarProps> = ({
   const unread = notices.filter(n => !n.read);
   return (
     <aside className="hidden space-y-4 lg:block">
+      <BirthdaysCard />
       <section className={CARD}>
         <h2 className="flex items-center gap-2 text-[15px] font-bold">
           <Megaphone className="h-4 w-4 text-amber-500" /> Comunicados

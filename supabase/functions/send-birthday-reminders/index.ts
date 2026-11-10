@@ -52,12 +52,17 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    // Get today's month and day (ignore year — birthday is annual)
+    // Dia e mês (o ano não conta). Hoje e amanhã, para os admins se prepararem.
     const today = new Date();
-    const todayMonth = today.getMonth() + 1;
-    const todayDay = today.getDate();
-
-    console.log(`Checking birthdays for ${todayDay}/${todayMonth}`);
+    const tomorrow = new Date(today.getTime() + 24 * 60 * 60 * 1000);
+    const monthDay = (d: Date) => d.toISOString().slice(5, 10);
+    const isOn = (birth: string, day: Date) => {
+      const md = monthDay(day);
+      if (birth.slice(5, 10) === md) return true;
+      // 29/02 conta a 28/02 nos anos que não são bissextos
+      const leap = new Date(Date.UTC(day.getUTCFullYear(), 1, 29)).getUTCMonth() === 1;
+      return birth.slice(5, 10) === '02-29' && md === '02-28' && !leap;
+    };
 
     // Fetch all active employees that have a birth_date
     const { data: employees, error: empError } = await supabaseAdmin
@@ -71,29 +76,33 @@ const handler = async (req: Request): Promise<Response> => {
       throw empError;
     }
 
-    // Filter to employees whose birthday is today
-    const birthdayEmployees: Employee[] = (employees || []).filter((emp: Employee) => {
-      if (!emp.birth_date) return false;
-      const d = new Date(emp.birth_date);
-      return d.getMonth() + 1 === todayMonth && d.getDate() === todayDay;
-    });
+    const list = (employees || []) as unknown as Employee[];
+    const birthdayEmployees = list.filter(emp => !!emp.birth_date && isOn(emp.birth_date, today));
+    const tomorrowEmployees = list.filter(
+      emp => !!emp.birth_date && isOn(emp.birth_date, tomorrow)
+    );
 
-    console.log(`Found ${birthdayEmployees.length} birthday(s) today`);
-
-    if (birthdayEmployees.length === 0) {
+    if (birthdayEmployees.length === 0 && tomorrowEmployees.length === 0) {
       return new Response(
         JSON.stringify({ success: true, message: 'Sem aniversários hoje', count: 0 }),
         { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
 
-    const sent = await sendBirthdayEmail(brevoApiKey, recipientEmails, birthdayEmployees, today);
+    const sent = await sendBirthdayEmail(
+      brevoApiKey,
+      recipientEmails,
+      birthdayEmployees,
+      tomorrowEmployees,
+      today
+    );
 
     return new Response(
       JSON.stringify({
         success: true,
-        message: `Email enviado para ${birthdayEmployees.length} aniversariante(s)`,
+        message: `Email enviado: ${birthdayEmployees.length} hoje, ${tomorrowEmployees.length} amanhã`,
         count: birthdayEmployees.length,
+        tomorrow: tomorrowEmployees.length,
         emailSent: sent,
       }),
       { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
@@ -111,6 +120,7 @@ async function sendBirthdayEmail(
   apiKey: string,
   recipients: string[],
   employees: Employee[],
+  tomorrowList: Employee[],
   today: Date
 ): Promise<boolean> {
   const todayFormatted = today.toLocaleDateString('pt-PT', {
@@ -142,9 +152,27 @@ async function sendBirthdayEmail(
     .join('');
 
   const plural = employees.length > 1;
-  const subject = plural
-    ? `🎂 ${employees.length} Aniversários hoje — ${today.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })}`
-    : `🎂 Aniversário: ${employees[0].name} — ${today.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })}`;
+  const ddmm = (d: Date) => d.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' });
+  const tomorrowNames = tomorrowList.map(emp => emp.name.trim()).join(', ');
+  const tomorrowHtml = tomorrowList.length
+    ? `
+            <div style="margin-top: 24px; padding: 14px 16px; background-color: #fdf2f8; border-left: 3px solid #db2777; border-radius: 0 6px 6px 0;">
+              <p style="margin: 0 0 6px 0; color: #9d174d; font-size: 13px; font-weight: 700;">🎁 Amanhã fazem anos:</p>
+              ${tomorrowList
+                .map(emp => {
+                  const age = today.getFullYear() - Number(emp.birth_date.slice(0, 4));
+                  return `<p style="margin: 2px 0; color: #444444; font-size: 13px;"><strong>${emp.name}</strong> — ${emp.company?.name || '—'} · ${age} anos</p>`;
+                })
+                .join('')}
+              <p style="margin: 8px 0 0 0; color: #9d174d; font-size: 12px;">Há tempo para preparar alguma coisa.</p>
+            </div>`
+    : '';
+  const subject =
+    employees.length === 0
+      ? `🎁 Amanhã: aniversário de ${tomorrowNames} — ${ddmm(new Date(today.getTime() + 86400000))}`
+      : plural
+        ? `🎂 ${employees.length} Aniversários hoje — ${today.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })}`
+        : `🎂 Aniversário: ${employees[0].name} — ${today.toLocaleDateString('pt-PT', { day: '2-digit', month: '2-digit' })}`;
 
   const htmlContent = `
     <!DOCTYPE html>
@@ -169,7 +197,7 @@ async function sendBirthdayEmail(
           <td style="background: linear-gradient(135deg, #d5b884 0%, #c9a96e 100%); padding: 24px 30px; text-align: center;">
             <p style="margin: 0 0 8px 0; font-size: 36px;">🎉</p>
             <h2 style="margin: 0 0 6px 0; color: #000000; font-size: 22px; font-weight: 700;">
-              ${plural ? `${employees.length} Aniversários hoje` : 'Aniversário hoje'}
+              ${employees.length === 0 ? 'Aniversário amanhã' : plural ? `${employees.length} Aniversários hoje` : 'Aniversário hoje'}
             </h2>
             <p style="margin: 0; color: #333333; font-size: 13px; text-transform: capitalize;">${todayFormatted}</p>
           </td>
@@ -178,6 +206,9 @@ async function sendBirthdayEmail(
         <!-- Body -->
         <tr>
           <td style="padding: 30px 30px 20px;">
+            ${
+              employees.length
+                ? `
             <p style="margin: 0 0 20px 0; color: #555555; font-size: 14px; line-height: 1.6;">
               ${
                 plural
@@ -210,6 +241,11 @@ async function sendBirthdayEmail(
                 💡 Não se esqueça de desejar os parabéns ${plural ? 'aos colaboradores' : 'ao colaborador'}!
               </p>
             </div>
+
+            `
+                : ''
+            }
+            ${tomorrowHtml}
 
             <table role="presentation" cellspacing="0" cellpadding="0" style="margin: 28px auto 0;">
               <tr>

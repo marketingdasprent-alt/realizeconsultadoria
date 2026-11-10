@@ -11,6 +11,7 @@ import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { ROUTES } from '@/lib/constants';
 import { matchesSearch } from '@/lib/utils';
 import { EmployeesStats } from '../components/employees/EmployeesStats';
+import { MissingBirthdatesNotice } from '../components/employees/MissingBirthdatesNotice';
 import { EmployeesToolbar, type StatusFilter } from '../components/employees/EmployeesToolbar';
 import { EmployeesTable, type SortField } from '../components/employees/EmployeesTable';
 import { PendingDocumentsDialog } from '../components/employees/PendingDocumentsDialog';
@@ -49,6 +50,7 @@ const EmployeesPage = () => {
   ) as StatusFilter;
   const companyId = params.get('empresa') || 'all';
   const onlyBirthdays = params.get('aniversarios') === '1';
+  const onlyMissingBirth = params.get('aniversarios') === 'sem';
   const onlyNotUsing = params.get('acesso') === '1';
   /** Ativo que nunca entrou ou não entra há 7+ dias. */
   const notUsing = (employee: Employee) => {
@@ -96,10 +98,20 @@ const EmployeesPage = () => {
     return searched
       .filter(e => status === 'all' || e.is_active === (status === 'active'))
       .filter(e => !onlyBirthdays || hasBirthdayIn(e, thisMonth))
+      .filter(e => !onlyMissingBirth || (e.is_active && !e.birth_date))
       .filter(e => !onlyNotUsing || notUsing(e))
       .sort((a, b) => SORTERS[sortField](a, b) * direction);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- notUsing depende de accessOf
-  }, [searched, status, onlyBirthdays, onlyNotUsing, accessOf, sortField, sortDirection]);
+  }, [
+    searched,
+    status,
+    onlyBirthdays,
+    onlyMissingBirth,
+    onlyNotUsing,
+    accessOf,
+    sortField,
+    sortDirection,
+  ]);
 
   const sort = (field: SortField) => {
     setSortDirection(field === sortField && sortDirection === 'asc' ? 'desc' : 'asc');
@@ -136,6 +148,12 @@ const EmployeesPage = () => {
         notUsing={searched.filter(notUsing).length}
         onlyNotUsing={onlyNotUsing}
         onNotUsingChange={value => setParam('acesso', value ? '1' : '0', '0')}
+      />
+
+      <MissingBirthdatesNotice
+        count={searched.filter(e => e.is_active && !e.birth_date).length}
+        isFiltering={onlyMissingBirth}
+        onToggle={() => setParam('aniversarios', onlyMissingBirth ? '0' : 'sem', '0')}
       />
 
       <section className="overflow-hidden rounded-[28px] bg-white shadow-rz-soft ring-1 ring-rz-line">

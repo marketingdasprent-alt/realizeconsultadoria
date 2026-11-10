@@ -1,7 +1,15 @@
 import React, { useState } from 'react';
 import { formatDistanceToNowStrict } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { Building2, MessageCircle, MoreHorizontal, SmilePlus, Trash2, Users } from 'lucide-react';
+import {
+  Building2,
+  Cake,
+  MessageCircle,
+  MoreHorizontal,
+  SmilePlus,
+  Trash2,
+  Users,
+} from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -37,19 +45,33 @@ export const PostCard: React.FC<PostCardProps> = ({
 }) => {
   const [showComments, setShowComments] = useState(!!isFocused);
   const AudienceIcon = post.audience === 'department' ? Users : Building2;
+  const isBirthday = post.kind === 'birthday';
 
   return (
     <article
       id={`post-${post.id}`}
       className={cn(
         'rz-rise rounded-[28px] bg-white p-5 shadow-rz-soft ring-1 ring-rz-line',
+        isBirthday && 'bg-gradient-to-br from-pink-50 via-white to-amber-50 ring-pink-200',
         isFocused && 'ring-2 ring-rz-primary/50'
       )}
     >
+      {isBirthday && (
+        <p className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-pink-100 px-3 py-1 text-[12.5px] font-bold text-pink-700">
+          <Cake className="h-3.5 w-3.5" /> Aniversário
+        </p>
+      )}
       <header className="flex items-start gap-3">
-        <UserAvatar name={post.authorName} userId={post.authorId} size="md" />
+        <UserAvatar
+          name={post.authorName}
+          userId={isBirthday ? (post.subjectId ?? null) : post.authorId}
+          size="md"
+        />
         <div className="min-w-0 flex-1">
-          <p className="truncate text-[15px] font-bold">{post.authorName}</p>
+          <p className="truncate text-[15px] font-bold">
+            {post.authorName}
+            {isBirthday && ' 🎂'}
+          </p>
           <p className="flex flex-wrap items-center gap-x-2 text-[12.5px] text-rz-muted">
             {post.authorRole && <span className="truncate">{post.authorRole}</span>}
             <span>
@@ -141,7 +163,9 @@ export const PostCard: React.FC<PostCardProps> = ({
           <MessageCircle className="h-4 w-4" />
           {post.commentCount > 0
             ? `${post.commentCount} comentário${post.commentCount > 1 ? 's' : ''}`
-            : 'Comentar'}
+            : isBirthday
+              ? 'Dar os parabéns'
+              : 'Comentar'}
         </button>
       </footer>
 

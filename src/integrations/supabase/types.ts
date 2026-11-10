@@ -4125,6 +4125,15 @@ export type Database = {
       };
       mail_remember_contacts: { Args: { _items: Json }; Returns: undefined };
       feed_unread_count: { Args: Record<PropertyKey, never>; Returns: number };
+      rz_upcoming_birthdays: {
+        Args: { _days?: number };
+        Returns: {
+          birthday: string;
+          days_until: number;
+          name: string;
+          user_id: string;
+        }[];
+      };
       feed_list_posts: {
         Args: { _before?: string; _limit?: number };
         Returns: {
@@ -4137,7 +4146,9 @@ export type Database = {
           department: string;
           edited_at: string;
           id: string;
+          kind: string;
           reactions: Json;
+          subject_id: string | null;
         }[];
       };
       get_admin_permissions: {

@@ -1,5 +1,6 @@
 // Notificações push no telemóvel/computador (Web Push). A chave pública VAPID é pública por
 // natureza; a privada está só nos segredos da Supabase (edge function push-send).
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 
 export const VAPID_PUBLIC_KEY =
@@ -77,23 +78,59 @@ const saveSubscription = async (sub: PushSubscription) => {
       _user_agent: navigator.userAgent.slice(0, 300),
     } as never
   );
-  if (error) throw new Error(`O servidor não guardou a subscrição (${error.message}).`);
+  if (error) {
+    reportPushIssue('save', error.message);
+    throw new Error(`O servidor não guardou a subscrição (${error.message}).`);
+  }
+};
+
+/**
+ * Regista no servidor porque não deu para ativar (push_issues), para se perceber sem ter o
+ * aparelho da pessoa. Nunca falha nem atrasa nada.
+ */
+export const reportPushIssue = (state: string, detail?: string) => {
+  try {
+    const perm = 'Notification' in window ? Notification.permission : 'sem Notification';
+    const info = `${detail ?? ''} | permissão=${perm} | sw=${'serviceWorker' in navigator} | push=${'PushManager' in window} | instalada=${isStandalone()}`;
+    void (supabase as unknown as SupabaseClient)
+      .from('push_issues')
+      .insert({ state, detail: info.slice(0, 1000), user_agent: navigator.userAgent.slice(0, 300) })
+      .then(() => undefined);
+  } catch {
+    // só diagnóstico: nunca interrompe
+  }
+};
+
+/** O service worker da app (no máx. 5 s à espera: sem ele, `ready` nunca resolvia). */
+const workerRegistration = async () => {
+  const now = await registration();
+  if (now) return now;
+  if (!('serviceWorker' in navigator)) return undefined;
+  return Promise.race([
+    navigator.serviceWorker.ready,
+    new Promise<undefined>(resolve => setTimeout(() => resolve(undefined), 5000)),
+  ]);
 };
 
 /** Pede autorização, subscreve e guarda a subscrição deste dispositivo. */
 export const enablePush = async (_userId?: string): Promise<PushState> => {
   const permission = await Notification.requestPermission();
-  if (permission !== 'granted') return permission === 'denied' ? 'denied' : 'off';
+  if (permission !== 'granted') {
+    reportPushIssue('permission', `requestPermission=${permission}`);
+    return permission === 'denied' ? 'denied' : 'off';
+  }
   // A app instalada/publicada regista o service worker ao abrir; no localhost não há.
-  const reg =
-    (await registration()) ?? (await navigator.serviceWorker.ready.catch(() => undefined));
-  if (!reg)
+  const reg = await workerRegistration();
+  if (!reg) {
+    reportPushIssue('no-sw');
     throw new Error('Sem service worker: feche e volte a abrir a app (ou atualize com Ctrl+F5).');
+  }
   let sub: PushSubscription;
   try {
     sub = await currentSubscription(reg);
   } catch (error: unknown) {
-    const detail = error instanceof Error ? error.message : String(error);
+    const detail = error instanceof Error ? `${error.name}: ${error.message}` : String(error);
+    reportPushIssue('subscribe', detail);
     throw new Error(`O browser não deixou subscrever (${detail}).`);
   }
   await saveSubscription(sub);

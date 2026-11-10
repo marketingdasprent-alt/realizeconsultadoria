@@ -2,13 +2,19 @@ import React, { useEffect, useState } from 'react';
 import { BellRing, Loader2 } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { useWorkspace } from '../context/workspaceContext';
-import { disablePush, enablePush, pushState, type PushState } from '../services/pushService';
+import {
+  disablePush,
+  enablePush,
+  pushState,
+  reportPushIssue,
+  type PushState,
+} from '../services/pushService';
 
 const HINTS: Record<PushState, string> = {
   on: 'Ativas neste dispositivo. Recebe as mensagens e os emails novos, avisos de ponto e lembretes, mesmo com a app fechada (as conversas silenciadas não avisam).',
   off: 'Receba as mensagens, os emails novos e os avisos (ex.: "Já registou a entrada?") mesmo com a app fechada.',
   denied:
-    'Bloqueou as notificações neste browser. Para ativar, permita-as nas definições do site (cadeado na barra de endereço).',
+    'As notificações estão bloqueadas neste browser. Clique no cadeado à esquerda do endereço → Notificações → Permitir, e recarregue a página. No Chrome com sincronização ligada, o bloqueio passa para os outros aparelhos: veja também em Definições do Chrome → Privacidade e segurança → Definições de sites → Notificações (lista "Não autorizados").',
   'ios-install':
     'No iPhone, primeiro instale a app: no Safari, toque em Partilhar → "Adicionar ao ecrã principal", abra-a a partir daí e volte aqui.',
   unsupported: 'Este browser não suporta notificações. Use o Chrome, o Edge ou a app instalada.',
@@ -21,7 +27,11 @@ export const PushCard: React.FC = () => {
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
-    void pushState().then(setState);
+    void pushState().then(next => {
+      setState(next);
+      // Bloqueadas ou sem suporte: fica registado o porquê (para o suporte ver)
+      if (next === 'denied' || next === 'unsupported') reportPushIssue(`card-${next}`);
+    });
   }, []);
 
   const toggle = async () => {

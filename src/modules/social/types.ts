@@ -1,4 +1,5 @@
 // Tipos do Feed (§12), das Apreciações (§7) e dos comunicados dos RH no Feed.
+import type { MentionPerson } from '@/modules/messenger/lib/mentions';
 
 export interface FeedAttachment {
   /** Caminho no bucket privado feed-files ("<publicação>/<ficheiro>"), ou URL local no exemplo. */
@@ -33,6 +34,8 @@ export interface FeedPost {
   subjectId?: string | null;
   /** Nome do aniversariante (a publicação é assinada pela Realize IA). */
   subjectName?: string | null;
+  /** Pessoas marcadas (@Nome) no texto. */
+  mentions?: MentionPerson[];
 }
 
 export interface FeedComment {
@@ -43,6 +46,7 @@ export interface FeedComment {
   isMine: boolean;
   body: string;
   createdAt: string;
+  mentions?: MentionPerson[];
 }
 
 /** Aviso dos RH (tabela notifications), mostrado no Feed como comunicado. */
@@ -86,6 +90,8 @@ export interface NewPostInput {
   body: string;
   audience: 'company' | 'department';
   files: File[];
+  /** Quem foi marcado com @ (ids). */
+  mentions: string[];
 }
 
 export interface NewAppreciationInput {

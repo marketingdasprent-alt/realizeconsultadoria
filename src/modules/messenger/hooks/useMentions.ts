@@ -10,7 +10,7 @@ import {
 interface UseMentionsOptions {
   value: string;
   onChange: (value: string) => void;
-  fieldRef: RefObject<HTMLTextAreaElement>;
+  fieldRef: RefObject<HTMLTextAreaElement | HTMLInputElement>;
   /** Quem se pode marcar (os outros membros da conversa). */
   people: MentionPerson[];
 }
@@ -44,7 +44,7 @@ export const useMentions = ({ value, onChange, fieldRef, people }: UseMentionsOp
   };
 
   /** true se a tecla era para a lista (não envia a mensagem). */
-  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+  const onKeyDown = (event: KeyboardEvent<HTMLTextAreaElement | HTMLInputElement>) => {
     if (!suggestions.length) return false;
     if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
       event.preventDefault();

@@ -1,5 +1,6 @@
 // Regras e conversões do Feed.
 import type { DirectoryPerson } from '@/modules/messenger/types';
+import type { MentionPerson } from '@/modules/messenger/lib/mentions';
 import type { FeedPostRow } from '../services/feedService';
 import type { FeedAttachment, FeedPost, FeedReaction } from '../types';
 import { richTextParts } from './richText';
@@ -79,7 +80,14 @@ export const toPost = (
   kind: row.kind === 'birthday' ? 'birthday' : 'post',
   subjectId: row.subject_id ?? null,
   subjectName: row.subject_id ? nameOf(row.subject_id) : null,
+  mentions: mentionsOf(row.mentions, nameOf),
 });
+
+/** Ids marcados → pessoas com nome (para destacar "@Nome" no texto). */
+export const mentionsOf = (
+  ids: string[] | null | undefined,
+  nameOf: (id: string | null) => string
+): MentionPerson[] => (ids ?? []).map(userId => ({ userId, name: nameOf(userId) }));
 
 /** Quem assina as publicações automáticas (aniversários). */
 export const REALIZE_AI_NAME = 'Realize IA';

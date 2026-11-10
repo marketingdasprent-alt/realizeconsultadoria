@@ -53,6 +53,7 @@ export const feedService = {
     body: string | null;
     audience: 'company' | 'department';
     department: string | null;
+    mentions: string[];
   }) => {
     const { data, error } = await supabase
       .from('feed_posts')
@@ -62,6 +63,7 @@ export const feedService = {
         body: input.body,
         audience: input.audience,
         department: input.audience === 'department' ? input.department : null,
+        mentions: input.mentions,
       })
       .select('id')
       .single();
@@ -103,10 +105,10 @@ export const feedService = {
     return { data: data ?? [], error };
   },
 
-  addComment: async (postId: string, authorId: string, body: string) => {
+  addComment: async (postId: string, authorId: string, body: string, mentions: string[] = []) => {
     const { error } = await supabase
       .from('feed_comments')
-      .insert({ post_id: postId, author_id: authorId, body });
+      .insert({ post_id: postId, author_id: authorId, body, mentions });
     return { error };
   },
 

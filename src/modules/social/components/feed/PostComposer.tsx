@@ -9,6 +9,9 @@ import { DropOverlay } from '@/modules/workspace/components/DropOverlay';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useFileDrop } from '@/modules/workspace/hooks/useFileDrop';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
+import { MentionSuggestions } from '@/modules/messenger/components/composer/MentionSuggestions';
+import { useMentions } from '@/modules/messenger/hooks/useMentions';
+import { useDirectory } from '../../hooks/useDirectory';
 import { MAX_POST_FILES, POST_FILE_TYPES } from '../../lib/feed';
 import { ComposerFiles } from './ComposerFiles';
 import type { NewPostInput } from '../../types';
@@ -36,6 +39,14 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPublish, isPublish
     onChange: value => setBody(value.slice(0, 5000)),
     fieldRef: bodyRef,
   });
+  // "@an" → lista de colegas para marcar (recebem um aviso).
+  const { colleagues } = useDirectory();
+  const mention = useMentions({
+    value: body,
+    onChange: value => setBody(value.slice(0, 5000)),
+    fieldRef: bodyRef,
+    people: colleagues.map(person => ({ userId: person.userId, name: person.name })),
+  });
   const canPublish = (body.trim().length > 0 || files.length > 0) && !isPublishing;
 
   const addFiles = (list: FileList | File[] | null) =>
@@ -45,7 +56,8 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPublish, isPublish
 
   const publish = async () => {
     if (!canPublish) return;
-    if (await onPublish({ body, audience, files })) {
+    if (await onPublish({ body, audience, files, mentions: mention.mentionedIn(body) })) {
+      mention.reset();
       setBody('');
       setFiles([]);
       setAudience('company');
@@ -71,16 +83,34 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPublish, isPublish
           onHover={emoji.setActive}
           className="left-14"
         />
+        {/* Abre por baixo: por cima ficava cortada no topo da página */}
+        <MentionSuggestions
+          suggestions={mention.suggestions}
+          active={mention.active}
+          onPick={mention.pick}
+          onHover={mention.setActive}
+          className="left-12 top-full mt-1"
+        />
         <textarea
           ref={bodyRef}
           value={body}
           onChange={event => {
             setBody(event.target.value.slice(0, 5000));
             emoji.update(event.target.value);
+            mention.update(event.target.value);
           }}
-          onSelect={() => emoji.update()}
-          onBlur={emoji.close}
-          onKeyDown={event => void emoji.onKeyDown(event)}
+          onSelect={() => {
+            emoji.update();
+            mention.update();
+          }}
+          onBlur={() => {
+            emoji.close();
+            mention.close();
+          }}
+          onKeyDown={event => {
+            if (mention.onKeyDown(event)) return;
+            void emoji.onKeyDown(event);
+          }}
           onPaste={event => {
             const pasted = Array.from(event.clipboardData.files);
             if (!pasted.length) return;
@@ -88,7 +118,7 @@ export const PostComposer: React.FC<PostComposerProps> = ({ onPublish, isPublish
             addFiles(pasted);
           }}
           rows={body ? Math.min(8, body.split('\n').length + 1) : 2}
-          placeholder={`Partilhe uma novidade, ${user.name.split(' ')[0]}… use #hashtags`}
+          placeholder={`Partilhe uma novidade, ${user.name.split(' ')[0]}… use #hashtags e @ para marcar`}
           className="min-h-[52px] flex-1 resize-none rounded-2xl bg-rz-canvas px-4 py-3 text-[15px] outline-none ring-1 ring-transparent placeholder:text-rz-muted focus:bg-white focus:ring-rz-primary/40"
         />
       </div>

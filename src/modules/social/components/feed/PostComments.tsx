@@ -8,6 +8,9 @@ import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { RichText } from '../RichText';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useFeedComments } from '../../hooks/useFeedComments';
+import { useDirectory } from '../../hooks/useDirectory';
+import { MentionSuggestions } from '@/modules/messenger/components/composer/MentionSuggestions';
+import { useMentions } from '@/modules/messenger/hooks/useMentions';
 
 /** Comentários de uma publicação e caixa para comentar. */
 export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
@@ -22,11 +25,21 @@ export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
     fieldRef: inputRef,
   });
   const [isSending, setIsSending] = useState(false);
+  const { colleagues } = useDirectory();
+  const mention = useMentions({
+    value: text,
+    onChange: value => setText(value.slice(0, 2000)),
+    fieldRef: inputRef,
+    people: colleagues.map(person => ({ userId: person.userId, name: person.name })),
+  });
 
   const submit = async () => {
     if (!text.trim() || isSending) return;
     setIsSending(true);
-    if (await add(text)) setText('');
+    if (await add(text, mention.mentionedIn(text))) {
+      mention.reset();
+      setText('');
+    }
     setIsSending(false);
   };
 
@@ -41,6 +54,7 @@ export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
               <p className="text-[13px] font-bold">{comment.authorName}</p>
               <RichText
                 text={comment.body}
+                mentions={comment.mentions}
                 className="whitespace-pre-wrap break-words text-[14px]"
               />
             </div>
@@ -68,6 +82,14 @@ export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
           onHover={emoji.setActive}
           className="left-9"
         />
+        {/* Por cima: por baixo ficava tapada pela publicação seguinte */}
+        <MentionSuggestions
+          suggestions={mention.suggestions}
+          active={mention.active}
+          onPick={mention.pick}
+          onHover={mention.setActive}
+          className="bottom-full left-7 mb-2"
+        />
         <div className="flex flex-1 items-center rounded-full bg-rz-canvas pr-1 ring-1 ring-transparent focus-within:bg-white focus-within:ring-rz-primary/40">
           <input
             ref={inputRef}
@@ -75,14 +97,22 @@ export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
             onChange={event => {
               setText(event.target.value.slice(0, 2000));
               emoji.update(event.target.value);
+              mention.update(event.target.value);
             }}
-            onSelect={() => emoji.update()}
-            onBlur={emoji.close}
+            onSelect={() => {
+              emoji.update();
+              mention.update();
+            }}
+            onBlur={() => {
+              emoji.close();
+              mention.close();
+            }}
             onKeyDown={event => {
+              if (mention.onKeyDown(event)) return;
               if (emoji.onKeyDown(event)) return;
               if (event.key === 'Enter') submit();
             }}
-            placeholder="Escreva um comentário…"
+            placeholder="Escreva um comentário… (@ para marcar)"
             className="h-10 flex-1 bg-transparent px-4 text-sm outline-none"
           />
           <button

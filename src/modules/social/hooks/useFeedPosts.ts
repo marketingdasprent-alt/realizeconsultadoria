@@ -84,6 +84,7 @@ export const useFeedPosts = () => {
         body,
         audience: input.audience,
         department: user.department,
+        mentions: input.mentions,
       });
       if (created.error || !created.data) return (fail('A publicação não foi criada.'), false);
       const uploads = await Promise.all(

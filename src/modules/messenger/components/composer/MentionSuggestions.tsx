@@ -8,6 +8,8 @@ interface MentionSuggestionsProps {
   active: number;
   onPick: (index: number) => void;
   onHover: (index: number) => void;
+  /** Posição (por omissão por cima da caixa de escrita). */
+  className?: string;
 }
 
 /** Lista de colegas por cima da caixa de escrita ao escrever "@". */
@@ -16,12 +18,16 @@ export const MentionSuggestions: React.FC<MentionSuggestionsProps> = ({
   active,
   onPick,
   onHover,
+  className = 'bottom-full left-2 mb-2',
 }) =>
   suggestions.length ? (
     <ul
       role="listbox"
       aria-label="Marcar pessoa"
-      className="absolute bottom-full left-2 z-50 mb-2 max-h-72 w-72 overflow-y-auto rounded-2xl bg-white p-1.5 shadow-rz-pop ring-1 ring-rz-line"
+      className={cn(
+        'absolute z-50 max-h-72 w-72 overflow-y-auto rounded-2xl bg-white p-1.5 shadow-rz-pop ring-1 ring-rz-line',
+        className
+      )}
     >
       <li className="px-2.5 pb-1 pt-1 text-[11px] font-bold uppercase tracking-wider text-rz-muted">
         Marcar pessoa

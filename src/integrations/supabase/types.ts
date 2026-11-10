@@ -1696,6 +1696,7 @@ export type Database = {
           created_at: string;
           deleted_at: string | null;
           id: string;
+          mentions: string[];
           post_id: string;
         };
         Insert: {
@@ -1704,6 +1705,7 @@ export type Database = {
           created_at?: string;
           deleted_at?: string | null;
           id?: string;
+          mentions?: string[];
           post_id: string;
         };
         Update: {
@@ -1712,6 +1714,7 @@ export type Database = {
           created_at?: string;
           deleted_at?: string | null;
           id?: string;
+          mentions?: string[];
           post_id?: string;
         };
         Relationships: [
@@ -1736,6 +1739,7 @@ export type Database = {
           department: string | null;
           edited_at: string | null;
           id: string;
+          mentions: string[];
         };
         Insert: {
           attachments?: Json;
@@ -1748,6 +1752,7 @@ export type Database = {
           department?: string | null;
           edited_at?: string | null;
           id?: string;
+          mentions?: string[];
         };
         Update: {
           attachments?: Json;
@@ -1760,6 +1765,7 @@ export type Database = {
           department?: string | null;
           edited_at?: string | null;
           id?: string;
+          mentions?: string[];
         };
         Relationships: [
           {
@@ -4147,6 +4153,7 @@ export type Database = {
           edited_at: string;
           id: string;
           kind: string;
+          mentions: string[];
           reactions: Json;
           subject_id: string | null;
         }[];

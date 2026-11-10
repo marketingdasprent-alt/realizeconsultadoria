@@ -4,7 +4,7 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { toast } from '@/hooks/use-toast';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { DEMO_COMMENTS } from '../lib/demoData';
-import { FEED_KEYS } from '../lib/feed';
+import { FEED_KEYS, mentionsOf } from '../lib/feed';
 import { feedService } from '../services/feedService';
 import type { FeedComment } from '../types';
 import { useDirectory } from './useDirectory';
@@ -37,6 +37,7 @@ export const useFeedComments = (postId: string, enabled: boolean) => {
             isMine: row.author_id === user.userId,
             body: row.body,
             createdAt: row.created_at,
+            mentions: mentionsOf(row.mentions, nameOf),
           })),
     [isPreview, demo, live.data, nameOf, user.userId]
   );
@@ -47,7 +48,7 @@ export const useFeedComments = (postId: string, enabled: boolean) => {
       qc.invalidateQueries({ queryKey: FEED_KEYS.posts }),
     ]);
 
-  const add = async (body: string): Promise<boolean> => {
+  const add = async (body: string, mentions: string[] = []): Promise<boolean> => {
     const text = body.trim();
     if (!text) return false;
     if (isPreview) {
@@ -65,7 +66,7 @@ export const useFeedComments = (postId: string, enabled: boolean) => {
       ]);
       return true;
     }
-    const { error } = await feedService.addComment(postId, user.userId, text);
+    const { error } = await feedService.addComment(postId, user.userId, text, mentions);
     if (error) {
       toast({ title: 'O comentário não foi publicado', variant: 'destructive' });
       return false;

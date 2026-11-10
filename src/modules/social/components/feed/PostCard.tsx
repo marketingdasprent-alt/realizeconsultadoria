@@ -110,6 +110,7 @@ export const PostCard: React.FC<PostCardProps> = ({
         <RichText
           text={post.body}
           onHashtag={onHashtag}
+          mentions={post.mentions}
           className="mt-3 whitespace-pre-wrap break-words text-[15px] leading-relaxed"
         />
       )}

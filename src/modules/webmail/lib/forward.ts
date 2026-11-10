@@ -41,12 +41,26 @@ export const forwardedText = (message: MailMessage, bodyText: string): string =>
  * HTML da citação numa resposta, como no Gmail e no Outlook: "Em …, X escreveu:" e o email
  * original (HTML, com imagens) com uma barra ao lado — sem os "> " do texto simples.
  */
+/**
+ * Tira os "> " do início das linhas: emails em texto simples trazem a conversa anterior citada
+ * assim pelo programa de quem respondeu; na nossa resposta a citação já leva a barra ao lado.
+ */
+export const stripQuoteMarkers = (text: string): string =>
+  text.replace(/^[ \t]*(?:>[ \t]?)+/gm, '');
+
+/** O mesmo no HTML: "&gt; " no início de cada linha (a seguir a <br>, <div>, <p> ou nova linha). */
+export const stripHtmlQuoteMarkers = (html: string): string =>
+  html.replace(
+    /(^|<br\s*\/?>|<div[^>]*>|<p[^>]*>|\n)((?:\s|&nbsp;)*(?:&gt;|>(?![a-z/!]))(?:\s|&nbsp;)?)+/gi,
+    '$1'
+  );
+
 export const repliedHtml = (message: MailMessage): string => {
   const when = format(new Date(message.date), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: pt });
   const who = message.from?.name || message.from?.email || 'Desconhecido';
   const body = message.html
-    ? stripActiveHtml(message.html)
-    : `<div style="white-space:pre-wrap">${escapeHtml(message.text ?? '')}</div>`;
+    ? stripHtmlQuoteMarkers(stripActiveHtml(message.html))
+    : `<div style="white-space:pre-wrap">${escapeHtml(stripQuoteMarkers(message.text ?? ''))}</div>`;
   return (
     `<div style="margin-top:16px;color:#64748b">Em ${escapeHtml(when)}, ${escapeHtml(who)} escreveu:</div>` +
     `<blockquote style="margin:6px 0 0 0;padding-left:12px;border-left:2px solid #cbd5e1">${body}</blockquote>`

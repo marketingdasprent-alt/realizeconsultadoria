@@ -30,43 +30,88 @@ export const pushState = async (): Promise<PushState> => {
   if (Notification.permission === 'denied') return 'denied';
   const reg = await registration();
   const sub = await reg?.pushManager.getSubscription();
-  return sub ? 'on' : 'off';
+  // Subscrição da app antiga (outra chave) não recebe nada: conta como desligada
+  return sub && sameKey(sub) ? 'on' : 'off';
+};
+
+/** A subscrição foi feita com esta chave? (as da app antiga "Realize Admin" tinham outra) */
+const sameKey = (sub: PushSubscription) => {
+  const used = sub.options?.applicationServerKey;
+  if (!used) return true;
+  const ours = toKey(VAPID_PUBLIC_KEY);
+  const theirs = new Uint8Array(used);
+  return theirs.length === ours.length && theirs.every((byte, i) => byte === ours[i]);
+};
+
+/**
+ * A subscrição deste browser com a nossa chave: a de outra chave (app antiga) é trocada — senão
+ * o browser recusava criar a nova ("já existe uma subscrição com outra chave") e nada se gravava.
+ */
+const currentSubscription = async (reg: ServiceWorkerRegistration) => {
+  const existing = await reg.pushManager.getSubscription();
+  if (existing && sameKey(existing)) return existing;
+  if (existing) await existing.unsubscribe().catch(() => false);
+  const options = { userVisibleOnly: true, applicationServerKey: toKey(VAPID_PUBLIC_KEY) };
+  try {
+    return await reg.pushManager.subscribe(options);
+  } catch {
+    // Às vezes fica uma subscrição presa: limpa e tenta uma vez mais
+    const stuck = await reg.pushManager.getSubscription();
+    if (stuck) await stuck.unsubscribe().catch(() => false);
+    return reg.pushManager.subscribe(options);
+  }
+};
+
+/**
+ * Guarda no servidor para quem tem a sessão aberta. Por função da BD: o mesmo browser subscrito
+ * antes por outra conta passa para esta (pela tabela era recusado e o erro ficava calado).
+ */
+const saveSubscription = async (sub: PushSubscription) => {
+  const json = sub.toJSON();
+  const { error } = await supabase.rpc(
+    'rz_save_push_subscription' as never,
+    {
+      _endpoint: sub.endpoint,
+      _p256dh: json.keys?.p256dh ?? '',
+      _auth: json.keys?.auth ?? '',
+      _user_agent: navigator.userAgent.slice(0, 300),
+    } as never
+  );
+  if (error) throw new Error(`O servidor não guardou a subscrição (${error.message}).`);
 };
 
 /** Pede autorização, subscreve e guarda a subscrição deste dispositivo. */
-export const enablePush = async (userId: string): Promise<PushState> => {
+export const enablePush = async (_userId?: string): Promise<PushState> => {
   const permission = await Notification.requestPermission();
   if (permission !== 'granted') return permission === 'denied' ? 'denied' : 'off';
   // A app instalada/publicada regista o service worker ao abrir; no localhost não há.
-  const reg = await registration();
-  if (!reg) throw new Error('Sem service worker (abra a app publicada).');
-  const sub =
-    (await reg.pushManager.getSubscription()) ??
-    (await reg.pushManager.subscribe({
-      userVisibleOnly: true,
-      applicationServerKey: toKey(VAPID_PUBLIC_KEY),
-    }));
-  // Uma subscrição por navegador: as antigas deste navegador (ex.: da app antiga "Realize Admin")
-  // saem, senão cada aviso chegava em duplicado.
-  await supabase
-    .from('push_subscriptions')
-    .delete()
-    .eq('user_id', userId)
-    .eq('user_agent', navigator.userAgent.slice(0, 300))
-    .neq('endpoint', sub.endpoint);
-  const json = sub.toJSON();
-  const { error } = await supabase.from('push_subscriptions').upsert(
-    {
-      user_id: userId,
-      endpoint: sub.endpoint,
-      p256dh: json.keys?.p256dh ?? '',
-      auth: json.keys?.auth ?? '',
-      user_agent: navigator.userAgent.slice(0, 300),
-    },
-    { onConflict: 'endpoint' }
-  );
-  if (error) throw error;
+  const reg =
+    (await registration()) ?? (await navigator.serviceWorker.ready.catch(() => undefined));
+  if (!reg)
+    throw new Error('Sem service worker: feche e volte a abrir a app (ou atualize com Ctrl+F5).');
+  let sub: PushSubscription;
+  try {
+    sub = await currentSubscription(reg);
+  } catch (error: unknown) {
+    const detail = error instanceof Error ? error.message : String(error);
+    throw new Error(`O browser não deixou subscrever (${detail}).`);
+  }
+  await saveSubscription(sub);
   return 'on';
+};
+
+/**
+ * Ao abrir a app: se este browser já está subscrito e autorizado, volta a guardar a subscrição
+ * no servidor (pode ter saído — expirada, ou guardada noutra conta). Sem perguntar nada.
+ */
+export const resyncPush = async (): Promise<void> => {
+  if (!('Notification' in window) || Notification.permission !== 'granted') return;
+  const reg = await registration();
+  if (!reg) return;
+  const existing = await reg.pushManager.getSubscription();
+  if (!existing) return;
+  const sub = sameKey(existing) ? existing : await currentSubscription(reg);
+  await saveSubscription(sub);
 };
 
 /** Deixa de receber neste dispositivo. */

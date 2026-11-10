@@ -1,16 +1,15 @@
 import React, { useRef, useState } from 'react';
 import { EmojiSuggestions } from '@/modules/workspace/components/EmojiSuggestions';
 import { useEmojiAutocomplete } from '@/modules/workspace/hooks/useEmojiAutocomplete';
-import { formatDistanceToNowStrict } from 'date-fns';
-import { pt } from 'date-fns/locale';
-import { Loader2, SendHorizontal, Trash2 } from 'lucide-react';
+import { Loader2, SendHorizontal, X } from 'lucide-react';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
-import { RichText } from '../RichText';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useFeedComments } from '../../hooks/useFeedComments';
 import { useDirectory } from '../../hooks/useDirectory';
 import { MentionSuggestions } from '@/modules/messenger/components/composer/MentionSuggestions';
 import { useMentions } from '@/modules/messenger/hooks/useMentions';
+import type { FeedComment } from '../../types';
+import { CommentItem } from './CommentItem';
 
 /** Comentários de uma publicação e caixa para comentar. */
 export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
@@ -25,6 +24,14 @@ export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
     fieldRef: inputRef,
   });
   const [isSending, setIsSending] = useState(false);
+  // A responder a um comentário (a resposta fica por baixo do comentário principal)
+  const [replyTo, setReplyTo] = useState<FeedComment | null>(null);
+  const top = comments.filter(c => !c.parentId || !comments.some(p => p.id === c.parentId));
+  const repliesOf = (id: string) => comments.filter(c => c.parentId === id);
+  const reply = (comment: FeedComment) => {
+    setReplyTo(comment);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  };
   const { colleagues } = useDirectory();
   const mention = useMentions({
     value: text,
@@ -36,9 +43,11 @@ export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
   const submit = async () => {
     if (!text.trim() || isSending) return;
     setIsSending(true);
-    if (await add(text, mention.mentionedIn(text))) {
+    const parentId = replyTo ? (replyTo.parentId ?? replyTo.id) : null;
+    if (await add(text, mention.mentionedIn(text), parentId)) {
       mention.reset();
       setText('');
+      setReplyTo(null);
     }
     setIsSending(false);
   };
@@ -46,33 +55,27 @@ export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
   return (
     <div className="mt-3 space-y-3 border-t border-rz-line pt-3">
       {isLoading && <Loader2 className="mx-auto h-5 w-5 animate-spin text-rz-primary" />}
-      {comments.map(comment => (
-        <div key={comment.id} className="group flex gap-2.5">
-          <UserAvatar name={comment.authorName} userId={comment.authorId} size="xs" />
-          <div className="min-w-0 flex-1">
-            <div className="inline-block max-w-full rounded-2xl bg-rz-canvas px-3.5 py-2">
-              <p className="text-[13px] font-bold">{comment.authorName}</p>
-              <RichText
-                text={comment.body}
-                mentions={comment.mentions}
-                className="whitespace-pre-wrap break-words text-[14px]"
-              />
-            </div>
-            <div className="ml-2 mt-0.5 flex items-center gap-3 text-[11.5px] text-rz-muted">
-              <span>{formatDistanceToNowStrict(new Date(comment.createdAt), { locale: pt })}</span>
-              {comment.isMine && (
-                <button
-                  type="button"
-                  onClick={() => remove(comment.id)}
-                  className="inline-flex items-center gap-1 opacity-0 transition-opacity hover:text-rose-600 group-hover:opacity-100"
-                >
-                  <Trash2 className="h-3 w-3" /> Eliminar
-                </button>
-              )}
-            </div>
-          </div>
+      {top.map(comment => (
+        <div key={comment.id} className="space-y-2">
+          <CommentItem comment={comment} onReply={reply} onRemove={remove} />
+          {repliesOf(comment.id).map(child => (
+            <CommentItem key={child.id} comment={child} onReply={reply} onRemove={remove} isReply />
+          ))}
         </div>
       ))}
+      {replyTo && (
+        <p className="ml-9 flex items-center gap-2 text-[12px] text-rz-muted">
+          A responder a <b className="text-rz-ink">{replyTo.authorName}</b>
+          <button
+            type="button"
+            onClick={() => setReplyTo(null)}
+            className="flex h-5 w-5 items-center justify-center rounded-full hover:bg-rz-canvas"
+            aria-label="Cancelar resposta"
+          >
+            <X className="h-3 w-3" />
+          </button>
+        </p>
+      )}
       <div className="relative flex items-center gap-2.5">
         <UserAvatar name={user.name} userId={user.userId} size="xs" />
         <EmojiSuggestions
@@ -110,9 +113,14 @@ export const PostComments: React.FC<{ postId: string }> = ({ postId }) => {
             onKeyDown={event => {
               if (mention.onKeyDown(event)) return;
               if (emoji.onKeyDown(event)) return;
+              if (event.key === 'Escape' && replyTo) setReplyTo(null);
               if (event.key === 'Enter') submit();
             }}
-            placeholder="Escreva um comentário… (@ para marcar)"
+            placeholder={
+              replyTo
+                ? `Responder a ${replyTo.authorName.split(' ')[0]}…`
+                : 'Escreva um comentário… (@ para marcar)'
+            }
             className="h-10 flex-1 bg-transparent px-4 text-sm outline-none"
           />
           <button

@@ -105,10 +105,16 @@ export const feedService = {
     return { data: data ?? [], error };
   },
 
-  addComment: async (postId: string, authorId: string, body: string, mentions: string[] = []) => {
+  addComment: async (
+    postId: string,
+    authorId: string,
+    body: string,
+    mentions: string[] = [],
+    parentId: string | null = null
+  ) => {
     const { error } = await supabase
       .from('feed_comments')
-      .insert({ post_id: postId, author_id: authorId, body, mentions });
+      .insert({ post_id: postId, author_id: authorId, body, mentions, parent_id: parentId });
     return { error };
   },
 

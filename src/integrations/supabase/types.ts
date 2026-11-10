@@ -1697,6 +1697,7 @@ export type Database = {
           deleted_at: string | null;
           id: string;
           mentions: string[];
+          parent_id: string | null;
           post_id: string;
         };
         Insert: {
@@ -1706,6 +1707,7 @@ export type Database = {
           deleted_at?: string | null;
           id?: string;
           mentions?: string[];
+          parent_id?: string | null;
           post_id: string;
         };
         Update: {
@@ -1715,6 +1717,7 @@ export type Database = {
           deleted_at?: string | null;
           id?: string;
           mentions?: string[];
+          parent_id?: string | null;
           post_id?: string;
         };
         Relationships: [

@@ -38,6 +38,7 @@ export const useFeedComments = (postId: string, enabled: boolean) => {
             body: row.body,
             createdAt: row.created_at,
             mentions: mentionsOf(row.mentions, nameOf),
+            parentId: row.parent_id ?? null,
           })),
     [isPreview, demo, live.data, nameOf, user.userId]
   );
@@ -48,7 +49,11 @@ export const useFeedComments = (postId: string, enabled: boolean) => {
       qc.invalidateQueries({ queryKey: FEED_KEYS.posts }),
     ]);
 
-  const add = async (body: string, mentions: string[] = []): Promise<boolean> => {
+  const add = async (
+    body: string,
+    mentions: string[] = [],
+    parentId: string | null = null
+  ): Promise<boolean> => {
     const text = body.trim();
     if (!text) return false;
     if (isPreview) {
@@ -62,11 +67,12 @@ export const useFeedComments = (postId: string, enabled: boolean) => {
           isMine: true,
           body: text,
           createdAt: new Date().toISOString(),
+          parentId,
         },
       ]);
       return true;
     }
-    const { error } = await feedService.addComment(postId, user.userId, text, mentions);
+    const { error } = await feedService.addComment(postId, user.userId, text, mentions, parentId);
     if (error) {
       toast({ title: 'O comentário não foi publicado', variant: 'destructive' });
       return false;

@@ -47,6 +47,8 @@ export interface FeedComment {
   body: string;
   createdAt: string;
   mentions?: MentionPerson[];
+  /** Resposta a outro comentário (o principal). */
+  parentId?: string | null;
 }
 
 /** Aviso dos RH (tabela notifications), mostrado no Feed como comunicado. */

@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import {
@@ -88,6 +89,8 @@ export const MailReader: React.FC<MailReaderProps> = ({
   onLabel,
   onManageLabels,
 }) => {
+  // App de email para clientes de fora: sem "Criar tarefa / evento" (são da Realize)
+  const { mailOnly } = useWorkspace();
   const thread = useMailThread(summary);
   // A conversa, a resposta mais recente em cima; sem outras mensagens, só o email aberto.
   const conversation = thread.some(m => m.id === summary.id) ? [...thread].reverse() : [];
@@ -206,6 +209,7 @@ export const MailReader: React.FC<MailReaderProps> = ({
           />
           <ReaderMoreMenu
             canPrint={!!message}
+            hideRealize={mailOnly}
             // Imprimir trata-se aqui (só precisa do email aberto).
             onAction={action =>
               action === 'print' ? message && printMail(message) : onAction(action)

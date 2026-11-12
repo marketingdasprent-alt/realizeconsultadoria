@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-PT">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+    <link rel="icon" href="/favicon.png" type="image/png" />
+    <title>Realize Mail</title>
+    <meta
+      name="description"
+      content="Realize Mail: as suas caixas de email (IMAP, Outlook e Microsoft 365) numa só app, com caixa de entrada unificada e assinaturas."
+    />
+    <meta name="robots" content="noindex" />
+    <meta name="color-scheme" content="light" />
+    <script>
+      try {
+        var t = localStorage.getItem('rz.theme');
+        if (
+          t === 'dark' ||
+          ((!t || t === 'system') && matchMedia('(prefers-color-scheme: dark)').matches)
+        )
+          document.documentElement.classList.add('dark');
+      } catch (e) {}
+    </script>
+    <meta name="theme-color" content="#B7933D" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Realize Mail" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+  </head>
+  <body spellcheck="true">
+    <div id="root"></div>
+    <script type="module" src="/src/mail-app/main.tsx"></script>
+  </body>
+</html>

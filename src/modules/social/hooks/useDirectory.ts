@@ -12,7 +12,7 @@ import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
  * Messenger; na pré-visualização devolve pessoas de exemplo.
  */
 export const useDirectory = () => {
-  const { isPreview, user } = useWorkspace();
+  const { isPreview, user, mailOnly } = useWorkspace();
   const query = useQuery({
     queryKey: CHAT_KEYS.directory,
     queryFn: async () => {
@@ -20,7 +20,8 @@ export const useDirectory = () => {
       if (error) throw error;
       return data;
     },
-    enabled: !isPreview,
+    // Na app de email (clientes de fora) não há colegas
+    enabled: !isPreview && !mailOnly,
     staleTime: 5 * 60_000,
   });
 

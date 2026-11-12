@@ -77,7 +77,7 @@ export const MailContextMenu: React.FC<MailContextMenuProps> = ({
   onManageLabels,
   children,
 }) => {
-  const { isPreview } = useWorkspace();
+  const { isPreview, mailOnly } = useWorkspace();
   const [menuOpen, setMenuOpen] = useState(false);
   const [creating, setCreating] = useState(false);
   const { create } = useFolderActions();
@@ -124,13 +124,17 @@ export const MailContextMenu: React.FC<MailContextMenuProps> = ({
                   <ContextMenuItem onSelect={() => act('forward')} className="gap-2">
                     <Forward className={ICON} /> Reencaminhar
                   </ContextMenuItem>
-                  <ContextMenuSeparator />
-                  <ContextMenuItem onSelect={() => act('task')} className="gap-2">
-                    <ListChecks className={ICON} /> Criar tarefa
-                  </ContextMenuItem>
-                  <ContextMenuItem onSelect={() => act('event')} className="gap-2">
-                    <CalendarPlus className={ICON} /> Criar evento
-                  </ContextMenuItem>
+                  {!mailOnly && (
+                    <>
+                      <ContextMenuSeparator />
+                      <ContextMenuItem onSelect={() => act('task')} className="gap-2">
+                        <ListChecks className={ICON} /> Criar tarefa
+                      </ContextMenuItem>
+                      <ContextMenuItem onSelect={() => act('event')} className="gap-2">
+                        <CalendarPlus className={ICON} /> Criar evento
+                      </ContextMenuItem>
+                    </>
+                  )}
                 </>
               )}
             </>

@@ -88,3 +88,6 @@ verify_jwt = false
 
 [functions.broadcast-send]
 verify_jwt = false
+
+[functions.mail-login]
+verify_jwt = false

@@ -7,6 +7,7 @@ import {
   DialogHeader,
   DialogTitle,
 } from '@/components/ui/dialog';
+import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { useServerDiscovery } from '../hooks/useServerDiscovery';
 import { domainOf } from '../lib/autodiscover';
 import {
@@ -57,6 +58,9 @@ export const ConnectMailDialog: React.FC<ConnectMailDialogProps> = ({
   const [busy, setBusy] = useState(false);
   const lastKey = useRef<string | null>(null);
   const isImap = provider?.method === 'imap';
+  // App de email, antes de entrar: a caixa é a conta (os textos dizem "Entrar")
+  const { mailOnly, user } = useWorkspace();
+  const signingIn = !!mailOnly && !user.userId;
   const { discovery, isSearching } = useServerDiscovery(form.email, isImap && !edited);
 
   useEffect(() => {
@@ -135,7 +139,9 @@ export const ConnectMailDialog: React.FC<ConnectMailDialogProps> = ({
           <span className="mb-2 flex h-16 w-16 items-center justify-center rounded-[22px] bg-rz-canvas">
             <provider.Logo />
           </span>
-          <DialogTitle className="text-xl font-extrabold">Ligar {provider.name}</DialogTitle>
+          <DialogTitle className="text-xl font-extrabold">
+            {signingIn ? 'Entrar com' : 'Ligar'} {provider.name}
+          </DialogTitle>
           <DialogDescription className="text-[14px]">
             {METHOD_TEXT[provider.method]}
           </DialogDescription>
@@ -200,7 +206,7 @@ export const ConnectMailDialog: React.FC<ConnectMailDialogProps> = ({
             className="inline-flex h-12 w-full items-center justify-center gap-2 rounded-full bg-rz-primary text-[15px] font-semibold text-white disabled:opacity-50"
           >
             {busy ? <Loader2 className="h-4 w-4 animate-spin" /> : <KeyRound className="h-4 w-4" />}
-            {isImap ? 'Ligar caixa' : 'Continuar'}
+            {isImap ? (signingIn ? 'Entrar' : 'Ligar caixa') : 'Continuar'}
           </button>
         )}
       </DialogContent>

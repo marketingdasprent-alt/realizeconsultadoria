@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { Loader2, Maximize2, Minus, Paperclip, Save, Send, Trash2, X } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
@@ -81,6 +82,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   toBase64,
 }) => {
   const { colleagues } = useDirectory();
+  // App de email para clientes de fora: sem o "Usar IA" (é da Realize)
+  const { mailOnly } = useWorkspace();
   // Colegas da empresa com email: também são sugeridos.
   const team = useMemo<ContactEntry[]>(
     () =>
@@ -597,19 +600,22 @@ export const MailComposer: React.FC<MailComposerProps> = ({
               placeholder="Escreva a sua mensagem…"
               className="min-h-[96px]"
             />
-            <AiRewriteBar
-              empty={!fields.body.trim()}
-              busy={ai.busy}
-              canUndo={!!ai.undoFor(fields.body)}
-              onRun={mode =>
-                void ai.run(mode, { text: fields.body, subject: fields.subject }, quote)
-              }
-              onUndo={() => {
-                const before = ai.undoFor(fields.body);
-                if (before) setFields(f => ({ ...f, body: before.text, subject: before.subject }));
-                ai.clearUndo();
-              }}
-            />
+            {!mailOnly && (
+              <AiRewriteBar
+                empty={!fields.body.trim()}
+                busy={ai.busy}
+                canUndo={!!ai.undoFor(fields.body)}
+                onRun={mode =>
+                  void ai.run(mode, { text: fields.body, subject: fields.subject }, quote)
+                }
+                onUndo={() => {
+                  const before = ai.undoFor(fields.body);
+                  if (before)
+                    setFields(f => ({ ...f, body: before.text, subject: before.subject }));
+                  ai.clearUndo();
+                }}
+              />
+            )}
             {signatureHtml && (
               // Já limpa (sem scripts nem eventos): é a assinatura da própria pessoa. Muda-se em cima.
               <div

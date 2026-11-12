@@ -26,6 +26,8 @@ const ITEMS: { action: MoreAction; label: string; icon: LucideIcon }[] = [
 
 interface ReaderMoreMenuProps {
   onAction: (action: MoreAction) => void;
+  /** Sem "Criar tarefa / evento" (app de email para clientes de fora). */
+  hideRealize?: boolean;
   /** Imprimir só com o email já carregado. */
   canPrint: boolean;
   className?: string;
@@ -36,6 +38,7 @@ export const ReaderMoreMenu: React.FC<ReaderMoreMenuProps> = ({
   onAction,
   canPrint,
   className,
+  hideRealize = false,
 }) => (
   <DropdownMenu>
     <DropdownMenuTrigger className={className} title="Mais ações" aria-label="Mais ações">
@@ -43,9 +46,11 @@ export const ReaderMoreMenu: React.FC<ReaderMoreMenuProps> = ({
       <span className="hidden 2xl:inline">Mais</span>
     </DropdownMenuTrigger>
     <DropdownMenuContent align="end" className="w-56 rounded-xl">
-      {ITEMS.map(({ action, label, icon: Icon }, index) => (
+      {ITEMS.filter(
+        item => !hideRealize || (item.action !== 'task' && item.action !== 'event')
+      ).map(({ action, label, icon: Icon }, index) => (
         <React.Fragment key={action}>
-          {index === 2 && <DropdownMenuSeparator />}
+          {index === 2 && !hideRealize && <DropdownMenuSeparator />}
           <DropdownMenuItem
             onSelect={() => onAction(action)}
             disabled={action === 'print' && !canPrint}

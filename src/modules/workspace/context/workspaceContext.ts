@@ -24,6 +24,11 @@ export interface WorkspaceContextValue {
   basePath: string;
   /** Pré-visualização com dados de exemplo (sem sessão). */
   isPreview: boolean;
+  /**
+   * App de email para clientes de fora (mail.realizeconsultadoria.pt): só o Webmail, sem o que
+   * é da Realize (colegas, tarefas, eventos, IA).
+   */
+  mailOnly?: boolean;
   onLogout: () => void;
   onChangePassword: () => void;
 }

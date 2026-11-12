@@ -27,6 +27,11 @@ import { MAIL_PROVIDER_KEYS, isRecord } from '../_shared/mail/request.ts';
 import type { MailProviderKey, OAuthProvider } from '../_shared/mail/types.ts';
 import { readSecret, saveMailAccount, storeSecret } from '../_shared/mail-server/accounts.ts';
 import {
+  MAIL_APP_ORIGIN,
+  createLoginCode,
+  mailAppUser,
+} from '../_shared/mail-server/mailAppSession.ts';
+import {
   authenticatedUserId,
   corsHeaders,
   errorMessage,
@@ -41,7 +46,9 @@ import {
 } from '../_shared/mail-server/oauth-client.ts';
 
 interface OAuthStateRow {
-  user_id: string;
+  /** null nas entradas da app de email (a conta é a própria caixa). */
+  user_id: string | null;
+  login: boolean;
   oauth_provider: string;
   mail_provider: string;
   redirect_to: string;
@@ -49,7 +56,11 @@ interface OAuthStateRow {
   created_at: string;
 }
 
-const allowedOrigins = () => parseAllowedOrigins(Deno.env.get('MAIL_ALLOWED_ORIGINS'));
+// Mais a app de email (mail.realizeconsultadoria.pt): ligar outra caixa a partir de lá
+const allowedOrigins = () => [
+  ...parseAllowedOrigins(Deno.env.get('MAIL_ALLOWED_ORIGINS')),
+  MAIL_APP_ORIGIN,
+];
 
 const redirect = (location: string) =>
   new Response(null, { status: 302, headers: { Location: location, 'Cache-Control': 'no-store' } });
@@ -142,7 +153,9 @@ const handleCallback = async (req: Request): Promise<Response> => {
     .from('mail_oauth_states')
     .delete()
     .eq('state', state)
-    .select('user_id, oauth_provider, mail_provider, redirect_to, code_verifier, created_at')
+    .select(
+      'user_id, login, oauth_provider, mail_provider, redirect_to, code_verifier, created_at'
+    )
     .maybeSingle();
   const row = data as OAuthStateRow | null;
   if (error || !row) {
@@ -153,7 +166,11 @@ const handleCallback = async (req: Request): Promise<Response> => {
     );
   }
   // As origens podem ter mudado desde o início do pedido: nunca redirecionar para fora.
-  if (!isAllowedRedirect(row.redirect_to, allowedOrigins())) {
+  // Entrada na app de email: regressa sempre à própria app.
+  const allowed = row.login
+    ? row.redirect_to.startsWith(`${MAIL_APP_ORIGIN}/`)
+    : isAllowedRedirect(row.redirect_to, allowedOrigins());
+  if (!allowed) {
     return plainText(400, 'Endereço de regresso não autorizado.');
   }
 
@@ -184,8 +201,13 @@ const handleCallback = async (req: Request): Promise<Response> => {
     const identity = await fetchMailboxIdentity(oauth, exchanged.secret.access_token);
     if (!identity) return fail('identidade');
 
+    // App de email: a caixa é a conta (cria/encontra a conta interna só de email)
+    const userId = row.login
+      ? await mailAppUser(db, identity.email, identity.name)
+      : row.user_id;
+    if (!userId) return fail('servidor');
     const account = await saveMailAccount(db, {
-      userId: row.user_id,
+      userId,
       provider: mailProvider,
       authMethod: authMethodFor(oauth),
       email: identity.email,
@@ -202,6 +224,11 @@ const handleCallback = async (req: Request): Promise<Response> => {
     }
     await storeSecret(db, account.id, secret);
 
+    // App de email: volta com um código de uma só utilização que a app troca pela sessão
+    if (row.login)
+      return redirect(
+        withResultParams(row.redirect_to, { login: await createLoginCode(db, userId) })
+      );
     return redirect(withResultParams(row.redirect_to, { mail: 'ligada' }));
   } catch (err) {
     console.error('mail-oauth: falha no callback', errorMessage(err));

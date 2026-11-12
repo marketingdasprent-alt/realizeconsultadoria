@@ -20,7 +20,8 @@
     "type-check": "tsc --noEmit",
     "validate": "pnpm lint && pnpm format:check && pnpm type-check && pnpm test",
     "setup:admin": "node scripts/setup-admin.mjs",
-    "sync": "git add . && git commit -m 'Update' && git push origin main"
+    "sync": "git add . && git commit -m 'Update' && git push origin main",
+    "build:mail": "vite build --mode mail"
   },
   "dependencies": {
     "@capacitor/android": "8.5.3",

@@ -1,5 +1,5 @@
 // Edge function mail-login: entrada na app de email para clientes de fora
-// (mail.realizeconsultadoria.pt) com a própria caixa — sem conta na Realize.
+// (email.realizeconsultadoria.pt) com a própria caixa — sem conta na Realize.
 //
 // POST (sem sessão; verify_jwt = false):
 //   { action: 'discover', email }            → servidores IMAP/SMTP do domínio (DNS)

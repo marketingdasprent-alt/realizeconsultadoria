@@ -56,7 +56,7 @@ interface OAuthStateRow {
   created_at: string;
 }
 
-// Mais a app de email (mail.realizeconsultadoria.pt): ligar outra caixa a partir de lá
+// Mais a app de email (email.realizeconsultadoria.pt): ligar outra caixa a partir de lá
 const allowedOrigins = () => [
   ...parseAllowedOrigins(Deno.env.get('MAIL_ALLOWED_ORIGINS')),
   MAIL_APP_ORIGIN,

@@ -1,4 +1,4 @@
-// App de email para clientes de fora (mail.realizeconsultadoria.pt): a caixa de email é a conta.
+// App de email para clientes de fora (email.realizeconsultadoria.pt): a caixa de email é a conta.
 // Cada caixa tem uma conta interna só de email (app_metadata.mail_only → o login dá-lhe o papel
 // mail_client, que só chega às tabelas do email). O endereço desta conta é inventado a partir
 // da caixa — nunca é a conta da Realize de quem tenha o mesmo email.
@@ -6,7 +6,7 @@
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
 /** Origem da app de email (regresso da Microsoft e ligações dos avisos). */
-export const MAIL_APP_ORIGIN = 'https://mail.realizeconsultadoria.pt';
+export const MAIL_APP_ORIGIN = 'https://email.realizeconsultadoria.pt';
 
 const sha256Hex = async (text: string) => {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(text));

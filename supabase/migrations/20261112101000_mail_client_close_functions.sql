@@ -34,3 +34,6 @@ BEGIN
     EXECUTE format('ALTER POLICY %I ON storage.objects TO authenticated', pol.policyname);
   END LOOP;
 END $$;
+
+-- O Auth chama a regra no schema public (documentação da Supabase)
+GRANT USAGE ON SCHEMA public TO supabase_auth_admin;

@@ -5,7 +5,7 @@ import path from 'path';
 import { componentTagger } from 'lovable-tagger';
 import { VitePWA } from 'vite-plugin-pwa';
 
-// Realize Mail (mail.realizeconsultadoria.pt): `vite build --mode mail` compila só a app de email
+// Realize Mail (email.realizeconsultadoria.pt): `vite build --mode mail` compila só a app de email
 // (mail.html → dist-mail/index.html), com o nome e o manifest dela.
 const isMail = (mode: string) => mode === 'mail';
 

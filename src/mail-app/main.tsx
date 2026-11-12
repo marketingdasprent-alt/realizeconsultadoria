@@ -1,4 +1,4 @@
-// Realize Mail (mail.realizeconsultadoria.pt): o Webmail da Realize como app própria para clientes
+// Realize Mail (email.realizeconsultadoria.pt): o Webmail da Realize como app própria para clientes
 // de fora. Entra-se com a caixa de email; não há conta da Realize.
 import { createRoot } from 'react-dom/client';
 import { registerSW } from 'virtual:pwa-register';

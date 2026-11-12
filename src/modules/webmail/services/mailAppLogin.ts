@@ -1,4 +1,4 @@
-// App de email para clientes de fora (mail.realizeconsultadoria.pt): entrar com a própria caixa
+// App de email para clientes de fora (email.realizeconsultadoria.pt): entrar com a própria caixa
 // (função mail-login). Devolve a sessão de uma conta interna só de email.
 import { supabase } from '@/integrations/supabase/client';
 import type { Discovery } from '../lib/autodiscover';

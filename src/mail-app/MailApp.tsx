@@ -13,6 +13,7 @@ import {
   WorkspaceContext,
   type WorkspaceContextValue,
 } from '@/modules/workspace/context/workspaceContext';
+import { useRzTheme } from '@/modules/workspace/hooks/useRzTheme';
 import { MailLoginPage } from './MailLoginPage';
 
 const WebmailPage = lazy(() => import('@/modules/webmail/pages/WebmailPage'));
@@ -102,6 +103,8 @@ const MailShell: React.FC<{ session: Session }> = ({ session }) => {
 };
 
 const MailAppContent: React.FC = () => {
+  // Cores, letra e tokens da Realize (classe rz-theme no <html>, também nos diálogos)
+  useRzTheme();
   const [session, setSession] = useState<Session | null | undefined>(undefined);
 
   useEffect(() => {

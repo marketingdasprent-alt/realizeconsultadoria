@@ -8,6 +8,8 @@ import { useNewTicket } from '../hooks/useMyTickets';
 import { useTicketFiles } from '../hooks/useTicketFiles';
 import { TICKET_FILE_ACCEPT, TICKET_MAX_FILES } from '../lib/ticketFiles';
 import { TicketFileChips } from './TicketFileChips';
+import { CompanyPicker } from './CompanyPicker';
+import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 
 const LABEL = 'mb-2 block text-[13px] font-bold';
 const CHIP = 'rounded-full px-4 py-2 text-[13px] font-semibold transition-colors';
@@ -29,6 +31,9 @@ export const NewTicketDialog: React.FC<NewTicketDialogProps> = ({
   const [subjectId, setSubjectId] = useState('');
   const [message, setMessage] = useState('');
   const [busy, setBusy] = useState(false);
+  // Realize Mail (clientes de fora): escolhem a empresa
+  const { mailOnly } = useWorkspace();
+  const [company, setCompany] = useState<{ id: string; name: string } | null>(null);
   const files = useTicketFiles();
   const input = useRef<HTMLInputElement>(null);
   const { isDragging, dropProps } = useFileDrop(files.add, open);
@@ -44,12 +49,20 @@ export const NewTicketDialog: React.FC<NewTicketDialogProps> = ({
 
   const options = subjects.filter(s => s.department_id === departmentId);
   const subject = options.find(s => s.id === subjectId);
-  const ready = !!departmentId && !!subject && message.trim().length > 0 && !busy;
+  const ready =
+    !!departmentId && !!subject && message.trim().length > 0 && !busy && (!mailOnly || !!company);
 
   const submit = async () => {
     if (!subject) return;
     setBusy(true);
-    const id = await create({ departmentId, subject, message, files: files.files });
+    const id = await create({
+      departmentId,
+      subject,
+      message,
+      files: files.files,
+      companyId: company?.id,
+      companyName: company?.name,
+    });
     setBusy(false);
     if (!id) return;
     onOpenChange(false);
@@ -77,7 +90,9 @@ export const NewTicketDialog: React.FC<NewTicketDialogProps> = ({
           <div>
             <DialogTitle className="text-xl font-extrabold">Novo pedido</DialogTitle>
             <DialogDescription className="text-[13px]">
-              A equipa responde aqui no Realize e recebe uma notificação.
+              {mailOnly
+                ? 'A equipa da Realize responde aqui e recebe uma notificação.'
+                : 'A equipa responde aqui no Realize e recebe uma notificação.'}
             </DialogDescription>
           </div>
         </div>
@@ -86,6 +101,7 @@ export const NewTicketDialog: React.FC<NewTicketDialogProps> = ({
           <Loader2 className="mx-auto my-8 h-6 w-6 animate-spin text-rz-primary" />
         ) : (
           <div className="space-y-5">
+            {mailOnly && <CompanyPicker value={company?.id ?? ''} onChange={setCompany} />}
             <div>
               <span className={LABEL}>Para que equipa?</span>
               <div className="flex flex-wrap gap-2">

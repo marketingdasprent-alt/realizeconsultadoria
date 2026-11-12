@@ -18,11 +18,14 @@ import { supportService, type SupportSubject } from '../services/supportService'
 export const TICKETS_KEY = ['support', 'tickets'] as const;
 
 export const useMyTickets = () => {
-  const { isPreview, user } = useWorkspace();
+  const { isPreview, user, mailOnly } = useWorkspace();
   const live = useQuery({
     queryKey: TICKETS_KEY,
     queryFn: async () => {
-      const { data, error } = await supportService.listMine(user.employeeId);
+      // Realize Mail: os tickets da conta da app de email (sem ficha de colaborador)
+      const { data, error } = await supportService.listMine(
+        mailOnly ? { requesterId: user.userId } : { employeeId: user.employeeId }
+      );
       if (error || !data) throw error;
       return data;
     },
@@ -136,7 +139,7 @@ export const useTicketThread = (ticket: SupportTicket | null) => {
 
 /** Departamentos e assuntos do formulário de novo pedido, e a criação do ticket. */
 export const useNewTicket = (enabled: boolean) => {
-  const { isPreview, user } = useWorkspace();
+  const { isPreview, user, mailOnly } = useWorkspace();
   const qc = useQueryClient();
   const options = useQuery({
     queryKey: ['support', 'options'],
@@ -154,6 +157,9 @@ export const useNewTicket = (enabled: boolean) => {
     subject: SupportSubject;
     message: string;
     files: File[];
+    /** Realize Mail: a empresa do cliente (escolhida no formulário). */
+    companyId?: string;
+    companyName?: string;
   }): Promise<string | null> => {
     if (isPreview) {
       toast({ title: 'Pré-visualização', description: 'Criar um ticket usa dados reais.' });
@@ -161,14 +167,19 @@ export const useNewTicket = (enabled: boolean) => {
     }
     const { id, error } = await supportService.create(
       {
-        employeeId: user.employeeId,
-        companyId: user.companyId,
+        employeeId: mailOnly ? null : user.employeeId,
+        companyId: mailOnly ? (input.companyId ?? '') : user.companyId,
+        requester: mailOnly ? { userId: user.userId, name: user.name, email: user.email } : null,
         departmentId: input.departmentId,
         subject: input.subject.label.trim(),
         message: input.message.trim(),
         priority: input.subject.default_priority || 'medium',
       },
-      { employeeName: user.name, employeeEmail: user.email, companyName: user.companyName ?? '' }
+      {
+        employeeName: user.name,
+        employeeEmail: user.email,
+        companyName: mailOnly ? (input.companyName ?? '') : (user.companyName ?? ''),
+      }
     );
     if (error || !id) {
       toast({ title: 'Erro', description: 'O pedido não foi criado.', variant: 'destructive' });
@@ -181,7 +192,7 @@ export const useNewTicket = (enabled: boolean) => {
         description: failed.join(', '),
         variant: 'destructive',
       });
-    else toast({ title: 'Pedido enviado aos RH' });
+    else toast({ title: mailOnly ? 'Pedido enviado ao suporte' : 'Pedido enviado aos RH' });
     await qc.invalidateQueries({ queryKey: TICKETS_KEY });
     return id;
   };

@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Headset, Loader2, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { ModuleIcon } from '@/modules/workspace/components/ModuleIcon';
 import { getModule } from '@/modules/workspace/lib/navigation';
 import { TicketListItem } from '../components/TicketListItem';
@@ -17,6 +18,8 @@ import { countTickets, filterTickets, TICKET_FILTERS, type TicketFilter } from '
  */
 const SupportPage: React.FC = () => {
   const { tickets, attachments, isLoading } = useMyTickets();
+  // Realize Mail (clientes de fora): o suporte é a equipa da Realize, não os RH
+  const { mailOnly } = useWorkspace();
   const [params, setParams] = useSearchParams();
   const [filter, setFilter] = useState<TicketFilter>('all');
   const [isNewOpen, setIsNewOpen] = useState(false);
@@ -29,11 +32,26 @@ const SupportPage: React.FC = () => {
   useEffect(() => {
     if (params.get('novo')) {
       setIsNewOpen(true);
-      setParams({}, { replace: true });
+      setParams(
+        previous => {
+          const next = new URLSearchParams(previous);
+          next.delete('novo');
+          return next;
+        },
+        { replace: true }
+      );
     }
   }, [params, setParams]);
 
   const newTicket = () => setIsNewOpen(true);
+  // Só muda o ticket aberto (?t=): o resto do endereço fica (ex.: ?v=suporte na Realize Mail)
+  const openTicket = (id: string | null) =>
+    setParams(previous => {
+      const next = new URLSearchParams(previous);
+      if (id) next.set('t', id);
+      else next.delete('t');
+      return next;
+    });
 
   return (
     <div className="flex h-full">
@@ -90,7 +108,7 @@ const SupportPage: React.FC = () => {
                 ticket={ticket}
                 attachmentCount={attachments[ticket.id]?.length ?? 0}
                 isActive={ticket.id === activeId}
-                onSelect={id => setParams({ t: id })}
+                onSelect={id => openTicket(id)}
               />
             ))
           )}
@@ -102,14 +120,16 @@ const SupportPage: React.FC = () => {
           <TicketThread
             ticket={active}
             attachments={attachments[active.id] ?? []}
-            onBack={() => setParams({})}
+            onBack={() => openTicket(null)}
           />
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center px-6 text-center">
             <span className="flex h-20 w-20 items-center justify-center rounded-[26px] bg-gradient-to-br from-cyan-100 to-violet-100">
               <Headset className="h-9 w-9 text-rz-primary" />
             </span>
-            <h2 className="mt-5 text-xl font-extrabold">Precisa de ajuda dos RH?</h2>
+            <h2 className="mt-5 text-xl font-extrabold">
+              {mailOnly ? 'Precisa de ajuda?' : 'Precisa de ajuda dos RH?'}
+            </h2>
             <p className="mt-1.5 max-w-sm text-sm text-rz-muted">
               Escolha um ticket para ver a conversa, ou abra um novo pedido.
             </p>
@@ -120,7 +140,7 @@ const SupportPage: React.FC = () => {
       <NewTicketDialog
         open={isNewOpen}
         onOpenChange={setIsNewOpen}
-        onCreated={id => setParams({ t: id })}
+        onCreated={id => openTicket(id)}
       />
     </div>
   );

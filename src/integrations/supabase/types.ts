@@ -3081,11 +3081,14 @@ export type Database = {
       };
       support_tickets: {
         Row: {
+          requester_email: string | null;
+          requester_name: string | null;
+          requester_user_id: string | null;
           admin_notes: string | null;
           company_id: string;
           created_at: string;
           department_id: string | null;
-          employee_id: string;
+          employee_id: string | null;
           id: string;
           message: string;
           priority: string;
@@ -3096,11 +3099,14 @@ export type Database = {
           updated_at: string;
         };
         Insert: {
+          requester_email?: string | null;
+          requester_name?: string | null;
+          requester_user_id?: string | null;
           admin_notes?: string | null;
           company_id: string;
           created_at?: string;
           department_id?: string | null;
-          employee_id: string;
+          employee_id?: string | null;
           id?: string;
           message: string;
           priority?: string;
@@ -3111,6 +3117,9 @@ export type Database = {
           updated_at?: string;
         };
         Update: {
+          requester_email?: string | null;
+          requester_name?: string | null;
+          requester_user_id?: string | null;
           admin_notes?: string | null;
           company_id?: string;
           created_at?: string;

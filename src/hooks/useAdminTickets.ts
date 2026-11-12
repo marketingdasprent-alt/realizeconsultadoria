@@ -12,7 +12,11 @@ export interface SupportTicket {
   updated_at: string;
   resolved_at: string | null;
   admin_notes: string | null;
-  employee_id: string;
+  /** null nos tickets de clientes da Realize Mail (vêm com requester_*). */
+  employee_id: string | null;
+  requester_user_id?: string | null;
+  requester_name?: string | null;
+  requester_email?: string | null;
   company_id: string;
   department_id: string | null;
   employees: {
@@ -45,7 +49,20 @@ export const useAdminTickets = () => {
       if (error) {
         throw error;
       }
-      setTickets((data as unknown as SupportTicket[]) || []);
+      // Clientes da Realize Mail não têm ficha: o nome e o email vêm do próprio ticket
+      setTickets(
+        ((data as unknown as SupportTicket[]) || []).map(ticket =>
+          ticket.employees
+            ? ticket
+            : {
+                ...ticket,
+                employees: {
+                  name: ticket.requester_name ?? 'Cliente',
+                  email: ticket.requester_email ?? '',
+                },
+              }
+        )
+      );
     } catch (error) {
       console.error('Error loading tickets:', error);
     } finally {

@@ -19,8 +19,11 @@ export interface SupportSubject {
 }
 
 export interface NewTicketInput {
-  employeeId: string;
+  /** null para clientes da Realize Mail (requerente externo). */
+  employeeId: string | null;
   companyId: string;
+  /** Cliente da Realize Mail: a conta da app de email, com nome e email. */
+  requester?: { userId: string; name: string; email: string } | null;
   departmentId: string;
   subject: string;
   message: string;
@@ -28,6 +31,12 @@ export interface NewTicketInput {
 }
 
 export const supportService = {
+  /** Empresas (só id e nome) para o cliente da Realize Mail escolher a sua. */
+  listCompanies: async () => {
+    const { data, error } = await supabase.rpc('mail_support_companies' as never);
+    return { data: (data ?? []) as unknown as { id: string; name: string }[], error };
+  },
+
   /** Departamentos e assuntos ativos (os mesmos do formulário antigo). */
   listOptions: async () => {
     const [departments, subjects] = await Promise.all([
@@ -61,6 +70,9 @@ export const supportService = {
       .insert({
         employee_id: input.employeeId,
         company_id: input.companyId,
+        requester_user_id: input.requester?.userId ?? null,
+        requester_name: input.requester?.name ?? null,
+        requester_email: input.requester?.email ?? null,
         subject: input.subject,
         message: input.message,
         priority: input.priority,
@@ -106,13 +118,17 @@ export const supportService = {
     return { failed };
   },
 
-  /** Os tickets do colaborador, mais recentes primeiro, com os anexos. */
-  listMine: async (employeeId: string) => {
-    const { data, error } = await supabase
-      .from('support_tickets')
-      .select('*')
-      .eq('employee_id', employeeId)
-      .order('created_at', { ascending: false });
+  /**
+   * Os tickets de quem está a usar, mais recentes primeiro, com os anexos: do colaborador
+   * (ficha) ou do cliente da Realize Mail (requerente).
+   */
+  listMine: async (owner: { employeeId?: string; requesterId?: string }) => {
+    const query = supabase.from('support_tickets').select('*');
+    const { data, error } = await (
+      owner.requesterId
+        ? query.eq('requester_user_id', owner.requesterId)
+        : query.eq('employee_id', owner.employeeId ?? '')
+    ).order('created_at', { ascending: false });
     if (error) return { data: null, error };
     const tickets = (data ?? []) as SupportTicket[];
     const ids = tickets.map(t => t.id);

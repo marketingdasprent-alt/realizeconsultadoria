@@ -1,9 +1,10 @@
 import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
 import type { Session } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { BrowserRouter } from 'react-router-dom';
+import { BrowserRouter, useSearchParams } from 'react-router-dom';
 import { ThemeProvider } from 'next-themes';
-import { Loader2, LogOut, Mail } from 'lucide-react';
+import { Headset, Loader2, LogOut, Mail } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
@@ -17,6 +18,7 @@ import { useRzTheme } from '@/modules/workspace/hooks/useRzTheme';
 import { MailLoginPage } from './MailLoginPage';
 
 const WebmailPage = lazy(() => import('@/modules/webmail/pages/WebmailPage'));
+const SupportPage = lazy(() => import('@/modules/support/pages/SupportPage'));
 
 const queryClient = new QueryClient({
   defaultOptions: { queries: { staleTime: 60_000, refetchOnWindowFocus: false, retry: 1 } },
@@ -57,6 +59,19 @@ const LOGIN_CONTEXT: WorkspaceContextValue = {
 /** O email: barra de cima (nome da app, caixa, Sair) e o Webmail inteiro por baixo. */
 const MailShell: React.FC<{ session: Session }> = ({ session }) => {
   const mailbox = String(session.user.app_metadata?.mailbox ?? '');
+  // Email ou Suporte (no endereço: ?v=suporte&t=<ticket>). Os avisos do suporte chegam com
+  // /?suporte=<ticket>: abre esse ticket.
+  const [params, setParams] = useSearchParams();
+  useEffect(() => {
+    const ticket = params.get('suporte');
+    if (ticket) setParams({ v: 'suporte', t: ticket }, { replace: true });
+  }, [params, setParams]);
+  const view = params.get('v') === 'suporte' || params.get('suporte') ? 'support' : 'mail';
+  const tab = (active: boolean) =>
+    cn(
+      'inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold transition-colors',
+      active ? 'bg-rz-ink text-white' : 'text-rz-muted hover:bg-rz-canvas hover:text-rz-ink'
+    );
   const value: WorkspaceContextValue = useMemo(
     () => ({
       user: {
@@ -80,7 +95,19 @@ const MailShell: React.FC<{ session: Session }> = ({ session }) => {
           <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rz-primary text-white">
             <Mail className="h-5 w-5" />
           </span>
-          <span className="text-[16px] font-extrabold">Realize Mail</span>
+          <span className="hidden text-[16px] font-extrabold sm:inline">Realize Mail</span>
+          <nav className="ml-2 flex items-center gap-1">
+            <button type="button" className={tab(view === 'mail')} onClick={() => setParams({})}>
+              <Mail className="h-4 w-4" /> Email
+            </button>
+            <button
+              type="button"
+              className={tab(view === 'support')}
+              onClick={() => setParams({ v: 'suporte' })}
+            >
+              <Headset className="h-4 w-4" /> Suporte
+            </button>
+          </nav>
           <span className="ml-auto hidden truncate text-[13px] text-rz-muted sm:block">
             {mailbox}
           </span>
@@ -94,7 +121,7 @@ const MailShell: React.FC<{ session: Session }> = ({ session }) => {
         </header>
         <main className="min-h-0 flex-1">
           <Suspense fallback={<Spinner />}>
-            <WebmailPage />
+            {view === 'support' ? <SupportPage /> : <WebmailPage />}
           </Suspense>
         </main>
       </div>

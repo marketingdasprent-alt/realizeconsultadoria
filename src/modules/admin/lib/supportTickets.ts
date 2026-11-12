@@ -159,6 +159,7 @@ export const filterTickets = (
         ticket.subject,
         ticket.message,
         ticket.employees?.name,
+        ticket.employees?.email,
         ticket.companies?.name
       );
     })

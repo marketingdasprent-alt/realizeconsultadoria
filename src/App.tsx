@@ -34,6 +34,7 @@ const EmployeeFormPage = lazy(() => import('./modules/admin/pages/EmployeeFormPa
 const CalendarPage = lazy(() => import('./modules/admin/pages/CalendarPage'));
 const SettingsPage = lazy(() => import('./modules/admin/pages/SettingsPage'));
 const BroadcastsPage = lazy(() => import('./modules/admin/pages/BroadcastsPage'));
+const MailClientsPage = lazy(() => import('./modules/admin/pages/MailClientsPage'));
 const FinancePage = lazy(() => import('./modules/admin/pages/FinancePage'));
 const SupportTicketsPage = lazy(() => import('./modules/admin/pages/SupportTicketsPage'));
 const AccessesPage = lazy(() => import('./modules/admin/pages/AccessesPage'));
@@ -154,6 +155,7 @@ const App = () => (
                         <Route path="/admin/financeiro" element={<FinancePage />} />
                         <Route path="/admin/configuracoes" element={<SettingsPage />} />
                         <Route path={ROUTES.ADMIN.BROADCASTS} element={<BroadcastsPage />} />
+                        <Route path={ROUTES.ADMIN.MAIL_CLIENTS} element={<MailClientsPage />} />
                       </Route>
                     </Route>
 

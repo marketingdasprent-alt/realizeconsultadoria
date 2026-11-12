@@ -61,6 +61,8 @@ export const ROUTES = {
     DOCUMENTS: '/admin/documentos',
     FINANCE: '/admin/financeiro',
     BROADCASTS: '/admin/comunicados',
+    /** Clientes da Realize Mail (app de email para clientes de fora). */
+    MAIL_CLIENTS: '/admin/realize-mail',
   },
   EMPLOYEE: {
     /** Login único (o antigo /colaborador/login reencaminha para aqui). */

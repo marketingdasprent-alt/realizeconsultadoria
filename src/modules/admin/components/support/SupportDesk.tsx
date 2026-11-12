@@ -55,8 +55,10 @@ export const SupportDesk: React.FC<SupportDeskProps> = ({
   const qc = useQueryClient();
   const marks = useReplyMarks();
   const [params, setParams] = useSearchParams();
-  const [queue, setQueue] = useState<QueueFilter>('awaiting');
-  const [search, setSearch] = useState('');
+  // Com ?q= (tickets de um cliente) mostra todos, não só os à espera
+  const [queue, setQueue] = useState<QueueFilter>(() => (params.get('q') ? 'all' : 'awaiting'));
+  // ?q= (ex.: vindo de Admin → Realize Mail, os tickets de um cliente)
+  const [search, setSearch] = useState(() => params.get('q') ?? '');
   const [priority, setPriority] = useState('all');
   const [departmentId, setDepartmentId] = useState('all');
   const [busy, setBusy] = useState(false);

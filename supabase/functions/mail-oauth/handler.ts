@@ -28,6 +28,7 @@ import type { MailProviderKey, OAuthProvider } from '../_shared/mail/types.ts';
 import { readSecret, saveMailAccount, storeSecret } from '../_shared/mail-server/accounts.ts';
 import {
   MAIL_APP_ORIGIN,
+  MailAppDisabledError,
   createLoginCode,
   mailAppUser,
 } from '../_shared/mail-server/mailAppSession.ts';
@@ -153,9 +154,7 @@ const handleCallback = async (req: Request): Promise<Response> => {
     .from('mail_oauth_states')
     .delete()
     .eq('state', state)
-    .select(
-      'user_id, login, oauth_provider, mail_provider, redirect_to, code_verifier, created_at'
-    )
+    .select('user_id, login, oauth_provider, mail_provider, redirect_to, code_verifier, created_at')
     .maybeSingle();
   const row = data as OAuthStateRow | null;
   if (error || !row) {
@@ -202,9 +201,13 @@ const handleCallback = async (req: Request): Promise<Response> => {
     if (!identity) return fail('identidade');
 
     // App de email: a caixa é a conta (cria/encontra a conta interna só de email)
-    const userId = row.login
-      ? await mailAppUser(db, identity.email, identity.name)
-      : row.user_id;
+    let userId: string | null;
+    try {
+      userId = row.login ? await mailAppUser(db, identity.email, identity.name) : row.user_id;
+    } catch (error) {
+      if (error instanceof MailAppDisabledError) return fail('desligado');
+      throw error;
+    }
     if (!userId) return fail('servidor');
     const account = await saveMailAccount(db, {
       userId,

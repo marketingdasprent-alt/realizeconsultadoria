@@ -24,6 +24,7 @@ import { denoResolver } from '../_shared/mail-server/dns.ts';
 import { corsHeaders, errorMessage, json, serviceClient } from '../_shared/mail-server/http.ts';
 import {
   MAIL_APP_ORIGIN,
+  MailAppDisabledError,
   consumeLoginCode,
   mailAppSession,
   mailAppUser,
@@ -95,13 +96,18 @@ const loginImap = async (req: Request, body: Record<string, unknown>) => {
       ok: false,
       code: isMailError(error) ? error.code : 'imap_login_failed',
       message:
-        isMailError(error) && error.message
-          ? error.message
-          : MAIL_ERROR_MESSAGES.imap_login_failed,
+        isMailError(error) && error.message ? error.message : MAIL_ERROR_MESSAGES.imap_login_failed,
     });
   }
   // A palavra-passe abriu a caixa: é dela. Liga a caixa à conta interna e entra.
-  const userId = await mailAppUser(db, input.email, input.displayName);
+  let userId: string;
+  try {
+    userId = await mailAppUser(db, input.email, input.displayName);
+  } catch (error) {
+    if (error instanceof MailAppDisabledError)
+      return json({ ok: false, code: 'disabled', message: error.message });
+    throw error;
+  }
   const account = await saveMailAccount(db, {
     userId,
     provider: input.provider,
@@ -126,7 +132,11 @@ const oauthStart = async (body: Record<string, unknown>) => {
   if (oauth !== 'microsoft') return json({ ok: false, code: 'bad_request' }, 400);
   const credentials = oauthCredentials(oauth);
   if (!credentials)
-    return json({ ok: false, code: 'not_configured', message: 'A Microsoft não está configurada.' });
+    return json({
+      ok: false,
+      code: 'not_configured',
+      message: 'A Microsoft não está configurada.',
+    });
   const db = serviceClient();
   const state = randomBase64Url(32);
   const codeVerifier = randomBase64Url(32);

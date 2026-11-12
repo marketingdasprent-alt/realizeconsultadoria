@@ -143,7 +143,12 @@ const MailAppContent: React.FC = () => {
     if (motivo)
       toast({
         title: 'A Microsoft não deixou entrar',
-        description: motivo === 'cancelado' ? 'Cancelou a entrada.' : 'Tente outra vez.',
+        description:
+          motivo === 'cancelado'
+            ? 'Cancelou a entrada.'
+            : motivo === 'desligado'
+              ? 'O acesso desta caixa foi desligado. Fale com a Realize.'
+              : 'Tente outra vez.',
         variant: 'destructive',
       });
     void (async () => {

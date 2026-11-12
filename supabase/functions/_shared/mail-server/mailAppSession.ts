@@ -13,6 +13,13 @@ const sha256Hex = async (text: string) => {
   return [...new Uint8Array(digest)].map(b => b.toString(16).padStart(2, '0')).join('');
 };
 
+/** Acesso desligado pelo admin (Admin → Realize Mail): não entra nem volta a ligar caixas. */
+export class MailAppDisabledError extends Error {
+  constructor() {
+    super('O acesso desta caixa à Realize Mail foi desligado. Fale com a Realize.');
+  }
+}
+
 /** Conta interna (só de email) da caixa: a que já existe, ou uma nova. */
 export const mailAppUser = async (
   db: SupabaseClient,
@@ -22,9 +29,10 @@ export const mailAppUser = async (
   const key = mailbox.trim().toLowerCase();
   const { data: existing } = await db
     .from('mail_app_users')
-    .select('user_id')
+    .select('user_id, disabled_at')
     .eq('mailbox', key)
     .maybeSingle();
+  if (existing?.disabled_at) throw new MailAppDisabledError();
   if (existing?.user_id) return existing.user_id as string;
 
   const email = `m-${(await sha256Hex(key)).slice(0, 32)}@clientes.mail.realizeconsultadoria.pt`;
@@ -88,7 +96,10 @@ export const createLoginCode = async (db: SupabaseClient, userId: string): Promi
 };
 
 /** Troca o código pela conta (apaga-o: só serve uma vez). */
-export const consumeLoginCode = async (db: SupabaseClient, code: string): Promise<string | null> => {
+export const consumeLoginCode = async (
+  db: SupabaseClient,
+  code: string
+): Promise<string | null> => {
   if (!code || code.length > 100) return null;
   const { data } = await db
     .from('mail_login_codes')

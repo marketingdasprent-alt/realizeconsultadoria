@@ -17,6 +17,8 @@ import type { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { json, serviceClient } from '../_shared/mail-server/http.ts';
 
 const APP_URL = 'https://app.realizeconsultadoria.pt';
+/** Clientes da app de email (contas só de email) abrem os avisos na Realize Mail, não na Realize. */
+const MAIL_APP_URL = 'https://email.realizeconsultadoria.pt';
 
 interface Push {
   userIds: string[];
@@ -26,6 +28,8 @@ interface Push {
     url: string;
     tag: string;
     conversationId?: string;
+    /** Tipo do aviso (mail, ticket…): o service worker destaca os de email. */
+    kind?: string;
   };
 }
 
@@ -41,13 +45,25 @@ const notificationPush = async (db: SupabaseClient, id: string): Promise<Push | 
     .eq('id', id)
     .maybeSingle();
   if (!notification) return null;
+  // Conta só de email (cliente de fora ou posto): o aviso abre a Realize Mail. O link de um
+  // email novo é o da Realize (/colaborador/email); na Realize Mail a caixa é a página inicial.
+  const { data: account } = await db.auth.admin.getUserById(notification.user_id as string);
+  const mailOnly = account?.user?.app_metadata?.mail_only === true;
+  const link =
+    typeof notification.link === 'string' && notification.link.startsWith('/')
+      ? notification.link
+      : null;
+  const url = mailOnly
+    ? `${MAIL_APP_URL}${notification.kind === 'mail' ? '/' : (link ?? '/')}`
+    : `${APP_URL}${link ?? '/colaborador'}`;
   return {
     userIds: [notification.user_id],
     payload: {
       title: notification.title,
       body: notification.body ?? '',
-      url: `${APP_URL}${notification.link ?? '/colaborador'}`,
+      url,
       tag: notification.kind,
+      kind: notification.kind,
     },
   };
 };

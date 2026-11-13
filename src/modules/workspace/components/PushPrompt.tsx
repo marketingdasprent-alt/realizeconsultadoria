@@ -25,7 +25,11 @@ const hiddenRecently = () => {
  * fechada), no topo da app. Desligadas: botão Ativar; iPhone sem a app instalada: como instalar;
  * bloqueadas no navegador: como desbloquear. Fechado, volta passada uma semana.
  */
-export const PushPrompt: React.FC<{ className?: string }> = ({ className }) => {
+export const PushPrompt: React.FC<{
+  className?: string;
+  /** Página de como instalar a app (iPhone); sem ela só se explica o passo. */
+  installHref?: string | null;
+}> = ({ className, installHref = ROUTES.PUBLIC.INSTALL }) => {
   const { user, isPreview } = useWorkspace();
   const [state, setState] = useState<PushState | null>(null);
   const [hidden, setHidden] = useState(hiddenRecently);
@@ -80,45 +84,48 @@ export const PushPrompt: React.FC<{ className?: string }> = ({ className }) => {
 
   return (
     <div
+      role="status"
       className={cn(
-        'flex items-center gap-3 rounded-2xl bg-amber-50 px-3 py-2.5 ring-1 ring-amber-200',
+        'flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3.5 shadow-sm ring-2 ring-amber-300',
         className
       )}
     >
-      <BellRing className="h-5 w-5 shrink-0 text-amber-600" />
-      <p className="min-w-0 flex-1 text-[12.5px] font-medium leading-snug text-amber-900">
+      <span className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-amber-500 text-white">
+        <BellRing className="h-6 w-6" />
+      </span>
+      <p className="min-w-[200px] flex-1 text-[14.5px] font-semibold leading-snug text-amber-950">
         {state === 'ios-install'
-          ? 'No iPhone, os avisos só chegam com a app instalada no ecrã principal.'
+          ? 'No iPhone, os avisos só chegam com a app instalada no ecrã principal (Partilhar → "Adicionar ao ecrã principal").'
           : state === 'denied'
             ? 'Os avisos estão bloqueados neste navegador. Desbloqueie-os no cadeado da barra de endereço.'
-            : 'Receba as mensagens e os emails novos mesmo com a app fechada.'}
+            : 'Ative os avisos para saber logo quando chegar um email novo, mesmo com a app fechada.'}
       </p>
-      {state === 'ios-install' ? (
-        <Link
-          to={ROUTES.PUBLIC.INSTALL}
-          className="inline-flex h-8 shrink-0 items-center rounded-full bg-amber-500 px-3 text-[12.5px] font-bold text-white hover:bg-amber-600"
-        >
-          Como instalar
-        </Link>
-      ) : (
-        state === 'off' && (
-          <button
-            type="button"
-            onClick={enable}
-            disabled={busy}
-            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full bg-amber-500 px-3 text-[12.5px] font-bold text-white hover:bg-amber-600 disabled:opacity-60"
-          >
-            {busy && <Loader2 className="h-3.5 w-3.5 animate-spin" />} Ativar
-          </button>
-        )
-      )}
+      {state === 'ios-install'
+        ? installHref && (
+            <Link
+              to={installHref}
+              className="inline-flex h-10 shrink-0 items-center rounded-full bg-amber-500 px-4 text-[14px] font-bold text-white hover:bg-amber-600"
+            >
+              Como instalar
+            </Link>
+          )
+        : state === 'off' && (
+            <button
+              type="button"
+              onClick={enable}
+              disabled={busy}
+              className="inline-flex h-10 shrink-0 items-center gap-2 rounded-full bg-amber-500 px-5 text-[14px] font-bold text-white shadow-sm hover:bg-amber-600 disabled:opacity-60"
+            >
+              {busy && <Loader2 className="h-4 w-4 animate-spin" />} Ativar avisos
+            </button>
+          )}
       <button
         type="button"
         onClick={hide}
         aria-label="Agora não"
-        className="rounded-full p-1 text-amber-700 hover:bg-amber-100"
+        className="rounded-full p-1.5 text-amber-700 hover:bg-amber-100"
       >
-        <X className="h-4 w-4" />
+        <X className="h-5 w-5" />
       </button>
     </div>
   );

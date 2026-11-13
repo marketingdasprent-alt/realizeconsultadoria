@@ -10,7 +10,9 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { NewMailPopup } from '@/modules/webmail/components/NewMailPopup';
 import { mailAppExchange, mailAppLoginPosto } from '@/modules/webmail/services/mailAppLogin';
+import { PushPrompt } from '@/modules/workspace/components/PushPrompt';
 import {
   WorkspaceContext,
   type WorkspaceContextValue,
@@ -133,6 +135,9 @@ const MailShell: React.FC<{ session: Session }> = ({ session }) => {
             </button>
           </header>
         )}
+        {/* Avisos desligados neste aparelho: convite no topo (sem eles não chega nenhum aviso de email) */}
+        <PushPrompt installHref={null} className="mx-3 mt-3" />
+        <NewMailPopup />
         <main className="min-h-0 flex-1">
           <Suspense fallback={<Spinner />}>
             {view === 'support' ? <SupportPage /> : <WebmailPage />}

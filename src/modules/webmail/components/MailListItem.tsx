@@ -17,6 +17,8 @@ interface MailListItemProps {
   /** Nome da caixa (ao passar o rato na marca de cor). */
   accountName?: string;
   onOpen: (mail: MailSummary) => void;
+  /** Duplo clique na linha: abre o email numa janela própria. */
+  onOpenWindow?: (mail: MailSummary) => void;
   /** Marcar/desmarcar (`range`: Shift+clique, intervalo desde o último). */
   onSelect: (mail: MailSummary, range: boolean) => void;
   onToggleStar: (mail: MailSummary) => void;
@@ -61,6 +63,11 @@ export const MailListItem: React.FC<MailListItemProps> = ({ mail, ...props }) =>
       onDragStart={event => props.dragGroup && startMailDrag(event, props.dragGroup)}
       onDragEnd={endMailDrag}
       onClick={() => props.onOpen(mail)}
+      onDoubleClick={event => {
+        // Duplo clique na estrela, no lixo ou na seleção não abre nada.
+        if ((event.target as Element).closest('button')) return;
+        props.onOpenWindow?.(mail);
+      }}
       onMouseEnter={() => props.onHover?.(mail)}
       onMouseLeave={() => props.onHover?.(null)}
       onKeyDown={event => event.key === 'Enter' && props.onOpen(mail)}

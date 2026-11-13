@@ -27,7 +27,6 @@ import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { useAccountFolders } from '../hooks/useAccountFolders';
 import { useFolderActions, type MoveTarget } from '../hooks/useFolderActions';
 import type { MailChange } from '../hooks/useMailChanges';
-import { mailLink } from '../lib/mailLink';
 import type { MailAccount, MailLabel, MailSummary } from '../types';
 import type { ReaderAction } from './MailReader';
 import { MailMoveSubmenu } from './MailMoveSubmenu';
@@ -46,6 +45,8 @@ interface MailContextMenuProps {
   targets: MailSummary[];
   accounts: MailAccount[];
   onOpen: (mail: MailSummary) => void;
+  /** Abrir numa janela própria (o mesmo que o duplo clique). */
+  onOpenWindow?: (mail: MailSummary) => void;
   onChange: (mails: MailSummary[], kind: MailChange) => void;
   onMove: (mails: MailSummary[], target: MoveTarget) => void;
   /** Responder, reencaminhar, criar tarefa/evento, imprimir (abre o email e faz a ação). */
@@ -68,6 +69,7 @@ export const MailContextMenu: React.FC<MailContextMenuProps> = ({
   targets,
   accounts,
   onOpen,
+  onOpenWindow,
   onChange,
   onMove,
   onAction,
@@ -106,12 +108,11 @@ export const MailContextMenu: React.FC<MailContextMenuProps> = ({
               <ContextMenuItem onSelect={() => onOpen(mail)} className="gap-2">
                 <ExternalLink className={ICON} /> Abrir
               </ContextMenuItem>
-              <ContextMenuItem
-                onSelect={() => window.open(mailLink(mail), '_blank', 'noopener')}
-                className="gap-2"
-              >
-                <AppWindow className={ICON} /> Abrir em nova janela
-              </ContextMenuItem>
+              {onOpenWindow && (
+                <ContextMenuItem onSelect={() => onOpenWindow(mail)} className="gap-2">
+                  <AppWindow className={ICON} /> Abrir em nova janela
+                </ContextMenuItem>
+              )}
               {onAction && (
                 <>
                   <ContextMenuSeparator />

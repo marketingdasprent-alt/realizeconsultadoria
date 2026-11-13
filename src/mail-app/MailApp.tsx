@@ -1,4 +1,5 @@
 import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import { isReaderWindow } from '@/modules/webmail/lib/readerWindow';
 import type { Session } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { BrowserRouter, useSearchParams } from 'react-router-dom';
@@ -100,36 +101,38 @@ const MailShell: React.FC<{ session: Session }> = ({ session }) => {
   return (
     <WorkspaceContext.Provider value={value}>
       <div className="flex h-[100dvh] flex-col bg-rz-canvas">
-        <header className="flex h-14 shrink-0 items-center gap-3 border-b border-rz-line bg-white px-4">
-          <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rz-primary text-white">
-            <Mail className="h-5 w-5" />
-          </span>
-          <span className="hidden text-[16px] font-extrabold sm:inline">Realize Mail</span>
-          <nav className="ml-2 flex items-center gap-1">
-            <button type="button" className={tab(view === 'mail')} onClick={() => setParams({})}>
-              <Mail className="h-4 w-4" /> Email
-            </button>
-            {!posto && (
-              <button
-                type="button"
-                className={tab(view === 'support')}
-                onClick={() => setParams({ v: 'suporte' })}
-              >
-                <Headset className="h-4 w-4" /> Suporte
+        {!isReaderWindow() && (
+          <header className="flex h-14 shrink-0 items-center gap-3 border-b border-rz-line bg-white px-4">
+            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-rz-primary text-white">
+              <Mail className="h-5 w-5" />
+            </span>
+            <span className="hidden text-[16px] font-extrabold sm:inline">Realize Mail</span>
+            <nav className="ml-2 flex items-center gap-1">
+              <button type="button" className={tab(view === 'mail')} onClick={() => setParams({})}>
+                <Mail className="h-4 w-4" /> Email
               </button>
-            )}
-          </nav>
-          <span className="ml-auto hidden truncate text-[13px] text-rz-muted sm:block">
-            {mailbox}
-          </span>
-          <button
-            type="button"
-            onClick={value.onLogout}
-            className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-rz-muted hover:bg-rz-canvas hover:text-rz-ink sm:ml-0"
-          >
-            <LogOut className="h-4 w-4" /> Sair
-          </button>
-        </header>
+              {!posto && (
+                <button
+                  type="button"
+                  className={tab(view === 'support')}
+                  onClick={() => setParams({ v: 'suporte' })}
+                >
+                  <Headset className="h-4 w-4" /> Suporte
+                </button>
+              )}
+            </nav>
+            <span className="ml-auto hidden truncate text-[13px] text-rz-muted sm:block">
+              {mailbox}
+            </span>
+            <button
+              type="button"
+              onClick={value.onLogout}
+              className="ml-auto inline-flex h-9 items-center gap-1.5 rounded-full px-3 text-[13px] font-semibold text-rz-muted hover:bg-rz-canvas hover:text-rz-ink sm:ml-0"
+            >
+              <LogOut className="h-4 w-4" /> Sair
+            </button>
+          </header>
+        )}
         <main className="min-h-0 flex-1">
           <Suspense fallback={<Spinner />}>
             {view === 'support' ? <SupportPage /> : <WebmailPage />}

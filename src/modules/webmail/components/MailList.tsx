@@ -27,6 +27,8 @@ interface MailListProps {
   search: string;
   onSearch: (value: string) => void;
   onOpen: (mail: MailSummary) => void;
+  /** Duplo clique: abre o email numa janela própria (sem ele, o duplo clique não faz nada). */
+  onOpenWindow?: (mail: MailSummary) => void;
   onToggleStar: (mail: MailSummary) => void;
   onTrash: (mail: MailSummary) => void;
   /** Ação sobre os emails selecionados. */
@@ -186,6 +188,7 @@ export const MailList: React.FC<MailListProps> = props => {
                   targets={group}
                   accounts={props.accounts}
                   onOpen={props.onOpen}
+                  onOpenWindow={props.onOpenWindow}
                   onChange={onBulkOf}
                   onMove={moveMails}
                   onRule={props.onRule}
@@ -205,6 +208,7 @@ export const MailList: React.FC<MailListProps> = props => {
               accountDot={props.showAccount ? colorOf.get(mail.accountId) : undefined}
               accountName={props.showAccount ? emailOf.get(mail.accountId) : undefined}
               onOpen={props.onOpen}
+              onOpenWindow={props.onOpenWindow}
               onSelect={(target, range) => selection.toggle(mailKey(target), range)}
               onToggleStar={props.onToggleStar}
               onTrash={props.onTrash}

@@ -13,6 +13,7 @@ import { WorkspaceTabsProvider } from './WorkspaceTabsProvider';
 // Ficheiros abertos dos Documentos (cada um na sua aba); carrega à parte da estrutura.
 const OpenFilesHost = lazy(() => import('@/modules/documents/components/company/OpenFilesHost'));
 import { WorkspaceTopBar } from './WorkspaceTopBar';
+import { isReaderWindow } from '@/modules/webmail/lib/readerWindow';
 
 interface WorkspaceShellProps {
   value: WorkspaceContextValue;
@@ -29,6 +30,18 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ value, children 
   const [collapsed, toggleCollapsed] = useSidebarCollapsed();
 
   useRzTheme();
+
+  // Janela aberta só para ler um email (duplo clique): sem menu, barras nem abas.
+  if (isReaderWindow())
+    return (
+      <WorkspaceContext.Provider value={value}>
+        <WorkspaceTabsProvider>
+          <div className="fixed inset-0 flex flex-col bg-rz-canvas font-jakarta text-rz-ink">
+            {children}
+          </div>
+        </WorkspaceTabsProvider>
+      </WorkspaceContext.Provider>
+    );
 
   return (
     <WorkspaceContext.Provider value={value}>

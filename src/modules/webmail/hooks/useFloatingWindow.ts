@@ -47,6 +47,13 @@ export const dockedPosition = (viewport: Viewport): FloatPosition => {
   );
 };
 
+/** O painel solto leva este atributo: é por ele que se encontra ao mover. */
+export const FLOATING_ATTRIBUTE = 'data-floating-window';
+const FLOATING_SELECTOR = `[${FLOATING_ATTRIBUTE}]`;
+
+/** Posição por transform (só compõe, não refaz o layout a cada movimento). */
+const moveTo = (position: FloatPosition) => `translate3d(${position.x}px, ${position.y}px, 0)`;
+
 const viewportNow = (): Viewport => ({ width: window.innerWidth, height: window.innerHeight });
 
 /**
@@ -81,6 +88,9 @@ export const useFloatingWindow = (active: boolean) => {
     if (window.innerWidth >= FLOAT_MIN_VIEWPORT) setPosition(dockedPosition(viewportNow()));
   }, []);
 
+  const floatingRef = useRef(floating);
+  floatingRef.current = floating;
+
   const onPointerDown = (event: React.PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || window.innerWidth < FLOAT_MIN_VIEWPORT) return;
     const panel = event.currentTarget.closest<HTMLElement>('[role="dialog"]');
@@ -95,7 +105,20 @@ export const useFloatingWindow = (active: boolean) => {
     const grabY = event.clientY - rect.top;
     const start = { x: event.clientX, y: event.clientY };
     let moved = false;
+    let latest: FloatPosition | null = null;
+    let frame = 0;
 
+    // Um quadro de cada vez, e depois de solta a janela move-se direto no DOM: refazer o
+    // compositor inteiro (centenas de elementos) a cada movimento do rato deixava o arrasto lento.
+    const paint = () => {
+      frame = 0;
+      if (!latest) return;
+      const panelNow = floatingRef.current
+        ? document.querySelector<HTMLElement>(FLOATING_SELECTOR)
+        : null;
+      if (panelNow) panelNow.style.transform = moveTo(latest);
+      else setPosition(latest); // primeiro movimento: passa de modal a solta
+    };
     // Ouvintes na janela, não na barra: ao soltar, a janela passa de modal a solta e os
     // seus elementos são recriados a meio do arrasto.
     const onMove = (move: PointerEvent) => {
@@ -103,14 +126,18 @@ export const useFloatingWindow = (active: boolean) => {
         return;
       if (!moved) document.body.style.userSelect = 'none';
       moved = true;
-      setPosition(clampFloat({ x: move.clientX - grabX, y: move.clientY - grabY }, viewportNow()));
+      latest = clampFloat({ x: move.clientX - grabX, y: move.clientY - grabY }, viewportNow());
+      if (!frame) frame = requestAnimationFrame(paint);
     };
     const end = () => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', end);
       window.removeEventListener('pointercancel', end);
+      if (frame) cancelAnimationFrame(frame);
       document.body.style.userSelect = '';
       stopDrag.current = null;
+      // Grava a posição final no estado (para o resto da aplicação e para o redimensionar).
+      if (latest) setPosition(latest);
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', end);
@@ -121,13 +148,21 @@ export const useFloatingWindow = (active: boolean) => {
   const size = floatSize(viewportNow());
   const style: React.CSSProperties | undefined = position
     ? {
-        left: position.x,
-        top: position.y,
-        transform: 'none',
+        left: 0,
+        top: 0,
+        transform: moveTo(position),
         width: size.width,
         height: size.height,
       }
     : undefined;
 
-  return { floating, style, dock, undock, handleProps: { onPointerDown } };
+  return {
+    floating,
+    style,
+    dock,
+    undock,
+    handleProps: { onPointerDown },
+    /** Atributos do painel: marca-o e tira a transição da base (senão a janela "arrasta atrás"). */
+    panelProps: floating ? { [FLOATING_ATTRIBUTE]: '' } : {},
+  };
 };

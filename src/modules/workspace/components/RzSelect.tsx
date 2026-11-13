@@ -1,4 +1,5 @@
 import React from 'react';
+import { usePortalContainer } from '@/lib/portalContainer';
 import * as SelectPrimitive from '@radix-ui/react-select';
 import { Check, ChevronDown } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -68,7 +69,7 @@ export const RzSelect: React.FC<RzSelectProps> = ({
           <ChevronDown className="h-4 w-4 shrink-0 opacity-60" />
         </SelectPrimitive.Icon>
       </SelectPrimitive.Trigger>
-      <SelectPrimitive.Portal>
+      <SelectPrimitive.Portal container={usePortalContainer()}>
         <SelectPrimitive.Content
           position="popper"
           align={align}

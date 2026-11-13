@@ -46,6 +46,7 @@ import { FOLDERS, draftFrom, mailKey } from '../lib/mailFormat';
 import { draftFromSaved } from '../lib/savedDraft';
 import { composeSession } from '../lib/composeSession';
 import { mailService } from '../services/mailService';
+import { isReaderWindow, openReaderWindow } from '../lib/readerWindow';
 import { draftMetaService } from '../services/draftMetaService';
 import { readSidebarWidth, saveSidebarWidth } from '../lib/sidebarWidth';
 import { providerOf, type MailProvider } from '../lib/providers';
@@ -63,6 +64,10 @@ const WebmailPage: React.FC = () => {
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
   const [active, setActive] = useState<MailSummary | null>(null);
+  // Janela aberta só para ler um email (duplo clique na lista): sem caixas nem lista.
+  const [solo] = useState(isReaderWindow);
+  const [soloTried, setSoloTried] = useState(false);
+  const soloOpened = useRef(false);
   // Uma mensagem que ficou a meio ao sair do Email volta, minimizada.
   const [draft, setDraftState] = useState<ComposeDraft | null>(() => composeSession.get());
   const [composerMinimized, setComposerMinimized] = useState(() => !!composeSession.get());
@@ -200,10 +205,18 @@ const WebmailPage: React.FC = () => {
   const viewAccount = params.get('conta');
   const viewMail = params.get('email');
   useEffect(() => {
-    if (!viewAccount || !viewMail || mail.isLoading) return;
-    setParams({}, { replace: true });
-    if (!accounts.some(a => a.id === viewAccount)) return;
+    if (!viewAccount || !viewMail) {
+      // Janela só de leitura sem email no endereço: não há nada a abrir.
+      if (solo) setSoloTried(true);
+      return;
+    }
+    if (mail.isLoading || soloOpened.current) return;
+    soloOpened.current = solo; // só uma vez: um email apagado ou movido não volta a abrir
+    // Na janela só de leitura o endereço fica (recarregar com F5 volta a abrir o mesmo email).
+    if (!solo) setParams({}, { replace: true });
+    if (!accounts.some(a => a.id === viewAccount)) return setSoloTried(true);
     void mailService.get(viewAccount, viewMail).then(({ data }) => {
+      setSoloTried(true);
       if (!data) {
         toast({ title: 'Não foi possível abrir o email', variant: 'destructive' });
         return;
@@ -275,6 +288,15 @@ const WebmailPage: React.FC = () => {
     if (folder === 'drafts' && !customOpen) return void openSavedDraft(summary);
     setActive(summary);
     if (summary.unread) list.keep(summary);
+  };
+  // Duplo clique: o email numa janela própria (nos Rascunhos continua-se no compositor).
+  const openInWindow = (summary: MailSummary) => {
+    if (!openReaderWindow(summary))
+      toast({
+        title: 'O navegador bloqueou a janela nova',
+        description: 'Permita janelas pop-up para este site e tente outra vez.',
+        variant: 'destructive',
+      });
   };
   // Lixo pela lista (um ou vários): se o email aberto for um deles, o leitor fecha.
   const closeIfAmong = (mails: MailSummary[]) => {
@@ -461,64 +483,76 @@ const WebmailPage: React.FC = () => {
 
   return (
     <div className="flex h-full">
-      {sidebar('hidden shrink-0 lg:flex', { width: sidebarWidth })}
-      <SidebarResizer width={sidebarWidth} onChange={setSidebarWidth} onCommit={saveSidebarWidth} />
-      <MailList
-        title={customOpen?.name ?? FOLDERS.find(f => f.key === folder)?.label ?? 'Email'}
-        messages={
-          labelFilter
-            ? list.messages.filter(
-                m =>
-                  m.accountId === labelFilter.accountId && m.labelIds?.includes(labelFilter.labelId)
-              )
-            : list.messages
-        }
-        labelsById={isPreview ? undefined : labels.byId}
-        labelsByAccount={isPreview ? undefined : labels.byAccount}
-        onLabel={isPreview ? undefined : (mails, label) => void labelActions.toggle(mails, label)}
-        onManageLabels={accountId => setManageLabels({ accountId })}
-        accounts={accounts}
-        activeKey={active ? mailKey(active) : null}
-        showAccount={current === 'all'}
-        selectionKey={`${current}|${customOpen?.id ?? folder}|${query}`}
-        search={search}
-        onSearch={setSearch}
-        onOpen={open}
-        onToggleStar={actions.toggleStar}
-        onTrash={target => {
-          closeIfAmong([target]);
-          void actions.trash(target);
-        }}
-        onBulk={bulk}
-        onMove={moveMails}
-        onAction={isPreview ? undefined : fromList}
-        onRule={
-          isPreview
-            ? undefined
-            : target =>
-                setRulesDialog({
-                  accountId: target.accountId,
-                  prefill: { fromContains: target.from?.email ?? '' },
-                })
-        }
-        onHover={prefetch}
-        onRefresh={() => {
-          list.clear();
-          void box.refetch();
-        }}
-        onMenu={() => setMenuOpen(true)}
-        isLoading={box.isLoading}
-        isRefreshing={box.isRefreshing}
-        hasMore={box.hasMore}
-        isLoadingMore={box.isLoadingMore}
-        onLoadMore={() => void box.loadMore()}
-        errors={box.errors}
-        className={cn(
-          'w-full border-r border-rz-line md:w-[340px] xl:w-[400px]',
-          active && 'hidden md:flex'
-        )}
-      />
-      <div className={cn('min-w-0 flex-1', active ? 'flex' : 'hidden md:flex')}>
+      {!solo && sidebar('hidden shrink-0 lg:flex', { width: sidebarWidth })}
+      {!solo && (
+        <SidebarResizer
+          width={sidebarWidth}
+          onChange={setSidebarWidth}
+          onCommit={saveSidebarWidth}
+        />
+      )}
+      {!solo && (
+        <MailList
+          title={customOpen?.name ?? FOLDERS.find(f => f.key === folder)?.label ?? 'Email'}
+          messages={
+            labelFilter
+              ? list.messages.filter(
+                  m =>
+                    m.accountId === labelFilter.accountId &&
+                    m.labelIds?.includes(labelFilter.labelId)
+                )
+              : list.messages
+          }
+          labelsById={isPreview ? undefined : labels.byId}
+          labelsByAccount={isPreview ? undefined : labels.byAccount}
+          onLabel={isPreview ? undefined : (mails, label) => void labelActions.toggle(mails, label)}
+          onManageLabels={accountId => setManageLabels({ accountId })}
+          accounts={accounts}
+          activeKey={active ? mailKey(active) : null}
+          showAccount={current === 'all'}
+          selectionKey={`${current}|${customOpen?.id ?? folder}|${query}`}
+          search={search}
+          onSearch={setSearch}
+          onOpen={open}
+          onOpenWindow={
+            isPreview || (folder === 'drafts' && !customOpen) ? undefined : openInWindow
+          }
+          onToggleStar={actions.toggleStar}
+          onTrash={target => {
+            closeIfAmong([target]);
+            void actions.trash(target);
+          }}
+          onBulk={bulk}
+          onMove={moveMails}
+          onAction={isPreview ? undefined : fromList}
+          onRule={
+            isPreview
+              ? undefined
+              : target =>
+                  setRulesDialog({
+                    accountId: target.accountId,
+                    prefill: { fromContains: target.from?.email ?? '' },
+                  })
+          }
+          onHover={prefetch}
+          onRefresh={() => {
+            list.clear();
+            void box.refetch();
+          }}
+          onMenu={() => setMenuOpen(true)}
+          isLoading={box.isLoading}
+          isRefreshing={box.isRefreshing}
+          hasMore={box.hasMore}
+          isLoadingMore={box.isLoadingMore}
+          onLoadMore={() => void box.loadMore()}
+          errors={box.errors}
+          className={cn(
+            'w-full border-r border-rz-line md:w-[340px] xl:w-[400px]',
+            active && 'hidden md:flex'
+          )}
+        />
+      )}
+      <div className={cn('min-w-0 flex-1', active || solo ? 'flex' : 'hidden md:flex')}>
         {selected ? (
           <MailReader
             summary={selected}
@@ -542,6 +576,28 @@ const WebmailPage: React.FC = () => {
             }
             onManageLabels={accountId => setManageLabels({ accountId })}
           />
+        ) : solo && !soloTried ? (
+          <div
+            className="flex flex-1 items-center justify-center"
+            role="status"
+            aria-label="A abrir o email"
+          >
+            <Loader2 className="h-7 w-7 animate-spin text-rz-primary" />
+          </div>
+        ) : solo ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 text-rz-muted">
+            <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-rz-primary-soft text-rz-primary">
+              <MailOpen className="h-8 w-8" />
+            </span>
+            <p className="text-sm">Este email já não está aqui ou não abriu.</p>
+            <button
+              type="button"
+              onClick={() => window.close()}
+              className="h-10 rounded-full bg-rz-primary px-5 text-sm font-bold text-white"
+            >
+              Fechar a janela
+            </button>
+          </div>
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 text-rz-muted">
             <span className="flex h-16 w-16 items-center justify-center rounded-[22px] bg-rz-primary-soft text-rz-primary">

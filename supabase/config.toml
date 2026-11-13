@@ -91,3 +91,6 @@ verify_jwt = false
 
 [functions.mail-login]
 verify_jwt = false
+
+[functions.mail-posto]
+verify_jwt = false

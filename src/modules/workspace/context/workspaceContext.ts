@@ -29,6 +29,8 @@ export interface WorkspaceContextValue {
    * é da Realize (colegas, tarefas, eventos, IA).
    */
   mailOnly?: boolean;
+  /** Posto de email (criado no admin): só tem as caixas que o admin escolheu e não liga outras. */
+  posto?: boolean;
   onLogout: () => void;
   onChangePassword: () => void;
 }

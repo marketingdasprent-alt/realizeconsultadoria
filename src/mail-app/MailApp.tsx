@@ -9,7 +9,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { mailAppExchange } from '@/modules/webmail/services/mailAppLogin';
+import { mailAppExchange, mailAppLoginPosto } from '@/modules/webmail/services/mailAppLogin';
 import {
   WorkspaceContext,
   type WorkspaceContextValue,
@@ -29,6 +29,9 @@ const Spinner = () => (
     <Loader2 className="h-7 w-7 animate-spin text-rz-primary" />
   </div>
 );
+
+/** Conta de um posto de email (criado no admin): só tem o Email, com as caixas que o admin escolheu. */
+const isPosto = (session: Session) => session.user.app_metadata?.posto === true;
 
 /** Só contas da app de email (as da Realize entram em app.realizeconsultadoria.pt). */
 const isMailOnly = (session: Session | null) => session?.user.app_metadata?.mail_only === true;
@@ -58,7 +61,11 @@ const LOGIN_CONTEXT: WorkspaceContextValue = {
 
 /** O email: barra de cima (nome da app, caixa, Sair) e o Webmail inteiro por baixo. */
 const MailShell: React.FC<{ session: Session }> = ({ session }) => {
-  const mailbox = String(session.user.app_metadata?.mailbox ?? '');
+  const posto = isPosto(session);
+  // Num posto a "caixa" é o nome do posto (a conta interna não é um endereço)
+  const mailbox = posto
+    ? String(session.user.user_metadata?.name ?? 'Posto')
+    : String(session.user.app_metadata?.mailbox ?? '');
   // Email ou Suporte (no endereço: ?v=suporte&t=<ticket>). Os avisos do suporte chegam com
   // /?suporte=<ticket>: abre esse ticket.
   const [params, setParams] = useSearchParams();
@@ -66,7 +73,8 @@ const MailShell: React.FC<{ session: Session }> = ({ session }) => {
     const ticket = params.get('suporte');
     if (ticket) setParams({ v: 'suporte', t: ticket }, { replace: true });
   }, [params, setParams]);
-  const view = params.get('v') === 'suporte' || params.get('suporte') ? 'support' : 'mail';
+  const view =
+    !posto && (params.get('v') === 'suporte' || params.get('suporte')) ? 'support' : 'mail';
   const tab = (active: boolean) =>
     cn(
       'inline-flex h-9 items-center gap-1.5 rounded-full px-3.5 text-[13.5px] font-semibold transition-colors',
@@ -83,10 +91,11 @@ const MailShell: React.FC<{ session: Session }> = ({ session }) => {
       basePath: '',
       isPreview: false,
       mailOnly: true,
+      posto,
       onLogout: () => void supabase.auth.signOut(),
       onChangePassword: () => undefined,
     }),
-    [session.user, mailbox]
+    [session.user, mailbox, posto]
   );
   return (
     <WorkspaceContext.Provider value={value}>
@@ -100,13 +109,15 @@ const MailShell: React.FC<{ session: Session }> = ({ session }) => {
             <button type="button" className={tab(view === 'mail')} onClick={() => setParams({})}>
               <Mail className="h-4 w-4" /> Email
             </button>
-            <button
-              type="button"
-              className={tab(view === 'support')}
-              onClick={() => setParams({ v: 'suporte' })}
-            >
-              <Headset className="h-4 w-4" /> Suporte
-            </button>
+            {!posto && (
+              <button
+                type="button"
+                className={tab(view === 'support')}
+                onClick={() => setParams({ v: 'suporte' })}
+              >
+                <Headset className="h-4 w-4" /> Suporte
+              </button>
+            )}
           </nav>
           <span className="ml-auto hidden truncate text-[13px] text-rz-muted sm:block">
             {mailbox}
@@ -139,7 +150,9 @@ const MailAppContent: React.FC = () => {
     const params = new URLSearchParams(window.location.search);
     const code = params.get('login');
     const motivo = params.get('motivo');
-    if (code || motivo) window.history.replaceState(null, '', '/');
+    // Link de um posto de email (?posto=<código>): sai do endereço e entra no posto
+    const postoToken = params.get('posto');
+    if (code || motivo || postoToken) window.history.replaceState(null, '', '/');
     if (motivo)
       toast({
         title: 'A Microsoft não deixou entrar',
@@ -154,6 +167,11 @@ const MailAppContent: React.FC = () => {
     void (async () => {
       if (code) {
         const error = await mailAppExchange(code);
+        if (error)
+          toast({ title: 'Não foi possível entrar', description: error, variant: 'destructive' });
+      }
+      if (postoToken) {
+        const error = await mailAppLoginPosto(postoToken);
         if (error)
           toast({ title: 'Não foi possível entrar', description: error, variant: 'destructive' });
       }

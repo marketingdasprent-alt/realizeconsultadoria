@@ -25,7 +25,7 @@ interface MailAccountListProps {
   onNewFolder?: (accountId: string) => void;
   onLabels?: (accountId: string) => void;
   onRules?: (accountId: string) => void;
-  onConnect: () => void;
+  onConnect?: () => void;
   onReorder: (ids: string[]) => void;
 }
 
@@ -95,13 +95,15 @@ export const MailAccountList: React.FC<MailAccountListProps> = props => {
           ) : null;
         })}
       </ul>
-      <button
-        type="button"
-        onClick={props.onConnect}
-        className={cn(SIDEBAR_ROW, 'text-rz-primary hover:bg-white/70')}
-      >
-        <Plus className="h-4 w-4" /> Ligar caixa
-      </button>
+      {props.onConnect && (
+        <button
+          type="button"
+          onClick={props.onConnect}
+          className={cn(SIDEBAR_ROW, 'text-rz-primary hover:bg-white/70')}
+        >
+          <Plus className="h-4 w-4" /> Ligar caixa
+        </button>
+      )}
     </section>
   );
 };

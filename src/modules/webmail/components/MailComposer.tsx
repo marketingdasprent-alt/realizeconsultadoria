@@ -1,6 +1,17 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
-import { Loader2, Maximize2, Minus, Paperclip, Save, Send, Trash2, X } from 'lucide-react';
+import {
+  Loader2,
+  Maximize2,
+  Minus,
+  Paperclip,
+  PictureInPicture2,
+  Save,
+  Send,
+  Trash2,
+  X,
+} from 'lucide-react';
+import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useDirectory } from '@/modules/social/hooks/useDirectory';
@@ -17,6 +28,7 @@ import { filesFromPaste, useFileDrop } from '@/modules/workspace/hooks/useFileDr
 import { useDraftSaver } from '../hooks/useDraftSaver';
 import { mailService } from '../services/mailService';
 import { useAiRewrite } from '../hooks/useAiRewrite';
+import { useFloatingWindow } from '../hooks/useFloatingWindow';
 import { composeSession } from '../lib/composeSession';
 import type { ContactEntry, ContactList } from '../lib/recipients';
 import { draftHasContent, stripSavedSignature } from '../lib/savedDraft';
@@ -84,6 +96,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const { colleagues } = useDirectory();
   // App de email para clientes de fora: sem o "Usar IA" (é da Realize)
   const { mailOnly } = useWorkspace();
+  // Janela solta (arrastável, sem bloquear a página) para abrir outros emails enquanto se escreve.
+  const win = useFloatingWindow(!!draft);
   // Colegas da empresa com email: também são sugeridos.
   const team = useMemo<ContactEntry[]>(
     () =>
@@ -463,9 +477,19 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           </button>
         </div>
       )}
-      <Dialog open={!!draft && !minimized} onOpenChange={open => !open && void close()}>
+      <Dialog
+        open={!!draft && !minimized}
+        modal={!win.floating}
+        onOpenChange={open => !open && void close()}
+      >
         <DialogContent
           onInteractOutside={event => event.preventDefault()}
+          // Solta, a janela convive com a página: só o Esc de dentro dela a fecha.
+          onEscapeKeyDown={event => {
+            if (win.floating && !(event.target as Element | null)?.closest?.('[role="dialog"]'))
+              event.preventDefault();
+          }}
+          style={win.style}
           onPaste={event => {
             const pasted = filesFromPaste(event);
             if (!pasted.length) {
@@ -480,21 +504,49 @@ export const MailComposer: React.FC<MailComposerProps> = ({
             addFiles(pasted);
           }}
           {...dropProps}
-          className="flex h-[min(92vh,920px)] w-[min(96vw,1120px)] max-w-none flex-col gap-0 overflow-hidden rounded-[28px] p-0 sm:max-w-none sm:rounded-[28px]"
+          className={cn(
+            'flex h-[min(92vh,920px)] w-[min(96vw,1120px)] max-w-none flex-col gap-0 overflow-hidden rounded-[28px] p-0 sm:max-w-none sm:rounded-[28px]',
+            win.floating && 'border-rz-line shadow-rz-pop'
+          )}
         >
           <DropOverlay visible={isDragging} />
-          {onMinimize && (
+          <div className="absolute right-12 top-4 z-10 flex items-center gap-1">
             <button
               type="button"
-              onClick={minimize}
-              className="absolute right-12 top-4 flex h-7 w-7 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
-              aria-label="Minimizar"
-              title="Minimizar"
+              onClick={win.floating ? win.undock : win.dock}
+              className="hidden h-7 w-7 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-ink sm:flex"
+              aria-label={win.floating ? 'Janela grande' : 'Soltar a janela'}
+              title={
+                win.floating
+                  ? 'Voltar à janela grande'
+                  : 'Soltar a janela (também se arrasta pela barra de título)'
+              }
             >
-              <Minus className="h-4 w-4" />
+              {win.floating ? (
+                <Maximize2 className="h-4 w-4" />
+              ) : (
+                <PictureInPicture2 className="h-4 w-4" />
+              )}
             </button>
-          )}
-          <DialogTitle className="px-5 pb-3 pt-5 text-[18px] font-extrabold">{title}</DialogTitle>
+            {onMinimize && (
+              <button
+                type="button"
+                onClick={minimize}
+                className="flex h-7 w-7 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
+                aria-label="Minimizar"
+                title="Minimizar"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+            )}
+          </div>
+          {/* Barra de título: pega-se aqui para arrastar a janela para outro lugar. */}
+          <div
+            {...win.handleProps}
+            className="select-none pr-28 sm:cursor-grab sm:active:cursor-grabbing"
+          >
+            <DialogTitle className="px-5 pb-3 pt-5 text-[18px] font-extrabold">{title}</DialogTitle>
+          </div>
           <Row label="De">
             <RzSelect
               value={accountId}

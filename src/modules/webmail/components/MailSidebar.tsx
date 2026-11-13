@@ -59,7 +59,8 @@ interface MailSidebarProps {
   onLabelFilter?: (filter: LabelFilter | null) => void;
   onManageLabels?: (accountId: string | null) => void;
   onCompose: () => void;
-  onConnect: () => void;
+  /** Sem ele não há "Ligar caixa" (postos de email). */
+  onConnect?: () => void;
   onSettings: (account: MailAccount) => void;
   onLists: () => void;
   /** Regras automáticas (não existem na pré-visualização). */
@@ -81,7 +82,7 @@ export const MailSidebar: React.FC<MailSidebarProps> = props => (
     <button
       type="button"
       onClick={props.onCompose}
-      className="inline-flex h-12 items-center justify-center gap-2 rounded-full bg-rz-primary text-[15px] font-bold text-white shadow-rz-soft"
+      className="inline-flex h-12 shrink-0 items-center justify-center gap-2 rounded-full bg-rz-primary text-[15px] font-bold text-white shadow-rz-soft"
     >
       <PenSquare className="h-[18px] w-[18px]" /> Escrever
     </button>

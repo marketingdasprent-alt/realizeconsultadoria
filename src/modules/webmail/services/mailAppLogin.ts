@@ -62,3 +62,7 @@ export const mailAppLoginMicrosoft = async (provider: string): Promise<string | 
 /** Regresso da Microsoft: troca o código pela sessão. */
 export const mailAppExchange = async (code: string) =>
   startSession(await call({ action: 'exchange', code }));
+
+/** Link de um posto (criado no admin): troca o código do link pela sessão do posto. */
+export const mailAppLoginPosto = async (token: string) =>
+  startSession(await call({ action: 'posto', token }));

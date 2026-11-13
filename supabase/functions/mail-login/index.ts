@@ -7,6 +7,8 @@
 //     display_name? }                        → testa o login, liga a caixa e devolve a sessão
 //   { action: 'oauth-start', provider }      → URL da Microsoft (regressa com ?login=<código>)
 //   { action: 'exchange', code }             → troca o código pela sessão
+//   { action: 'posto', token }               → link de um posto de email (criado no admin): entra
+//                                              com as caixas do posto, sem palavra-passe
 // A sessão é de uma conta interna só de email (papel mail_client na base de dados).
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
@@ -18,6 +20,7 @@ import {
   pkceChallenge,
   randomBase64Url,
 } from '../_shared/mail/oauth.ts';
+import { hashInviteToken, isInviteToken } from '../_shared/mail/posto.ts';
 import { isRecord, optionalString, parseImapConnectRequest } from '../_shared/mail/request.ts';
 import { saveMailAccount, storeSecret } from '../_shared/mail-server/accounts.ts';
 import { denoResolver } from '../_shared/mail-server/dns.ts';
@@ -171,6 +174,54 @@ const exchange = async (body: Record<string, unknown>) => {
   return json({ ok: true, data: await mailAppSession(db, userId) });
 };
 
+/** Link de um posto: o código serve uma só vez e só até expirar; entra na conta do posto. */
+const loginPosto = async (req: Request, body: Record<string, unknown>) => {
+  const db = serviceClient();
+  const ip = clientIp(req);
+  const invalid = {
+    ok: false,
+    code: 'invalid_invite',
+    message: 'Este link já não é válido. Peça um novo à Realize.',
+  };
+  if (await tooManyAttempts(db, `posto:${ip}`, ip))
+    return json({
+      ok: false,
+      code: 'rate_limited',
+      message: 'Demasiadas tentativas. Espere 15 minutos e volte a tentar.',
+    });
+  if (!isInviteToken(body.token)) {
+    await db.from('mail_login_attempts').insert({ mailbox: `posto:${ip}`, ip });
+    return json(invalid);
+  }
+  // Gasta o convite de forma atómica: dois pedidos com o mesmo link nunca entram os dois
+  const { data: used } = await db
+    .from('mail_posto_invites')
+    .update({ used_at: new Date().toISOString() })
+    .eq('token_hash', await hashInviteToken(body.token))
+    .is('used_at', null)
+    .gt('expires_at', new Date().toISOString())
+    .select('posto_id')
+    .maybeSingle();
+  if (!used) {
+    await db.from('mail_login_attempts').insert({ mailbox: `posto:${ip}`, ip });
+    return json(invalid);
+  }
+  const { data: posto } = await db
+    .from('mail_postos')
+    .select('user_id')
+    .eq('id', used.posto_id as string)
+    .maybeSingle();
+  if (!posto) return json(invalid);
+  const { data: access } = await db
+    .from('mail_app_users')
+    .select('disabled_at')
+    .eq('user_id', posto.user_id as string)
+    .maybeSingle();
+  if (access?.disabled_at)
+    return json({ ok: false, code: 'disabled', message: new MailAppDisabledError().message });
+  return json({ ok: true, data: await mailAppSession(db, posto.user_id as string) });
+};
+
 serve(async req => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') return json({ ok: false, code: 'method_not_allowed' }, 405);
@@ -190,6 +241,7 @@ serve(async req => {
     if (body.action === 'imap') return await loginImap(req, body);
     if (body.action === 'oauth-start') return await oauthStart(body);
     if (body.action === 'exchange') return await exchange(body);
+    if (body.action === 'posto') return await loginPosto(req, body);
     return json({ ok: false, code: 'bad_request' }, 400);
   } catch (error) {
     console.error('mail-login:', errorMessage(error));

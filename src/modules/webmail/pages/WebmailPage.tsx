@@ -139,7 +139,7 @@ const WebmailPage: React.FC = () => {
   const actions = useMailActions(customOpen ? undefined : folder);
   const folderActions = useFolderActions(customOpen ? undefined : folder);
   const labelActions = useLabelActions(customOpen ? undefined : folder);
-  const { isPreview } = useWorkspace();
+  const { isPreview, posto } = useWorkspace();
   const [rulesDialog, setRulesDialog] = useState<{
     accountId: string | null;
     prefill: Partial<RuleDraft> | null;
@@ -341,7 +341,16 @@ const WebmailPage: React.FC = () => {
       onSwitch={setConnect}
     />
   );
-  if (!accounts.length || params.get('ligar'))
+  if (posto && !accounts.length)
+    return (
+      <div className="mx-auto mt-24 max-w-sm px-6 text-center">
+        <p className="text-[15px] font-bold">Este posto ainda não tem caixas.</p>
+        <p className="mt-1 text-[13px] text-rz-muted">
+          As caixas aparecem aqui assim que a Realize as ligar. Volte a abrir a app daqui a pouco.
+        </p>
+      </div>
+    );
+  if (!posto && (!accounts.length || params.get('ligar')))
     return (
       <>
         <ProviderGrid
@@ -439,7 +448,7 @@ const WebmailPage: React.FC = () => {
         setMenuOpen(false);
         setDraft({ accountId: current === 'all' ? undefined : current });
       }}
-      onConnect={() => setParams({ ligar: '1' })}
+      onConnect={posto ? undefined : () => setParams({ ligar: '1' })}
       onSettings={setSettings}
       onLists={() => {
         setMenuOpen(false);

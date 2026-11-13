@@ -3,6 +3,7 @@ import { WorkspaceContext, type WorkspaceContextValue } from '../../context/work
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useRzTheme } from '../../hooks/useRzTheme';
 import { useSidebarCollapsed } from '../../hooks/useSidebarCollapsed';
+import { NewMailPopup } from '@/modules/webmail/components/NewMailPopup';
 import { PushPrompt } from '../PushPrompt';
 import { MobileTabBar } from './MobileTabBar';
 import { WorkspaceSidebar } from './WorkspaceSidebar';
@@ -58,6 +59,7 @@ export const WorkspaceShell: React.FC<WorkspaceShellProps> = ({ value, children 
             <main className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-t-[28px] bg-rz-canvas shadow-rz-panel md:mb-3 md:mr-3 md:rounded-[28px]">
               {/* Avisos push desligados neste dispositivo: convite no topo, em qualquer página. */}
               <PushPrompt className="mx-3 mt-3 md:mx-4" />
+              <NewMailPopup />
               {/* Abas como no Chrome (no telemóvel há a barra inferior). */}
               {isDesktop && <WorkspaceTabs />}
               {/* Férias, Colaboradores, Tickets, Definições: separadores de gestão para admins */}

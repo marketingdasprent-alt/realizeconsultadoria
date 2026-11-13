@@ -16,6 +16,16 @@ export interface Viewport {
   height: number;
 }
 
+/** Onde, no ecrã (todos os monitores), a janela foi largada fora do navegador. */
+export interface TearOffPoint {
+  screenX: number;
+  screenY: number;
+}
+
+/** O rato saiu da área do navegador (arrastar a janela para fora, como destacar uma aba). */
+export const isOutsideViewport = (x: number, y: number, viewport: Viewport) =>
+  x < 0 || y < 0 || x > viewport.width || y > viewport.height;
+
 export interface FloatPosition {
   x: number;
   y: number;
@@ -60,9 +70,11 @@ const viewportNow = (): Viewport => ({ width: window.innerWidth, height: window.
  * Janela que se solta e arrasta pela barra de título. Enquanto está solta não bloqueia a
  * página: dá para abrir outros emails por baixo, como no Outlook.
  */
-export const useFloatingWindow = (active: boolean) => {
+export const useFloatingWindow = (active: boolean, onTearOff?: (at: TearOffPoint) => void) => {
   const [position, setPosition] = useState<FloatPosition | null>(null);
   const stopDrag = useRef<(() => void) | null>(null);
+  const tearOffRef = useRef(onTearOff);
+  tearOffRef.current = onTearOff;
   const floating = position !== null;
 
   // Janela fechada ou enviada: a próxima abre outra vez no centro.
@@ -107,6 +119,7 @@ export const useFloatingWindow = (active: boolean) => {
     let moved = false;
     let latest: FloatPosition | null = null;
     let frame = 0;
+    let outside = false;
 
     // Um quadro de cada vez, e depois de solta a janela move-se direto no DOM: refazer o
     // compositor inteiro (centenas de elementos) a cada movimento do rato deixava o arrasto lento.
@@ -116,7 +129,11 @@ export const useFloatingWindow = (active: boolean) => {
       const panelNow = floatingRef.current
         ? document.querySelector<HTMLElement>(FLOATING_SELECTOR)
         : null;
-      if (panelNow) panelNow.style.transform = moveTo(latest);
+      if (panelNow) {
+        panelNow.style.transform = moveTo(latest);
+        // Fora do navegador: a janela fica meio transparente (ao largar abre noutra janela).
+        panelNow.style.opacity = outside ? '0.5' : '';
+      }
       else setPosition(latest); // primeiro movimento: passa de modal a solta
     };
     // Ouvintes na janela, não na barra: ao soltar, a janela passa de modal a solta e os
@@ -127,17 +144,23 @@ export const useFloatingWindow = (active: boolean) => {
       if (!moved) document.body.style.userSelect = 'none';
       moved = true;
       latest = clampFloat({ x: move.clientX - grabX, y: move.clientY - grabY }, viewportNow());
+      outside = isOutsideViewport(move.clientX, move.clientY, viewportNow());
       if (!frame) frame = requestAnimationFrame(paint);
     };
-    const end = () => {
+    const end = (event?: Event) => {
       window.removeEventListener('pointermove', onMove);
       window.removeEventListener('pointerup', end);
       window.removeEventListener('pointercancel', end);
       if (frame) cancelAnimationFrame(frame);
       document.body.style.userSelect = '';
       stopDrag.current = null;
+      document.querySelector<HTMLElement>(FLOATING_SELECTOR)?.style.removeProperty('opacity');
       // Grava a posição final no estado (para o resto da aplicação e para o redimensionar).
       if (latest) setPosition(latest);
+      // Largada fora do navegador: abre noutra janela, onde o rato está.
+      const up = event as PointerEvent | undefined;
+      if (moved && up?.type === 'pointerup' && isOutsideViewport(up.clientX, up.clientY, viewportNow()))
+        tearOffRef.current?.({ screenX: up.screenX, screenY: up.screenY });
     };
     window.addEventListener('pointermove', onMove);
     window.addEventListener('pointerup', end);

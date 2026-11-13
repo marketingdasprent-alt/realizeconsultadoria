@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { clampFloat, dockedPosition, floatSize } from '../useFloatingWindow';
+import { clampFloat, dockedPosition, floatSize, isOutsideViewport } from '../useFloatingWindow';
 
 const desktop = { width: 1280, height: 800 };
 
@@ -23,5 +23,16 @@ describe('janela solta do email', () => {
     expect(x + 640).toBeLessThanOrEqual(desktop.width);
     expect(y + 680).toBeLessThanOrEqual(desktop.height);
     expect(x).toBeGreaterThan(desktop.width / 2 - 640);
+  });
+});
+
+describe('arrastar para fora do navegador', () => {
+  it('só conta como "fora" quando o rato sai da área da página', () => {
+    expect(isOutsideViewport(640, 400, desktop)).toBe(false);
+    expect(isOutsideViewport(0, 0, desktop)).toBe(false);
+    expect(isOutsideViewport(-1, 400, desktop)).toBe(true);
+    expect(isOutsideViewport(1281, 400, desktop)).toBe(true);
+    expect(isOutsideViewport(640, -30, desktop)).toBe(true);
+    expect(isOutsideViewport(640, 801, desktop)).toBe(true);
   });
 });

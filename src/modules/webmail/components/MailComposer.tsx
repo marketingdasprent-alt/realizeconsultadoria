@@ -101,10 +101,17 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   // App de email para clientes de fora: sem o "Usar IA" (é da Realize)
   const { mailOnly } = useWorkspace();
   // Janela solta (arrastável, sem bloquear a página) para abrir outros emails enquanto se escreve.
-  const win = useFloatingWindow(!!draft);
+  // Arrastar a janela para fora do navegador abre-a noutra janela, onde se largou.
+  const win = useFloatingWindow(!!draft, at =>
+    openPopout({ left: at.screenX - 120, top: at.screenY - 24 })
+  );
   // Janela própria do navegador (para levar a mensagem a outro monitor).
   const [popped, setPopped] = useState(false);
-  const popout = useWindowPopout(!!draft, () => setPopped(false));
+  // A janela nova fechou (X do sistema ou "Trazer de volta"): a mensagem volta, grande e ao centro.
+  const popout = useWindowPopout(!!draft, () => {
+    setPopped(false);
+    win.undock();
+  });
   useEffect(() => {
     if (!draft) setPopped(false);
   }, [draft]);
@@ -470,13 +477,13 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     addFiles(pasted);
   };
 
-  const openPopout = () => {
+  const openPopout = (at?: { left: number; top: number }) => {
     void saver.flush();
-    if (popout.open()) setPopped(true);
+    if (popout.open(at)) setPopped(true);
     else
       toast({
         title: 'O navegador bloqueou a janela nova',
-        description: 'Permita janelas pop-up para este site e tente outra vez.',
+        description: 'Permita janelas pop-up para este site, ou use o botão "Abrir noutra janela".',
         variant: 'destructive',
       });
   };
@@ -512,7 +519,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           <div className="absolute right-12 top-4 z-10 flex items-center gap-1">
             <button
               type="button"
-              onClick={openPopout}
+              onClick={() => openPopout()}
               className="hidden h-7 w-7 items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas hover:text-rz-ink sm:flex"
               aria-label="Abrir noutra janela"
               title="Abrir noutra janela (para levar a outro monitor)"
@@ -551,6 +558,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           {/* Barra de título: pega-se aqui para arrastar a janela para outro lugar. */}
           <div
             {...win.handleProps}
+            title="Arraste para mover. Arraste para fora do navegador para abrir noutra janela."
             className="select-none pr-36 sm:cursor-grab sm:active:cursor-grabbing"
           >
             <DialogTitle className="px-5 pb-3 pt-5 text-[18px] font-extrabold">{title}</DialogTitle>

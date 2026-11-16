@@ -98,7 +98,9 @@ export const MailList: React.FC<MailListProps> = props => {
           allSelected={selection.allSelected}
           allStarred={selection.selected.every(m => m.starred)}
           hasMessages={props.messages.length > 0}
+          unreadCount={selection.unreadCount}
           onToggleAll={selection.toggleAll}
+          onSelectUnread={selection.selectUnread}
           onAction={onBulk}
           onClear={selection.clear}
           moveSlot={

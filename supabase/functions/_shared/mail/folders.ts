@@ -1,7 +1,7 @@
 // Pastas do Webmail → Gmail (pesquisa), Microsoft Graph (pastas conhecidas) e IMAP
 // (special-use RFC 6154 com nomes habituais como alternativa).
 
-import type { MailFolder, MailFolderInfo } from './types.ts';
+import type { MailFolder, MailFolderInfo, MailListFilters, MailSummary } from './types.ts';
 
 export const MAIL_FOLDERS: readonly MailFolder[] = [
   'inbox',
@@ -30,16 +30,45 @@ export const GMAIL_FOLDER_QUERY: Record<MailFolder, string> = {
   starred: 'is:starred',
 };
 
-/** Pesquisa Gmail da pasta + texto do utilizador (aceita a sintaxe do Gmail, ex. from:). */
+/** Operadores do Gmail para os filtros da lista (is:unread, is:read, is:starred, has:attachment). */
+export const gmailFilterOperators = (filters?: MailListFilters): string[] => {
+  if (!filters) return [];
+  const ops: string[] = [];
+  if (filters.unread) ops.push('is:unread');
+  if (filters.read) ops.push('is:read');
+  if (filters.starred) ops.push('is:starred');
+  if (filters.attachments) ops.push('has:attachment');
+  return ops;
+};
+
+/**
+ * Pesquisa Gmail da pasta + filtros + texto do utilizador (aceita a sintaxe do Gmail, ex. from:).
+ * Sem filtros, é exatamente a pesquisa de antes.
+ */
 export const gmailListQuery = (
   folder: MailFolder,
-  userQuery: string | null
+  userQuery: string | null,
+  filters?: MailListFilters
 ): { q: string; includeSpamTrash: boolean } => {
   const extra = userQuery?.replace(/[\r\n]+/g, ' ').trim();
+  const base = [GMAIL_FOLDER_QUERY[folder], ...gmailFilterOperators(filters)].join(' ');
   return {
-    q: extra ? `${GMAIL_FOLDER_QUERY[folder]} ${extra}` : GMAIL_FOLDER_QUERY[folder],
+    q: extra ? `${base} ${extra}` : base,
     includeSpamTrash: folder === 'trash' || folder === 'spam',
   };
+};
+
+/**
+ * Pesquisa Gmail só com os filtros e o texto, para uma pasta da pessoa (etiqueta): a etiqueta
+ * vai à parte (labelIds). Sem filtros nem texto, não há pesquisa.
+ */
+export const gmailLabelListQuery = (
+  userQuery: string | null,
+  filters?: MailListFilters
+): string | null => {
+  const extra = userQuery?.replace(/[\r\n]+/g, ' ').trim();
+  const q = [...gmailFilterOperators(filters), ...(extra ? [extra] : [])].join(' ');
+  return q || null;
 };
 
 // ---------------------------------------------------------------- Microsoft Graph
@@ -87,9 +116,55 @@ const graphSearchTerm = (query: string): string =>
  * possível, por isso `postFilterFlagged`/`postFilterUnread` pedem para filtrar a página no
  * servidor da função.
  */
+/**
+ * Os filtros da lista que o Graph aceita no $filter (isRead, flag, hasAttachments), além dos da
+ * pasta. Cada um é uma condição; juntam-se com "and".
+ */
+const graphFilterConditions = (
+  folder: MailFolder,
+  filters: MailListFilters | undefined,
+  folderId: string | null | undefined
+): string[] => {
+  const conditions: string[] = [];
+  if (!folderId && folder === 'starred') conditions.push("flag/flagStatus eq 'flagged'");
+  if (!folderId && folder === 'unread') conditions.push('isRead eq false');
+  if (filters?.unread && !conditions.includes('isRead eq false'))
+    conditions.push('isRead eq false');
+  if (filters?.read) conditions.push('isRead eq true');
+  if (filters?.starred && !conditions.includes("flag/flagStatus eq 'flagged'"))
+    conditions.push("flag/flagStatus eq 'flagged'");
+  if (filters?.attachments) conditions.push('hasAttachments eq true');
+  return conditions;
+};
+
+/**
+ * Filtros da lista aplicados à página já lida (rede de segurança: com $search o Graph não deixa
+ * usar $filter, e o servidor pode ignorar uma condição). Sem filtros, a lista como está.
+ */
+export const applyMailListFilters = (
+  messages: MailSummary[],
+  filters?: MailListFilters
+): MailSummary[] => {
+  if (!filters) return messages;
+  return messages.filter(
+    m =>
+      (!filters.unread || m.unread) &&
+      (!filters.read || !m.unread) &&
+      (!filters.starred || m.starred) &&
+      (!filters.attachments || m.has_attachments)
+  );
+};
+
 export const buildGraphListUrl = (
   folder: MailFolder,
-  options: { query: string | null; limit: number; root?: string; folderId?: string | null }
+  options: {
+    query: string | null;
+    limit: number;
+    root?: string;
+    folderId?: string | null;
+    /** Filtros opcionais da lista (isRead, flag, hasAttachments). Sem eles, tudo como antes. */
+    filters?: MailListFilters;
+  }
 ): { url: string; postFilterFlagged: boolean; postFilterUnread: boolean } => {
   // A própria caixa (/me) ou, com a permissão da app, a de outra pessoa (/users/<email>).
   const root = options.root ?? `${GRAPH_BASE}/me`;
@@ -111,17 +186,11 @@ export const buildGraphListUrl = (
       postFilterUnread: folder === 'unread',
     };
   }
-  if (folder === 'starred') {
-    // O Graph exige que a propriedade do $orderby apareça primeiro no $filter.
+  // O Graph exige que a propriedade do $orderby apareça primeiro no $filter.
+  const conditions = graphFilterConditions(folder, options.filters, options.folderId);
+  if (conditions.length) {
     params.push(
-      `$filter=${encodeURIComponent(
-        "receivedDateTime ge 1900-01-01T00:00:00Z and flag/flagStatus eq 'flagged'"
-      )}`
-    );
-  }
-  if (folder === 'unread') {
-    params.push(
-      `$filter=${encodeURIComponent('receivedDateTime ge 1900-01-01T00:00:00Z and isRead eq false')}`
+      `$filter=${encodeURIComponent(['receivedDateTime ge 1900-01-01T00:00:00Z', ...conditions].join(' and '))}`
     );
   }
   params.push(`$orderby=${encodeURIComponent('receivedDateTime desc')}`);

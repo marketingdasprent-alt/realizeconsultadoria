@@ -1,7 +1,11 @@
 // Gmail API (https://gmail.googleapis.com/gmail/v1/users/me/...).
 
 import { mailError } from '../../_shared/mail/errors.ts';
-import { gmailListQuery } from '../../_shared/mail/folders.ts';
+import {
+  applyMailListFilters,
+  gmailLabelListQuery,
+  gmailListQuery,
+} from '../../_shared/mail/folders.ts';
 import {
   decodeGmailPartData,
   findGmailPart,
@@ -151,13 +155,13 @@ export const createGmailDriver = (
   };
 
   return {
-    async list({ folder, query, pageToken, limit, folderId }) {
-      const { q, includeSpamTrash } = gmailListQuery(folder, query);
+    async list({ folder, query, pageToken, limit, folderId, filters }) {
+      const { q, includeSpamTrash } = gmailListQuery(folder, query, filters);
       const params = new URLSearchParams({ maxResults: String(limit) });
       // Etiqueta da pessoa: os emails com essa etiqueta (mais a pesquisa, se houver).
       if (folderId) {
         params.set('labelIds', folderId);
-        const extra = query?.replace(/[\r\n]+/g, ' ').trim();
+        const extra = gmailLabelListQuery(query, filters);
         if (extra) params.set('q', extra);
       } else {
         params.set('q', q);
@@ -175,7 +179,11 @@ export const createGmailDriver = (
         return parseGmailSummary((await res.json()) as GmailMessage);
       });
       return {
-        messages: summaries.filter((s): s is MailSummary => s !== null),
+        // Os filtros pedidos aplicam-se também à página (rede de segurança)
+        messages: applyMailListFilters(
+          summaries.filter((s): s is MailSummary => s !== null),
+          filters
+        ),
         next_page_token: list.nextPageToken ?? null,
       };
     },

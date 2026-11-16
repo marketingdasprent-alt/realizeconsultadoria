@@ -6,10 +6,12 @@ interface MailFilterBarProps {
   filter: ListFilter;
   onToggle: (key: ListFilterKey) => void;
   onClear: () => void;
+  /** Filtros que não se podem ligar aqui (ex.: "Lidos" na pasta "Não lidos"). */
+  disabled?: readonly ListFilterKey[];
 }
 
 const CHIP =
-  'inline-flex h-8 shrink-0 items-center rounded-full px-2.5 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rz-primary/40';
+  'inline-flex h-8 shrink-0 items-center rounded-full px-2 text-[12px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rz-primary/40';
 
 /**
  * Filtros da lista, como no Gmail: Todos, Não lidos, Com estrela, Com anexos. "Todos" limpa;
@@ -17,7 +19,12 @@ const CHIP =
  * inteiros na lista estreita (a partir de 340 px); se mesmo assim faltar espaço, a linha rola na
  * horizontal com margem no fim, para o último botão aparecer inteiro.
  */
-export const MailFilterBar: React.FC<MailFilterBarProps> = ({ filter, onToggle, onClear }) => {
+export const MailFilterBar: React.FC<MailFilterBarProps> = ({
+  filter,
+  onToggle,
+  onClear,
+  disabled = [],
+}) => {
   const filtering = isFiltering(filter);
   return (
     <div
@@ -43,12 +50,18 @@ export const MailFilterBar: React.FC<MailFilterBarProps> = ({ filter, onToggle, 
             key={item.key}
             type="button"
             onClick={() => onToggle(item.key)}
+            disabled={disabled.includes(item.key)}
             aria-pressed={on}
             aria-label={item.label}
-            title={item.label}
+            title={
+              disabled.includes(item.key)
+                ? `${item.label}: esta pasta já é só de não lidos`
+                : item.label
+            }
             className={cn(
               CHIP,
-              on ? 'bg-rz-ink text-white' : 'bg-rz-canvas text-rz-muted hover:text-rz-ink'
+              on ? 'bg-rz-ink text-white' : 'bg-rz-canvas text-rz-muted hover:text-rz-ink',
+              'disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:text-rz-muted'
             )}
           >
             {item.short}

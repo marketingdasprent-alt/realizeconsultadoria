@@ -7,7 +7,7 @@ describe('MailFilterBar', () => {
   it('mostra Todos, Não lidos, Com estrela e Com anexos, com "Todos" ativo sem filtros', () => {
     render(<MailFilterBar filter={NO_FILTER} onToggle={vi.fn()} onClear={vi.fn()} />);
     expect(screen.getByRole('button', { name: 'Todos' })).toHaveAttribute('aria-pressed', 'true');
-    for (const name of ['Não lidos', 'Com estrela', 'Com anexos'])
+    for (const name of ['Não lidos', 'Lidos', 'Com estrela', 'Com anexos'])
       expect(screen.getByRole('button', { name })).toHaveAttribute('aria-pressed', 'false');
   });
 
@@ -35,6 +35,19 @@ describe('MailFilterBar', () => {
     expect(star).toHaveTextContent('Estrela');
     expect(star).toHaveAttribute('title', 'Com estrela');
     expect(screen.getByRole('button', { name: 'Com anexos' })).toHaveTextContent('Anexos');
+  });
+
+  it('"Lidos" pode ser desativado (pasta Não lidos) e então não chama nada', () => {
+    const onToggle = vi.fn();
+    render(
+      <MailFilterBar filter={NO_FILTER} onToggle={onToggle} onClear={vi.fn()} disabled={['read']} />
+    );
+    const read = screen.getByRole('button', { name: 'Lidos' });
+    expect(read).toBeDisabled();
+    expect(read).toHaveAttribute('title', expect.stringContaining('só de não lidos'));
+    fireEvent.click(read);
+    expect(onToggle).not.toHaveBeenCalled();
+    expect(screen.getByRole('button', { name: 'Não lidos' })).toBeEnabled();
   });
 
   it('cada chip chama o seu filtro e "Todos" limpa', () => {

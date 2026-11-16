@@ -3,7 +3,7 @@
 
 import { isValidEmail, parseAddress, parseAddressList } from './address.ts';
 import { base64ToBytes, utf8Encode } from './mime.ts';
-import type { MailAddress, MailProviderKey, OutgoingAttachment } from './types.ts';
+import type { MailAddress, MailListFilters, MailProviderKey, OutgoingAttachment } from './types.ts';
 
 export const MAX_SEND_BYTES = 10 * 1024 * 1024;
 export const MAX_ATTACHMENTS = 100;
@@ -37,6 +37,24 @@ export const optionalString = (value: unknown, max: number): string | null => {
   if (typeof value !== 'string') return null;
   const trimmed = value.trim();
   return trimmed ? trimmed.slice(0, max) : null;
+};
+
+const FILTER_KEYS = ['unread', 'read', 'starred', 'attachments'] as const;
+
+/**
+ * Filtros opcionais da lista: lista de nomes ("unread", "read", "starred", "attachments").
+ * O que não se reconhece ignora-se, e "unread" com "read" (impossível) não filtra por leitura.
+ * Sem filtros válidos devolve undefined: o pedido fica igual ao de antes.
+ */
+export const parseListFilters = (value: unknown): MailListFilters | undefined => {
+  if (!Array.isArray(value)) return undefined;
+  const asked = new Set(value.slice(0, 8).filter(item => FILTER_KEYS.includes(item as never)));
+  const filters: MailListFilters = {};
+  if (asked.has('unread') && !asked.has('read')) filters.unread = true;
+  if (asked.has('read') && !asked.has('unread')) filters.read = true;
+  if (asked.has('starred')) filters.starred = true;
+  if (asked.has('attachments')) filters.attachments = true;
+  return Object.keys(filters).length ? filters : undefined;
 };
 
 export const parseListLimit = (value: unknown): number => {

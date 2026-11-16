@@ -3,6 +3,7 @@ import { useInfiniteQuery, useQuery, useQueryClient } from '@tanstack/react-quer
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { matchesTerm } from '@/modules/workspace/search/searchRules';
 import { useDemoMail } from '../lib/demoStore';
+import { NO_FILTER, filterKey, serverFilters, type ListFilter } from '../lib/listFilter';
 import { readMailboxCache, writeMailboxCache } from '../lib/mailCache';
 import { mailService, type MailError } from '../services/mailService';
 import type { MailAccount, MailFolder, MailSummary } from '../types';
@@ -28,7 +29,9 @@ export const useMailbox = (
   /** Pasta criada pela pessoa (manda sobre `folder`; só a caixa dessa pasta). */
   folderId: string | null = null,
   /** Só emails com este marcador (o servidor filtra; só da caixa do marcador). */
-  labelFilter: { accountId: string; labelId: string } | null = null
+  labelFilter: { accountId: string; labelId: string } | null = null,
+  /** Filtros da lista: vão ao servidor (Gmail e Microsoft 365 filtram lá); o ecrã filtra sempre. */
+  filter: ListFilter = NO_FILTER
 ) => {
   const { isPreview, user } = useWorkspace();
   const demo = useDemoMail();
@@ -42,7 +45,9 @@ export const useMailbox = (
   // Na cache do browser, cada pasta da pessoa tem a sua lista.
   const cacheFolder = folderId ? `custom:${folderId}` : folder;
   // Última lista de cada caixa guardada no browser: aparece já, e a nova chega a seguir.
-  const useCache = !search.trim() && !isPreview && !labelFilter;
+  const filtersKey = filterKey(filter);
+  // Com filtros a lista guardada no browser não serve (é a da pasta inteira)
+  const useCache = !search.trim() && !isPreview && !labelFilter && !filtersKey;
   const cached = useMemo(
     () =>
       useCache
@@ -62,6 +67,8 @@ export const useMailbox = (
       search.trim(),
       idsKey,
       labelFilter?.labelId ?? '',
+      // Listas filtradas e não filtradas nunca se misturam na cache
+      filtersKey,
     ],
     initialPageParam: null as PageTokens,
     queryFn: async ({ pageParam }): Promise<MailboxPage> => {
@@ -77,7 +84,8 @@ export const useMailbox = (
             pageParam?.[id] ?? null,
             folderId,
             labelFilter?.labelId,
-            fresh
+            fresh,
+            serverFilters(filter)
           )
         )
       );

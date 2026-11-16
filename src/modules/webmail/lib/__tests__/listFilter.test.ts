@@ -9,6 +9,7 @@ import {
   filterKey,
   isFiltering,
   maxAutoPages,
+  serverFilters,
   toggleFilter,
 } from '../listFilter';
 import { mailKey } from '../mailFormat';
@@ -47,6 +48,36 @@ describe('toggleFilter', () => {
   it('isFiltering só com filtros ligados', () => {
     expect(isFiltering(NO_FILTER)).toBe(false);
     expect(isFiltering(toggleFilter(NO_FILTER, 'starred'))).toBe(true);
+  });
+});
+
+describe('Lidos e Não lidos', () => {
+  it('excluem-se: ligar um desliga o outro, sem mexer nos outros filtros', () => {
+    const unread = toggleFilter(toggleFilter(NO_FILTER, 'attachments'), 'unread');
+    const read = toggleFilter(unread, 'read');
+    expect(read.has('read')).toBe(true);
+    expect(read.has('unread')).toBe(false);
+    expect(read.has('attachments')).toBe(true);
+    const back = toggleFilter(read, 'unread');
+    expect(back.has('unread')).toBe(true);
+    expect(back.has('read')).toBe(false);
+  });
+  it('desligar "Lidos" não liga "Não lidos"', () => {
+    const read = toggleFilter(NO_FILTER, 'read');
+    expect(toggleFilter(read, 'read').size).toBe(0);
+  });
+  it('"Lidos" mostra só os já lidos e combina com os outros', () => {
+    const read = toggleFilter(NO_FILTER, 'read');
+    expect(ids(applyListFilter(list, read))).toEqual(['lido', 'estrela', 'anexo']);
+    expect(ids(applyListFilter(list, toggleFilter(read, 'attachments')))).toEqual(['anexo']);
+  });
+  it('texto da lista vazia e filtros pedidos ao servidor', () => {
+    expect(filterEmptyText(toggleFilter(NO_FILTER, 'read'))).toBe('Sem emails lidos aqui.');
+    expect(serverFilters(toggleFilter(toggleFilter(NO_FILTER, 'attachments'), 'read'))).toEqual([
+      'read',
+      'attachments',
+    ]);
+    expect(serverFilters(NO_FILTER)).toEqual([]);
   });
 });
 

@@ -161,16 +161,24 @@ const WebmailPage: React.FC = () => {
     accountId: string | null;
     parentId: string | null;
   } | null>(null);
-  const box = useMailbox(accounts, current, folder, query, customOpen?.id ?? null, labelFilter);
-  // Em "Não lidos" o email aberto fica na lista até se sair da pasta ou atualizar.
-  const list = useKeptUnread(folder, current, query, box.messages);
-  usePrefetchTop(list.messages);
-  // Filtros da lista (não lidos, com estrela, com anexos): valem para a caixa e a pasta
+  // Filtros da lista (não lidos, lidos, com estrela, com anexos): valem para a caixa e a pasta
   // abertas (mudar de caixa ou de pasta limpa-os) e combinam com a pesquisa e os marcadores.
   const [listFilter, setListFilter] = useState<ListFilter>(NO_FILTER);
   // Emails abertos com "Não lidos" ligado: ficam na lista, já como lidos, até se mudar o filtro.
   const [openedUnread, setOpenedUnread] = useState<ReadonlySet<string>>(new Set());
   useEffect(() => setListFilter(NO_FILTER), [current, folder, customOpen?.id]);
+  const box = useMailbox(
+    accounts,
+    current,
+    folder,
+    query,
+    customOpen?.id ?? null,
+    labelFilter,
+    listFilter
+  );
+  // Em "Não lidos" o email aberto fica na lista até se sair da pasta ou atualizar.
+  const list = useKeptUnread(folder, current, query, box.messages);
+  usePrefetchTop(list.messages);
   useEffect(() => setOpenedUnread(new Set()), [listFilter, current, folder, customOpen?.id, query]);
   const shown = useMemo(
     () =>
@@ -574,6 +582,7 @@ const WebmailPage: React.FC = () => {
           filter={listFilter}
           onToggleFilter={key => setListFilter(current => toggleFilter(current, key))}
           onClearFilter={() => setListFilter(NO_FILTER)}
+          filterDisabled={folder === 'unread' && !customOpen ? ['read'] : undefined}
           errors={box.errors}
           className={cn(
             'w-full border-r border-rz-line md:w-[340px] xl:w-[400px]',

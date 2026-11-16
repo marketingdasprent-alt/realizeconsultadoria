@@ -34,6 +34,7 @@ import {
   isUuid,
   optionalString,
   parseImapConnectRequest,
+  parseListFilters,
   parseListLimit,
   parseSendRequest,
 } from '../_shared/mail/request.ts';
@@ -353,6 +354,8 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
         pageToken: optionalString(body.page_token, 4000),
         limit: parseListLimit(body.limit),
         folderId,
+        // Opcional: pedidos sem "filters" (app em cache, outras janelas) ficam como sempre
+        filters: parseListFilters(body.filters),
       };
       try {
         // Uma falha de ligação passageira (ex.: servidor partilhado a recusar várias ligações

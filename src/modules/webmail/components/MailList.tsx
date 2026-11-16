@@ -70,6 +70,8 @@ interface MailListProps {
   filter: ListFilter;
   onToggleFilter: (key: ListFilterKey) => void;
   onClearFilter: () => void;
+  /** Filtros que não se podem ligar nesta pasta. */
+  filterDisabled?: readonly ListFilterKey[];
   errors: Record<string, MailError>;
   className?: string;
 }
@@ -169,6 +171,7 @@ export const MailList: React.FC<MailListProps> = props => {
           filter={props.filter}
           onToggle={props.onToggleFilter}
           onClear={props.onClearFilter}
+          disabled={props.filterDisabled}
         />
         {Object.entries(props.errors).map(([accountId, error]) => (
           <p

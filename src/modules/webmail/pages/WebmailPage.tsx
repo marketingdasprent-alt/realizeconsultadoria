@@ -560,6 +560,7 @@ const WebmailPage: React.FC = () => {
           onHover={prefetch}
           onRefresh={() => {
             list.clear();
+            setOpenedUnread(new Set());
             void box.refetch();
           }}
           onMenu={() => setMenuOpen(true)}

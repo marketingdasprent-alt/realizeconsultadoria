@@ -9,12 +9,13 @@ interface MailFilterBarProps {
 }
 
 const CHIP =
-  'inline-flex h-8 shrink-0 items-center rounded-full px-3.5 text-[13px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rz-primary/40';
+  'inline-flex h-8 shrink-0 items-center rounded-full px-2.5 text-[12.5px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rz-primary/40';
 
 /**
  * Filtros da lista, como no Gmail: Todos, Não lidos, Com estrela, Com anexos. "Todos" limpa;
- * os outros ligam-se e desligam-se e combinam-se entre si. Em ecrãs estreitos a linha rola na
- * horizontal (os botões não quebram nem tapam a lista).
+ * os outros ligam-se e desligam-se e combinam-se entre si. Os botões têm texto curto para caberem
+ * inteiros na lista estreita (a partir de 340 px); se mesmo assim faltar espaço, a linha rola na
+ * horizontal com margem no fim, para o último botão aparecer inteiro.
  */
 export const MailFilterBar: React.FC<MailFilterBarProps> = ({ filter, onToggle, onClear }) => {
   const filtering = isFiltering(filter);
@@ -22,7 +23,7 @@ export const MailFilterBar: React.FC<MailFilterBarProps> = ({ filter, onToggle, 
     <div
       role="group"
       aria-label="Filtrar emails"
-      className="rz-scroll -mx-4 flex gap-2 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+      className="rz-scroll -mx-4 flex gap-1.5 overflow-x-auto px-4 pb-0.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
     >
       <button
         type="button"
@@ -43,12 +44,14 @@ export const MailFilterBar: React.FC<MailFilterBarProps> = ({ filter, onToggle, 
             type="button"
             onClick={() => onToggle(item.key)}
             aria-pressed={on}
+            aria-label={item.label}
+            title={item.label}
             className={cn(
               CHIP,
               on ? 'bg-rz-ink text-white' : 'bg-rz-canvas text-rz-muted hover:text-rz-ink'
             )}
           >
-            {item.label}
+            {item.short}
           </button>
         );
       })}

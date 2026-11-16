@@ -189,7 +189,9 @@ export const MailList: React.FC<MailListProps> = props => {
         )}
         {!props.isLoading && props.messages.length === 0 && (
           <p className="mt-12 text-center text-sm text-rz-muted">
-            {filtering ? filterEmptyText(props.filter) : 'Nenhum email aqui.'}
+            {filtering
+              ? filterEmptyText(props.filter, props.search.trim().length > 0)
+              : 'Nenhum email aqui.'}
             {filtering && props.hasMore && (
               <span className="mt-1 block text-[12.5px]">Ainda há emails por procurar.</span>
             )}

@@ -29,6 +29,14 @@ describe('MailFilterBar', () => {
     );
   });
 
+  it('o botão mostra texto curto (cabe na lista estreita) e o nome completo fica para leitores de ecrã', () => {
+    render(<MailFilterBar filter={NO_FILTER} onToggle={vi.fn()} onClear={vi.fn()} />);
+    const star = screen.getByRole('button', { name: 'Com estrela' });
+    expect(star).toHaveTextContent('Estrela');
+    expect(star).toHaveAttribute('title', 'Com estrela');
+    expect(screen.getByRole('button', { name: 'Com anexos' })).toHaveTextContent('Anexos');
+  });
+
   it('cada chip chama o seu filtro e "Todos" limpa', () => {
     const onToggle = vi.fn();
     const onClear = vi.fn();

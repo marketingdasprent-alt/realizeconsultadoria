@@ -9,10 +9,11 @@ export type ListFilter = ReadonlySet<ListFilterKey>;
 
 export const NO_FILTER: ListFilter = new Set<ListFilterKey>();
 
-export const LIST_FILTERS: readonly { key: ListFilterKey; label: string }[] = [
-  { key: 'unread', label: 'Não lidos' },
-  { key: 'starred', label: 'Com estrela' },
-  { key: 'attachments', label: 'Com anexos' },
+/** `label`: nome completo (leitores de ecrã e balão); `short`: o que se vê no botão (a lista é estreita). */
+export const LIST_FILTERS: readonly { key: ListFilterKey; label: string; short: string }[] = [
+  { key: 'unread', label: 'Não lidos', short: 'Não lidos' },
+  { key: 'starred', label: 'Com estrela', short: 'Estrela' },
+  { key: 'attachments', label: 'Com anexos', short: 'Anexos' },
 ];
 
 export const isFiltering = (filter: ListFilter): boolean => filter.size > 0;
@@ -59,8 +60,12 @@ const EMPTY_TEXT: Record<ListFilterKey, string> = {
   attachments: 'Sem emails com anexos aqui.',
 };
 
-/** Texto da lista vazia quando há filtros ligados. */
-export const filterEmptyText = (filter: ListFilter): string => {
+/**
+ * Texto da lista vazia quando há filtros ligados. Com pesquisa de texto o motivo pode ser ela, por
+ * isso a mensagem é neutra.
+ */
+export const filterEmptyText = (filter: ListFilter, searching = false): string => {
+  if (searching) return 'Nenhum email encontrado.';
   const keys = LIST_FILTERS.filter(item => filter.has(item.key)).map(item => item.key);
   return keys.length === 1
     ? EMPTY_TEXT[keys[0]]

@@ -105,6 +105,15 @@ describe('filterKey e textos', () => {
   });
 });
 
+describe('filterEmptyText com pesquisa', () => {
+  it('com texto de pesquisa a mensagem é neutra, seja qual for o filtro', () => {
+    const unread = toggleFilter(NO_FILTER, 'unread');
+    expect(filterEmptyText(unread, true)).toBe('Nenhum email encontrado.');
+    expect(filterEmptyText(toggleFilter(unread, 'starred'), true)).toBe('Nenhum email encontrado.');
+    expect(filterEmptyText(unread, false)).toBe('Sem emails não lidos aqui.');
+  });
+});
+
 describe('maxAutoPages', () => {
   it('com filtros insiste mais', () => {
     expect(maxAutoPages(false)).toBe(MAX_AUTO_PAGES);

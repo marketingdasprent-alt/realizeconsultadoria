@@ -325,7 +325,9 @@ export const mailService = {
     /** Só os emails com este marcador (o servidor filtra a pasta). */
     labelId?: string | null,
     /** Lista acabada de ler do servidor de email (sem a guardada). */
-    fresh = false
+    fresh = false,
+    /** Filtros (unread, read, starred, attachments): o Gmail e o Microsoft 365 filtram no servidor. */
+    filters: string[] = []
   ) => {
     const { data, error } = await call<{ messages: Row[]; next_page_token: string | null }>(
       'mail-api',
@@ -338,6 +340,8 @@ export const mailService = {
         query,
         page_token: pageToken ?? undefined,
         fresh: fresh || undefined,
+        // Só se há filtros: sem eles o pedido é exatamente o de antes
+        filters: filters.length ? filters : undefined,
       }
     );
     return {

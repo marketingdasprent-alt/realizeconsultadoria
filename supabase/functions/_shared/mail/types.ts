@@ -72,6 +72,22 @@ export interface MailAttachmentContent {
   base64: string;
 }
 
+/**
+ * Filtros opcionais da lista (como no Gmail), pedidos pelo ecrã. O Gmail e o Microsoft 365
+ * filtram no servidor, para as páginas virem cheias; o IMAP ignora-os (o ecrã filtra sempre,
+ * como rede de segurança). Sem eles, a lista é exatamente a de antes.
+ */
+export interface MailListFilters {
+  /** Só por ler. */
+  unread?: boolean;
+  /** Só lidos. */
+  read?: boolean;
+  /** Só com estrela. */
+  starred?: boolean;
+  /** Só com anexos. */
+  attachments?: boolean;
+}
+
 export interface MailListParams {
   folder: MailFolder;
   query: string | null;
@@ -84,6 +100,8 @@ export interface MailListParams {
    * `folder` é ignorada (os emails dessa pasta, como numa pasta normal).
    */
   folderId?: string | null;
+  /** Filtros opcionais (ver MailListFilters). Ausente = sem filtros. */
+  filters?: MailListFilters;
 }
 
 /** Pasta criada pela pessoa no Outlook/Gmail/servidor (as fixas do Webmail ficam de fora). */

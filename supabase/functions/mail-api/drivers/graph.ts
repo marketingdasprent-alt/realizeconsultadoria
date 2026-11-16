@@ -6,6 +6,7 @@ import {
   GRAPH_BASE,
   GRAPH_SUMMARY_FIELDS,
   GRAPH_SYSTEM_FOLDERS,
+  applyMailListFilters,
   buildGraphListUrl,
   graphCustomFolders,
   isAllowedGraphNextLink,
@@ -209,7 +210,7 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
   };
 
   return {
-    async list({ folder, query, pageToken, limit, folderId }) {
+    async list({ folder, query, pageToken, limit, folderId, filters }) {
       let url: string;
       let postFilterFlagged = false;
       let postFilterUnread = false;
@@ -224,10 +225,23 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
           limit,
           root: ME,
           folderId,
+          filters,
         }));
       }
 
-      const res = await session.fetch(url);
+      let res = await session.fetch(url);
+      // Com filtros, o Graph pode recusar a combinação ($filter + $orderby demasiado complexo,
+      // erro 400): tenta-se outra vez sem os filtros e o ecrã filtra a página (rede de segurança).
+      if (filters && !pageToken && res.status === 400) {
+        await res.body?.cancel();
+        ({ url, postFilterFlagged, postFilterUnread } = buildGraphListUrl(folder, {
+          query,
+          limit,
+          root: ME,
+          folderId,
+        }));
+        res = await session.fetch(url);
+      }
       // Caixas sem pasta Arquivo devolvem 404: lista vazia.
       if (res.status === 404 && folder === 'archive') {
         await res.body?.cancel();
@@ -238,6 +252,8 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
       let messages = (data.value ?? []).map(parseGraphSummary);
       if (postFilterFlagged) messages = messages.filter(m => m.starred);
       if (postFilterUnread) messages = messages.filter(m => m.unread);
+      // Os filtros pedidos aplicam-se sempre à página (com $search o Graph não os filtra)
+      messages = applyMailListFilters(messages, filters);
       return { messages, next_page_token: data['@odata.nextLink'] ?? null };
     },
 

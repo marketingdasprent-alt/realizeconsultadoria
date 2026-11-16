@@ -1,0 +1,97 @@
+// Filtros da lista de emails (como no Gmail: não lidos, com estrela, com anexos). Combinam-se
+// entre si (E) e com a pasta, a pesquisa e os marcadores. Filtram os emails já carregados; a
+// lista vai buscar mais páginas sozinha até haver resultados (ver useAutoLoadMore).
+import type { MailSummary } from '../types';
+import { mailKey } from './mailFormat';
+
+export type ListFilterKey = 'unread' | 'read' | 'starred' | 'attachments';
+export type ListFilter = ReadonlySet<ListFilterKey>;
+
+export const NO_FILTER: ListFilter = new Set<ListFilterKey>();
+
+/** `label`: nome completo (leitores de ecrã e balão); `short`: o que se vê no botão (a lista é estreita). */
+export const LIST_FILTERS: readonly { key: ListFilterKey; label: string; short: string }[] = [
+  { key: 'unread', label: 'Não lidos', short: 'Não lidos' },
+  { key: 'read', label: 'Lidos', short: 'Lidos' },
+  { key: 'starred', label: 'Com estrela', short: 'Estrela' },
+  { key: 'attachments', label: 'Com anexos', short: 'Anexos' },
+];
+
+export const isFiltering = (filter: ListFilter): boolean => filter.size > 0;
+
+/** "Lidos" e "Não lidos" excluem-se: ligar um desliga o outro. */
+const OPPOSITE: Partial<Record<ListFilterKey, ListFilterKey>> = { unread: 'read', read: 'unread' };
+
+/** Liga ou desliga um filtro (devolve um conjunto novo). */
+export const toggleFilter = (filter: ListFilter, key: ListFilterKey): ListFilter => {
+  const next = new Set(filter);
+  if (next.delete(key)) return next;
+  next.add(key);
+  const opposite = OPPOSITE[key];
+  if (opposite) next.delete(opposite);
+  return next;
+};
+
+const MATCH: Record<ListFilterKey, (mail: MailSummary) => boolean> = {
+  unread: mail => mail.unread,
+  read: mail => !mail.unread,
+  starred: mail => mail.starred,
+  attachments: mail => mail.hasAttachments,
+};
+
+/**
+ * Só os emails que cumprem todos os filtros ligados (sem filtros, a lista como está).
+ * `opened`: os que a pessoa abriu com "Não lidos" ligado. Passam a lidos mas ficam na lista
+ * (como no Gmail) até se mudar o filtro, a pasta ou atualizar; senão sumiam ao abri-los.
+ */
+export const applyListFilter = (
+  messages: MailSummary[],
+  filter: ListFilter,
+  opened: ReadonlySet<string> = new Set()
+): MailSummary[] => {
+  if (!isFiltering(filter)) return messages;
+  const keys = [...filter];
+  return messages.filter(mail =>
+    keys.every(key => (key === 'unread' && opened.has(mailKey(mail)) ? true : MATCH[key](mail)))
+  );
+};
+
+/** Chave estável do conjunto de filtros (para reiniciar a seleção e o carregamento). */
+export const filterKey = (filter: ListFilter): string =>
+  LIST_FILTERS.filter(item => filter.has(item.key))
+    .map(item => item.key)
+    .join('+');
+
+const EMPTY_TEXT: Record<ListFilterKey, string> = {
+  unread: 'Sem emails não lidos aqui.',
+  read: 'Sem emails lidos aqui.',
+  starred: 'Sem emails com estrela aqui.',
+  attachments: 'Sem emails com anexos aqui.',
+};
+
+/**
+ * Texto da lista vazia quando há filtros ligados. Com pesquisa de texto o motivo pode ser ela, por
+ * isso a mensagem é neutra.
+ */
+export const filterEmptyText = (filter: ListFilter, searching = false): string => {
+  if (searching) return 'Nenhum email encontrado.';
+  const keys = LIST_FILTERS.filter(item => filter.has(item.key)).map(item => item.key);
+  return keys.length === 1
+    ? EMPTY_TEXT[keys[0]]
+    : 'Nenhum email aqui cumpre todos os filtros escolhidos.';
+};
+
+/**
+ * Filtros que se pedem ao servidor (Gmail e Microsoft 365 filtram lá, para as páginas virem
+ * cheias; o IMAP ignora-os). O ecrã filtra sempre, como rede de segurança.
+ */
+export const serverFilters = (filter: ListFilter): ListFilterKey[] =>
+  LIST_FILTERS.filter(item => filter.has(item.key)).map(item => item.key);
+
+/** Páginas que se carregam sozinhas, seguidas e sem a pessoa rolar, antes de pedir um clique. */
+export const MAX_AUTO_PAGES = 3;
+/** Com filtros (à procura de resultados) vale a pena insistir mais. */
+export const MAX_AUTO_PAGES_FILTERING = 8;
+
+export const maxAutoPages = (filtering: boolean): number =>
+  filtering ? MAX_AUTO_PAGES_FILTERING : MAX_AUTO_PAGES;

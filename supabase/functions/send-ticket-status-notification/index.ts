@@ -1,4 +1,7 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
+import { errorResponse, escapeHtml } from '../_shared/guard.ts';
+import { authenticatedUserId, serviceClient } from '../_shared/mail-server/http.ts';
+import { canHandleTicket, loadTicket, ticketParty } from '../_shared/ticket-mail.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,18 +39,49 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const {
-      employeeEmail,
-      employeeName,
-      ticketSubject,
-      oldStatus,
-      newStatus,
-      adminNotes,
-      notificationType,
-    }: TicketStatusNotificationRequest = await req.json();
+    const body: TicketStatusNotificationRequest | null = await req.json().catch(() => null);
+    if (
+      !body ||
+      typeof body.ticketId !== 'string' ||
+      !body.newStatus ||
+      !statusLabels[body.newStatus]
+    )
+      return errorResponse(400, 'Pedido inválido.', corsHeaders);
+    if (body.notificationType !== 'status_change' && body.notificationType !== 'notes_added')
+      return errorResponse(400, 'Pedido inválido.', corsHeaders);
+    const { newStatus, notificationType } = body;
+    const oldStatus = body.oldStatus && statusLabels[body.oldStatus] ? body.oldStatus : undefined;
+    const adminNotes =
+      typeof body.adminNotes === 'string' && body.adminNotes.trim()
+        ? body.adminNotes.trim().slice(0, 5000)
+        : undefined;
+
+    // Só com sessão e só quem pode tratar este ticket (administrador ou equipa do departamento).
+    // O email vai SÓ para quem abriu o ticket, lido da base de dados: o endereço e o nome que
+    // vierem no pedido são ignorados (senão dava para mandar email com a marca Realize a qualquer
+    // pessoa).
+    const db = serviceClient();
+    const callerId = await authenticatedUserId(req, db);
+    if (!callerId) return errorResponse(401, 'Não autorizado.', corsHeaders);
+    const ticket = await loadTicket(db, body.ticketId);
+    if (!ticket) return errorResponse(404, 'Ticket não encontrado.', corsHeaders);
+    if (!(await canHandleTicket(req, ticket.id)))
+      return errorResponse(403, 'Não pode tratar este ticket.', corsHeaders);
+    const party = await ticketParty(db, ticket);
+    if (!party.email)
+      return new Response(
+        JSON.stringify({
+          success: true,
+          message: 'Quem abriu o ticket não tem email, nada enviado',
+        }),
+        { status: 200, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    const employeeEmail = party.email;
+    const employeeName = party.name;
+    const ticketSubject = ticket.subject;
 
     console.log('Processing ticket status notification:', {
-      employeeEmail,
+      ticketId: ticket.id,
       newStatus,
       notificationType,
     });
@@ -102,7 +136,7 @@ const handler = async (req: Request): Promise<Response> => {
           💬 Resposta do Técnico
         </h2>
         <div style="background: #f0f9ff; border-left: 4px solid #3b82f6; padding: 15px; border-radius: 0 8px 8px 0;">
-          <p style="color: #333; margin: 0; white-space: pre-wrap; line-height: 1.6;">${adminNotes}</p>
+          <p style="color: #333; margin: 0; white-space: pre-wrap; line-height: 1.6;">${escapeHtml(adminNotes)}</p>
         </div>
       </div>
     `
@@ -122,11 +156,11 @@ const handler = async (req: Request): Promise<Response> => {
   
   <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px; border: 1px solid #e9ecef; border-top: none;">
     <p style="font-size: 16px; color: #333; margin-bottom: 25px;">
-      Olá <strong>${employeeName}</strong>,
+      Olá <strong>${escapeHtml(employeeName)}</strong>,
     </p>
     
     <p style="font-size: 15px; color: #666; margin-bottom: 25px;">
-      O seu ticket <strong>"${ticketSubject}"</strong> foi atualizado.
+      O seu ticket <strong>"${escapeHtml(ticketSubject)}"</strong> foi atualizado.
     </p>
     
     ${statusChangeSection}

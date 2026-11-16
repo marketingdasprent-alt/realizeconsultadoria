@@ -1,5 +1,8 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { errorResponse, isRecent } from '../_shared/guard.ts';
+import { authenticatedUserId } from '../_shared/mail-server/http.ts';
+import { loadTicket, ticketParty } from '../_shared/ticket-mail.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -22,18 +25,40 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const {
-      employeeName,
-      employeeEmail,
-      companyName,
-      subject,
-      message,
-      departmentId,
-    }: ReplyNotificationRequest = await req.json();
+    const body: ReplyNotificationRequest | null = await req.json().catch(() => null);
+    if (!body || typeof body.ticketId !== 'string')
+      return errorResponse(400, 'Pedido inválido.', corsHeaders);
+    let { employeeName, employeeEmail, companyName, subject, message, departmentId } = body;
 
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Só com sessão, só para um ticket desta pessoa e para a resposta que ela acabou de gravar:
+    // o conteúdo e quem a escreveu vêm da base de dados, não do pedido.
+    const callerId = await authenticatedUserId(req, supabase);
+    if (!callerId) return errorResponse(401, 'Não autorizado.', corsHeaders);
+    const ticket = await loadTicket(supabase, body.ticketId);
+    if (!ticket) return errorResponse(404, 'Ticket não encontrado.', corsHeaders);
+    const party = await ticketParty(supabase, ticket);
+    if (!party.userIds.includes(callerId))
+      return errorResponse(403, 'Este ticket não é seu.', corsHeaders);
+    const { data: reply } = await supabase
+      .from('support_ticket_replies')
+      .select('message, created_at')
+      .eq('ticket_id', ticket.id)
+      .eq('user_id', callerId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!reply || !isRecent(reply.created_at as string))
+      return errorResponse(403, 'Não há uma resposta sua acabada de enviar.', corsHeaders);
+    subject = ticket.subject;
+    message = (reply.message as string | null) ?? message;
+    departmentId = ticket.department_id;
+    employeeName = party.name;
+    employeeEmail = party.email ?? employeeEmail;
+    companyName = party.companyName || companyName;
 
     // Get notification emails for the department
     let recipientEmails: string[] = [];

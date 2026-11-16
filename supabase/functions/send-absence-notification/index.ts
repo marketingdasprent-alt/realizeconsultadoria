@@ -1,5 +1,7 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { errorResponse, escapeHtml } from '../_shared/guard.ts';
+import { authenticatedUserId } from '../_shared/mail-server/http.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,15 +36,59 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const payload: NotificationRequest = await req.json();
-
-    console.log('Processing absence notification for:', payload.employeeName);
+    const payload: NotificationRequest | null = await req.json().catch(() => null);
+    const validPeriods =
+      !!payload &&
+      Array.isArray(payload.periods) &&
+      payload.periods.length >= 1 &&
+      payload.periods.length <= 20 &&
+      payload.periods.every(
+        p =>
+          !!p &&
+          typeof p.startDate === 'string' &&
+          typeof p.endDate === 'string' &&
+          Number.isFinite(Date.parse(p.startDate)) &&
+          Number.isFinite(Date.parse(p.endDate)) &&
+          typeof p.businessDays === 'number' &&
+          p.businessDays >= 0 &&
+          p.businessDays <= 400
+      );
+    if (!payload || !validPeriods || typeof payload.absenceType !== 'string')
+      return errorResponse(400, 'Pedido inválido.', corsHeaders);
+    if (typeof payload.notes !== 'string') payload.notes = undefined;
+    else payload.notes = payload.notes.slice(0, 2000);
 
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
       { auth: { autoRefreshToken: false, persistSession: false } }
     );
+
+    // Só com sessão e só um colaborador ativo: quem pede e a empresa vêm da ficha dele na base
+    // de dados (o nome, o email e a empresa do pedido são ignorados).
+    const callerId = await authenticatedUserId(req, supabaseAdmin);
+    if (!callerId) return errorResponse(401, 'Não autorizado.', corsHeaders);
+    const { data: employee } = await supabaseAdmin
+      .from('employees')
+      .select('name, email, company_id, is_active')
+      .or(`user_id.eq.${callerId},admin_user_id.eq.${callerId}`)
+      .eq('is_active', true)
+      .limit(1)
+      .maybeSingle();
+    if (!employee)
+      return errorResponse(403, 'Só um colaborador ativo envia este aviso.', corsHeaders);
+    const { data: company } = employee.company_id
+      ? await supabaseAdmin
+          .from('companies')
+          .select('name')
+          .eq('id', employee.company_id)
+          .maybeSingle()
+      : { data: null };
+    payload.employeeName = employee.name?.trim() || payload.employeeName;
+    payload.employeeEmail = employee.email?.trim() || payload.employeeEmail;
+    payload.companyName = company?.name?.trim() || payload.companyName;
+
+    console.log('Processing absence notification for:', payload.employeeName);
 
     // Get active emails from notification_emails_absences
     const { data: emailRecords, error: emailsError } = await supabaseAdmin
@@ -174,7 +220,7 @@ const handler = async (req: Request): Promise<Response> => {
                   ? `
               <p style="color: #666666; font-size: 14px; margin: 0 0 10px 0;"><strong>Observações:</strong></p>
               <p style="color: #666666; font-size: 14px; line-height: 1.6; margin: 0 0 25px 0; padding: 15px; background-color: #f9f9f9; border-radius: 6px;">
-                ${payload.notes}
+                ${escapeHtml(payload.notes)}
               </p>
               `
                   : ''

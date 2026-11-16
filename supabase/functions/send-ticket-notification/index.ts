@@ -1,5 +1,8 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { errorResponse } from '../_shared/guard.ts';
+import { authenticatedUserId } from '../_shared/mail-server/http.ts';
+import { findRecentOwnTicket } from '../_shared/ticket-mail.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -36,20 +39,35 @@ const handler = async (req: Request): Promise<Response> => {
   }
 
   try {
-    const {
-      employeeName,
-      employeeEmail,
-      companyName,
-      subject,
-      priority,
-      message,
-      departmentId,
-    }: TicketNotificationRequest = await req.json();
+    const body: TicketNotificationRequest | null = await req.json().catch(() => null);
+    if (!body || typeof body.subject !== 'string' || !body.subject.trim())
+      return errorResponse(400, 'Pedido inválido.', corsHeaders);
+    let { employeeName, employeeEmail, companyName, subject, priority, message, departmentId } =
+      body;
 
     // Initialize Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+    // Só com sessão, e só para um ticket que esta pessoa acabou de abrir: o conteúdo e quem o
+    // abriu vêm do ticket na base de dados, não do pedido.
+    const callerId = await authenticatedUserId(req, supabase);
+    if (!callerId) return errorResponse(401, 'Não autorizado.', corsHeaders);
+    const own = await findRecentOwnTicket(supabase, callerId, departmentId, subject);
+    if (!own)
+      return errorResponse(
+        403,
+        'Este aviso só se envia para um ticket seu, acabado de abrir.',
+        corsHeaders
+      );
+    subject = own.ticket.subject;
+    message = own.ticket.message ?? message;
+    priority = own.ticket.priority ?? priority;
+    departmentId = own.ticket.department_id ?? departmentId;
+    employeeName = own.party.name;
+    employeeEmail = own.party.email ?? employeeEmail;
+    companyName = own.party.companyName || companyName;
 
     // Get active notification emails for this department
     const { data: emailRecords, error: emailsError } = await supabase

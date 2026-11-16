@@ -1,6 +1,9 @@
 project_id = "jvvnsoasylusbmxfotci"
 
+# Igual ao servidor (verify_jwt = false): a função verifica por dentro quem chama (chave de serviço
+# ou token de sistema) e o agendador da base de dados não leva JWT.
 [functions.send-birthday-reminders]
+verify_jwt = false
 
 [functions.delete-employee]
 verify_jwt = false

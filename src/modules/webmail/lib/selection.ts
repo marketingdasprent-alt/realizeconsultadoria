@@ -1,4 +1,7 @@
-// Seleção de vários emails na lista: um a um, intervalo com Shift e todos os da página.
+// Seleção de vários emails na lista: um a um, intervalo com Shift, todos os da página e os não lidos.
+
+import { mailKey } from './mailFormat';
+import type { MailSummary } from '../types';
 
 /**
  * Marca ou desmarca `key`. Com `range` e uma âncora (o último email clicado) que ainda está na
@@ -27,3 +30,7 @@ export const toggleAllSelection = (
   selected: ReadonlySet<string>
 ): Set<string> =>
   order.length > 0 && order.every(key => selected.has(key)) ? new Set() : new Set(order);
+
+/** Os emails por ler da página (só os que estão carregados na lista). */
+export const unreadSelection = (messages: readonly MailSummary[]): Set<string> =>
+  new Set(messages.filter(mail => mail.unread).map(mailKey));

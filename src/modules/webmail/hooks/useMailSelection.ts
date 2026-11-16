@@ -1,6 +1,6 @@
 import { useMemo, useRef, useState } from 'react';
 import { mailKey } from '../lib/mailFormat';
-import { toggleAllSelection, toggleSelection } from '../lib/selection';
+import { toggleAllSelection, toggleSelection, unreadSelection } from '../lib/selection';
 import type { MailSummary } from '../types';
 
 const EMPTY: ReadonlySet<string> = new Set();
@@ -17,6 +17,7 @@ export const useMailSelection = (messages: MailSummary[], scopeKey: string) => {
   const anchor = useRef<string | null>(null);
   const keys = state.scope === scopeKey ? state.keys : EMPTY;
   const order = useMemo(() => messages.map(mailKey), [messages]);
+  const unreadCount = useMemo(() => messages.filter(m => m.unread).length, [messages]);
   const selected = useMemo(() => messages.filter(m => keys.has(mailKey(m))), [messages, keys]);
 
   const change = (next: (current: ReadonlySet<string>) => ReadonlySet<string>) =>
@@ -25,6 +26,8 @@ export const useMailSelection = (messages: MailSummary[], scopeKey: string) => {
   return {
     selected,
     count: selected.length,
+    /** Quantos emails por ler há na lista carregada. */
+    unreadCount,
     allSelected: order.length > 0 && selected.length === order.length,
     isSelected: (key: string) => keys.has(key),
     /** Clique na caixa de seleção de um email (`range`: com Shift). */
@@ -35,6 +38,11 @@ export const useMailSelection = (messages: MailSummary[], scopeKey: string) => {
     },
     /** Todos os emails carregados na lista, ou nenhum. */
     toggleAll: () => change(current => toggleAllSelection(order, current)),
+    /** Só os emails por ler da lista (troca a seleção atual). */
+    selectUnread: () => {
+      anchor.current = null;
+      change(() => unreadSelection(messages));
+    },
     clear: () => {
       anchor.current = null;
       change(() => EMPTY);

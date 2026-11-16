@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { toggleAllSelection, toggleSelection } from '../selection';
+import { mailKey } from '../mailFormat';
+import { toggleAllSelection, toggleSelection, unreadSelection } from '../selection';
+
+const mailKeys = (ids: string[]) => ids.map(id => mailKey({ id, accountId: 'a1' } as never));
 
 const order = ['a', 'b', 'c', 'd', 'e'];
 const sorted = (set: Set<string>) => [...set].sort().join('');
@@ -44,5 +47,21 @@ describe('toggleAllSelection', () => {
 
   it('página vazia fica sem seleção', () => {
     expect(sorted(toggleAllSelection([], new Set()))).toBe('');
+  });
+});
+
+describe('unreadSelection', () => {
+  const mail = (id: string, unread: boolean) =>
+    ({ id, accountId: 'a1', unread }) as unknown as import('../../types').MailSummary;
+
+  it('escolhe só os emails por ler da lista', () => {
+    const picked = unreadSelection([mail('1', true), mail('2', false), mail('3', true)]);
+    expect(picked.size).toBe(2);
+    expect(mailKeys(['1', '3']).every(key => picked.has(key))).toBe(true);
+  });
+
+  it('sem emails por ler, não escolhe nenhum', () => {
+    expect(unreadSelection([mail('1', false)]).size).toBe(0);
+    expect(unreadSelection([]).size).toBe(0);
   });
 });

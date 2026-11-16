@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, MailOpen } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -46,6 +46,13 @@ import { FOLDERS, draftFrom, mailKey } from '../lib/mailFormat';
 import { draftFromSaved } from '../lib/savedDraft';
 import { composeSession } from '../lib/composeSession';
 import { mailService } from '../services/mailService';
+import {
+  NO_FILTER,
+  applyListFilter,
+  filterKey,
+  toggleFilter,
+  type ListFilter,
+} from '../lib/listFilter';
 import { isReaderWindow, openReaderWindow } from '../lib/readerWindow';
 import { draftMetaService } from '../services/draftMetaService';
 import { readSidebarWidth, saveSidebarWidth } from '../lib/sidebarWidth';
@@ -158,6 +165,27 @@ const WebmailPage: React.FC = () => {
   // Em "Não lidos" o email aberto fica na lista até se sair da pasta ou atualizar.
   const list = useKeptUnread(folder, current, query, box.messages);
   usePrefetchTop(list.messages);
+  // Filtros da lista (não lidos, com estrela, com anexos): valem para a caixa e a pasta
+  // abertas (mudar de caixa ou de pasta limpa-os) e combinam com a pesquisa e os marcadores.
+  const [listFilter, setListFilter] = useState<ListFilter>(NO_FILTER);
+  // Emails abertos com "Não lidos" ligado: ficam na lista, já como lidos, até se mudar o filtro.
+  const [openedUnread, setOpenedUnread] = useState<ReadonlySet<string>>(new Set());
+  useEffect(() => setListFilter(NO_FILTER), [current, folder, customOpen?.id]);
+  useEffect(() => setOpenedUnread(new Set()), [listFilter, current, folder, customOpen?.id, query]);
+  const shown = useMemo(
+    () =>
+      applyListFilter(
+        labelFilter
+          ? list.messages.filter(
+              m =>
+                m.accountId === labelFilter.accountId && m.labelIds?.includes(labelFilter.labelId)
+            )
+          : list.messages,
+        listFilter,
+        openedUnread
+      ),
+    [list.messages, labelFilter, listFilter, openedUnread]
+  );
   // Chegou email novo (o total de não lidos subiu): a lista atualiza-se logo, sem esperar.
   // E se a lista da Entrada mostra mais por ler do que o fornecedor conta (lidos noutro sítio,
   // ex. no Outlook ou no telemóvel), também se atualiza: as bolinhas não ficam presas.
@@ -287,7 +315,10 @@ const WebmailPage: React.FC = () => {
   const open = (summary: MailSummary) => {
     if (folder === 'drafts' && !customOpen) return void openSavedDraft(summary);
     setActive(summary);
-    if (summary.unread) list.keep(summary);
+    if (summary.unread) {
+      list.keep(summary);
+      if (listFilter.has('unread')) setOpenedUnread(keys => new Set(keys).add(mailKey(summary)));
+    }
   };
   // Duplo clique: o email numa janela própria (nos Rascunhos continua-se no compositor).
   const openInWindow = (summary: MailSummary) => {
@@ -494,15 +525,7 @@ const WebmailPage: React.FC = () => {
       {!solo && (
         <MailList
           title={customOpen?.name ?? FOLDERS.find(f => f.key === folder)?.label ?? 'Email'}
-          messages={
-            labelFilter
-              ? list.messages.filter(
-                  m =>
-                    m.accountId === labelFilter.accountId &&
-                    m.labelIds?.includes(labelFilter.labelId)
-                )
-              : list.messages
-          }
+          messages={shown}
           labelsById={isPreview ? undefined : labels.byId}
           labelsByAccount={isPreview ? undefined : labels.byAccount}
           onLabel={isPreview ? undefined : (mails, label) => void labelActions.toggle(mails, label)}
@@ -510,7 +533,7 @@ const WebmailPage: React.FC = () => {
           accounts={accounts}
           activeKey={active ? mailKey(active) : null}
           showAccount={current === 'all'}
-          selectionKey={`${current}|${customOpen?.id ?? folder}|${query}`}
+          selectionKey={`${current}|${customOpen?.id ?? folder}|${query}|${filterKey(listFilter)}`}
           search={search}
           onSearch={setSearch}
           onOpen={open}
@@ -544,7 +567,12 @@ const WebmailPage: React.FC = () => {
           isRefreshing={box.isRefreshing}
           hasMore={box.hasMore}
           isLoadingMore={box.isLoadingMore}
+          loadMoreFailed={box.loadMoreFailed}
+          pageCount={box.pageCount}
           onLoadMore={() => void box.loadMore()}
+          filter={listFilter}
+          onToggleFilter={key => setListFilter(current => toggleFilter(current, key))}
+          onClearFilter={() => setListFilter(NO_FILTER)}
           errors={box.errors}
           className={cn(
             'w-full border-r border-rz-line md:w-[340px] xl:w-[400px]',

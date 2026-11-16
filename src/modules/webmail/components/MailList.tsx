@@ -2,12 +2,22 @@ import React from 'react';
 import { AlertTriangle, Loader2, Menu, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { MailChange } from '../hooks/useMailChanges';
+import { useAutoLoadMore } from '../hooks/useAutoLoadMore';
 import { useMailSelection } from '../hooks/useMailSelection';
+import {
+  filterEmptyText,
+  filterKey,
+  isFiltering,
+  maxAutoPages,
+  type ListFilter,
+  type ListFilterKey,
+} from '../lib/listFilter';
 import { ACCOUNT_DOTS, accountName, mailKey } from '../lib/mailFormat';
 import { mailErrorText, type MailError } from '../services/mailService';
 import type { MailAccount, MailSummary } from '../types';
 import { MailBulkBar } from './MailBulkBar';
 import { MailContextMenu, type ListMailAction } from './MailContextMenu';
+import { MailFilterBar } from './MailFilterBar';
 import { findDoneLabel } from '../lib/doneLabel';
 import { LabelChips } from './LabelChips';
 import { LabelPicker } from './LabelPicker';
@@ -51,7 +61,15 @@ interface MailListProps {
   isRefreshing: boolean;
   hasMore: boolean;
   isLoadingMore: boolean;
+  /** A última página pedida falhou. */
+  loadMoreFailed: boolean;
+  /** Páginas já carregadas (para o carregamento automático ao rolar). */
+  pageCount: number;
   onLoadMore: () => void;
+  /** Filtros ligados (não lidos, com estrela, com anexos) e como os mudar. */
+  filter: ListFilter;
+  onToggleFilter: (key: ListFilterKey) => void;
+  onClearFilter: () => void;
   errors: Record<string, MailError>;
   className?: string;
 }
@@ -71,6 +89,16 @@ export const MailList: React.FC<MailListProps> = props => {
     selection.clear();
   };
   const oneAccount = new Set(selection.selected.map(m => m.accountId)).size === 1;
+  const filtering = isFiltering(props.filter);
+  const autoLoad = useAutoLoadMore({
+    hasMore: props.hasMore,
+    isLoadingMore: props.isLoadingMore,
+    failed: props.loadMoreFailed,
+    loadMore: props.onLoadMore,
+    pageCount: props.pageCount,
+    maxRun: maxAutoPages(filtering),
+    resetKey: `${props.selectionKey}|${filterKey(props.filter)}`,
+  });
   return (
     <section className={cn('flex min-h-0 flex-col bg-white', props.className)} aria-label="Emails">
       <div className="space-y-3 px-4 pb-2 pt-4">
@@ -137,6 +165,11 @@ export const MailList: React.FC<MailListProps> = props => {
             />
           </label>
         </MailBulkBar>
+        <MailFilterBar
+          filter={props.filter}
+          onToggle={props.onToggleFilter}
+          onClear={props.onClearFilter}
+        />
         {Object.entries(props.errors).map(([accountId, error]) => (
           <p
             key={accountId}
@@ -155,7 +188,12 @@ export const MailList: React.FC<MailListProps> = props => {
           <Loader2 className="mx-auto mt-10 h-6 w-6 animate-spin text-rz-primary" />
         )}
         {!props.isLoading && props.messages.length === 0 && (
-          <p className="mt-12 text-center text-sm text-rz-muted">Nenhum email aqui.</p>
+          <p className="mt-12 text-center text-sm text-rz-muted">
+            {filtering ? filterEmptyText(props.filter) : 'Nenhum email aqui.'}
+            {filtering && props.hasMore && (
+              <span className="mt-1 block text-[12.5px]">Ainda há emails por procurar.</span>
+            )}
+          </p>
         )}
         {props.messages.map(mail => {
           const key = mailKey(mail);
@@ -219,15 +257,32 @@ export const MailList: React.FC<MailListProps> = props => {
           );
         })}
         {props.hasMore && (
-          <li className="py-3 text-center">
-            <button
-              type="button"
-              onClick={props.onLoadMore}
-              disabled={props.isLoadingMore}
-              className="h-9 rounded-full bg-rz-canvas px-4 text-[13px] font-bold text-rz-primary"
-            >
-              {props.isLoadingMore ? 'A carregar…' : 'Carregar mais'}
-            </button>
+          <li ref={autoLoad.sentinel} className="min-h-6 py-3 text-center" aria-live="polite">
+            {props.isLoadingMore ? (
+              <span className="inline-flex items-center gap-2 text-[13px] font-semibold text-rz-muted">
+                <Loader2 className="h-4 w-4 animate-spin" />
+                {filtering ? 'A procurar emails…' : 'A carregar…'}
+              </span>
+            ) : props.loadMoreFailed ? (
+              <span className="inline-flex flex-wrap items-center justify-center gap-2 text-[13px] text-amber-900">
+                Não foi possível carregar mais emails.
+                <button
+                  type="button"
+                  onClick={props.onLoadMore}
+                  className="h-9 rounded-full bg-rz-canvas px-4 text-[13px] font-bold text-rz-primary"
+                >
+                  Tentar de novo
+                </button>
+              </span>
+            ) : autoLoad.stalled || !autoLoad.supported ? (
+              <button
+                type="button"
+                onClick={props.onLoadMore}
+                className="h-9 rounded-full bg-rz-canvas px-4 text-[13px] font-bold text-rz-primary"
+              >
+                {filtering ? 'Procurar mais emails' : 'Carregar mais'}
+              </button>
+            ) : null}
           </li>
         )}
       </ul>

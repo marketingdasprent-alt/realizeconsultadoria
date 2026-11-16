@@ -158,6 +158,10 @@ export const useMailbox = (
     hasMore: !isPreview && !!query.hasNextPage,
     loadMore: () => query.fetchNextPage(),
     isLoadingMore: query.isFetchingNextPage,
+    /** A última página pedida falhou (a lista que já veio mantém-se). */
+    loadMoreFailed: !isPreview && query.isFetchNextPageError,
+    /** Páginas já carregadas (cada uma que chega volta a verificar se há mais para mostrar). */
+    pageCount: query.data?.pages.length ?? 0,
     errors,
     refetch: () => {
       freshRef.current = true;

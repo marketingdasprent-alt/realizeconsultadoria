@@ -35,3 +35,9 @@ dist-ssr
 
 .vercel
 dist-mail
+
+# Scripts e ficheiros locais com chaves: nunca no repositório
+.claude/settings.local.json
+migrate.mjs
+fix.mjs
+reimport.mjs

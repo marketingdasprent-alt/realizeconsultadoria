@@ -32,10 +32,8 @@ type PageTab = (typeof PAGE_TABS)[number]['value'];
 const SharingPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const companies = useMyCompanies();
-  // Só quem é administrador da empresa gere a partilha.
-  const adminOf = (companies.data ?? []).filter(
-    item => item.role === 'admin' && item.status === 'ativa'
-  );
+  // Só quem é administrador da empresa gere a partilha (rz_my_companies já só devolve pertenças ativas).
+  const adminOf = (companies.data ?? []).filter(item => item.role === 'admin');
   const [chosen, setChosen] = useState<string | null>(null);
   const company = adminOf.find(item => item.company_id === chosen) ?? adminOf[0];
 

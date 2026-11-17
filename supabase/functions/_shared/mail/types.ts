@@ -47,6 +47,8 @@ export interface MailSummary {
   message_key?: string | null;
   /** Marcadores do email (ids de mail_labels), acrescentados pelo servidor. */
   label_ids?: string[];
+  /** Só na pesquisa em todas as pastas: nome (em português) da pasta onde o email está; null se não se souber. */
+  folder_name?: string | null;
 }
 
 export interface MailAttachmentInfo {
@@ -114,6 +116,25 @@ export interface MailFolderInfo {
   unread: number | null;
 }
 
+/** Pesquisa em todas as pastas da caixa (menos Lixo e Spam): ver docs/webmail-pesquisa-todas-pastas.md. */
+export interface MailSearchAllParams {
+  /** Já aparado, com 2 ou mais caracteres. */
+  query: string;
+  /** false = só cabeçalhos (assunto, de, para, cc); true = também o texto do email. */
+  includeBody: boolean;
+  /** Máximo de resultados juntos (1 a 100). */
+  limit: number;
+}
+
+export interface MailSearchAllResult {
+  /** Todos juntos, do mais recente para o mais antigo, com folder_name. */
+  messages: MailSummary[];
+  /** Havia mais resultados do que os devolvidos. */
+  truncated: boolean;
+  /** Acabou o tempo (ou uma pasta falhou) e algumas pastas ficaram por pesquisar. */
+  partial: boolean;
+}
+
 export interface MailListResult {
   messages: MailSummary[];
   next_page_token: string | null;
@@ -145,6 +166,8 @@ export interface MailSendParams {
 /** Operações que cada fornecedor (Gmail API, Microsoft Graph, IMAP/SMTP) implementa. */
 export interface MailDriver {
   list(params: MailListParams): Promise<MailListResult>;
+  /** Pesquisa em todas as pastas (opcional: um driver que não a tenha responde not_supported). */
+  searchAll?(params: MailSearchAllParams): Promise<MailSearchAllResult>;
   get(messageId: string): Promise<MailMessage>;
   /**
    * Vários anexos do mesmo email de uma vez (opcional): no IMAP lê o email uma só vez em vez de

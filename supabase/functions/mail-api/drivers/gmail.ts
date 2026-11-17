@@ -25,7 +25,18 @@ import {
   generateMessageId,
   randomHex,
 } from '../../_shared/mail/mime.ts';
-import type { MailDriver, MailSendParams, MailSummary } from '../../_shared/mail/types.ts';
+import {
+  gmailFolderName,
+  gmailSearchAllQuery,
+  mergeSearchResults,
+} from '../../_shared/mail/search-all.ts';
+import type {
+  MailDriver,
+  MailSearchAllParams,
+  MailSearchAllResult,
+  MailSendParams,
+  MailSummary,
+} from '../../_shared/mail/types.ts';
 import { mapWithConcurrency } from '../../_shared/mail-server/http.ts';
 import type { OAuthSession } from '../session.ts';
 import { SEND_TIMEOUT_MS } from '../session.ts';
@@ -185,6 +196,54 @@ export const createGmailDriver = (
           filters
         ),
         next_page_token: list.nextPageToken ?? null,
+      };
+    },
+
+    /**
+     * Pesquisa em todas as etiquetas: o Gmail já deixa de fora Spam e Lixo. Os resultados vêm do
+     * mais recente para o mais antigo; havendo mais páginas, truncated. O nome da "pasta" vem das
+     * etiquetas do email (Entrada, Enviados, Rascunhos, ou a etiqueta da pessoa).
+     */
+    async searchAll({
+      query,
+      includeBody,
+      limit,
+    }: MailSearchAllParams): Promise<MailSearchAllResult> {
+      const params = new URLSearchParams({
+        maxResults: String(limit),
+        q: gmailSearchAllQuery(query, includeBody),
+      });
+      const [list, labels] = await Promise.all([
+        session.json<{ messages?: { id: string }[]; nextPageToken?: string }>(
+          `${GMAIL}/messages?${params.toString()}`
+        ),
+        // Sem os nomes das etiquetas da pessoa, só se dão as três pastas padrão
+        session
+          .json<{ labels?: { id: string; name: string; type?: string }[] }>(`${GMAIL}/labels`)
+          .catch(() => ({ labels: [] as { id: string; name: string; type?: string }[] })),
+      ]);
+      const userLabels = new Map(
+        (labels.labels ?? []).filter(l => l.type === 'user').map(l => [l.id, l.name])
+      );
+      const found = await mapWithConcurrency(
+        list.messages ?? [],
+        10,
+        async ({ id }): Promise<MailSummary | null> => {
+          const res = await session.fetch(`${GMAIL}/messages/${enc(id)}?${METADATA}`);
+          if (res.status === 404) return null; // apagada entretanto
+          await session.ensureOk(res);
+          const raw = (await res.json()) as GmailMessage;
+          return {
+            ...parseGmailSummary(raw),
+            folder_name: gmailFolderName(raw.labelIds, userLabels),
+          };
+        }
+      );
+      const merged = mergeSearchResults([found.filter((m): m is MailSummary => m !== null)], limit);
+      return {
+        messages: merged.messages,
+        truncated: merged.truncated || !!list.nextPageToken,
+        partial: false,
       };
     },
 

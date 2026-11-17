@@ -65,6 +65,7 @@ import { createGmailDriver } from './drivers/gmail.ts';
 import { createGraphDriver } from './drivers/graph.ts';
 import { createImapDriver, testImapLogin, type ImapAccountConfig } from './drivers/imap.ts';
 import { pollNewMail } from './poll.ts';
+import { parseSearchAllRequest } from '../_shared/mail/search-all.ts';
 import {
   MAX_LABELS_PER_ACCOUNT,
   applyLabel,
@@ -343,7 +344,10 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
 
   switch (action) {
     case 'list': {
-      const folder = body.folder;
+      // Pesquisa em todas as pastas (opcional: sem all_folders o pedido é exatamente o de sempre)
+      const searchAll = parseSearchAllRequest(body);
+      if (searchAll.kind === 'invalid') return badRequest();
+      const folder = searchAll.kind === 'ok' && !isMailFolder(body.folder) ? 'inbox' : body.folder;
       if (!isMailFolder(folder)) return badRequest();
       const folderId = optionalString(body.folder_id, 1000);
       if (folderId && /[\r\n\0]/.test(folderId)) return badRequest();
@@ -358,6 +362,27 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
         filters: parseListFilters(body.filters),
       };
       try {
+        if (searchAll.kind === 'ok') {
+          // Sem páginas seguintes, marcadores nem lista guardada: um só pedido, tudo junto
+          if (!driver.searchAll) throw mailError('not_supported');
+          const found = await driver.searchAll({
+            query: searchAll.query,
+            includeBody: searchAll.includeBody,
+            limit: searchAll.limit,
+          });
+          await updateAccountStatus(db, account.id, {
+            status: 'active',
+            last_error: null,
+            last_sync_at: new Date().toISOString(),
+          });
+          return ok({
+            messages: await attachLabels(db, account.id, found.messages),
+            next_page_token: null,
+            scope: 'all_folders',
+            truncated: found.truncated,
+            partial: found.partial,
+          });
+        }
         // Uma falha de ligação passageira (ex.: servidor partilhado a recusar várias ligações
         // ao mesmo tempo) tenta-se outra vez antes de desistir.
         const listPage = (page: MailListParams) =>

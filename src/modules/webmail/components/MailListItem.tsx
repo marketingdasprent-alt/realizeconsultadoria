@@ -16,6 +16,8 @@ interface MailListItemProps {
   accountDot?: string;
   /** Nome da caixa (ao passar o rato na marca de cor). */
   accountName?: string;
+  /** Pasta do email (na pesquisa em todas as pastas). */
+  folderName?: string;
   onOpen: (mail: MailSummary) => void;
   /** Duplo clique na linha: abre o email numa janela própria. */
   onOpenWindow?: (mail: MailSummary) => void;
@@ -130,6 +132,11 @@ export const MailListItem: React.FC<MailListItemProps> = ({ mail, ...props }) =>
           >
             {who}
           </span>
+          {props.folderName && (
+            <span className="max-w-[40%] shrink-0 truncate rounded-full bg-rz-canvas px-2 py-0.5 text-[11px] font-semibold text-rz-muted">
+              {props.folderName}
+            </span>
+          )}
           <span
             className={cn(
               'shrink-0 text-[12px]',

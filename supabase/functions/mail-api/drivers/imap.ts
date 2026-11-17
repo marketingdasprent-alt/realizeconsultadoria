@@ -41,7 +41,20 @@ import {
   generateMessageId,
   utf8Decode,
 } from '../../_shared/mail/mime.ts';
-import type { MailDriver, MailListResult, MailSendParams } from '../../_shared/mail/types.ts';
+import {
+  SEARCH_ALL_BUDGET_MS,
+  imapSearchAllCriteria,
+  imapSearchFolders,
+  mergeSearchResults,
+} from '../../_shared/mail/search-all.ts';
+import type {
+  MailDriver,
+  MailListResult,
+  MailSearchAllParams,
+  MailSearchAllResult,
+  MailSendParams,
+  MailSummary,
+} from '../../_shared/mail/types.ts';
 import {
   PART_ATTACHMENT_PREFIX,
   buildLightMessage,
@@ -656,6 +669,100 @@ export const createImapDriver = (
             next_page_token: uids.length > limit ? String(page[page.length - 1]) : null,
           };
         });
+      });
+    },
+
+    /**
+     * Pesquisa em todas as pastas, uma a uma na mesma ligação (só leitura). Por pasta: os UIDs
+     * mais recentes que acertam, o envelope e a estrutura (sem pré-visualizações). Uma pasta que
+     * falha não deita a pesquisa abaixo (partial); ao acabar o tempo devolve o que já tem.
+     */
+    searchAll({ query, includeBody, limit }: MailSearchAllParams): Promise<MailSearchAllResult> {
+      return withClient(async client => {
+        const started = Date.now();
+        const folders = imapSearchFolders(await client.list());
+        const criteria = imapSearchAllCriteria(query, includeBody);
+        const groups: MailSummary[][] = [];
+        let partial = false;
+        let capped = false;
+        let searched = 0;
+
+        const searchFolder = (folder: { path: string; name: string }) =>
+          withMailbox(client, folder.path, true, async () => {
+            const found = await client.search(criteria, { uid: true });
+            const uids = (Array.isArray(found) ? found : []).sort((a, b) => b - a);
+            const page = uids.slice(0, limit);
+            if (!page.length) return { messages: [] as MailSummary[], capped: false };
+            const items: ImapFetchMessage[] = [];
+            for await (const msg of client.fetch(
+              page.join(','),
+              { uid: true, flags: true, envelope: true, bodyStructure: true, internalDate: true },
+              { uid: true }
+            )) {
+              items.push(msg);
+            }
+            return {
+              capped: uids.length > limit,
+              messages: items.map(m => ({
+                ...imapSummary({
+                  id: encodeImapMessageId(folder.path, m.uid),
+                  envelope: m.envelope,
+                  flags: m.flags,
+                  internalDate: m.internalDate,
+                  bodyStructure: m.bodyStructure,
+                }),
+                folder_name: folder.name,
+              })),
+            };
+          });
+
+        for (const folder of folders) {
+          const remaining = SEARCH_ALL_BUDGET_MS - (Date.now() - started);
+          if (remaining <= 1_000) {
+            partial = true;
+            break;
+          }
+          const work = searchFolder(folder);
+          let timer: ReturnType<typeof setTimeout> | undefined;
+          try {
+            const result = await Promise.race([
+              work,
+              new Promise<'timeout'>(resolve => {
+                timer = setTimeout(() => resolve('timeout'), remaining);
+              }),
+            ]);
+            if (result === 'timeout') {
+              // Ficou um pedido pendente nesta ligação: fecha-se, para não bloquear os seguintes
+              work.catch(() => undefined);
+              dropPooled(key);
+              partial = true;
+              break;
+            }
+            searched += 1;
+            groups.push(result.messages);
+            capped = capped || result.capped;
+          } catch (error) {
+            // Esta pasta não se conseguiu pesquisar: segue para a seguinte
+            console.warn(
+              'mail-api imap: pesquisa em todas as pastas, pasta falhou',
+              errorMessage(error)
+            );
+            partial = true;
+            if (!isUsable(client)) break;
+          } finally {
+            clearTimeout(timer);
+          }
+        }
+
+        // Nenhuma pasta se pesquisou: é uma falha, não uma pesquisa sem resultados
+        if (!searched && folders.length)
+          throw mailError('provider_error', 'Não foi possível pesquisar nas pastas desta caixa.');
+        const merged = mergeSearchResults(groups, limit);
+        return {
+          messages: merged.messages,
+          truncated: merged.truncated || capped,
+          partial,
+        };
       });
     },
 

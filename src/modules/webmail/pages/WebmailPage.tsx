@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchAllFolders } from '../hooks/useSearchAllFolders';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, MailOpen } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
@@ -71,6 +72,10 @@ const WebmailPage: React.FC = () => {
   const [custom, setCustom] = useState<CustomFolderRef | null>(null);
   const [search, setSearch] = useState('');
   const [query, setQuery] = useState('');
+  // Pesquisar em todas as pastas (a escolha fica guardada neste browser; o texto dos emails não)
+  const [searchAll, changeSearchAll] = useSearchAllFolders();
+  const [searchBody, setSearchBody] = useState(false);
+  const allFolders = searchAll && query.trim().length >= 2 ? { body: searchBody } : null;
   const [active, setActive] = useState<MailSummary | null>(null);
   // Janela aberta só para ler um email (duplo clique na lista): sem caixas nem lista.
   const [solo] = useState(isReaderWindow);
@@ -175,7 +180,8 @@ const WebmailPage: React.FC = () => {
     query,
     customOpen?.id ?? null,
     labelFilter,
-    listFilter
+    listFilter,
+    allFolders
   );
   // "Abrir o email" do popup de email novo, já estando aqui: vai buscar os emails novos.
   const refetchRef = useRef(box.refetch);
@@ -541,7 +547,25 @@ const WebmailPage: React.FC = () => {
       )}
       {!solo && (
         <MailList
-          title={customOpen?.name ?? FOLDERS.find(f => f.key === folder)?.label ?? 'Email'}
+          title={
+            allFolders
+              ? 'Resultados em todas as pastas'
+              : (customOpen?.name ?? FOLDERS.find(f => f.key === folder)?.label ?? 'Email')
+          }
+          searchScope={
+            isPreview
+              ? undefined
+              : {
+                  allFolders: searchAll,
+                  onAllFolders: changeSearchAll,
+                  includeBody: searchBody,
+                  onIncludeBody: setSearchBody,
+                  active: !!allFolders,
+                  info: box.allFoldersInfo,
+                  folderLabel:
+                    customOpen?.name ?? FOLDERS.find(f => f.key === folder)?.label ?? 'Esta pasta',
+                }
+          }
           messages={shown}
           labelsById={isPreview ? undefined : labels.byId}
           labelsByAccount={isPreview ? undefined : labels.byAccount}
@@ -550,7 +574,7 @@ const WebmailPage: React.FC = () => {
           accounts={accounts}
           activeKey={active ? mailKey(active) : null}
           showAccount={current === 'all'}
-          selectionKey={`${current}|${customOpen?.id ?? folder}|${query}|${filterKey(listFilter)}`}
+          selectionKey={`${current}|${customOpen?.id ?? folder}|${query}|${filterKey(listFilter)}|${allFolders ? (allFolders.body ? 'tp+' : 'tp') : ''}`}
           search={search}
           onSearch={setSearch}
           onOpen={open}

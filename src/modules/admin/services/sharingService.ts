@@ -6,6 +6,7 @@ import {
   SharingError,
   toSharingError,
   type Capability,
+  type CompanyViewer,
   type GroupMember,
   type MyCompany,
   type RequestDirection,
@@ -61,6 +62,10 @@ export const sharingService = {
     if (error) throw toSharingError(error);
     return list(data as Capability[] | null);
   },
+
+  /** Quem pode ver os dados da empresa (administradores, gestores e a equipa da plataforma). */
+  companyViewers: async (company: string): Promise<CompanyViewer[]> =>
+    list(await call<CompanyViewer[] | null>('rz_company_viewers', { p_company: company })),
 
   getShareCode: (company: string) => call<ShareCode>('rz_get_share_code', { p_company: company }),
 

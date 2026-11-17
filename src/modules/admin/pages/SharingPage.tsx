@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Inbox, KeyRound, Link2, Users } from 'lucide-react';
+import { Eye, Inbox, KeyRound, Link2, Users } from 'lucide-react';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -18,13 +18,16 @@ import { RequestShareDialog } from '../components/sharing/RequestShareDialog';
 import { RequestsPanel } from '../components/sharing/RequestsPanel';
 import { ShareCodeCard } from '../components/sharing/ShareCodeCard';
 import { SharesPanel } from '../components/sharing/SharesPanel';
+import { ViewersPanel } from '../components/sharing/ViewersPanel';
 import { useMyCompanies } from '../hooks/useSharing';
+import { managesCompany } from '../lib/sharing';
 
 const PAGE_TABS = [
   { value: 'codigo', label: 'Código', icon: KeyRound },
   { value: 'pedidos', label: 'Pedidos', icon: Inbox },
   { value: 'acesso', label: 'Quem tem acesso', icon: Link2 },
   { value: 'grupo', label: 'Grupo', icon: Users },
+  { value: 'quem-ve', label: 'Quem pode ver', icon: Eye },
 ] as const;
 type PageTab = (typeof PAGE_TABS)[number]['value'];
 
@@ -33,7 +36,7 @@ const SharingPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const companies = useMyCompanies();
   // Só quem é administrador da empresa gere a partilha (rz_my_companies já só devolve pertenças ativas).
-  const adminOf = (companies.data ?? []).filter(item => item.role === 'admin');
+  const adminOf = (companies.data ?? []).filter(item => managesCompany(item.role));
   const [chosen, setChosen] = useState<string | null>(null);
   const company = adminOf.find(item => item.company_id === chosen) ?? adminOf[0];
 
@@ -105,6 +108,13 @@ const SharingPage: React.FC = () => {
               </TabsContent>
               <TabsContent value="grupo" className="mt-6">
                 <GroupPanel key={company.company_id} company={company.company_id} />
+              </TabsContent>
+              <TabsContent value="quem-ve" className="mt-6">
+                <ViewersPanel
+                  key={company.company_id}
+                  company={company.company_id}
+                  name={company.name}
+                />
               </TabsContent>
             </Tabs>
           </>

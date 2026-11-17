@@ -11,7 +11,6 @@ import {
   Palmtree,
   Scale,
   Settings,
-  Share2,
   Users,
   Wallet,
   type LucideIcon,
@@ -98,13 +97,8 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         moduleKey: 'companies',
         tint: 'from-sky-400 to-blue-600',
       },
-      {
-        href: ROUTES.ADMIN.SHARING,
-        icon: Share2,
-        label: 'Partilha entre empresas',
-        moduleKey: 'companies',
-        tint: 'from-indigo-400 to-violet-600',
-      },
+      // "Partilha entre empresas" (ROUTES.ADMIN.SHARING, /admin/partilha) volta ao menu quando o
+      // módulo de empresas for ligado: com os interruptores desligados mostraria uma página vazia.
       {
         href: ROUTES.ADMIN.ACCESSES,
         icon: KeyRound,

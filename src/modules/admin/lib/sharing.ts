@@ -14,6 +14,29 @@ export interface MyCompany {
   is_group_member: boolean;
 }
 
+/** Quem gere a empresa: o admin dela, ou um Super Admin (equipa da plataforma, todas as empresas). */
+export const managesCompany = (role: string) => role === 'admin' || role === 'super_admin';
+
+export type ViewerKind = 'super_admin' | 'admin_empresa' | 'gestor';
+
+/** Quem pode ver os dados de uma empresa (rz_company_viewers). */
+export interface CompanyViewer {
+  user_id: string;
+  name: string;
+  email: string;
+  kind: ViewerKind;
+  role: string;
+}
+
+export const VIEWER_KIND_LABEL: Record<ViewerKind, string> = {
+  super_admin: 'Equipa da plataforma',
+  admin_empresa: 'Administrador da empresa',
+  gestor: 'Gestor',
+};
+
+export const viewerKindLabel = (kind: string): string =>
+  VIEWER_KIND_LABEL[kind as ViewerKind] ?? kind;
+
 export interface ShareCode {
   share_code: string;
   rotated_at: string | null;

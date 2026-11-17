@@ -19,6 +19,13 @@ export const useMyCompanies = () =>
     retry: retryTransient,
   });
 
+export const useCompanyViewers = (company: string) =>
+  useQuery({
+    queryKey: [...KEY, 'viewers', company],
+    queryFn: () => sharingService.companyViewers(company),
+    retry: retryTransient,
+  });
+
 export const useCapabilities = () =>
   useQuery({
     queryKey: [...KEY, 'capabilities'],

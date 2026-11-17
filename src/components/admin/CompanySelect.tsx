@@ -51,13 +51,19 @@ export const CompanySelect: React.FC<CompanySelectProps> = ({
   className,
 }) => {
   const [open, setOpen] = useState(false);
+  // A pesquisa é nossa para que a lista abra sempre limpa (reabrir depressa mostrava o filtro antigo).
+  const [query, setQuery] = useState('');
+  const changeOpen = (next: boolean) => {
+    setOpen(next);
+    if (!next) setQuery('');
+  };
   const sorted = sortCompanies(companies);
   const all = allLabel ? [{ id: ALL_COMPANIES, name: allLabel }] : [];
   const options = [...all, ...sorted, ...extra];
   const current = options.find(option => option.id === value);
 
   return (
-    <Popover open={open} onOpenChange={setOpen}>
+    <Popover open={open} onOpenChange={changeOpen}>
       <PopoverTrigger asChild>
         <Button
           id={id}
@@ -77,7 +83,11 @@ export const CompanySelect: React.FC<CompanySelectProps> = ({
       </PopoverTrigger>
       <PopoverContent className="w-[--radix-popover-trigger-width] min-w-[16rem] p-0" align="start">
         <Command filter={(itemValue, query) => (fold(itemValue).includes(fold(query)) ? 1 : 0)}>
-          <CommandInput placeholder="Procurar empresa…" />
+          <CommandInput
+            placeholder="Procurar empresa…"
+            value={query}
+            onValueChange={setQuery}
+          />
           <CommandList>
             <CommandEmpty>Nenhuma empresa encontrada.</CommandEmpty>
             <CommandGroup>
@@ -85,9 +95,11 @@ export const CompanySelect: React.FC<CompanySelectProps> = ({
                 <CommandItem
                   key={option.id}
                   value={companyLabel(option.name)}
+                  // 44 px de altura no telemóvel: a lista antiga tinha 30 px, difícil de tocar.
+                  className="min-h-11 sm:min-h-0"
                   onSelect={() => {
                     onChange(option.id);
-                    setOpen(false);
+                    changeOpen(false);
                   }}
                 >
                   <Check

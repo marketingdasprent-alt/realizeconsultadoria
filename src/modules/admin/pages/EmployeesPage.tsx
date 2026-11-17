@@ -80,10 +80,15 @@ const EmployeesPage = () => {
 
   const { employees } = actions;
   // Todas as empresas ativas (e não só as que já têm colaboradores): para filtrar e criar numa vazia.
+  // O hook partilhado traz também as inativas; aqui só interessam as ativas, como na ficha.
   const allCompanies = useCompanies();
+  const activeCompanies = useMemo(
+    () => allCompanies.companies.filter(company => company.is_active),
+    [allCompanies.companies]
+  );
   const companies = useMemo(
-    () => (allCompanies.companies.length ? allCompanies.companies : companiesOf(employees)),
-    [allCompanies.companies, employees]
+    () => (activeCompanies.length ? activeCompanies : companiesOf(employees)),
+    [activeCompanies, employees]
   );
 
   // Os números refletem a pesquisa e a empresa, mas não o estado (servem para o escolher).

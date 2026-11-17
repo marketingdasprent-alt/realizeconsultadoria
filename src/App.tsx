@@ -29,6 +29,7 @@ const CookiesPolicyPage = lazy(() => import('./pages/CookiesPolicyPage'));
 const TermsPage = lazy(() => import('./pages/TermsPage'));
 const AdminDashboard = lazy(() => import('./modules/admin/pages/AdminDashboard'));
 const CompaniesPage = lazy(() => import('./modules/admin/pages/CompaniesPage'));
+const SharingPage = lazy(() => import('./modules/admin/pages/SharingPage'));
 const EmployeesPage = lazy(() => import('./modules/admin/pages/EmployeesPage'));
 const EmployeeFormPage = lazy(() => import('./modules/admin/pages/EmployeeFormPage'));
 const CalendarPage = lazy(() => import('./modules/admin/pages/CalendarPage'));
@@ -135,6 +136,7 @@ const App = () => (
                         <Route path="/admin" element={<AdminDashboard />} />
                         <Route path="/admin/juridico" element={<LegalPage />} />
                         <Route path="/admin/empresas" element={<CompaniesPage />} />
+                        <Route path="/admin/partilha" element={<SharingPage />} />
                         <Route path="/admin/colaboradores" element={<EmployeesPage />} />
                         <Route path="/admin/colaboradores/novo" element={<EmployeeFormPage />} />
                         <Route path="/admin/colaboradores/:id" element={<EmployeeFormPage />} />

@@ -11,6 +11,7 @@ import {
   Palmtree,
   Scale,
   Settings,
+  Share2,
   Users,
   Wallet,
   type LucideIcon,
@@ -96,6 +97,13 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         label: 'Empresas',
         moduleKey: 'companies',
         tint: 'from-sky-400 to-blue-600',
+      },
+      {
+        href: ROUTES.ADMIN.SHARING,
+        icon: Share2,
+        label: 'Partilha entre empresas',
+        moduleKey: 'companies',
+        tint: 'from-indigo-400 to-violet-600',
       },
       {
         href: ROUTES.ADMIN.ACCESSES,

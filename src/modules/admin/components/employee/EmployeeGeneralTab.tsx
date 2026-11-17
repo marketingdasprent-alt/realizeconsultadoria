@@ -53,19 +53,21 @@ export interface EmployeeRecord {
 
 interface EmployeeGeneralTabProps {
   employee: EmployeeRecord | null;
+  /** Colaborador novo: a empresa que já vem escolhida (a do filtro da lista). */
+  defaultCompanyId?: string;
   companies: { id: string; name: string }[];
   isEditMode: boolean;
   onSaved: () => void;
   onCreated: (employeeId: string) => void;
 }
 
-const toFormValues = (employee: EmployeeRecord | null) => ({
+const toFormValues = (employee: EmployeeRecord | null, defaultCompanyId = '') => ({
   name: employee?.name || '',
   email: employee?.email || '',
   phone: employee?.phone || '',
   position: employee?.position || '',
   department: employee?.department || '',
-  company_id: employee?.company_id || '',
+  company_id: employee?.company_id || defaultCompanyId,
   nationality: employee?.nationality || '',
   document_number: employee?.document_number || '',
   hire_date: employee?.hire_date || '',
@@ -94,6 +96,7 @@ const isoDate = (date: Date | undefined) => (date ? format(date, 'yyyy-MM-dd') :
  */
 const EmployeeGeneralTab = ({
   employee,
+  defaultCompanyId,
   companies,
   isEditMode,
   onSaved,
@@ -120,7 +123,7 @@ const EmployeeGeneralTab = ({
 
   const methods = useForm<FormValues>({
     resolver: zodResolver(isEditMode ? updateEmployeeSchema : createEmployeeSchema),
-    defaultValues: toFormValues(employee),
+    defaultValues: toFormValues(employee, defaultCompanyId),
   });
   const { register, handleSubmit, formState, reset, control, watch, setValue } = methods;
   const errors = formState.errors as FieldErrors;

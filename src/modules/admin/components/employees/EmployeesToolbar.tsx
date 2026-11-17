@@ -1,13 +1,7 @@
 import React from 'react';
+import { CompanySelect } from '@/components/admin/CompanySelect';
 import { Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 
 export type StatusFilter = 'active' | 'inactive' | 'all';
 
@@ -65,19 +59,14 @@ export const EmployeesToolbar: React.FC<EmployeesToolbarProps> = props => (
           className="w-full bg-transparent text-[14px] text-rz-ink outline-none placeholder:text-rz-muted"
         />
       </label>
-      <Select value={props.companyId} onValueChange={props.onCompanyChange}>
-        <SelectTrigger className="h-10 w-full rounded-full sm:w-[230px]">
-          <SelectValue placeholder="Empresa" />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todas as empresas</SelectItem>
-          {props.companies.map(company => (
-            <SelectItem key={company.id} value={company.id}>
-              {company.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      <CompanySelect
+        companies={props.companies}
+        value={props.companyId}
+        onChange={props.onCompanyChange}
+        allLabel="Todas as empresas"
+        aria-label="Empresa"
+        className="h-10 rounded-full sm:w-[230px]"
+      />
     </div>
     <div className="flex flex-wrap items-center gap-2">
       <Segmented

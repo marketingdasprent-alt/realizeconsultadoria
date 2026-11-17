@@ -4,13 +4,6 @@ import { Eye, Inbox, KeyRound, Link2, Network, Users } from 'lucide-react';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { AllGroupsPanel } from '../components/sharing/AllGroupsPanel';
 import { GroupPanel } from '../components/sharing/GroupPanel';
@@ -19,9 +12,10 @@ import { RequestShareDialog } from '../components/sharing/RequestShareDialog';
 import { RequestsPanel } from '../components/sharing/RequestsPanel';
 import { ShareCodeCard } from '../components/sharing/ShareCodeCard';
 import { SharesPanel } from '../components/sharing/SharesPanel';
+import { CompanyPicker } from '../components/sharing/CompanyPicker';
 import { ViewersPanel } from '../components/sharing/ViewersPanel';
 import { useMyCompanies } from '../hooks/useSharing';
-import { isSuperAdminAccount, managesCompany } from '../lib/sharing';
+import { companyLabel, isSuperAdminAccount, managesCompany, sortCompanies } from '../lib/sharing';
 
 const PAGE_TABS = [
   { value: 'codigo', label: 'Código', icon: KeyRound },
@@ -39,7 +33,7 @@ const SharingPage: React.FC = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const companies = useMyCompanies();
   // Só quem é administrador da empresa gere a partilha (rz_my_companies já só devolve pertenças ativas).
-  const adminOf = (companies.data ?? []).filter(item => managesCompany(item.role));
+  const adminOf = sortCompanies((companies.data ?? []).filter(item => managesCompany(item.role)));
   const [chosen, setChosen] = useState<string | null>(null);
   const company = adminOf.find(item => item.company_id === chosen) ?? adminOf[0];
 
@@ -74,18 +68,12 @@ const SharingPage: React.FC = () => {
             {adminOf.length > 1 && (
               <div className="max-w-sm space-y-2">
                 <Label htmlFor="sharing-company">Empresa</Label>
-                <Select value={company.company_id} onValueChange={setChosen}>
-                  <SelectTrigger id="sharing-company">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {adminOf.map(item => (
-                      <SelectItem key={item.company_id} value={item.company_id}>
-                        {item.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <CompanyPicker
+                  id="sharing-company"
+                  companies={adminOf}
+                  value={company.company_id}
+                  onChange={setChosen}
+                />
               </div>
             )}
             <Tabs value={tab} onValueChange={changeTab} className="w-full">
@@ -119,7 +107,7 @@ const SharingPage: React.FC = () => {
                 <ViewersPanel
                   key={company.company_id}
                   company={company.company_id}
-                  name={company.name}
+                  name={companyLabel(company.name)}
                 />
               </TabsContent>
               {superAdmin && (

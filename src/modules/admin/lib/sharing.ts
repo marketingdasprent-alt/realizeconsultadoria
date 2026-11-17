@@ -105,7 +105,15 @@ export interface GroupOverview {
   }[];
 }
 
-const byName = (a: string, b: string) => a.localeCompare(b, 'pt-PT', { sensitivity: 'base' });
+/** O nome para mostrar e ordenar: sem espaços a mais (há nomes na base com um espaço no início). */
+export const companyLabel = (name: string): string => name.replace(/\s+/g, ' ').trim();
+
+const byName = (a: string, b: string) =>
+  companyLabel(a).localeCompare(companyLabel(b), 'pt-PT', { sensitivity: 'base' });
+
+/** As empresas por ordem alfabética (ignora espaços a mais, acentos e maiúsculas). */
+export const sortCompanies = <T extends { name: string }>(companies: readonly T[]): T[] =>
+  [...companies].sort((a, b) => byName(a.name, b.name));
 
 /** As linhas do servidor, agrupadas: cada grupo com as suas empresas, tudo por ordem de nome. */
 export const groupOverview = (rows: readonly GroupOverviewRow[]): GroupOverview[] => {
@@ -118,7 +126,7 @@ export const groupOverview = (rows: readonly GroupOverviewRow[]): GroupOverview[
     };
     group.members.push({
       companyId: row.company_id,
-      name: row.company_name,
+      name: companyLabel(row.company_name),
       joinedAt: row.joined_at,
       origin: row.origin,
     });
@@ -138,9 +146,7 @@ export const companiesWithoutGroup = (
   rows: readonly GroupOverviewRow[]
 ): MyCompany[] => {
   const inGroup = new Set(rows.map(row => row.company_id));
-  return all
-    .filter(company => !inGroup.has(company.company_id))
-    .sort((a, b) => byName(a.name, b.name));
+  return sortCompanies(all.filter(company => !inGroup.has(company.company_id)));
 };
 
 /** A conta é Super Admin (vê todas as empresas): só ela tem a vista de todos os grupos. */

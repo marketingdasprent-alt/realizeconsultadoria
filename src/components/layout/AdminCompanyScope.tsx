@@ -1,23 +1,20 @@
 import React, { useState } from 'react';
-import { Building2, Check, ChevronsUpDown, Layers } from 'lucide-react';
+import { ChevronsUpDown } from 'lucide-react';
 import {
-  Command,
-  CommandEmpty,
-  CommandGroup,
-  CommandInput,
-  CommandItem,
-  CommandList,
-} from '@/components/ui/command';
+  COMPANY_PANEL_CLASS,
+  CompanyPickerList,
+  CompanyTile,
+  type CompanyPickerSection,
+} from '@/components/admin/CompanyPickerList';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip';
-import { companyLabel, sortCompanies } from '@/lib/companyName';
-import { fold } from '@/lib/text';
+import { sortCompanies } from '@/lib/companyName';
 import { cn } from '@/lib/utils';
 import { useCompanyScope } from '@/modules/admin/context/CompanyScopeContext';
 import { SCOPE_ALL, companyScope, groupScope } from '@/modules/admin/lib/companyScope';
 
 interface AdminCompanyScopeProps {
-  /** Menu recolhido: só o ícone. */
+  /** Menu recolhido: só o mosaico. */
   collapsed?: boolean;
   /** 'light': sobre fundo claro (folha do menu no telemóvel). */
   tone?: 'dark' | 'light';
@@ -26,8 +23,8 @@ interface AdminCompanyScopeProps {
 }
 
 /**
- * "Empresa" no topo do menu do admin: escolhe-se uma vez e Colaboradores, Acessos e os outros
- * ecrãs mostram só essa empresa (ou todas as de um grupo). Só aparece com mais de uma empresa.
+ * "Empresa" no topo do menu: escolhe-se uma vez e Colaboradores, Acessos, Calendário e os outros
+ * ecrãs mostram só essa empresa (ou as de um grupo). Só aparece com mais de uma empresa.
  */
 export const AdminCompanyScope: React.FC<AdminCompanyScopeProps> = ({
   collapsed = false,
@@ -45,13 +42,44 @@ export const AdminCompanyScope: React.FC<AdminCompanyScopeProps> = ({
     setOpen(next);
     if (!next) setQuery('');
   };
-  const choose = (value: string) => {
-    setScope(value);
+  const choose = (id: string) => {
+    setScope(id);
     changeOpen(false);
     onChosen?.();
   };
-  const filtered = scope !== SCOPE_ALL;
-  const Icon = scope.startsWith('g:') ? Layers : Building2;
+
+  const sections: CompanyPickerSection[] = [
+    {
+      key: 'all',
+      entries: [{ id: SCOPE_ALL, name: 'Todas as empresas', kind: 'all' }],
+    },
+    ...(groups.length
+      ? [
+          {
+            key: 'groups',
+            heading: 'Grupos',
+            entries: groups.map(group => ({
+              id: groupScope(group.id),
+              name: group.name,
+              kind: 'group' as const,
+              meta: `${group.companyIds.length} empresas`,
+            })),
+          },
+        ]
+      : []),
+    {
+      key: 'companies',
+      heading: 'Empresas',
+      entries: sortCompanies(companies).map(company => ({
+        id: companyScope(company.id),
+        name: company.name,
+        kind: 'company' as const,
+      })),
+    },
+  ];
+
+  const kind = scope.startsWith('g:') ? 'group' : scope.startsWith('c:') ? 'company' : 'all';
+  const light = tone === 'light';
 
   const trigger = (
     <button
@@ -60,51 +88,41 @@ export const AdminCompanyScope: React.FC<AdminCompanyScopeProps> = ({
       aria-expanded={open}
       aria-label={`Empresa: ${label}. Mudar de empresa`}
       className={cn(
-        'flex w-full min-h-11 items-center gap-3 rounded-2xl text-left text-[14px] font-medium transition-colors',
-        tone === 'light'
-          ? 'bg-white text-rz-ink shadow-rz-soft ring-1 ring-rz-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rz-primary'
-          : 'bg-white/[0.10] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)] hover:bg-white/[0.16] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70',
-        collapsed ? 'justify-center px-0' : 'px-2.5 py-2'
+        'flex w-full min-h-12 items-center gap-3 rounded-2xl text-left text-[14px] font-semibold transition-colors',
+        'focus-visible:outline-none focus-visible:ring-2',
+        light
+          ? 'bg-white px-2.5 py-2 text-rz-ink shadow-rz-soft ring-1 ring-rz-line focus-visible:ring-rz-primary'
+          : cn(
+              'text-white focus-visible:ring-white/70',
+              collapsed ? 'justify-center px-0 py-2' : 'px-2.5 py-2',
+              open || scope !== SCOPE_ALL
+                ? 'bg-white/[0.16] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.18)]'
+                : 'bg-white/[0.08] hover:bg-white/[0.12]'
+            )
       )}
     >
-      <span
-        className={cn(
-          'relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl',
-          tone === 'light'
-            ? filtered
-              ? 'bg-rz-primary text-white'
-              : 'bg-rz-canvas text-rz-ink'
-            : filtered
-              ? 'bg-white text-rz-ink'
-              : 'bg-white/15 text-white'
-        )}
-        aria-hidden
-      >
-        <Icon className="h-4 w-4" />
-      </span>
+      <CompanyTile entry={{ name: label, kind }} />
       {!collapsed && (
         <>
           <span className="min-w-0 flex-1">
             <span
               className={cn(
-                'block text-[11px] font-semibold uppercase tracking-[0.14em]',
-                tone === 'light' ? 'text-rz-muted' : 'text-white/55'
+                'block text-[10.5px] font-semibold uppercase leading-none tracking-[0.14em]',
+                light ? 'text-rz-muted' : 'text-white/55'
               )}
             >
               Empresa
             </span>
-            <span className="block truncate">{label}</span>
+            <span className="mt-1 block truncate leading-tight">{label}</span>
           </span>
           <ChevronsUpDown
-            className={cn('h-4 w-4 shrink-0', tone === 'light' ? 'text-rz-muted' : 'text-white/60')}
+            className={cn('h-4 w-4 shrink-0', light ? 'text-rz-muted' : 'text-white/60')}
             aria-hidden
           />
         </>
       )}
     </button>
   );
-
-  const sorted = sortCompanies(companies);
 
   return (
     <div className="px-3 pb-2 pt-1">
@@ -124,77 +142,18 @@ export const AdminCompanyScope: React.FC<AdminCompanyScopeProps> = ({
         <PopoverContent
           side={collapsed ? 'right' : 'bottom'}
           align="start"
-          className="w-[min(18rem,calc(100vw-2rem))] p-0"
+          sideOffset={8}
+          collisionPadding={12}
+          className={cn('w-[min(21rem,calc(100vw-1.5rem))]', COMPANY_PANEL_CLASS)}
         >
-          <Command filter={(itemValue, q) => (fold(itemValue).includes(fold(q)) ? 1 : 0)}>
-            <CommandInput
-              placeholder="Procurar empresa ou grupo…"
-              value={query}
-              onValueChange={setQuery}
-            />
-            <CommandList>
-              <CommandEmpty>Nenhuma empresa encontrada.</CommandEmpty>
-              <CommandGroup>
-                <CommandItem
-                  value="Todas as empresas"
-                  className="min-h-11 sm:min-h-0"
-                  onSelect={() => choose(SCOPE_ALL)}
-                >
-                  <Check
-                    className={cn(
-                      'mr-2 h-4 w-4 shrink-0',
-                      scope === SCOPE_ALL ? 'opacity-100' : 'opacity-0'
-                    )}
-                    aria-hidden
-                  />
-                  <span className="truncate">Todas as empresas</span>
-                </CommandItem>
-              </CommandGroup>
-              {groups.length > 0 && (
-                <CommandGroup heading="Grupos">
-                  {groups.map(group => (
-                    <CommandItem
-                      key={group.id}
-                      value={group.name}
-                      className="min-h-11 sm:min-h-0"
-                      onSelect={() => choose(groupScope(group.id))}
-                    >
-                      <Check
-                        className={cn(
-                          'mr-2 h-4 w-4 shrink-0',
-                          scope === groupScope(group.id) ? 'opacity-100' : 'opacity-0'
-                        )}
-                        aria-hidden
-                      />
-                      <span className="min-w-0 flex-1 truncate">{group.name}</span>
-                      <span className="ml-2 shrink-0 text-xs text-muted-foreground">
-                        {group.companyIds.length} empresas
-                      </span>
-                    </CommandItem>
-                  ))}
-                </CommandGroup>
-              )}
-              <CommandGroup heading="Empresas">
-                {sorted.map(company => (
-                  <CommandItem
-                    key={company.id}
-                    value={companyLabel(company.name)}
-                    className="min-h-11 sm:min-h-0"
-                    onSelect={() => choose(companyScope(company.id))}
-                  >
-                    <Check
-                      className={cn(
-                        'mr-2 h-4 w-4 shrink-0',
-                        scope === companyScope(company.id) ? 'opacity-100' : 'opacity-0'
-                      )}
-                      aria-hidden
-                    />
-                    <span className="truncate">{companyLabel(company.name)}</span>
-                  </CommandItem>
-                ))}
-              </CommandGroup>
-            </CommandList>
-          </Command>
+          <CompanyPickerList
+            sections={sections}
+            value={scope}
+            onPick={choose}
+            query={query}
+            onQueryChange={setQuery}
+            placeholder="Procurar empresa ou grupo…"
+          />
         </PopoverContent>
       </Popover>
     </div>

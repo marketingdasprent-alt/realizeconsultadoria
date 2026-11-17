@@ -11,3 +11,12 @@ export const compareCompanyNames = (a: string, b: string): number =>
 /** As empresas por ordem alfabética. */
 export const sortCompanies = <T extends { name: string }>(companies: readonly T[]): T[] =>
   [...companies].sort((a, b) => compareCompanyNames(a.name, b.name));
+
+/** As iniciais para o mosaico da empresa: até duas letras das primeiras palavras do nome. */
+export const companyInitials = (name: string): string => {
+  const words = companyLabel(name)
+    .split(' ')
+    .filter(word => /^\p{L}/u.test(word));
+  const letters = words.slice(0, 2).map(word => word[0]);
+  return (letters.join('') || '?').toUpperCase();
+};

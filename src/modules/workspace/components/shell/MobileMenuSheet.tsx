@@ -6,6 +6,7 @@ import { useWorkspace } from '../../context/workspaceContext';
 import { useSupportDesk } from '@/modules/support/hooks/useSupportDesk';
 import { MANAGEMENT_LABEL, useAdminMenu } from '../../hooks/useManagementGroup';
 import { SETTINGS_MODULE, modulePath, visibleGroups } from '../../lib/navigation';
+import { AdminCompanyScope } from '@/components/layout/AdminCompanyScope';
 import { ModuleIcon } from '../ModuleIcon';
 
 interface MobileMenuSheetProps {
@@ -30,6 +31,9 @@ export const MobileMenuSheet: React.FC<MobileMenuSheetProps> = ({ open, onOpenCh
       >
         <div className="mx-auto mb-4 h-1.5 w-12 rounded-full bg-rz-line" aria-hidden />
         <SheetTitle className="mb-4 px-1 text-xl font-extrabold">Todas as ferramentas</SheetTitle>
+        <div className="-mx-3 -mt-2 mb-1">
+          <AdminCompanyScope tone="light" onChosen={() => onOpenChange(false)} />
+        </div>
         <div className="space-y-5">
           {groups.map(group => (
             <section

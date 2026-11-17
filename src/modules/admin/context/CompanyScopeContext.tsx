@@ -2,6 +2,8 @@ import React, { createContext, useCallback, useContext, useMemo, useState } from
 import { useQuery } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { useAuth } from '@/contexts/AuthContext';
+import { useAdminAccess } from '@/modules/workspace/hooks/useIsAdmin';
 import { useAllGroups } from '../hooks/useSharing';
 import { groupOverview } from '../lib/sharing';
 import {
@@ -17,8 +19,9 @@ import {
 } from '../lib/companyScope';
 
 /** Empresas ativas que a conta vê (a base já limita as de cada admin). */
-export const useActiveCompanies = () =>
+export const useActiveCompanies = (enabled = true) =>
   useQuery({
+    enabled,
     queryKey: ['admin', 'companies-active'],
     queryFn: async (): Promise<ScopeCompany[]> => {
       const { data, error } = await supabase
@@ -61,8 +64,12 @@ const readStored = (): string => {
 
 export const CompanyScopeProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isSuperAdmin } = useAdminPermissions();
-  const companiesQuery = useActiveCompanies();
-  const groupsQuery = useAllGroups(isSuperAdmin);
+  const { role } = useAuth();
+  const access = useAdminAccess();
+  // Só quem é administrador escolhe empresa (conta de admin ou conta unificada no Workspace).
+  const isAdmin = role === 'admin' || access.isAdmin;
+  const companiesQuery = useActiveCompanies(isAdmin);
+  const groupsQuery = useAllGroups(isAdmin && isSuperAdmin);
   const [stored, setStored] = useState(readStored);
 
   const companies = useMemo(() => companiesQuery.data ?? [], [companiesQuery.data]);

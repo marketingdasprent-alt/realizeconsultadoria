@@ -50,6 +50,27 @@ export const PERMISSIONS_CONFIG: ModuleTopicsConfig[] = [
     ],
   },
   {
+    moduleKey: 'sharing',
+    moduleLabel: 'Partilha entre empresas',
+    topics: [
+      {
+        key: 'view',
+        label: 'Ver a partilha entre empresas',
+        description:
+          'Ver o código da empresa, os pedidos, quem tem acesso, o grupo e quem pode ver a empresa',
+        hasView: true,
+        hasExecute: false,
+      },
+      {
+        key: 'manage',
+        label: 'Gerir a partilha entre empresas',
+        description: 'Pedir ligações, aprovar ou recusar pedidos e retirar partilhas',
+        hasView: false,
+        hasExecute: true,
+      },
+    ],
+  },
+  {
     moduleKey: 'employees',
     moduleLabel: 'Colaboradores',
     topics: [

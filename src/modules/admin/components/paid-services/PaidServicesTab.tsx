@@ -1,4 +1,6 @@
 import React, { useMemo, useState } from 'react';
+import { useCompanyScope } from '../../context/CompanyScopeContext';
+import { filterByScope } from '../../lib/companyScope';
 import { format, parseISO } from 'date-fns';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
@@ -37,7 +39,12 @@ export const PaidServicesTab: React.FC<PaidServicesTabProps> = ({ canManage, com
   const [toDelete, setToDelete] = useState<PaidService | null>(null);
   const [taskFor, setTaskFor] = useState<PaidService | null>(null);
 
-  const list = useMemo(() => filterPaid(data.services, filters), [data.services, filters]);
+  const { ids: scopeIds } = useCompanyScope();
+  const scoped = useMemo(
+    () => filterByScope(data.services, scopeIds, service => service.companyId),
+    [data.services, scopeIds]
+  );
+  const list = useMemo(() => filterPaid(scoped, filters), [scoped, filters]);
   const summary = useMemo(() => summarizePaid(list), [list]);
 
   const togglePaid = async (service: PaidService) => {

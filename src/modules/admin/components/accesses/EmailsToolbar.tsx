@@ -9,6 +9,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { CompanySelect } from '@/components/admin/CompanySelect';
 import { cn } from '@/lib/utils';
 import { NO_COMPANY, type CredentialCompany, type MailboxState } from '../../lib/credentials';
 import type { EmailFilters } from '../../lib/emailRows';
@@ -120,23 +121,15 @@ export const EmailsToolbar: React.FC<EmailsToolbarProps> = ({
           <SelectItem value="department">Só departamentais</SelectItem>
         </SelectContent>
       </Select>
-      <Select value={filters.companyId} onValueChange={companyId => onChange({ companyId })}>
-        <SelectTrigger
-          className="h-9 rounded-full border-rz-line text-[13px] sm:w-[200px]"
-          aria-label="Empresa"
-        >
-          <SelectValue />
-        </SelectTrigger>
-        <SelectContent>
-          <SelectItem value="all">Todas as empresas</SelectItem>
-          {companies.map(company => (
-            <SelectItem key={company.id} value={company.id}>
-              {company.name}
-            </SelectItem>
-          ))}
-          <SelectItem value={NO_COMPANY}>Outro (sem empresa)</SelectItem>
-        </SelectContent>
-      </Select>
+      <CompanySelect
+        companies={companies}
+        value={filters.companyId}
+        onChange={companyId => onChange({ companyId })}
+        allLabel="Todas as empresas"
+        extra={[{ id: NO_COMPANY, name: 'Outro (sem empresa)' }]}
+        aria-label="Empresa"
+        className="h-9 rounded-full border-rz-line text-[13px] sm:w-[200px]"
+      />
     </div>
   </div>
 );

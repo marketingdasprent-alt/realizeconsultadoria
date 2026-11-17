@@ -12,6 +12,7 @@ import { AdminSidebar } from './AdminSidebar';
 import { AdminMobileHeader } from './AdminMobileHeader';
 import { AdminMobileSidebar } from './AdminMobileSidebar';
 import { PrintPreviewHost } from '@/components/admin/PrintPreviewHost';
+import { CompanyScopeProvider } from '@/modules/admin/context/CompanyScopeContext';
 import { useAdminBadges } from '@/modules/admin/hooks/useAdminBadges';
 import { AccountSwitchButton } from '@/modules/auth/components/AccountSwitchButton';
 import { useAccountSwitch } from '@/modules/auth/hooks/useAccountSwitch';
@@ -82,69 +83,71 @@ const AdminLayout = ({ children }: AdminLayoutProps) => {
   }
 
   return (
-    <div className="min-h-screen bg-rz-aurora bg-fixed font-jakarta text-rz-ink print:bg-white">
-      <AdminSidebar
-        groups={groups}
-        settings={settings}
-        userName={userName}
-        userInitial={userInitial}
-        collapsed={collapsed}
-        onToggle={toggleCollapsed}
-        onLogout={handleLogout}
-        badges={badges}
-      />
+    <CompanyScopeProvider>
+      <div className="min-h-screen bg-rz-aurora bg-fixed font-jakarta text-rz-ink print:bg-white">
+        <AdminSidebar
+          groups={groups}
+          settings={settings}
+          userName={userName}
+          userInitial={userInitial}
+          collapsed={collapsed}
+          onToggle={toggleCollapsed}
+          onLogout={handleLogout}
+          badges={badges}
+        />
 
-      <AdminMobileHeader isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
+        <AdminMobileHeader isSidebarOpen={isSidebarOpen} setIsSidebarOpen={setIsSidebarOpen} />
 
-      <AdminMobileSidebar
-        isOpen={isSidebarOpen}
-        onClose={() => setIsSidebarOpen(false)}
-        groups={groups}
-        settings={settings}
-        userName={userName}
-        userInitial={userInitial}
-        onLogout={handleLogout}
-        badges={badges}
-      />
+        <AdminMobileSidebar
+          isOpen={isSidebarOpen}
+          onClose={() => setIsSidebarOpen(false)}
+          groups={groups}
+          settings={settings}
+          userName={userName}
+          userInitial={userInitial}
+          onLogout={handleLogout}
+          badges={badges}
+        />
 
-      <div
-        className={cn(
-          'min-h-screen pt-14 transition-[padding] duration-300 ease-out lg:pb-3 lg:pr-3 print:p-0',
-          canSwitch ? 'lg:pt-0' : 'lg:pt-3',
-          collapsed ? 'lg:pl-[76px]' : 'lg:pl-[260px]'
-        )}
-      >
-        {canSwitch && (
-          <div className="hidden h-14 items-center justify-end lg:flex print:hidden">
-            <AccountSwitchButton
-              current="admin"
-              className="rz-glass text-white hover:bg-white/20"
-            />
-          </div>
-        )}
-        <main
+        <div
           className={cn(
-            'min-h-[calc(100vh-3.5rem)] overflow-x-hidden rounded-t-[28px] bg-rz-canvas shadow-rz-panel lg:rounded-[28px] print:min-h-0 print:rounded-none print:bg-white print:shadow-none',
-            canSwitch ? 'lg:min-h-[calc(100vh-4.25rem)]' : 'lg:min-h-[calc(100vh-1.5rem)]'
+            'min-h-screen pt-14 transition-[padding] duration-300 ease-out lg:pb-3 lg:pr-3 print:p-0',
+            canSwitch ? 'lg:pt-0' : 'lg:pt-3',
+            collapsed ? 'lg:pl-[76px]' : 'lg:pl-[260px]'
           )}
         >
-          <div className="mx-auto max-w-[1600px] p-4 lg:p-8 print:max-w-none print:p-0">
-            {children || (
-              <Suspense
-                fallback={
-                  <div className="py-16 text-center text-sm text-rz-muted">A carregar…</div>
-                }
-              >
-                <Outlet />
-              </Suspense>
+          {canSwitch && (
+            <div className="hidden h-14 items-center justify-end lg:flex print:hidden">
+              <AccountSwitchButton
+                current="admin"
+                className="rz-glass text-white hover:bg-white/20"
+              />
+            </div>
+          )}
+          <main
+            className={cn(
+              'min-h-[calc(100vh-3.5rem)] overflow-x-hidden rounded-t-[28px] bg-rz-canvas shadow-rz-panel lg:rounded-[28px] print:min-h-0 print:rounded-none print:bg-white print:shadow-none',
+              canSwitch ? 'lg:min-h-[calc(100vh-4.25rem)]' : 'lg:min-h-[calc(100vh-1.5rem)]'
             )}
-          </div>
-        </main>
-      </div>
+          >
+            <div className="mx-auto max-w-[1600px] p-4 lg:p-8 print:max-w-none print:p-0">
+              {children || (
+                <Suspense
+                  fallback={
+                    <div className="py-16 text-center text-sm text-rz-muted">A carregar…</div>
+                  }
+                >
+                  <Outlet />
+                </Suspense>
+              )}
+            </div>
+          </main>
+        </div>
 
-      {/* Impressões (mapa de férias, relatórios…) abertas por cima da página */}
-      <PrintPreviewHost />
-    </div>
+        {/* Impressões (mapa de férias, relatórios…) abertas por cima da página */}
+        <PrintPreviewHost />
+      </div>
+    </CompanyScopeProvider>
   );
 };
 

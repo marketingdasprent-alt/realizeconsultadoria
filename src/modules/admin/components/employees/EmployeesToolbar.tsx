@@ -11,6 +11,8 @@ interface EmployeesToolbarProps {
   status: StatusFilter;
   onStatusChange: (status: StatusFilter) => void;
   companies: { id: string; name: string }[];
+  /** Com uma empresa só escolhida no menu, o filtro de empresa não faz falta. */
+  showCompany?: boolean;
   companyId: string;
   onCompanyChange: (companyId: string) => void;
   count: number;
@@ -59,14 +61,16 @@ export const EmployeesToolbar: React.FC<EmployeesToolbarProps> = props => (
           className="w-full bg-transparent text-[14px] text-rz-ink outline-none placeholder:text-rz-muted"
         />
       </label>
-      <CompanySelect
-        companies={props.companies}
-        value={props.companyId}
-        onChange={props.onCompanyChange}
-        allLabel="Todas as empresas"
-        aria-label="Empresa"
-        className="h-10 rounded-full sm:w-[230px]"
-      />
+      {props.showCompany !== false && (
+        <CompanySelect
+          companies={props.companies}
+          value={props.companyId}
+          onChange={props.onCompanyChange}
+          allLabel="Todas as empresas"
+          aria-label="Empresa"
+          className="h-10 rounded-full sm:w-[230px]"
+        />
+      )}
     </div>
     <div className="flex flex-wrap items-center gap-2">
       <Segmented

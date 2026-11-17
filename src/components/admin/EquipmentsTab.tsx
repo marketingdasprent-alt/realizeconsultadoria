@@ -1,4 +1,6 @@
 import { useState, useMemo } from 'react';
+import { CompanySelect } from '@/components/admin/CompanySelect';
+import { useCompanyScope } from '@/modules/admin/context/CompanyScopeContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import {
   Plus,
@@ -165,9 +167,13 @@ const EquipmentsTab = ({
     },
   });
 
+  const scope = useCompanyScope();
+  const scopeIds = useMemo(() => (scope.ids ? [...scope.ids] : null), [scope.ids]);
+  const scopeKey = scopeIds ? scopeIds.join(',') : 'all';
+
   // Fetch equipments (sem filtro de categoria na query)
   const { data: equipments = [], isLoading } = useQuery({
-    queryKey: ['equipments', companyFilter],
+    queryKey: ['equipments', companyFilter, scopeKey],
     queryFn: async () => {
       let query = supabase
         .from('equipments')
@@ -183,6 +189,9 @@ const EquipmentsTab = ({
 
       if (companyFilter !== 'all') {
         query = query.eq('company_id', companyFilter);
+      } else if (scopeIds) {
+        // Grupo escolhido no menu: só as empresas dele.
+        query = query.in('company_id', scopeIds);
       }
 
       const { data, error } = await query;
@@ -767,19 +776,14 @@ const EquipmentsTab = ({
               />
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <Select value={companyFilter} onValueChange={setCompanyFilter}>
-                <SelectTrigger className="w-full sm:w-48">
-                  <SelectValue placeholder="Empresa" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as empresas</SelectItem>
-                  {companies.map(company => (
-                    <SelectItem key={company.id} value={company.id}>
-                      {company.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <CompanySelect
+                companies={companies}
+                value={companyFilter}
+                onChange={setCompanyFilter}
+                allLabel="Todas as empresas"
+                aria-label="Empresa"
+                className="w-full sm:w-56"
+              />
             </div>
           </div>
 

@@ -1,7 +1,9 @@
-import React, { useMemo, useState } from 'react';
+import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
+import React, { useEffect, useMemo, useState } from 'react';
 import { CalendarX2, FileSpreadsheet, Loader2, Printer } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import CalendarPrintDialog from '@/components/admin/CalendarPrintDialog';
+import { useCompanyScope } from '../../context/CompanyScopeContext';
 import { useAdminCalendar } from '../../hooks/useAdminCalendar';
 import { useVacationReport } from '../../hooks/useVacationReport';
 import { buildTeamRows, isoDay } from '../../lib/teamCalendar';
@@ -45,12 +47,17 @@ const readView = (): CalendarView => {
 export const CalendarTab: React.FC<{ tabs: React.ReactNode }> = ({ tabs }) => {
   const [month, setMonth] = useState(() => new Date());
   const [view, setView] = useState<CalendarView>(readView);
-  const [companyId, setCompanyId] = useState('all');
+  const [companyFilter, setCompanyId] = useState('all');
+  const scope = useCompanyScope();
   const [onlyAbsent, setOnlyAbsent] = useState(true);
   const [openDay, setOpenDay] = useState<Date | null>(null);
   const [printOpen, setPrintOpen] = useState(false);
   const [types, setTypes] = useState<Set<string>>(readTypes);
 
+  // Mudar de empresa no menu limpa o filtro próprio do calendário.
+  useEffect(() => setCompanyId('all'), [scope.scope]);
+  // Uma empresa só no menu manda; senão vale o filtro do calendário.
+  const companyId = scope.singleCompanyId ?? companyFilter;
   const calendar = useAdminCalendar(month, companyId, types);
   const chosenTypes = ABSENCE_TYPE_KEYS.filter(type => types.has(type));
   const changeTypes = (next: Set<string>) => {
@@ -107,6 +114,8 @@ export const CalendarTab: React.FC<{ tabs: React.ReactNode }> = ({ tabs }) => {
           </div>
         </div>
 
+        <CompanyScopeNotice />
+
         <section className="overflow-hidden rounded-[28px] bg-white shadow-rz-soft ring-1 ring-rz-line">
           <CalendarToolbar
             month={month}
@@ -115,6 +124,7 @@ export const CalendarTab: React.FC<{ tabs: React.ReactNode }> = ({ tabs }) => {
             onViewChange={changeView}
             companies={calendar.companies}
             companyId={companyId}
+            showCompany={!scope.singleCompanyId}
             onCompanyChange={setCompanyId}
             onlyAbsent={onlyAbsent}
             onOnlyAbsentChange={setOnlyAbsent}

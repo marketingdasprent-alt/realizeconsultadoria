@@ -1,5 +1,6 @@
 import React from 'react';
 import { Globe, Plus, Repeat, Search, Wifi } from 'lucide-react';
+import { CompanySelect } from '@/components/admin/CompanySelect';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -7,13 +8,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import type { PaidFilters, PaidKind } from '../../lib/paidServices';
 
@@ -76,22 +70,14 @@ export const PaidServicesToolbar: React.FC<PaidServicesToolbarProps> = ({
         className="h-9 w-full rounded-full bg-white pl-9 pr-3 text-[13px] outline-none ring-1 ring-rz-line focus:ring-2 focus:ring-rz-primary"
       />
     </div>
-    <Select value={filters.companyId} onValueChange={companyId => onChange({ companyId })}>
-      <SelectTrigger
-        className="h-9 w-[190px] rounded-full border-rz-line text-[13px]"
-        aria-label="Empresa"
-      >
-        <SelectValue />
-      </SelectTrigger>
-      <SelectContent>
-        <SelectItem value="all">Todas as empresas</SelectItem>
-        {companies.map(company => (
-          <SelectItem key={company.id} value={company.id}>
-            {company.name}
-          </SelectItem>
-        ))}
-      </SelectContent>
-    </Select>
+    <CompanySelect
+      companies={companies}
+      value={filters.companyId}
+      onChange={companyId => onChange({ companyId })}
+      allLabel="Todas as empresas"
+      aria-label="Empresa"
+      className="h-9 w-[190px] rounded-full border-rz-line text-[13px]"
+    />
     {canManage && (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>

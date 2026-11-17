@@ -3,13 +3,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { ChevronLeft, ChevronRight, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+import { CompanySelect } from '@/components/admin/CompanySelect';
 import { Switch } from '@/components/ui/switch';
 import type { CalendarCompany } from '../../services/calendarService';
 
@@ -21,6 +15,8 @@ interface CalendarToolbarProps {
   view: CalendarView;
   onViewChange: (view: CalendarView) => void;
   companies: CalendarCompany[];
+  /** Com uma empresa só escolhida no menu, o filtro de empresa não faz falta. */
+  showCompany?: boolean;
   companyId: string;
   onCompanyChange: (companyId: string) => void;
   onlyAbsent: boolean;
@@ -86,19 +82,16 @@ export const CalendarToolbar: React.FC<CalendarToolbarProps> = props => {
             Só com ausências
           </label>
         )}
-        <Select value={props.companyId} onValueChange={props.onCompanyChange}>
-          <SelectTrigger className="h-9 w-[210px] rounded-full">
-            <SelectValue placeholder="Empresa" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as empresas</SelectItem>
-            {props.companies.map(company => (
-              <SelectItem key={company.id} value={company.id}>
-                {company.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {props.showCompany !== false && (
+          <CompanySelect
+            companies={props.companies}
+            value={props.companyId}
+            onChange={props.onCompanyChange}
+            allLabel="Todas as empresas"
+            aria-label="Empresa"
+            className="h-9 w-[210px] rounded-full"
+          />
+        )}
       </div>
     </div>
   );

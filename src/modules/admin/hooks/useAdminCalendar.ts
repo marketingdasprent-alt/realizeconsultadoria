@@ -8,6 +8,8 @@ import {
   type CalendarAbsence,
   type DayEntry,
 } from '../lib/teamCalendar';
+import { useCompanyScope } from '../context/CompanyScopeContext';
+import { inScope } from '../lib/companyScope';
 import { calendarService, type CalendarMonthData } from '../services/calendarService';
 
 const EMPTY: CalendarMonthData = { absences: [], employees: [], companies: [], holidays: [] };
@@ -45,7 +47,21 @@ export const useAdminCalendar = (
     staleTime: 60_000,
   });
 
-  const data = query.data ?? EMPTY;
+  const rawData = query.data ?? EMPTY;
+  const { ids: scopeIds } = useCompanyScope();
+  // O menu pode limitar a uma empresa ou grupo: só as ausências, pessoas e empresas dessa escolha.
+  const data = useMemo(
+    () =>
+      scopeIds === null
+        ? rawData
+        : {
+            ...rawData,
+            absences: rawData.absences.filter(a => inScope(scopeIds, a.employees?.company_id)),
+            employees: rawData.employees.filter(e => inScope(scopeIds, e.companyId)),
+            companies: rawData.companies.filter(c => inScope(scopeIds, c.id)),
+          },
+    [rawData, scopeIds]
+  );
 
   const view = useMemo(() => {
     const days = eachDayOfInterval({ start: startOfMonth(month), end: endOfMonth(month) });

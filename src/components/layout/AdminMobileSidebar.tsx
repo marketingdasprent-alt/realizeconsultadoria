@@ -1,4 +1,5 @@
 import React from 'react';
+import { AdminCompanyScope } from './AdminCompanyScope';
 import { AdminInstallLink } from './AdminInstallLink';
 import { AdminNavGroups } from './AdminNavGroups';
 import { AdminNavLink } from './AdminNavLink';
@@ -35,6 +36,9 @@ export const AdminMobileSidebar: React.FC<AdminMobileSidebarProps> = ({
         className="flex h-full w-72 flex-col bg-rz-aurora pt-14"
         onClick={event => event.stopPropagation()}
       >
+        <div className="pt-3">
+          <AdminCompanyScope onChosen={onClose} />
+        </div>
         <nav className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-3 py-4">
           <AdminNavGroups groups={groups} onNavigate={onClose} badges={badges} />
         </nav>

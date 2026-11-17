@@ -12,7 +12,7 @@ import {
 } from '@/components/ui/select';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import { useToast } from '@/hooks/use-toast';
-import { useCredentials } from '../../hooks/useCredentials';
+import { useScopedCredentials } from '../../hooks/useCredentials';
 import { groupCredentials, withoutMainAccess } from '../../lib/credentialGroups';
 import { isEmailCategory, NO_COMPANY, type Credential } from '../../lib/credentials';
 import { credentialService } from '../../services/credentialService';
@@ -27,7 +27,7 @@ const SELECT = 'h-9 rounded-full border-rz-line text-[13px] sm:w-[200px]';
 /** Acessos → Acessos: sites, sistemas, servidores, bases de dados… (os emails têm aba própria). */
 export const CredentialsTab: React.FC<{ canManage: boolean }> = ({ canManage }) => {
   const { toast } = useToast();
-  const data = useCredentials();
+  const data = useScopedCredentials();
   const [filters, setFilters] = useState({ search: '', companyId: 'all', categoryId: 'all' });
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [panel, setPanel] = useState<AccessPanelTarget | null>(null);

@@ -4,6 +4,7 @@ import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { ROUTES } from '@/lib/constants';
 import { BrandMark } from '@/modules/workspace/components/BrandMark';
+import { AdminCompanyScope } from './AdminCompanyScope';
 import { AdminInstallLink } from './AdminInstallLink';
 import { AdminNavGroups } from './AdminNavGroups';
 import { AdminNavLink } from './AdminNavLink';
@@ -46,6 +47,8 @@ export const AdminSidebar: React.FC<AdminSidebarProps> = ({
     >
       <BrandMark withName={!collapsed} subtitle="Admin" />
     </Link>
+
+    <AdminCompanyScope collapsed={collapsed} />
 
     <nav className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-3 pb-3 pt-2">
       <AdminNavGroups groups={groups} collapsed={collapsed} badges={badges} />

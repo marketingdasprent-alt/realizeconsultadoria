@@ -83,6 +83,75 @@ export interface Share {
   revoked_at: string | null;
 }
 
+/** Uma linha de rz_list_groups(): um grupo e uma empresa membro (só para Super Admin). */
+export interface GroupOverviewRow {
+  group_id: string;
+  group_name: string;
+  group_created_at: string;
+  company_id: string;
+  company_name: string;
+  joined_at: string;
+  origin: 'pedido' | 'migracao';
+}
+
+export interface GroupOverview {
+  id: string;
+  name: string;
+  members: {
+    companyId: string;
+    name: string;
+    joinedAt: string;
+    origin: GroupOverviewRow['origin'];
+  }[];
+}
+
+const byName = (a: string, b: string) => a.localeCompare(b, 'pt-PT', { sensitivity: 'base' });
+
+/** As linhas do servidor, agrupadas: cada grupo com as suas empresas, tudo por ordem de nome. */
+export const groupOverview = (rows: readonly GroupOverviewRow[]): GroupOverview[] => {
+  const groups = new Map<string, GroupOverview>();
+  for (const row of rows) {
+    const group = groups.get(row.group_id) ?? {
+      id: row.group_id,
+      name: row.group_name,
+      members: [],
+    };
+    group.members.push({
+      companyId: row.company_id,
+      name: row.company_name,
+      joinedAt: row.joined_at,
+      origin: row.origin,
+    });
+    groups.set(row.group_id, group);
+  }
+  return [...groups.values()]
+    .map(group => ({
+      ...group,
+      members: [...group.members].sort((a, b) => byName(a.name, b.name)),
+    }))
+    .sort((a, b) => byName(a.name, b.name));
+};
+
+/** As empresas que não estão em nenhum grupo (todas as do Super Admin menos as dos grupos). */
+export const companiesWithoutGroup = (
+  all: readonly MyCompany[],
+  rows: readonly GroupOverviewRow[]
+): MyCompany[] => {
+  const inGroup = new Set(rows.map(row => row.company_id));
+  return all
+    .filter(company => !inGroup.has(company.company_id))
+    .sort((a, b) => byName(a.name, b.name));
+};
+
+/** A conta é Super Admin (vê todas as empresas): só ela tem a vista de todos os grupos. */
+export const isSuperAdminAccount = (companies: readonly MyCompany[]): boolean =>
+  companies.some(company => company.role === 'super_admin');
+
+export const GROUP_ORIGIN_LABEL: Record<GroupOverviewRow['origin'], string> = {
+  migracao: 'Definido pela Realize',
+  pedido: 'Por pedido aprovado',
+};
+
 export interface GroupMember {
   group_id: string;
   company_id: string;

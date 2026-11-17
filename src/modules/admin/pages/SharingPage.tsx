@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Eye, Inbox, KeyRound, Link2, Users } from 'lucide-react';
+import { Eye, Inbox, KeyRound, Link2, Network, Users } from 'lucide-react';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Label } from '@/components/ui/label';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { AllGroupsPanel } from '../components/sharing/AllGroupsPanel';
 import { GroupPanel } from '../components/sharing/GroupPanel';
 import { QueryState } from '../components/sharing/QueryState';
 import { RequestShareDialog } from '../components/sharing/RequestShareDialog';
@@ -20,7 +21,7 @@ import { ShareCodeCard } from '../components/sharing/ShareCodeCard';
 import { SharesPanel } from '../components/sharing/SharesPanel';
 import { ViewersPanel } from '../components/sharing/ViewersPanel';
 import { useMyCompanies } from '../hooks/useSharing';
-import { managesCompany } from '../lib/sharing';
+import { isSuperAdminAccount, managesCompany } from '../lib/sharing';
 
 const PAGE_TABS = [
   { value: 'codigo', label: 'Código', icon: KeyRound },
@@ -28,6 +29,8 @@ const PAGE_TABS = [
   { value: 'acesso', label: 'Quem tem acesso', icon: Link2 },
   { value: 'grupo', label: 'Grupo', icon: Users },
   { value: 'quem-ve', label: 'Quem pode ver', icon: Eye },
+  // Só para Super Admin: todos os grupos de uma vez (não depende da empresa escolhida).
+  { value: 'grupos', label: 'Todos os grupos', icon: Network },
 ] as const;
 type PageTab = (typeof PAGE_TABS)[number]['value'];
 
@@ -40,8 +43,10 @@ const SharingPage: React.FC = () => {
   const [chosen, setChosen] = useState<string | null>(null);
   const company = adminOf.find(item => item.company_id === chosen) ?? adminOf[0];
 
+  const superAdmin = isSuperAdminAccount(companies.data ?? []);
+  const tabs = PAGE_TABS.filter(t => t.value !== 'grupos' || superAdmin);
   const asked = searchParams.get('tab');
-  const tab: PageTab = PAGE_TABS.some(t => t.value === asked) ? (asked as PageTab) : 'codigo';
+  const tab: PageTab = tabs.some(t => t.value === asked) ? (asked as PageTab) : 'codigo';
   const changeTab = (value: string) =>
     setSearchParams(value === 'codigo' ? {} : { tab: value }, { replace: true });
 
@@ -86,7 +91,7 @@ const SharingPage: React.FC = () => {
             <Tabs value={tab} onValueChange={changeTab} className="w-full">
               <ScrollArea className="w-full whitespace-nowrap pb-2">
                 <TabsList className="inline-flex h-10 w-auto">
-                  {PAGE_TABS.map(({ value, label, icon: Icon }) => (
+                  {tabs.map(({ value, label, icon: Icon }) => (
                     <TabsTrigger
                       key={value}
                       value={value}
@@ -117,6 +122,11 @@ const SharingPage: React.FC = () => {
                   name={company.name}
                 />
               </TabsContent>
+              {superAdmin && (
+                <TabsContent value="grupos" className="mt-6">
+                  <AllGroupsPanel />
+                </TabsContent>
+              )}
             </Tabs>
           </>
         )}

@@ -9,6 +9,7 @@ import { useSupportDesk } from '@/modules/support/hooks/useSupportDesk';
 import { useMailUnreadTotal } from '@/modules/webmail/hooks/useMailUnreadTotal';
 import { MANAGEMENT_LABEL, useAdminMenu } from '../../hooks/useManagementGroup';
 import { SETTINGS_MODULE, visibleGroups } from '../../lib/navigation';
+import { AdminCompanyScope } from '@/components/layout/AdminCompanyScope';
 import { BrandMark } from '../BrandMark';
 import { SidebarNavItem } from './SidebarNavItem';
 
@@ -53,6 +54,9 @@ export const WorkspaceSidebar: React.FC<WorkspaceSidebarProps> = ({
       >
         <BrandMark withName={!collapsed} />
       </Link>
+
+      {/* Administradores com mais de uma empresa: escolhem qual ver (Colaboradores, Férias, Acessos…) */}
+      <AdminCompanyScope collapsed={collapsed} />
 
       <nav className="scrollbar-hide flex-1 space-y-5 overflow-y-auto px-3 pb-3 pt-2">
         {groups.map(group => {

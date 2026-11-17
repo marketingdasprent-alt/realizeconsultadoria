@@ -19,6 +19,8 @@ import { SCOPE_ALL, companyScope, groupScope } from '@/modules/admin/lib/company
 interface AdminCompanyScopeProps {
   /** Menu recolhido: só o ícone. */
   collapsed?: boolean;
+  /** 'light': sobre fundo claro (folha do menu no telemóvel). */
+  tone?: 'dark' | 'light';
   /** Fecha o menu do telemóvel depois de escolher. */
   onChosen?: () => void;
 }
@@ -29,6 +31,7 @@ interface AdminCompanyScopeProps {
  */
 export const AdminCompanyScope: React.FC<AdminCompanyScopeProps> = ({
   collapsed = false,
+  tone = 'dark',
   onChosen,
 }) => {
   const { scope, setScope, companies, groups, label, hasChoice, isLoading } = useCompanyScope();
@@ -57,16 +60,23 @@ export const AdminCompanyScope: React.FC<AdminCompanyScopeProps> = ({
       aria-expanded={open}
       aria-label={`Empresa: ${label}. Mudar de empresa`}
       className={cn(
-        'flex w-full min-h-11 items-center gap-3 rounded-2xl text-left text-[14px] font-medium text-white transition-colors',
-        'bg-white/[0.10] shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)] hover:bg-white/[0.16]',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70',
+        'flex w-full min-h-11 items-center gap-3 rounded-2xl text-left text-[14px] font-medium transition-colors',
+        tone === 'light'
+          ? 'bg-white text-rz-ink shadow-rz-soft ring-1 ring-rz-line focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rz-primary'
+          : 'bg-white/[0.10] text-white shadow-[inset_0_0_0_1px_rgba(255,255,255,0.16)] hover:bg-white/[0.16] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/70',
         collapsed ? 'justify-center px-0' : 'px-2.5 py-2'
       )}
     >
       <span
         className={cn(
           'relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl',
-          filtered ? 'bg-white text-rz-ink' : 'bg-white/15 text-white'
+          tone === 'light'
+            ? filtered
+              ? 'bg-rz-primary text-white'
+              : 'bg-rz-canvas text-rz-ink'
+            : filtered
+              ? 'bg-white text-rz-ink'
+              : 'bg-white/15 text-white'
         )}
         aria-hidden
       >
@@ -75,12 +85,20 @@ export const AdminCompanyScope: React.FC<AdminCompanyScopeProps> = ({
       {!collapsed && (
         <>
           <span className="min-w-0 flex-1">
-            <span className="block text-[11px] font-semibold uppercase tracking-[0.14em] text-white/55">
+            <span
+              className={cn(
+                'block text-[11px] font-semibold uppercase tracking-[0.14em]',
+                tone === 'light' ? 'text-rz-muted' : 'text-white/55'
+              )}
+            >
               Empresa
             </span>
             <span className="block truncate">{label}</span>
           </span>
-          <ChevronsUpDown className="h-4 w-4 shrink-0 text-white/60" aria-hidden />
+          <ChevronsUpDown
+            className={cn('h-4 w-4 shrink-0', tone === 'light' ? 'text-rz-muted' : 'text-white/60')}
+            aria-hidden
+          />
         </>
       )}
     </button>

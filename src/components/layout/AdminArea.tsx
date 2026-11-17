@@ -10,6 +10,7 @@ import { WorkdayProvider } from '@/modules/timeclock/context/WorkdayProvider';
 import WorkspaceLayout from '@/modules/workspace/components/WorkspaceLayout';
 import { WorkspacePage } from '@/modules/workspace/components/WorkspacePage';
 import { useAdminAccess } from '@/modules/workspace/hooks/useIsAdmin';
+import { CompanyScopeProvider } from '@/modules/admin/context/CompanyScopeContext';
 import AdminLayout from './AdminLayout';
 import './admin-theme.css';
 
@@ -40,7 +41,10 @@ export const AppShell: React.FC = () => (
   <ProtectedRoute>
     {/* Quem ativou a confirmação em dois passos faz o código antes de ver qualquer ecrã */}
     <MfaGate>
-      <ShellByRole />
+      {/* A empresa escolhida no menu vale no Workspace e no painel de admin */}
+      <CompanyScopeProvider>
+        <ShellByRole />
+      </CompanyScopeProvider>
     </MfaGate>
   </ProtectedRoute>
 );

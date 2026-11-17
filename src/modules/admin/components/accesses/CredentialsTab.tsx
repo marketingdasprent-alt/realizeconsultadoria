@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { useCompanyScope } from '../../context/CompanyScopeContext';
 import { CompanySelect } from '@/components/admin/CompanySelect';
 import { ChevronDown, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -28,6 +29,7 @@ const SELECT = 'h-9 rounded-full border-rz-line text-[13px] sm:w-[200px]';
 export const CredentialsTab: React.FC<{ canManage: boolean }> = ({ canManage }) => {
   const { toast } = useToast();
   const data = useScopedCredentials();
+  const scope = useCompanyScope();
   const [filters, setFilters] = useState({ search: '', companyId: 'all', categoryId: 'all' });
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [panel, setPanel] = useState<AccessPanelTarget | null>(null);
@@ -87,15 +89,17 @@ export const CredentialsTab: React.FC<{ canManage: boolean }> = ({ canManage }) 
             className="h-9 rounded-full border-rz-line pl-9 text-[13px]"
           />
         </div>
-        <CompanySelect
-          companies={data.companies}
-          value={filters.companyId}
-          onChange={companyId => setFilters(f => ({ ...f, companyId }))}
-          allLabel="Todas as empresas"
-          extra={[{ id: NO_COMPANY, name: 'Outro (sem empresa)' }]}
-          aria-label="Empresa"
-          className={SELECT}
-        />
+        {!scope.singleCompanyId && (
+          <CompanySelect
+            companies={data.companies}
+            value={filters.companyId}
+            onChange={companyId => setFilters(f => ({ ...f, companyId }))}
+            allLabel="Todas as empresas"
+            extra={scope.ids ? [] : [{ id: NO_COMPANY, name: 'Outro (sem empresa)' }]}
+            aria-label="Empresa"
+            className={SELECT}
+          />
+        )}
         <Select
           value={filters.categoryId}
           onValueChange={categoryId => setFilters(f => ({ ...f, categoryId }))}

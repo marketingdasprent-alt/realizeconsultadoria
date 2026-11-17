@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { useCompanyScope } from '@/modules/admin/context/CompanyScopeContext';
+import { inScope } from '@/modules/admin/lib/companyScope';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { openPrintPreview } from '@/lib/print-preview';
 import { supabase } from '@/integrations/supabase/client';
@@ -57,6 +59,8 @@ const AssignmentsTab = () => {
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'returned'>('active');
   const [keysCount, setKeysCount] = useState<string>('');
   const [keysLocations, setKeysLocations] = useState<string[]>([]);
+
+  const { ids: scopeIds } = useCompanyScope();
 
   // Fetch employees
   const { data: employees = [] } = useQuery({
@@ -703,6 +707,7 @@ const AssignmentsTab = () => {
 
   // Filter assignments
   const filteredAssignments = assignments.filter((assignment: any) => {
+    if (!inScope(scopeIds, assignment.company_id)) return false;
     if (statusFilter !== 'all' && assignment.status !== statusFilter) return false;
     if (!searchTerm) return true;
     const search = searchTerm.toLowerCase();
@@ -933,11 +938,13 @@ const AssignmentsTab = () => {
                     <SelectValue placeholder="Selecionar colaborador" />
                   </SelectTrigger>
                   <SelectContent>
-                    {employees.map(emp => (
-                      <SelectItem key={emp.id} value={emp.id}>
-                        {emp.name}
-                      </SelectItem>
-                    ))}
+                    {employees
+                      .filter(emp => inScope(scopeIds, emp.company_id))
+                      .map(emp => (
+                        <SelectItem key={emp.id} value={emp.id}>
+                          {emp.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               )}

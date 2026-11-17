@@ -776,14 +776,16 @@ const EquipmentsTab = ({
               />
             </div>
             <div className="flex flex-col sm:flex-row gap-3">
-              <CompanySelect
-                companies={companies}
-                value={companyFilter}
-                onChange={setCompanyFilter}
-                allLabel="Todas as empresas"
-                aria-label="Empresa"
-                className="w-full sm:w-56"
-              />
+              {!scope.singleCompanyId && (
+                <CompanySelect
+                  companies={companies}
+                  value={companyFilter}
+                  onChange={setCompanyFilter}
+                  allLabel="Todas as empresas"
+                  aria-label="Empresa"
+                  className="w-full sm:w-56"
+                />
+              )}
             </div>
           </div>
 

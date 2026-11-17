@@ -54,6 +54,7 @@ import {
   type ListFilter,
 } from '../lib/listFilter';
 import { isReaderWindow, openReaderWindow } from '../lib/readerWindow';
+import { MAIL_REFRESH_EVENT } from '../lib/pushMessage';
 import { draftMetaService } from '../services/draftMetaService';
 import { readSidebarWidth, saveSidebarWidth } from '../lib/sidebarWidth';
 import { providerOf, type MailProvider } from '../lib/providers';
@@ -176,6 +177,14 @@ const WebmailPage: React.FC = () => {
     labelFilter,
     listFilter
   );
+  // "Abrir o email" do popup de email novo, já estando aqui: vai buscar os emails novos.
+  const refetchRef = useRef(box.refetch);
+  refetchRef.current = box.refetch;
+  useEffect(() => {
+    const refresh = () => void refetchRef.current();
+    window.addEventListener(MAIL_REFRESH_EVENT, refresh);
+    return () => window.removeEventListener(MAIL_REFRESH_EVENT, refresh);
+  }, []);
   // Em "Não lidos" o email aberto fica na lista até se sair da pasta ou atualizar.
   const list = useKeptUnread(folder, current, query, box.messages);
   usePrefetchTop(list.messages);

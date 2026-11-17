@@ -12,6 +12,8 @@ interface QueryStateProps {
   emptyTitle: string;
   emptyHint?: string;
   onRetry?: () => void;
+  /** Mostra também "Verificar outra vez" na lista vazia (quando o vazio pode ser passageiro). */
+  retryOnEmpty?: boolean;
   children: React.ReactNode;
 }
 
@@ -23,6 +25,7 @@ export const QueryState: React.FC<QueryStateProps> = ({
   emptyTitle,
   emptyHint,
   onRetry,
+  retryOnEmpty = false,
   children,
 }) => {
   if (isLoading)
@@ -53,6 +56,11 @@ export const QueryState: React.FC<QueryStateProps> = ({
         <Inbox className="h-8 w-8 text-muted-foreground" aria-hidden />
         <p className="font-medium">{emptyTitle}</p>
         {emptyHint && <p className="max-w-md text-sm text-muted-foreground">{emptyHint}</p>}
+        {retryOnEmpty && onRetry && (
+          <Button size="sm" variant="outline" onClick={onRetry}>
+            Verificar outra vez
+          </Button>
+        )}
       </div>
     );
   return <>{children}</>;

@@ -1,6 +1,8 @@
 // Partilha entre empresas: tipos, mensagens de erro e ajudantes puros.
 // O contrato das chamadas está em docs/multiempresa/CONTRATO.md, secção 2.5.
 
+import { companyLabel, compareCompanyNames, sortCompanies } from '@/lib/companyName';
+
 export type RequestStatus = 'pedido' | 'aprovado' | 'recusado' | 'cancelado' | 'expirado';
 export type ShareStatus = 'pedido' | 'aprovado' | 'revogado';
 export type ShareOrigin = 'pedido' | 'legado';
@@ -105,15 +107,9 @@ export interface GroupOverview {
   }[];
 }
 
-/** O nome para mostrar e ordenar: sem espaços a mais (há nomes na base com um espaço no início). */
-export const companyLabel = (name: string): string => name.replace(/\s+/g, ' ').trim();
+export { companyLabel, sortCompanies };
 
-const byName = (a: string, b: string) =>
-  companyLabel(a).localeCompare(companyLabel(b), 'pt-PT', { sensitivity: 'base' });
-
-/** As empresas por ordem alfabética (ignora espaços a mais, acentos e maiúsculas). */
-export const sortCompanies = <T extends { name: string }>(companies: readonly T[]): T[] =>
-  [...companies].sort((a, b) => byName(a.name, b.name));
+const byName = compareCompanyNames;
 
 /** As linhas do servidor, agrupadas: cada grupo com as suas empresas, tudo por ordem de nome. */
 export const groupOverview = (rows: readonly GroupOverviewRow[]): GroupOverview[] => {

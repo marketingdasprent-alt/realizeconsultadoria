@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +32,7 @@ interface Company {
 const EmployeeFormPage = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const [params] = useSearchParams();
   const { toast } = useToast();
   const { canExecuteTopic } = useAdminPermissions();
   const avatarOf = useEmployeeAvatars();
@@ -151,6 +152,7 @@ const EmployeeFormPage = () => {
           <EmployeeGeneralTab
             employee={employee}
             companies={companies}
+            defaultCompanyId={params.get('empresa') ?? undefined}
             isEditMode={isEditMode}
             onSaved={handleSaved}
             onCreated={newId => navigate(`${ROUTES.ADMIN.EMPLOYEES}/${newId}`)}

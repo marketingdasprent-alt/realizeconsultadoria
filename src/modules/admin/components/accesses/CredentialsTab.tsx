@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { CompanySelect } from '@/components/admin/CompanySelect';
 import { ChevronDown, Plus, Search } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -86,23 +87,15 @@ export const CredentialsTab: React.FC<{ canManage: boolean }> = ({ canManage }) 
             className="h-9 rounded-full border-rz-line pl-9 text-[13px]"
           />
         </div>
-        <Select
+        <CompanySelect
+          companies={data.companies}
           value={filters.companyId}
-          onValueChange={companyId => setFilters(f => ({ ...f, companyId }))}
-        >
-          <SelectTrigger className={SELECT} aria-label="Empresa">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as empresas</SelectItem>
-            {data.companies.map(c => (
-              <SelectItem key={c.id} value={c.id}>
-                {c.name}
-              </SelectItem>
-            ))}
-            <SelectItem value={NO_COMPANY}>Outro (sem empresa)</SelectItem>
-          </SelectContent>
-        </Select>
+          onChange={companyId => setFilters(f => ({ ...f, companyId }))}
+          allLabel="Todas as empresas"
+          extra={[{ id: NO_COMPANY, name: 'Outro (sem empresa)' }]}
+          aria-label="Empresa"
+          className={SELECT}
+        />
         <Select
           value={filters.categoryId}
           onValueChange={categoryId => setFilters(f => ({ ...f, categoryId }))}

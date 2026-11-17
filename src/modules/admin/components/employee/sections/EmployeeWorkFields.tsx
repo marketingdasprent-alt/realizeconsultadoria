@@ -1,14 +1,8 @@
 import { Link } from 'react-router-dom';
+import { CompanySelect } from '@/components/admin/CompanySelect';
 import type { FieldErrors, UseFormRegister, UseFormSetValue } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { ROUTES } from '@/lib/constants';
 import { CatalogCombobox } from '../CatalogCombobox';
 import { Field } from '../FormSection';
@@ -41,21 +35,12 @@ export const EmployeeWorkFields = ({
       error={errors.company_id?.message as string | undefined}
       className="md:col-span-2"
     >
-      <Select
+      <CompanySelect
+        companies={companies}
         value={companyId}
-        onValueChange={value => setValue('company_id', value, { shouldDirty: true })}
-      >
-        <SelectTrigger>
-          <SelectValue placeholder="Selecione uma empresa" />
-        </SelectTrigger>
-        <SelectContent>
-          {companies.map(company => (
-            <SelectItem key={company.id} value={company.id}>
-              {company.name}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+        onChange={value => setValue('company_id', value, { shouldDirty: true })}
+        placeholder="Selecione uma empresa"
+      />
     </Field>
     <Field label="Função">
       <CatalogCombobox

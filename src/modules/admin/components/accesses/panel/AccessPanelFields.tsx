@@ -1,13 +1,7 @@
 import React from 'react';
+import { CompanySelect } from '@/components/admin/CompanySelect';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { RzSelect } from '@/modules/workspace/components/RzSelect';
 import { NO_COMPANY } from '../../../lib/credentials';
@@ -57,22 +51,15 @@ export const AccessPanelFields: React.FC<AccessPanelFieldsProps> = ({
   return (
     <div className="space-y-4">
       <Field id="acc-company" label="Empresa *" error={errors.companyId}>
-        <Select
-          value={form.companyId || undefined}
-          onValueChange={companyId => update({ companyId })}
-        >
-          <SelectTrigger id="acc-company" className="h-10">
-            <SelectValue placeholder="Escolha a empresa" />
-          </SelectTrigger>
-          <SelectContent>
-            {data.companies.map(company => (
-              <SelectItem key={company.id} value={company.id}>
-                {company.name}
-              </SelectItem>
-            ))}
-            <SelectItem value={NO_COMPANY}>Outro (sem empresa · gmail, sapo…)</SelectItem>
-          </SelectContent>
-        </Select>
+        <CompanySelect
+          id="acc-company"
+          companies={data.companies}
+          value={form.companyId}
+          onChange={companyId => update({ companyId })}
+          extra={[{ id: NO_COMPANY, name: 'Outro (sem empresa · gmail, sapo…)' }]}
+          placeholder="Escolha a empresa"
+          className="h-10"
+        />
       </Field>
 
       {!isEmail && (

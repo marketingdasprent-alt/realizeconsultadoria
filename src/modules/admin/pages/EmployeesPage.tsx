@@ -19,6 +19,7 @@ import { useDocumentAlerts } from '../hooks/useDocumentAlerts';
 import { useEmployeeAvatars } from '../hooks/useEmployeeAvatars';
 import { useEmployeeLastSignIn } from '../hooks/useEmployeeLastSignIn';
 import { useEmployeeListActions } from '../hooks/useEmployeeListActions';
+import { useCompanies } from '@/hooks/useCompanies';
 import { companiesOf, companyName, hasBirthdayIn } from '../lib/employeeView';
 import type { Employee } from '../services/employeeService';
 
@@ -78,7 +79,12 @@ const EmployeesPage = () => {
   };
 
   const { employees } = actions;
-  const companies = useMemo(() => companiesOf(employees), [employees]);
+  // Todas as empresas ativas (e não só as que já têm colaboradores): para filtrar e criar numa vazia.
+  const allCompanies = useCompanies();
+  const companies = useMemo(
+    () => (allCompanies.companies.length ? allCompanies.companies : companiesOf(employees)),
+    [allCompanies.companies, employees]
+  );
 
   // Os números refletem a pesquisa e a empresa, mas não o estado (servem para o escolher).
   const searched = useMemo(() => {
@@ -127,7 +133,17 @@ const EmployeesPage = () => {
         actions={
           <>
             {canExecuteTopic('employees', 'create') && (
-              <Button className="rounded-full" onClick={() => navigate(ROUTES.ADMIN.EMPLOYEE_NEW)}>
+              <Button
+                className="rounded-full"
+                onClick={() =>
+                  // Com uma empresa escolhida no filtro, o colaborador novo já nasce nessa empresa
+                  navigate(
+                    companyId === 'all'
+                      ? ROUTES.ADMIN.EMPLOYEE_NEW
+                      : `${ROUTES.ADMIN.EMPLOYEE_NEW}?empresa=${companyId}`
+                  )
+                }
+              >
                 <Plus className="h-4 w-4" /> Novo colaborador
               </Button>
             )}

@@ -60,8 +60,9 @@ const SharingPage: React.FC = () => {
         error={companies.error}
         isEmpty={!company}
         emptyTitle="A sua conta não administra nenhuma empresa"
-        emptyHint="Só os administradores de uma empresa podem gerir a partilha com outras empresas."
+        emptyHint="Só os administradores de uma empresa e os Super Admin podem gerir a partilha com outras empresas. Se acabou de receber este acesso, carregue em Verificar outra vez."
         onRetry={() => companies.refetch()}
+        retryOnEmpty
       >
         {company && (
           <>

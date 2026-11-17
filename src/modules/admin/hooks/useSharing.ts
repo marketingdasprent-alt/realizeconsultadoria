@@ -15,7 +15,10 @@ export const useMyCompanies = () =>
   useQuery({
     queryKey: [...KEY, 'companies'],
     queryFn: sharingService.myCompanies,
-    staleTime: 5 * 60_000,
+    // As empresas de que se é admin mudam quando alguém dá o acesso: ao abrir a página, ler sempre
+    // de novo (senão um "vazio" de há minutos ficava a valer).
+    staleTime: 30_000,
+    refetchOnMount: 'always',
     retry: retryTransient,
   });
 

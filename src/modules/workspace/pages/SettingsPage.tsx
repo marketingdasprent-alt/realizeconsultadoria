@@ -24,6 +24,7 @@ import { maskTail } from '@/modules/employee/lib/home-summaries';
 import { WorkScheduleCard } from '@/modules/timeclock/components/employee/WorkScheduleCard';
 import { MyEquipmentCard } from '../components/MyEquipmentCard';
 import { PushCard } from '../components/PushCard';
+import { TwoFactorCard } from '../components/TwoFactorCard';
 import { WorkspacePage } from '../components/WorkspacePage';
 import { useWorkspace } from '../context/workspaceContext';
 import { isNativeApp } from '@/lib/nativeApp';
@@ -157,6 +158,7 @@ const SettingsPage: React.FC = () => {
         <div className="space-y-4">
           <WorkScheduleCard />
           <PushCard />
+          <TwoFactorCard />
 
           <section className={CARD}>
             <h2 className="flex items-center gap-2 text-[17px] font-bold">

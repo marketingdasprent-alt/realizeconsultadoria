@@ -4,6 +4,7 @@ import { Loader2 } from 'lucide-react';
 import { PrintPreviewHost } from '@/components/admin/PrintPreviewHost';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
 import { useAuth } from '@/contexts/AuthContext';
+import { MfaGate } from '@/modules/auth/components/MfaGate';
 import { ROUTES } from '@/lib/constants';
 import { WorkdayProvider } from '@/modules/timeclock/context/WorkdayProvider';
 import WorkspaceLayout from '@/modules/workspace/components/WorkspaceLayout';
@@ -37,7 +38,10 @@ const ShellByRole: React.FC = () => {
  */
 export const AppShell: React.FC = () => (
   <ProtectedRoute>
-    <ShellByRole />
+    {/* Quem ativou a confirmação em dois passos faz o código antes de ver qualquer ecrã */}
+    <MfaGate>
+      <ShellByRole />
+    </MfaGate>
   </ProtectedRoute>
 );
 

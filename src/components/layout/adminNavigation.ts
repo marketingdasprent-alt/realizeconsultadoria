@@ -97,6 +97,8 @@ export const ADMIN_NAV_GROUPS: AdminNavGroup[] = [
         moduleKey: 'companies',
         tint: 'from-sky-400 to-blue-600',
       },
+      // "Partilha entre empresas" (ROUTES.ADMIN.SHARING, /admin/partilha) volta ao menu quando o
+      // módulo de empresas for ligado: com os interruptores desligados mostraria uma página vazia.
       {
         href: ROUTES.ADMIN.ACCESSES,
         icon: KeyRound,

@@ -11,10 +11,27 @@ import type { MailAccount, MailFolder, MailSummary } from '../types';
 /** Página da caixa unificada: os tokens de cada conta que ainda tem mais emails. */
 type PageTokens = Record<string, string> | null;
 
+/** Pesquisa em todas as pastas: o que o servidor disse sobre ela. */
+export interface AllFoldersInfo {
+  /** O servidor conhece este modo (um servidor antigo devolve só a pasta aberta). */
+  supported: boolean;
+  /** Havia mais resultados do que os mostrados. */
+  truncated: boolean;
+  /** Acabou o tempo e ficaram pastas por pesquisar. */
+  partial: boolean;
+}
+
+/** O que se pede na pesquisa em todas as pastas (`body`: também no texto dos emails). */
+export interface AllFoldersSearch {
+  body: boolean;
+}
+
 interface MailboxPage {
   messages: MailSummary[];
   next: Record<string, string>;
   errors: Record<string, MailError>;
+  /** Só na pesquisa em todas as pastas (a cache do navegador não a guarda). */
+  allFolders?: AllFoldersInfo | null;
 }
 
 /**
@@ -31,7 +48,9 @@ export const useMailbox = (
   /** Só emails com este marcador (o servidor filtra; só da caixa do marcador). */
   labelFilter: { accountId: string; labelId: string } | null = null,
   /** Filtros da lista: vão ao servidor (Gmail e Microsoft 365 filtram lá); o ecrã filtra sempre. */
-  filter: ListFilter = NO_FILTER
+  filter: ListFilter = NO_FILTER,
+  /** Pesquisa em todas as pastas das caixas (ignora a pasta aberta; sem páginas seguintes). */
+  allFolders: AllFoldersSearch | null = null
 ) => {
   const { isPreview, user } = useWorkspace();
   const demo = useDemoMail();
@@ -47,7 +66,7 @@ export const useMailbox = (
   // Última lista de cada caixa guardada no browser: aparece já, e a nova chega a seguir.
   const filtersKey = filterKey(filter);
   // Com filtros a lista guardada no browser não serve (é a da pasta inteira)
-  const useCache = !search.trim() && !isPreview && !labelFilter && !filtersKey;
+  const useCache = !search.trim() && !isPreview && !labelFilter && !filtersKey && !allFolders;
   const cached = useMemo(
     () =>
       useCache
@@ -69,6 +88,8 @@ export const useMailbox = (
       labelFilter?.labelId ?? '',
       // Listas filtradas e não filtradas nunca se misturam na cache
       filtersKey,
+      // Pesquisa em todas as pastas: outra lista (com ou sem o texto dos emails)
+      allFolders ? (allFolders.body ? 'all-folders+body' : 'all-folders') : '',
     ],
     initialPageParam: null as PageTokens,
     queryFn: async ({ pageParam }): Promise<MailboxPage> => {
@@ -85,15 +106,23 @@ export const useMailbox = (
             folderId,
             labelFilter?.labelId,
             fresh,
-            serverFilters(filter)
+            serverFilters(filter),
+            allFolders
           )
         )
       );
-      const page: MailboxPage = { messages: [], next: {}, errors: {} };
+      const page: MailboxPage = { messages: [], next: {}, errors: {}, allFolders: null };
       results.forEach((result, index) => {
         const id = targets[index];
         if (result.error) page.errors[id] = result.error;
         if (!result.data) return;
+        const info = result.data.allFolders;
+        if (info)
+          page.allFolders = {
+            supported: (page.allFolders?.supported ?? true) && info.supported,
+            truncated: (page.allFolders?.truncated ?? false) || info.truncated,
+            partial: (page.allFolders?.partial ?? false) || info.partial,
+          };
         page.messages.push(...result.data.messages);
         if (result.data.nextPageToken) page.next[id] = result.data.nextPageToken;
       });
@@ -143,16 +172,18 @@ export const useMailbox = (
       demo.mails
         .filter(m => ids.includes(m.accountId))
         .filter(m =>
-          folder === 'starred'
-            ? m.starred && m.folder !== 'trash'
-            : folder === 'unread'
-              ? m.unread && m.folder === 'inbox'
-              : m.folder === folder
+          allFolders
+            ? m.folder !== 'trash' && m.folder !== 'spam'
+            : folder === 'starred'
+              ? m.starred && m.folder !== 'trash'
+              : folder === 'unread'
+                ? m.unread && m.folder === 'inbox'
+                : m.folder === folder
         )
         .filter(m => matchesTerm(search, m.subject, m.snippet, m.from?.name, m.from?.email))
         .sort((a, b) => b.date.localeCompare(a.date)),
     // eslint-disable-next-line react-hooks/exhaustive-deps -- ids é derivado de accounts/scope
-    [demo.mails, accounts, scope, folder, search]
+    [demo.mails, accounts, scope, folder, search, allFolders]
   );
 
   const errors = Object.assign({}, ...(query.data?.pages ?? []).map(p => p.errors)) as Record<
@@ -170,6 +201,8 @@ export const useMailbox = (
     loadMoreFailed: !isPreview && query.isFetchNextPageError,
     /** Páginas já carregadas (cada uma que chega volta a verificar se há mais para mostrar). */
     pageCount: query.data?.pages.length ?? 0,
+    /** Pesquisa em todas as pastas: o que o servidor disse (null fora desse modo). */
+    allFoldersInfo: allFolders ? (query.data?.pages[0]?.allFolders ?? null) : null,
     errors,
     refetch: () => {
       freshRef.current = true;

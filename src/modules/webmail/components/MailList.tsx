@@ -1,4 +1,6 @@
 import React from 'react';
+import { MailSearchScope } from './MailSearchScope';
+import type { AllFoldersInfo } from '../hooks/useMailbox';
 import { AlertTriangle, Loader2, Menu, RefreshCw, Search } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import type { MailChange } from '../hooks/useMailChanges';
@@ -73,6 +75,17 @@ interface MailListProps {
   /** Filtros que não se podem ligar nesta pasta. */
   filterDisabled?: readonly ListFilterKey[];
   errors: Record<string, MailError>;
+  /** Pesquisa em todas as pastas: a escolha, o que o servidor disse e o texto a mostrar. */
+  searchScope?: {
+    allFolders: boolean;
+    onAllFolders: (value: boolean) => void;
+    includeBody: boolean;
+    onIncludeBody: (value: boolean) => void;
+    /** A pesquisa em todas as pastas está a correr (2 ou mais letras). */
+    active: boolean;
+    info: AllFoldersInfo | null;
+    folderLabel: string;
+  };
   className?: string;
 }
 
@@ -92,6 +105,18 @@ export const MailList: React.FC<MailListProps> = props => {
   };
   const oneAccount = new Set(selection.selected.map(m => m.accountId)).size === 1;
   const filtering = isFiltering(props.filter);
+  const inAllFolders = !!props.searchScope?.active;
+  const allInfo = props.searchScope?.info ?? null;
+  // Avisos da pesquisa em todas as pastas (servidor antigo, resultado cortado, tempo esgotado)
+  const scopeInfo = !inAllFolders
+    ? null
+    : allInfo && !allInfo.supported
+      ? 'O servidor ainda não pesquisa em todas as pastas: estão só os emails da pasta aberta.'
+      : allInfo?.partial
+        ? 'A pesquisa demorou demasiado e algumas pastas ficaram por procurar. Refine a pesquisa.'
+        : allInfo?.truncated
+          ? 'Mostram-se os 100 emails mais recentes. Refine a pesquisa para ver outros.'
+          : null;
   const autoLoad = useAutoLoadMore({
     hasMore: props.hasMore,
     isLoadingMore: props.isLoadingMore,
@@ -167,6 +192,22 @@ export const MailList: React.FC<MailListProps> = props => {
             />
           </label>
         </MailBulkBar>
+        {props.searchScope && props.search.trim().length > 0 && (
+          <MailSearchScope
+            allFolders={props.searchScope.allFolders}
+            onAllFolders={props.searchScope.onAllFolders}
+            includeBody={props.searchScope.includeBody}
+            onIncludeBody={props.searchScope.onIncludeBody}
+            tooShort={props.search.trim().length < 2}
+            folderLabel={props.searchScope.folderLabel}
+          />
+        )}
+        {scopeInfo && (
+          <p className="flex gap-2 rounded-2xl bg-amber-50 px-3 py-2 text-[12.5px] text-amber-900 ring-1 ring-amber-200">
+            <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
+            <span>{scopeInfo}</span>
+          </p>
+        )}
         <MailFilterBar
           filter={props.filter}
           onToggle={props.onToggleFilter}
@@ -188,13 +229,21 @@ export const MailList: React.FC<MailListProps> = props => {
 
       <ul className="rz-scroll min-h-0 flex-1 overflow-y-auto px-2 pb-28 md:pb-4">
         {props.isLoading && (
-          <Loader2 className="mx-auto mt-10 h-6 w-6 animate-spin text-rz-primary" />
+          <div
+            className="mt-10 flex flex-col items-center gap-2 text-sm text-rz-muted"
+            role="status"
+          >
+            <Loader2 className="h-6 w-6 animate-spin text-rz-primary" />
+            {inAllFolders && <span>A pesquisar em todas as pastas…</span>}
+          </div>
         )}
         {!props.isLoading && props.messages.length === 0 && (
           <p className="mt-12 text-center text-sm text-rz-muted">
             {filtering
               ? filterEmptyText(props.filter, props.search.trim().length > 0)
-              : 'Nenhum email aqui.'}
+              : inAllFolders
+                ? 'Nenhum email encontrado nas pastas (o Lixo e o Spam não entram).'
+                : 'Nenhum email aqui.'}
             {filtering && props.hasMore && (
               <span className="mt-1 block text-[12.5px]">Ainda há emails por procurar.</span>
             )}
@@ -252,6 +301,7 @@ export const MailList: React.FC<MailListProps> = props => {
               selecting={selection.count > 0}
               accountDot={props.showAccount ? colorOf.get(mail.accountId) : undefined}
               accountName={props.showAccount ? emailOf.get(mail.accountId) : undefined}
+              folderName={inAllFolders ? (mail.folderName ?? undefined) : undefined}
               onOpen={props.onOpen}
               onOpenWindow={props.onOpenWindow}
               onSelect={(target, range) => selection.toggle(mailKey(target), range)}

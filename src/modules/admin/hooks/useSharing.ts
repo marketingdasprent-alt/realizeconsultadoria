@@ -29,6 +29,16 @@ export const useCompanyViewers = (company: string) =>
     retry: retryTransient,
   });
 
+export const useAllGroups = (enabled: boolean) =>
+  useQuery({
+    queryKey: [...KEY, 'all-groups'],
+    queryFn: sharingService.listAllGroups,
+    enabled,
+    staleTime: 30_000,
+    refetchOnMount: 'always',
+    retry: retryTransient,
+  });
+
 export const useCapabilities = () =>
   useQuery({
     queryKey: [...KEY, 'capabilities'],

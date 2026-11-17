@@ -1,13 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   SharingError,
+  companiesWithoutGroup,
   formatShareCode,
+  groupOverview,
   groupGrantable,
+  isSuperAdminAccount,
   normalizeShareCode,
   sharingErrorText,
   sortRequests,
   toSharingError,
   type Capability,
+  type GroupOverviewRow,
+  type MyCompany,
   type ShareRequest,
 } from '../sharing';
 
@@ -114,5 +119,61 @@ describe('sortRequests', () => {
       request({ request_id: 'recente', status: 'aprovado', created_at: '2026-11-09T00:00:00Z' }),
     ]);
     expect(sorted.map(r => r.request_id)).toEqual(['aberto', 'recente', 'velho']);
+  });
+});
+
+describe('vista de todos os grupos', () => {
+  const row = (
+    group: string,
+    name: string,
+    company: string,
+    companyName: string
+  ): GroupOverviewRow => ({
+    group_id: group,
+    group_name: name,
+    group_created_at: '2026-11-17T10:00:00Z',
+    company_id: company,
+    company_name: companyName,
+    joined_at: '2026-11-17T10:00:00Z',
+    origin: 'migracao',
+  });
+  const company = (id: string, name: string, role = 'super_admin'): MyCompany => ({
+    company_id: id,
+    name,
+    role,
+    status: 'ativo',
+    origin: 'super_admin',
+    is_group_member: false,
+  });
+
+  it('agrupa as linhas por grupo, com grupos e empresas por ordem de nome', () => {
+    const groups = groupOverview([
+      row('g2', 'Urbango', 'c3', 'Pro Peças'),
+      row('g1', 'Realize', 'c2', 'UseAuto'),
+      row('g1', 'Realize', 'c1', 'DASP AUTO REPAIR'),
+      row('g2', 'Urbango', 'c4', 'Abreu e Pereira'),
+    ]);
+    expect(groups.map(g => g.name)).toEqual(['Realize', 'Urbango']);
+    expect(groups[0].members.map(m => m.name)).toEqual(['DASP AUTO REPAIR', 'UseAuto']);
+    expect(groups[1].members.map(m => m.name)).toEqual(['Abreu e Pereira', 'Pro Peças']);
+  });
+
+  it('sem linhas, não há grupos', () => {
+    expect(groupOverview([])).toEqual([]);
+  });
+
+  it('as empresas sem grupo são as que nenhuma linha refere', () => {
+    const all = [company('c1', 'Zeta'), company('c2', 'Alfa'), company('c3', 'Meta')];
+    const alone = companiesWithoutGroup(all, [row('g1', 'Realize', 'c3', 'Meta')]);
+    expect(alone.map(c => c.name)).toEqual(['Alfa', 'Zeta']);
+    expect(companiesWithoutGroup(all, [])).toHaveLength(3);
+  });
+
+  it('só uma conta com empresas como Super Admin tem a vista', () => {
+    expect(isSuperAdminAccount([company('c1', 'A')])).toBe(true);
+    expect(isSuperAdminAccount([company('c1', 'A', 'admin'), company('c2', 'B', 'gestor')])).toBe(
+      false
+    );
+    expect(isSuperAdminAccount([])).toBe(false);
   });
 });

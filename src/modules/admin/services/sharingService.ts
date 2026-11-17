@@ -8,6 +8,7 @@ import {
   type Capability,
   type CompanyViewer,
   type GroupMember,
+  type GroupOverviewRow,
   type MyCompany,
   type RequestDirection,
   type Share,
@@ -131,6 +132,10 @@ export const sharingService = {
 
   listGroup: async (company: string): Promise<GroupMember[]> =>
     list(await call<GroupMember[] | null>('rz_list_group', { p_company: company })),
+
+  /** Todos os grupos e as suas empresas (só Super Admin). */
+  listAllGroups: async (): Promise<GroupOverviewRow[]> =>
+    list(await call<GroupOverviewRow[] | null>('rz_list_groups')),
 
   leaveGroup: (company: string) =>
     call<{ revoked: number }>('rz_leave_group', { p_company: company }),

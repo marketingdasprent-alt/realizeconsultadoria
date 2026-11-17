@@ -5,6 +5,7 @@ import { useAllGroups, useMyCompanies } from '../../hooks/useSharing';
 import {
   GROUP_ORIGIN_LABEL,
   companiesWithoutGroup,
+  companyLabel,
   groupOverview,
   type MyCompany,
 } from '../../lib/sharing';
@@ -89,8 +90,11 @@ export const AllGroupsPanel: React.FC = () => {
                     className="flex min-w-0 items-center gap-2 rounded-md bg-muted/40 px-3 py-2"
                   >
                     <Building2 className="h-4 w-4 shrink-0 text-muted-foreground" aria-hidden />
-                    <span className="min-w-0 truncate font-medium" title={company.name}>
-                      {company.name}
+                    <span
+                      className="min-w-0 truncate font-medium"
+                      title={companyLabel(company.name)}
+                    >
+                      {companyLabel(company.name)}
                     </span>
                   </li>
                 ))}

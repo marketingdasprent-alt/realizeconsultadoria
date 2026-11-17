@@ -2,12 +2,14 @@ import { describe, expect, it } from 'vitest';
 import {
   SharingError,
   companiesWithoutGroup,
+  companyLabel,
   formatShareCode,
   groupOverview,
   groupGrantable,
   isSuperAdminAccount,
   normalizeShareCode,
   sharingErrorText,
+  sortCompanies,
   sortRequests,
   toSharingError,
   type Capability,
@@ -175,5 +177,37 @@ describe('vista de todos os grupos', () => {
       false
     );
     expect(isSuperAdminAccount([])).toBe(false);
+  });
+});
+
+describe('nomes e ordem das empresas', () => {
+  const named = (name: string) => ({ name });
+
+  it('o nome para mostrar não leva espaços a mais (a Razão Dinâmica tem um no início)', () => {
+    expect(companyLabel(' Razão Dinâmica, Lda')).toBe('Razão Dinâmica, Lda');
+    expect(companyLabel('DASP   AUTO  REPAIR ')).toBe('DASP AUTO REPAIR');
+  });
+
+  it('ordena por nome, ignorando o espaço no início, os acentos e as maiúsculas', () => {
+    const sorted = sortCompanies([
+      named('Premium Ride'),
+      named(' Razão Dinâmica, Lda'),
+      named('abreu e Pereira'),
+      named('Década Ousada'),
+      named('BVSeguros'),
+    ]).map(c => companyLabel(c.name));
+    expect(sorted).toEqual([
+      'abreu e Pereira',
+      'BVSeguros',
+      'Década Ousada',
+      'Premium Ride',
+      'Razão Dinâmica, Lda',
+    ]);
+  });
+
+  it('não altera a lista original', () => {
+    const original = [named('B'), named('A')];
+    sortCompanies(original);
+    expect(original.map(c => c.name)).toEqual(['B', 'A']);
   });
 });

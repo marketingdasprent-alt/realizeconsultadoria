@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useCompanyScope } from '../../context/CompanyScopeContext';
 import { CompanySelect } from '@/components/admin/CompanySelect';
 import { ChevronDown, Plus, Search } from 'lucide-react';
@@ -31,6 +31,8 @@ export const CredentialsTab: React.FC<{ canManage: boolean }> = ({ canManage }) 
   const data = useScopedCredentials();
   const scope = useCompanyScope();
   const [filters, setFilters] = useState({ search: '', companyId: 'all', categoryId: 'all' });
+  // Mudar de empresa no menu limpa o filtro de empresa desta aba (senão ficava escondido e a lista vazia).
+  useEffect(() => setFilters(f => ({ ...f, companyId: 'all' })), [scope.scope]);
   const [closed, setClosed] = useState<Set<string>>(new Set());
   const [panel, setPanel] = useState<AccessPanelTarget | null>(null);
   const [toDelete, setToDelete] = useState<Credential | null>(null);

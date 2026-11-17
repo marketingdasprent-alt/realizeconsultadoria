@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useCompanyScope } from '../../context/CompanyScopeContext';
 import { filterByScope } from '../../lib/companyScope';
 import { format, parseISO } from 'date-fns';
@@ -30,16 +30,18 @@ const HEADER = ['Serviço', 'Empresa', 'Valor', 'Renova a', 'Estado', ''];
 export const PaidServicesTab: React.FC<PaidServicesTabProps> = ({ canManage, companies }) => {
   const { toast } = useToast();
   const data = usePaidServices();
+  const { ids: scopeIds, scope: scopeValue } = useCompanyScope();
   const [filters, setFilters] = useState<PaidFilters>({
     kind: 'all',
     companyId: 'all',
     search: '',
   });
+  // Mudar de empresa no menu limpa o filtro de empresa desta aba (senão ficava escondido e a lista vazia).
+  useEffect(() => setFilters(f => ({ ...f, companyId: 'all' })), [scopeValue]);
   const [dialog, setDialog] = useState<PaidDialogTarget>(null);
   const [toDelete, setToDelete] = useState<PaidService | null>(null);
   const [taskFor, setTaskFor] = useState<PaidService | null>(null);
 
-  const { ids: scopeIds } = useCompanyScope();
   const scoped = useMemo(
     () => filterByScope(data.services, scopeIds, service => service.companyId),
     [data.services, scopeIds]

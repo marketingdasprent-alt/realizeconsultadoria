@@ -45,6 +45,21 @@ describe('internalPath', () => {
     expect(internalPath(`${origin}/?suporte=1#x`, origin)).toBe('/?suporte=1#x');
     expect(internalPath('/colaborador/email', origin)).toBe('/colaborador/email');
   });
+  it('o Realize serve-se por vários endereços: o aviso do app. abre dentro da app de realize.dasprent.pt', () => {
+    const installed = 'https://realize.dasprent.pt';
+    expect(internalPath('https://app.realizeconsultadoria.pt/colaborador/email', installed)).toBe(
+      '/colaborador/email'
+    );
+    expect(
+      internalPath(
+        'https://app.realizeconsultadoria.pt/colaborador/email',
+        'https://admin.realizeconsultadoria.pt'
+      )
+    ).toBe('/colaborador/email');
+    // mas não entre o Realize e a Realize Mail, nem para outro site com nome parecido
+    expect(internalPath('https://realize.dasprent.pt/colaborador/email', origin)).toBeNull();
+    expect(internalPath('https://realize.dasprent.pt.evil.example/', installed)).toBeNull();
+  });
   it('recusa outra origem (nunca navega para fora)', () => {
     expect(internalPath('https://app.realizeconsultadoria.pt/', origin)).toBeNull();
     expect(internalPath('https://evil.example/', origin)).toBeNull();

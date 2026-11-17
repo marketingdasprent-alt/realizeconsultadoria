@@ -30,11 +30,29 @@ export const parseOpenMessage = (data: unknown): string | null => {
   return message.type === 'rz-open' ? text(message.url, 500) || null : null;
 };
 
-/** Caminho dentro desta app (só se o endereço for desta mesma origem). */
+/**
+ * O Realize serve-se por vários endereços (app., admin. e realize.dasprent.pt) e o aviso aponta
+ * sempre para o app.: quem tem a app instalada por outro endereço ficava com o botão "Abrir o
+ * email" sem fazer nada (a origem não coincidia). Entre estes endereços navega-se dentro da app.
+ */
+/** Pedido à lista de emails (se estiver aberta) para ir buscar os emails novos já. */
+export const MAIL_REFRESH_EVENT = 'rz:mail-refresh';
+
+const SAME_APP_HOSTS = new Set([
+  'app.realizeconsultadoria.pt',
+  'admin.realizeconsultadoria.pt',
+  'realize.dasprent.pt',
+]);
+
+/** Caminho dentro desta app (só se o endereço for desta mesma origem, ou do mesmo Realize). */
 export const internalPath = (url: string, origin: string): string | null => {
   try {
     const target = new URL(url, origin);
-    return target.origin === origin ? `${target.pathname}${target.search}${target.hash}` : null;
+    const here = new URL(origin);
+    const sameApp = SAME_APP_HOSTS.has(target.hostname) && SAME_APP_HOSTS.has(here.hostname);
+    return target.origin === here.origin || sameApp
+      ? `${target.pathname}${target.search}${target.hash}`
+      : null;
   } catch {
     return null;
   }

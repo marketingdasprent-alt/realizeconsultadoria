@@ -1,7 +1,13 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Mail, Volume2, VolumeX, X } from 'lucide-react';
-import { internalPath, parseMailPush, parseOpenMessage, type MailPopup } from '../lib/pushMessage';
+import {
+  MAIL_REFRESH_EVENT,
+  internalPath,
+  parseMailPush,
+  parseOpenMessage,
+  type MailPopup,
+} from '../lib/pushMessage';
 import { isMailSoundOn, playMailSound, primeMailSound, setMailSoundOn } from '../lib/mailSound';
 
 /** Quanto tempo o popup fica no ecrã se ninguém lhe tocar. */
@@ -38,6 +44,9 @@ export const NewMailPopup: React.FC = () => {
       close();
       const path = internalPath(url, window.location.origin);
       if (path) navigate(path);
+      // Já estava na página de Email: a navegação não muda nada, por isso pede-se à lista que se
+      // atualize (o email novo aparece em cima). Se a página ainda não abriu, lê ao abrir.
+      window.dispatchEvent(new Event(MAIL_REFRESH_EVENT));
     },
     [close, navigate]
   );

@@ -68,9 +68,28 @@ function tellOpenWindows(data) {
 }
 
 // Tocar na notificação: abre (ou foca) o Realize na página certa.
+// O Realize serve-se por vários endereços e o aviso aponta sempre para o app.: quem instalou a
+// app por outro (admin. ou realize.dasprent.pt) abria o aviso num separador à parte. Entre estes
+// endereços, o aviso abre na origem desta app.
+const SAME_APP_HOSTS = ['app.realizeconsultadoria.pt', 'admin.realizeconsultadoria.pt', 'realize.dasprent.pt'];
+function inThisApp(url) {
+  try {
+    const target = new URL(url, self.location.origin);
+    if (
+      target.origin !== self.location.origin &&
+      SAME_APP_HOSTS.includes(target.hostname) &&
+      SAME_APP_HOSTS.includes(self.location.hostname)
+    )
+      return self.location.origin + target.pathname + target.search + target.hash;
+  } catch (error) {
+    // endereço inválido: fica como veio
+  }
+  return url;
+}
+
 self.addEventListener('notificationclick', event => {
   event.notification.close();
-  const url = (event.notification.data && event.notification.data.url) || '/colaborador';
+  const url = inThisApp((event.notification.data && event.notification.data.url) || '/colaborador');
   event.waitUntil(
     self.clients.matchAll({ type: 'window', includeUncontrolled: true }).then(clients => {
       for (const client of clients) {

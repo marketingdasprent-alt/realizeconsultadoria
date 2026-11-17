@@ -8,6 +8,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { CompanySelect } from '@/components/admin/CompanySelect';
 import { absenceTypeLabels } from '@/lib/absence-types';
 import { cn } from '@/lib/utils';
 import {
@@ -96,19 +97,14 @@ export const RequestsFilters: React.FC<RequestsFiltersProps> = ({
         </SelectContent>
       </Select>
       {companies.length > 1 && (
-        <Select value={filters.companyId} onValueChange={companyId => onChange({ companyId })}>
-          <SelectTrigger className={SELECT} aria-label="Empresa">
-            <SelectValue />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as empresas</SelectItem>
-            {companies.map(company => (
-              <SelectItem key={company.id} value={company.id}>
-                {company.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        <CompanySelect
+          companies={companies}
+          value={filters.companyId}
+          onChange={companyId => onChange({ companyId })}
+          allLabel="Todas as empresas"
+          aria-label="Empresa"
+          className={SELECT}
+        />
       )}
     </div>
   </div>

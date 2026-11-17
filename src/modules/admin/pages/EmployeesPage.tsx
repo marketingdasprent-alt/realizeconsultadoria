@@ -10,6 +10,9 @@ import ResendInviteSuccessDialog from '@/components/admin/ResendInviteSuccessDia
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { ROUTES } from '@/lib/constants';
 import { matchesSearch } from '@/lib/utils';
+import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
+import { useCompanyScope } from '../context/CompanyScopeContext';
+import { filterByScope, inScope } from '../lib/companyScope';
 import { EmployeesStats } from '../components/employees/EmployeesStats';
 import { MissingBirthdatesNotice } from '../components/employees/MissingBirthdatesNotice';
 import { EmployeesToolbar, type StatusFilter } from '../components/employees/EmployeesToolbar';
@@ -49,7 +52,8 @@ const EmployeesPage = () => {
   const status = (
     ['inactive', 'all'].includes(params.get('status') || '') ? params.get('status') : 'active'
   ) as StatusFilter;
-  const companyId = params.get('empresa') || 'all';
+  const scopeCtx = useCompanyScope();
+  const urlCompanyId = params.get('empresa') || 'all';
   const onlyBirthdays = params.get('aniversarios') === '1';
   const onlyMissingBirth = params.get('aniversarios') === 'sem';
   const onlyNotUsing = params.get('acesso') === '1';
@@ -78,7 +82,11 @@ const EmployeesPage = () => {
     canResetPassword: canExecuteTopic('employees', 'reset_password'),
   };
 
-  const { employees } = actions;
+  // O menu pode limitar a uma empresa ou grupo: só as pessoas e empresas dessa escolha.
+  const employees = useMemo(
+    () => filterByScope(actions.employees, scopeCtx.ids, e => e.company_id),
+    [actions.employees, scopeCtx.ids]
+  );
   // Todas as empresas ativas (e não só as que já têm colaboradores): para filtrar e criar numa vazia.
   // O hook partilhado traz também as inativas; aqui só interessam as ativas, como na ficha.
   const allCompanies = useCompanies();
@@ -87,9 +95,16 @@ const EmployeesPage = () => {
     [allCompanies.companies]
   );
   const companies = useMemo(
-    () => (activeCompanies.length ? activeCompanies : companiesOf(employees)),
-    [activeCompanies, employees]
+    () =>
+      (activeCompanies.length ? activeCompanies : companiesOf(employees)).filter(company =>
+        inScope(scopeCtx.ids, company.id)
+      ),
+    [activeCompanies, employees, scopeCtx.ids]
   );
+  // Uma empresa só no menu manda; senão vale o filtro do endereço, se ainda estiver na escolha.
+  const companyId =
+    scopeCtx.singleCompanyId ??
+    (urlCompanyId !== 'all' && companies.some(c => c.id === urlCompanyId) ? urlCompanyId : 'all');
 
   // Os números refletem a pesquisa e a empresa, mas não o estado (servem para o escolher).
   const searched = useMemo(() => {
@@ -156,6 +171,8 @@ const EmployeesPage = () => {
         }
       />
 
+      <CompanyScopeNotice />
+
       <EmployeesStats
         active={searched.filter(e => e.is_active).length}
         inactive={searched.filter(e => !e.is_active).length}
@@ -184,6 +201,7 @@ const EmployeesPage = () => {
           status={status}
           onStatusChange={value => setParam('status', value, 'active')}
           companies={companies}
+          showCompany={!scopeCtx.singleCompanyId}
           companyId={companyId}
           onCompanyChange={value => setParam('empresa', value, 'all')}
           count={visible.length}

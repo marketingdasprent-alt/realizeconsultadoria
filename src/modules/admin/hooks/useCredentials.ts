@@ -1,5 +1,7 @@
-import { useCallback } from 'react';
+import { useCallback, useMemo } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useCompanyScope } from '../context/CompanyScopeContext';
+import { filterByScope } from '../lib/companyScope';
 import { credentialService, type CredentialsData } from '../services/credentialService';
 
 export const CREDENTIALS_KEY = ['admin', 'credentials'] as const;
@@ -35,4 +37,19 @@ export const useCredentials = () => {
     isError: query.isError,
     refresh,
   };
+};
+
+/** Os acessos e emails só da empresa ou grupo escolhido no menu (as abas Emails e Acessos). */
+export const useScopedCredentials = () => {
+  const data = useCredentials();
+  const { ids } = useCompanyScope();
+  return useMemo(
+    () => ({
+      ...data,
+      credentials: filterByScope(data.credentials, ids, c => c.company_id),
+      employees: filterByScope(data.employees, ids, e => e.company_id),
+      companies: filterByScope(data.companies, ids, c => c.id),
+    }),
+    [data, ids]
+  );
 };

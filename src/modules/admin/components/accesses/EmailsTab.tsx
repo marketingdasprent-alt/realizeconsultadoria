@@ -1,6 +1,7 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
+import { useCompanyScope } from '../../context/CompanyScopeContext';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
-import { useCredentials } from '../../hooks/useCredentials';
+import { useScopedCredentials } from '../../hooks/useCredentials';
 import { useEmailActions } from '../../hooks/useEmailActions';
 import { isDepartmentCategory, type Credential } from '../../lib/credentials';
 import {
@@ -20,7 +21,8 @@ import type { AccessPanelTarget } from './panel/useAccessForm';
 
 /** Acessos → Emails: cada caixa, de quem é e se está ligada ao Webmail. */
 export const EmailsTab: React.FC<{ canManage: boolean }> = ({ canManage }) => {
-  const data = useCredentials();
+  const data = useScopedCredentials();
+  const scope = useCompanyScope();
   const actions = useEmailActions(data.refresh);
   const [filters, setFilters] = useState<EmailFilters>({
     search: '',
@@ -28,6 +30,8 @@ export const EmailsTab: React.FC<{ canManage: boolean }> = ({ canManage }) => {
     type: 'all',
     state: 'all',
   });
+  // Mudar de empresa no menu limpa o filtro de empresa desta aba (senão ficava escondido e a lista vazia).
+  useEffect(() => setFilters(f => ({ ...f, companyId: 'all' })), [scope.scope]);
   const [panel, setPanel] = useState<AccessPanelTarget | null>(null);
   const [peopleOf, setPeopleOf] = useState<Credential | null>(null);
   const [toDelete, setToDelete] = useState<Credential | null>(null);

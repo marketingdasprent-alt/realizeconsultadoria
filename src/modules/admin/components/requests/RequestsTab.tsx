@@ -1,4 +1,7 @@
+import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
 import React, { useMemo, useState } from 'react';
+import { useCompanyScope } from '../../context/CompanyScopeContext';
+import { filterByScope } from '../../lib/companyScope';
 import { useSearchParams } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { useAbsenceRequests } from '../../hooks/useAbsenceRequests';
@@ -30,7 +33,13 @@ const EMPTY: Record<string, string> = {
 const RequestsTab: React.FC<{ tabs: React.ReactNode }> = ({ tabs }) => {
   const [searchParams, setSearchParams] = useSearchParams();
   const { toast } = useToast();
-  const data = useAbsenceRequests();
+  const all = useAbsenceRequests();
+  const { ids: scopeIds } = useCompanyScope();
+  // O menu pode limitar a uma empresa ou grupo: só os pedidos dessa escolha.
+  const data = useMemo(
+    () => ({ ...all, requests: filterByScope(all.requests, scopeIds, r => r.company.id) }),
+    [all, scopeIds]
+  );
   const decisions = useRequestDecisions(data);
   const avatarFor = useEmployeeAvatars();
   const [others, setOthers] = useState({ search: '', type: 'all', companyId: 'all' });
@@ -110,6 +119,8 @@ const RequestsTab: React.FC<{ tabs: React.ReactNode }> = ({ tabs }) => {
           onRefresh={() => void data.refresh()}
         />
       </div>
+
+      <CompanyScopeNotice />
 
       <section className="overflow-hidden rounded-[28px] bg-white shadow-rz-soft ring-1 ring-rz-line">
         <RequestsFilters

@@ -1,13 +1,14 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
 import { Lock, Mail, Package, Wifi } from 'lucide-react';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
-import { supabase } from '@/integrations/supabase/client';
+import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
+import { useActiveCompanies, useCompanyScope } from '../context/CompanyScopeContext';
+import { inScope } from '../lib/companyScope';
 import { CredentialsTab } from '../components/accesses/CredentialsTab';
 import { EmailsTab } from '../components/accesses/EmailsTab';
 import { EquipmentArea } from '../components/accesses/EquipmentArea';
@@ -22,22 +23,6 @@ const PAGE_TABS = [
 ] as const;
 type PageTab = (typeof PAGE_TABS)[number]['value'];
 
-/** Empresas ativas (para os filtros e formulários de equipamentos e serviços). */
-const useActiveCompanies = () =>
-  useQuery({
-    queryKey: ['admin', 'companies-active'],
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from('companies')
-        .select('id, name')
-        .eq('is_active', true)
-        .order('name');
-      if (error) throw error;
-      return data ?? [];
-    },
-    staleTime: 5 * 60_000,
-  });
-
 /** Acessos: emails (e a ligação ao Webmail), credenciais, equipamentos e serviços pagos. */
 const AccessesPage: React.FC = () => {
   const { toast } = useToast();
@@ -45,8 +30,19 @@ const AccessesPage: React.FC = () => {
   const { canExecuteTopic, isSuperAdmin, isLoading } = useAdminPermissions();
   const canManage = canExecuteTopic('accesses', 'manage');
   const [searchParams, setSearchParams] = useSearchParams();
-  const [companyFilter, setCompanyFilter] = useState('all');
-  const companies = useActiveCompanies().data ?? [];
+  const [companyFilterRaw, setCompanyFilter] = useState('all');
+  const useActive = useActiveCompanies();
+  const scope = useCompanyScope();
+  const companies = useMemo(
+    () => (useActive.data ?? []).filter(company => inScope(scope.ids, company.id)),
+    [useActive.data, scope.ids]
+  );
+  // Uma empresa só no menu manda no filtro das abas; senão vale o filtro da aba, se ainda existir.
+  const companyFilter =
+    scope.singleCompanyId ??
+    (companyFilterRaw !== 'all' && companies.some(c => c.id === companyFilterRaw)
+      ? companyFilterRaw
+      : 'all');
 
   // Página só para super administradores.
   useEffect(() => {
@@ -73,6 +69,7 @@ const AccessesPage: React.FC = () => {
         title="Acessos e Equipamentos"
         description="Emails e Webmail, credenciais, equipamentos e serviços pagos"
       />
+      <CompanyScopeNotice />
       <Tabs value={tab} onValueChange={changeTab} className="w-full">
         <ScrollArea className="w-full whitespace-nowrap pb-2">
           <TabsList className="inline-flex h-10 w-auto">

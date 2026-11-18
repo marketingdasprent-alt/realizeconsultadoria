@@ -11,6 +11,8 @@ export interface GraphRecipient {
 export interface GraphMessage {
   id: string;
   conversationId?: string | null;
+  /** Pasta onde está (só pedido na pesquisa em todas as pastas). */
+  parentFolderId?: string | null;
   subject?: string | null;
   bodyPreview?: string | null;
   receivedDateTime?: string | null;

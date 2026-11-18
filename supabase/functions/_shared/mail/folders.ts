@@ -104,7 +104,7 @@ export const GRAPH_SUMMARY_FIELDS = [
 ];
 
 /** Texto para $search do Graph (entre aspas; sem aspas/barras do utilizador). */
-const graphSearchTerm = (query: string): string =>
+export const graphSearchTerm = (query: string): string =>
   `"${query
     .replace(/["\\\r\n]+/g, ' ')
     .replace(/\s{2,}/g, ' ')

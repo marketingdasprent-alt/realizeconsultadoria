@@ -34,7 +34,7 @@ export const MAIL_ERRORS: Record<string, string> = {
   reauth: 'A autorização desta caixa expirou. Volte a ligá-la.',
   imap_login_failed: 'Não foi possível entrar com estes dados. Confirme o email e a palavra-passe.',
   smtp_port_blocked: 'O envio só funciona por SMTP com SSL na porta 465.',
-  too_large: 'Os anexos ultrapassam 10 MB.',
+  too_large: 'Os anexos ultrapassam 14 MB.',
   not_found: 'Esta caixa de correio já não existe.',
 };
 
@@ -85,6 +85,7 @@ const toSummary = (accountId: string, row: Row): MailSummary => ({
   messageKey: (row.message_key as string | null) ?? null,
   labelIds: Array.isArray(row.label_ids) ? (row.label_ids as string[]) : [],
   forwarded: row.forwarded === true,
+  folderName: typeof row.folder_name === 'string' && row.folder_name ? row.folder_name : null,
 });
 
 const toMessage = (accountId: string, row: Row): MailMessage => ({
@@ -327,28 +328,44 @@ export const mailService = {
     /** Lista acabada de ler do servidor de email (sem a guardada). */
     fresh = false,
     /** Filtros (unread, read, starred, attachments): o Gmail e o Microsoft 365 filtram no servidor. */
-    filters: string[] = []
+    filters: string[] = [],
+    /** Pesquisar em todas as pastas da caixa (`body`: também no texto dos emails, mais lento). */
+    allFolders: { body: boolean } | null = null
   ) => {
-    const { data, error } = await call<{ messages: Row[]; next_page_token: string | null }>(
-      'mail-api',
-      {
-        action: 'list',
-        account_id: accountId,
-        folder,
-        folder_id: folderId ?? undefined,
-        label_id: labelId ?? undefined,
-        query,
-        page_token: pageToken ?? undefined,
-        fresh: fresh || undefined,
-        // Só se há filtros: sem eles o pedido é exatamente o de antes
-        filters: filters.length ? filters : undefined,
-      }
-    );
+    const { data, error } = await call<{
+      messages: Row[];
+      next_page_token: string | null;
+      scope?: string;
+      truncated?: boolean;
+      partial?: boolean;
+    }>('mail-api', {
+      action: 'list',
+      account_id: accountId,
+      folder,
+      folder_id: folderId ?? undefined,
+      label_id: labelId ?? undefined,
+      query,
+      page_token: pageToken ?? undefined,
+      fresh: fresh || undefined,
+      // Só se há filtros: sem eles o pedido é exatamente o de antes
+      filters: filters.length ? filters : undefined,
+      // Só na pesquisa em todas as pastas: sem estes campos o pedido é o de sempre
+      all_folders: allFolders ? true : undefined,
+      include_body: allFolders?.body ? true : undefined,
+    });
     return {
       data: data
         ? {
             messages: data.messages.map(row => toSummary(accountId, row)),
             nextPageToken: data.next_page_token,
+            // Um servidor que ainda não conhece a pesquisa em todas as pastas não responde com `scope`
+            allFolders: allFolders
+              ? {
+                  supported: data.scope === 'all_folders',
+                  truncated: data.truncated === true,
+                  partial: data.partial === true,
+                }
+              : null,
           }
         : null,
       error,

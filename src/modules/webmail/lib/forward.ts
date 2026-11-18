@@ -52,10 +52,66 @@ export const forwardedText = (message: MailMessage, bodyText: string): string =>
     .map(line => `${line.label}: ${line.value}`)
     .join('\n')}\n\n${bodyText.trim()}`;
 
+// Caracteres invisíveis que os emails de marketing metem para encher a pré-visualização
+// (travessão suave, junção de grafemas, espaços de largura zero, BOM…).
+const span = (from: number, to: number) =>
+  Array.from({ length: to - from + 1 }, (_unused, index) => from + index);
+const INVISIBLE = new RegExp(
+  [
+    0x00ad,
+    0x034f,
+    0x061c,
+    0x115f,
+    0x1160,
+    0x17b4,
+    0x17b5,
+    0x180e,
+    0x2800,
+    0x3164,
+    0xfeff,
+    ...span(0x200b, 0x200f),
+    ...span(0x202a, 0x202e),
+    ...span(0x2060, 0x206f),
+  ]
+    .map(code => `\\u${code.toString(16).padStart(4, '0')}`)
+    .join('|'),
+  'g'
+);
+const IMAGE_URL = /\.(?:png|jpe?g|gif|webp|svg|bmp|ico)(?:[?#]|$)/i;
+const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+
 /**
- * HTML da citação numa resposta, como no Gmail e no Outlook: "Em …, X escreveu:" e o email
- * original (HTML, com imagens) com uma barra ao lado — sem os "> " do texto simples.
+ * Limpa o texto simples de um email para o citar numa resposta ou reencaminhamento. Muitas
+ * plataformas (Odoo, Mailchimp…) geram o texto simples do HTML com notas de rodapé das ligações
+ * ("[1] https://…"), marcadores "[3]" no meio das frases, "None [2]" no lugar das imagens sem
+ * descrição, o nome do ficheiro das imagens ("logo [13]") e centenas de caracteres invisíveis.
+ * Nada disto serve numa citação: sai tudo, e fica o texto que a pessoa lia.
  */
+export const cleanPlainText = (text: string): string => {
+  let out = text.replace(INVISIBLE, '');
+  // Notas de rodapé: "[n] https://…" ou "[n] mailto:…" (uma por linha)
+  const refs = new Map<string, string>();
+  out = out.replace(
+    /^[ \t]*\[(\d{1,3})\][ \t]+((?:https?:\/\/|mailto:|tel:|cid:)\S+)[ \t]*$/gim,
+    (_all, n, url) => {
+      refs.set(n, url);
+      return '';
+    }
+  );
+  for (const [n, url] of refs) {
+    const mark = `\\[${escapeRegex(n)}\\]`;
+    // Imagem: o nome do ficheiro e o marcador ("logo [13]") saem juntos
+    if (IMAGE_URL.test(url)) out = out.replace(new RegExp(`[\\w.\\-]*[ \\t]*${mark}`, 'g'), '');
+    // Imagem sem descrição que o gerador escreveu como "None [2]"
+    out = out.replace(new RegExp(`\\bNone[ \\t]*${mark}`, 'g'), '');
+    out = out.replace(new RegExp(`[ \\t]?${mark}`, 'g'), '');
+  }
+  return out
+    .replace(/[ \t]+$/gm, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+};
+
 /**
  * Tira os "> " do início das linhas: emails em texto simples trazem a conversa anterior citada
  * assim pelo programa de quem respondeu; na nossa resposta a citação já leva a barra ao lado.
@@ -70,12 +126,16 @@ export const stripHtmlQuoteMarkers = (html: string): string =>
     '$1'
   );
 
+/**
+ * HTML da citação numa resposta, como no Gmail e no Outlook: "Em …, X escreveu:" e o email
+ * original (HTML, com imagens) com uma barra ao lado — sem os "> " do texto simples.
+ */
 export const repliedHtml = (message: MailMessage): string => {
   const when = format(new Date(message.date), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: pt });
   const who = message.from?.name || message.from?.email || 'Desconhecido';
   const body = message.html
     ? stripHtmlQuoteMarkers(quotableHtml(message.html))
-    : `<div style="white-space:pre-wrap">${escapeHtml(stripQuoteMarkers(message.text ?? ''))}</div>`;
+    : `<div style="white-space:pre-wrap">${escapeHtml(cleanPlainText(stripQuoteMarkers(message.text ?? '')))}</div>`;
   return (
     `<div style="margin-top:16px;color:#64748b">Em ${escapeHtml(when)}, ${escapeHtml(who)} escreveu:</div>` +
     `<blockquote style="margin:6px 0 0 0;padding-left:12px;border-left:2px solid #cbd5e1">${body}</blockquote>`

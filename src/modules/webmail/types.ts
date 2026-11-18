@@ -126,6 +126,8 @@ export interface MailSummary {
   labelIds?: string[];
   /** Já foi reencaminhado pelo Webmail. */
   forwarded?: boolean;
+  /** Pasta onde o email está (só na pesquisa em todas as pastas). */
+  folderName?: string | null;
 }
 
 export interface MailAttachmentInfo {

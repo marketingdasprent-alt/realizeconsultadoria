@@ -9,6 +9,7 @@ import {
   applyMailListFilters,
   buildGraphListUrl,
   graphCustomFolders,
+  graphSearchTerm,
   isAllowedGraphNextLink,
   type GraphFolderEntry,
 } from '../../_shared/mail/folders.ts';
@@ -32,7 +33,20 @@ import {
   replaceCidLinks,
 } from '../../_shared/mail/html.ts';
 import { bytesToBase64 } from '../../_shared/mail/mime.ts';
-import type { MailDriver, MailSendParams } from '../../_shared/mail/types.ts';
+import {
+  graphRecipientTerms,
+  graphSearchAllSelect,
+  graphSearchAllUrl,
+  graphSearchFolderIndex,
+  headerMatches,
+  mergeSearchResults,
+} from '../../_shared/mail/search-all.ts';
+import type {
+  MailDriver,
+  MailSearchAllParams,
+  MailSearchAllResult,
+  MailSendParams,
+} from '../../_shared/mail/types.ts';
 import {
   errorMessage,
   fetchWithTimeout,
@@ -207,6 +221,51 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
     });
     if (res.status !== 404) await session.ensureOk(res);
     await res.body?.cancel();
+  };
+
+  /** Os ids das pastas de sistema (num só pedido $batch) e a árvore toda, nível a nível. */
+  const loadFolderTree = async () => {
+    const relative = ME.slice(GRAPH_BASE.length);
+    const batch = await session.json<{
+      responses?: { id: string; status: number; body?: { id?: string } }[];
+    }>(`${GRAPH_BASE}/$batch`, {
+      method: 'POST',
+      headers: JSON_HEADERS,
+      body: JSON.stringify({
+        requests: GRAPH_SYSTEM_FOLDERS.map(name => ({
+          id: name,
+          method: 'GET',
+          url: `${relative}/mailFolders/${name}?$select=id`,
+        })),
+      }),
+    });
+    const system = new Map<string, string>();
+    for (const r of batch.responses ?? []) {
+      if (r.status === 200 && r.body?.id) system.set(r.body.id, r.id);
+    }
+
+    const select =
+      '$select=id,displayName,parentFolderId,unreadItemCount,childFolderCount&$top=250';
+    type Entry = GraphFolderEntry & { childFolderCount?: number };
+    const all: Entry[] = [];
+    let level =
+      (await session.json<{ value?: Entry[] }>(`${ME}/mailFolders?${select}`)).value ?? [];
+    for (let depth = 0; level.length && depth < 6 && all.length < 1000; depth++) {
+      all.push(...level);
+      const parents = level.filter(f => (f.childFolderCount ?? 0) > 0);
+      const children = await mapWithConcurrency(
+        parents,
+        6,
+        async parent =>
+          (
+            await session.json<{ value?: Entry[] }>(
+              `${ME}/mailFolders/${enc(parent.id)}/childFolders?${select}`
+            )
+          ).value ?? []
+      );
+      level = children.flat();
+    }
+    return { system, all };
   };
 
   return {
@@ -491,48 +550,56 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
     },
 
     async folders() {
-      // Os ids das pastas de sistema (num só pedido $batch) e a árvore toda, nível a nível.
-      const relative = ME.slice(GRAPH_BASE.length);
-      const batch = await session.json<{
-        responses?: { id: string; status: number; body?: { id?: string } }[];
-      }>(`${GRAPH_BASE}/$batch`, {
-        method: 'POST',
-        headers: JSON_HEADERS,
-        body: JSON.stringify({
-          requests: GRAPH_SYSTEM_FOLDERS.map(name => ({
-            id: name,
-            method: 'GET',
-            url: `${relative}/mailFolders/${name}?$select=id`,
-          })),
-        }),
-      });
-      const system = new Map<string, string>();
-      for (const r of batch.responses ?? []) {
-        if (r.status === 200 && r.body?.id) system.set(r.body.id, r.id);
-      }
-
-      const select =
-        '$select=id,displayName,parentFolderId,unreadItemCount,childFolderCount&$top=250';
-      type Entry = GraphFolderEntry & { childFolderCount?: number };
-      const all: Entry[] = [];
-      let level =
-        (await session.json<{ value?: Entry[] }>(`${ME}/mailFolders?${select}`)).value ?? [];
-      for (let depth = 0; level.length && depth < 6 && all.length < 1000; depth++) {
-        all.push(...level);
-        const parents = level.filter(f => (f.childFolderCount ?? 0) > 0);
-        const children = await mapWithConcurrency(
-          parents,
-          6,
-          async parent =>
-            (
-              await session.json<{ value?: Entry[] }>(
-                `${ME}/mailFolders/${enc(parent.id)}/childFolders?${select}`
-              )
-            ).value ?? []
-        );
-        level = children.flat();
-      }
+      const { system, all } = await loadFolderTree();
       return graphCustomFolders(all, system);
+    },
+
+    /**
+     * Pesquisa em todas as pastas: $search à caixa toda (/me/messages), menos o Lixo e o Spam (e o
+     * que está dentro deles). O $search simples procura em remetente, assunto e corpo; sem
+     * include_body ficam só os que acertam no assunto, no remetente, no para ou no cc (a
+     * comparação faz-se aqui, sem ligar a acentos), e para uma palavra pedem-se também as buscas
+     * por "to:" e "cc:" (o $search simples não as inclui).
+     */
+    async searchAll({
+      query,
+      includeBody,
+      limit,
+    }: MailSearchAllParams): Promise<MailSearchAllResult> {
+      const select = graphSearchAllSelect([...GRAPH_SUMMARY_FIELDS]);
+      type Page = { value?: GraphMessage[]; '@odata.nextLink'?: string };
+      const search = (term: string) =>
+        session.json<Page>(graphSearchAllUrl(ME, term, limit, select));
+      const extras = includeBody ? [] : graphRecipientTerms(query);
+      const [tree, main, more] = await Promise.all([
+        loadFolderTree(),
+        search(graphSearchTerm(query)),
+        // Contas pessoais recusam a pesquisa por propriedade: sem efeito, não é erro
+        Promise.all(extras.map(term => search(term).catch(() => null))),
+      ]);
+      const index = graphSearchFolderIndex(tree.all, tree.system);
+      const seen = new Set<string>();
+      const messages = [main, ...more]
+        .flatMap(page => page?.value ?? [])
+        .filter(m => !seen.has(m.id) && seen.add(m.id))
+        .filter(m => !index.isExcluded(m.parentFolderId))
+        .filter(
+          m =>
+            includeBody ||
+            headerMatches(query, [
+              m.subject,
+              ...[m.from, m.sender, ...(m.toRecipients ?? []), ...(m.ccRecipients ?? [])].flatMap(
+                r => [r?.emailAddress?.name, r?.emailAddress?.address]
+              ),
+            ])
+        )
+        .map(m => ({ ...parseGraphSummary(m), folder_name: index.nameOf(m.parentFolderId) }));
+      const merged = mergeSearchResults([messages], limit);
+      return {
+        messages: merged.messages,
+        truncated: merged.truncated || !!main['@odata.nextLink'],
+        partial: false,
+      };
     },
   };
 };

@@ -5,6 +5,7 @@ import { pt } from 'date-fns/locale';
 import {
   AlertTriangle,
   ArrowLeft,
+  ArrowRightLeft,
   Briefcase,
   Cake,
   Key,
@@ -31,6 +32,8 @@ import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useEmployeeProfileActions } from '../../hooks/useEmployeeProfileActions';
+import { useMoveAccess } from '../../hooks/useCompanyMembership';
+import { MoveEmployeesDialog } from '../employees/MoveEmployeesDialog';
 import type { EmployeeRecord } from './EmployeeGeneralTab';
 
 interface EmployeeProfileHeaderProps {
@@ -74,6 +77,11 @@ export const EmployeeProfileHeader = ({
   const actions = useEmployeeProfileActions(employee, onChanged);
   const [noticesOpen, setNoticesOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const moveAccess = useMoveAccess();
+  // Só quem administra a empresa atual da ficha, e se houver outra empresa para onde mover.
+  const canMove =
+    canExecuteTopic('employees', 'edit') && employee.is_active && moveAccess.canOfferMove(employee);
   const canResetPassword = canExecuteTopic('employees', 'reset_password');
   const role = [employee.position, employee.companies?.name].filter(Boolean).join(' · ');
 
@@ -159,6 +167,11 @@ export const EmployeeProfileHeader = ({
                 </DropdownMenuItem>
               </>
             )}
+            {canMove && (
+              <DropdownMenuItem onClick={() => setMoveOpen(true)}>
+                <ArrowRightLeft className="mr-2 h-4 w-4" /> Mover para empresa…
+              </DropdownMenuItem>
+            )}
             {canExecuteTopic('employees', 'edit') && (
               <DropdownMenuItem onClick={actions.toggleStatus} disabled={actions.isToggling}>
                 {employee.is_active ? (
@@ -187,6 +200,24 @@ export const EmployeeProfileHeader = ({
         onOpenChange={setPasswordOpen}
         employeeId={employee.id}
         employeeName={employee.name}
+      />
+      <MoveEmployeesDialog
+        employees={
+          moveOpen
+            ? [
+                {
+                  id: employee.id,
+                  name: employee.name,
+                  company_id: employee.company_id,
+                  user_id: employee.user_id,
+                  is_active: employee.is_active,
+                  companyName: employee.companies?.name,
+                },
+              ]
+            : null
+        }
+        onClose={() => setMoveOpen(false)}
+        onMoved={onChanged}
       />
       <ResendInviteSuccessDialog
         open={!!actions.invitePassword}

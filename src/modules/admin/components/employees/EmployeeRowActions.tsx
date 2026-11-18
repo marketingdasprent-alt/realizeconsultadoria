@@ -1,6 +1,7 @@
 import React from 'react';
 import {
   AlertTriangle,
+  ArrowRightLeft,
   Edit,
   Key,
   Loader2,
@@ -33,12 +34,16 @@ export interface EmployeeActionHandlers {
   onResendInvite: (employee: Employee) => void;
   onToggleStatus: (employee: Employee) => void;
   onDelete: (employee: Employee) => void;
+  /** "Mover para empresa…": só aparece quando o ecrã passa a ação (e `canMove` é verdadeiro). */
+  onMove?: (employee: Employee) => void;
 }
 
 interface EmployeeRowActionsProps extends EmployeeActionHandlers {
   employee: Employee;
   permissions: EmployeeActionPermissions;
   isResending: boolean;
+  /** O utilizador administra a empresa atual da ficha e há para onde mover. */
+  canMove?: boolean;
 }
 
 /** Menu "⋯" de cada colaborador (ativar/desativar está aqui, e não no clique do estado). */
@@ -46,6 +51,7 @@ export const EmployeeRowActions: React.FC<EmployeeRowActionsProps> = ({
   employee,
   permissions,
   isResending,
+  canMove = false,
   ...on
 }) => (
   <DropdownMenu>
@@ -84,6 +90,11 @@ export const EmployeeRowActions: React.FC<EmployeeRowActionsProps> = ({
             Re-enviar convite
           </DropdownMenuItem>
         </>
+      )}
+      {canMove && on.onMove && (
+        <DropdownMenuItem onClick={() => on.onMove?.(employee)}>
+          <ArrowRightLeft className="mr-2 h-4 w-4" /> Mover para empresa…
+        </DropdownMenuItem>
       )}
       {permissions.canEdit && (
         <DropdownMenuItem onClick={() => on.onToggleStatus(employee)}>

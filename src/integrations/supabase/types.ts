@@ -4259,6 +4259,34 @@ export type Database = {
         Returns: string;
       };
       rz_my_company: { Args: never; Returns: string };
+      // Multiempresa, Fase C1 (docs/multiempresa/FASE-C1.md): escritos à mão, sem CLI.
+      rz_transfer_employee: {
+        Args: { p_employee: string; p_to_company: string; p_note?: string | null };
+        Returns: Json;
+      };
+      rz_transfer_employees: {
+        Args: { p_employees: string[]; p_to_company: string };
+        Returns: Json;
+      };
+      rz_add_company_admin: {
+        Args: { p_company: string; p_user: string; p_role?: string };
+        Returns: Json;
+      };
+      rz_remove_company_admin: {
+        Args: { p_company: string; p_user: string };
+        Returns: Json;
+      };
+      rz_create_company: {
+        Args: {
+          p_name: string;
+          p_nif: string;
+          p_email: string;
+          p_group?: string | null;
+          p_group_name?: string | null;
+          p_admin_user?: string | null;
+        };
+        Returns: Json;
+      };
       rz_team_absences: {
         Args: { p_from: string; p_to: string };
         Returns: {

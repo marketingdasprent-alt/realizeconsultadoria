@@ -74,8 +74,8 @@ const SLOW = 'A IA está a demorar demasiado neste momento. Tente outra vez daqu
 // "Agenda" sozinha ("o que tenho na agenda?") é a agenda, não o verbo: vai para o modelo rápido.
 // Pedidos de ficheiros ("encontra o contrato…", "onde está a pasta…").
 const FILES_HINT =
-  // eslint-disable-next-line no-control-regex -- NOTA: o literal tem o caractere 0x08 (backspace) em vez de b, por isso hoje nunca casa. Corrigir à parte: muda o encaminhamento da IA.
-  /(ficheiro|ficheiros|arquivo|pasta|documento|documentos|contrato|encontra|procura|onde esta)/;
+  // Corrigido: o literal tinha o caractere 0x08 (backspace) em vez de \b e nunca casava.
+  /\b(ficheiro|ficheiros|arquivo|pasta|documento|documentos|contrato|encontra|procura|onde esta)\b/;
 
 const ACTION_HINT =
   /\b(marca|marcar|marque|agendar|agende|agenda (uma?|reuniao|evento|chamada)|desmarca|lembra|lembrar|lembre|lembrete|convida|convidar|convide|cria|criar|crie|adiciona|adicionar|nova reuniao|nova tarefa)\b/;

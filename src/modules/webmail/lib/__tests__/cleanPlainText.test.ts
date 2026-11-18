@@ -3,7 +3,7 @@ import { cleanPlainText } from '../forward';
 
 // Texto simples de um orçamento da MyPRINT (Odoo), como chegou numa resposta (17/11/2026).
 const ODOO = [
-  '͏ ​ ͏ ​ ͏ ​ ͏ ​',
+  '\u034F \u200B \u034F \u200B \u034F \u200B',
   '',
   'team_logo [13]',
   '',
@@ -56,7 +56,7 @@ describe('cleanPlainText', () => {
     expect(out).not.toMatch(/team_logo|simao_f|simao_my|whatsapp/);
   });
   it('tira os caracteres invisíveis', () => {
-    expect(out).not.toMatch(/[͏​]/);
+    expect(out.includes('\u034F') || out.includes('\u200B')).toBe(false);
   });
   it('mantém o texto que a pessoa lia', () => {
     expect(out).toContain('OR 26/0626');

@@ -54,8 +54,29 @@ export const forwardedText = (message: MailMessage, bodyText: string): string =>
 
 // Caracteres invisíveis que os emails de marketing metem para encher a pré-visualização
 // (travessão suave, junção de grafemas, espaços de largura zero, BOM…).
-const INVISIBLE =
-  /[\u00AD\u034F\u061C\u115F\u1160\u17B4\u17B5\u180E\u200B-\u200F\u202A-\u202E\u2060-\u206F\u2800\u3164\uFEFF]/g;
+const span = (from: number, to: number) =>
+  Array.from({ length: to - from + 1 }, (_unused, index) => from + index);
+const INVISIBLE = new RegExp(
+  [
+    0x00ad,
+    0x034f,
+    0x061c,
+    0x115f,
+    0x1160,
+    0x17b4,
+    0x17b5,
+    0x180e,
+    0x2800,
+    0x3164,
+    0xfeff,
+    ...span(0x200b, 0x200f),
+    ...span(0x202a, 0x202e),
+    ...span(0x2060, 0x206f),
+  ]
+    .map(code => `\\u${code.toString(16).padStart(4, '0')}`)
+    .join('|'),
+  'g'
+);
 const IMAGE_URL = /\.(?:png|jpe?g|gif|webp|svg|bmp|ico)(?:[?#]|$)/i;
 const escapeRegex = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 

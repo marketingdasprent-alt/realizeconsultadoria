@@ -783,7 +783,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           ))}
         </ul>
       )}
-      <div className="flex shrink-0 items-center gap-2 border-t border-rz-line px-5 py-3">
+      <div className="flex shrink-0 flex-wrap items-center gap-2 border-t border-rz-line px-5 py-3">
         <label
           className="flex h-10 w-10 cursor-pointer items-center justify-center rounded-full text-rz-muted hover:bg-rz-canvas"
           aria-label="Anexar ficheiros"
@@ -822,8 +822,9 @@ export const MailComposer: React.FC<MailComposerProps> = ({
             {(totalSize / (1024 * 1024)).toFixed(1).replace('.', ',')} MB
           </span>
         )}
+        {/* O aviso fica numa linha própria, com a largura toda: é longo e espremia o botão Enviar no telemóvel */}
         {(size > MAX_BYTES || totalSize > MAX_TOTAL_BYTES) && (
-          <span className="text-[12.5px] font-semibold text-rose-600">
+          <span className="order-last basis-full text-[12.5px] font-semibold text-rose-600">
             {size > MAX_BYTES
               ? 'Anexos novos acima de 14 MB. Para ficheiros maiores, envie uma ligação (OneDrive, Google Drive…).'
               : 'Anexos acima de 18 MB (no email ficam com mais de 25 MB, o limite dos servidores).'}

@@ -1,6 +1,7 @@
 // Reencaminhar sem passar os anexos pelo browser: o pedido de envio diz "anexos A, B, C do email
 // X da caixa Y" e o servidor vai buscá-los à caixa e junta-os ao email. Assim o compositor abre
-// logo e os anexos do original não contam para o limite do pedido (10 MB).
+// logo e os anexos do original não contam para o limite do pedido (MAX_SEND_BYTES, 18 MB);
+// o total, com os do original, é limitado por MAX_TOTAL_BYTES.
 
 import { mailError } from '../_shared/mail/errors.ts';
 import { base64ToBytes } from '../_shared/mail/mime.ts';
@@ -98,7 +99,7 @@ export const fetchRemoteAttachments = async (
     if (total > MAX_TOTAL_BYTES)
       throw mailError(
         'too_large',
-        'Os anexos passam de 25 MB no total. Retire alguns ou envie-os noutro email.'
+        'Os anexos passam de 18 MB no total. Retire alguns ou envie-os noutro email.'
       );
     attachments.push({ filename: file.filename, mime: file.mime, base64: file.base64 });
     bytes.push(content);

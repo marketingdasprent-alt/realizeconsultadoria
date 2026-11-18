@@ -94,7 +94,7 @@ jobs:
 
   e2e:
     name: 🚀 E2E Tests
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04 # Playwright ainda não suporta ubuntu 26.04 (ubuntu-latest)
     steps:
       - uses: actions/checkout@v4
       - run: corepack enable && corepack prepare pnpm@latest --activate

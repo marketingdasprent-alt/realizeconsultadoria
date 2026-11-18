@@ -1,4 +1,6 @@
 import { Link } from 'react-router-dom';
+import { ArrowRightLeft } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { CompanySelect } from '@/components/admin/CompanySelect';
 import type { FieldErrors, UseFormRegister, UseFormSetValue } from 'react-hook-form';
 import { Input } from '@/components/ui/input';
@@ -15,6 +17,11 @@ interface EmployeeWorkFieldsProps {
   errors: FieldErrors;
   companyId: string;
   companies: { id: string; name: string }[];
+  /**
+   * Ficha existente: a empresa só se mostra (a troca faz-se com "Mover para empresa…"). Sem isto
+   * (colaborador novo) há o seletor de empresa.
+   */
+  currentCompany?: { name: string; onMove?: () => void };
   position: string;
   department: string;
 }
@@ -26,22 +33,42 @@ export const EmployeeWorkFields = ({
   errors,
   companyId,
   companies,
+  currentCompany,
   position,
   department,
 }: EmployeeWorkFieldsProps) => (
   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-    <Field
-      label="Empresa *"
-      error={errors.company_id?.message as string | undefined}
-      className="md:col-span-2"
-    >
-      <CompanySelect
-        companies={companies}
-        value={companyId}
-        onChange={value => setValue('company_id', value, { shouldDirty: true })}
-        placeholder="Selecione uma empresa"
-      />
-    </Field>
+    {currentCompany ? (
+      <Field
+        label="Empresa"
+        hint="Para mudar de empresa use «Mover para empresa…»: valida os dados e fica registado."
+        className="md:col-span-2"
+      >
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="rounded-md border bg-muted/40 px-3 py-2 text-sm font-medium">
+            {currentCompany.name || '—'}
+          </span>
+          {currentCompany.onMove && (
+            <Button type="button" variant="outline" size="sm" onClick={currentCompany.onMove}>
+              <ArrowRightLeft className="mr-1.5 h-4 w-4" /> Mover para empresa…
+            </Button>
+          )}
+        </div>
+      </Field>
+    ) : (
+      <Field
+        label="Empresa *"
+        error={errors.company_id?.message as string | undefined}
+        className="md:col-span-2"
+      >
+        <CompanySelect
+          companies={companies}
+          value={companyId}
+          onChange={value => setValue('company_id', value, { shouldDirty: true })}
+          placeholder="Selecione uma empresa"
+        />
+      </Field>
+    )}
     <Field label="Função">
       <CatalogCombobox
         kind="job_positions"

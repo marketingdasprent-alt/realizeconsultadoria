@@ -8,6 +8,7 @@ import {
   FileClock,
   UsersRound,
 } from 'lucide-react';
+import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { companyName, hasBirthdayIn } from '../../lib/employeeView';
@@ -34,6 +35,14 @@ interface EmployeesTableProps extends EmployeeActionHandlers {
   alertsOf: (employeeId: string) => { expiring: number; pending: number };
   /** Última entrada na app (null enquanto não chega). */
   accessOf?: (employeeId: string) => AccessStatus | null;
+  /** O utilizador pode mover esta ficha de empresa (administra a empresa atual)? */
+  canMove?: (employee: Employee) => boolean;
+  /** Seleção múltipla (para mover em massa); sem isto não há caixas de seleção. */
+  selection?: {
+    ids: ReadonlySet<string>;
+    onToggle: (employeeId: string) => void;
+    onToggleAll: (employeeIds: string[], select: boolean) => void;
+  };
 }
 
 const COLUMNS: { field: SortField; label: string; className?: string }[] = [
@@ -47,7 +56,11 @@ const thisMonth = new Date().getMonth();
 
 /** Lista de colaboradores: fotografia, nome e email, empresa, cargo, telefone e estado. */
 export const EmployeesTable: React.FC<EmployeesTableProps> = props => {
-  const { employees, isLoading, sortField, sortDirection } = props;
+  const { employees, isLoading, sortField, sortDirection, selection } = props;
+  const selectable = selection
+    ? employees.filter(employee => props.canMove?.(employee)).map(employee => employee.id)
+    : [];
+  const allSelected = selectable.length > 0 && selectable.every(id => selection?.ids.has(id));
 
   if (isLoading) {
     return (
@@ -76,6 +89,16 @@ export const EmployeesTable: React.FC<EmployeesTableProps> = props => {
       <table className="w-full text-[14px]">
         <thead>
           <tr className="border-b border-rz-line text-left text-[12px] font-bold text-rz-muted">
+            {selection && (
+              <th className="w-10 px-4 py-2.5">
+                <Checkbox
+                  checked={allSelected}
+                  disabled={selectable.length === 0}
+                  onCheckedChange={checked => selection.onToggleAll(selectable, checked === true)}
+                  aria-label="Selecionar todos os colaboradores que pode mover"
+                />
+              </th>
+            )}
             {COLUMNS.map(column => (
               <th key={column.field} className={cn('px-4 py-2.5', column.className)}>
                 <button
@@ -112,6 +135,17 @@ export const EmployeesTable: React.FC<EmployeesTableProps> = props => {
                   alerts.expiring > 0 && 'bg-red-50 shadow-[inset_3px_0_0_#ef4444] hover:bg-red-100'
                 )}
               >
+                {selection && (
+                  <td className="px-4 py-2.5" onClick={event => event.stopPropagation()}>
+                    {props.canMove?.(employee) && (
+                      <Checkbox
+                        checked={selection.ids.has(employee.id)}
+                        onCheckedChange={() => selection.onToggle(employee.id)}
+                        aria-label={`Selecionar ${employee.name}`}
+                      />
+                    )}
+                  </td>
+                )}
                 <td className="px-4 py-2.5">
                   <div className="flex items-center gap-3">
                     <UserAvatar
@@ -193,6 +227,8 @@ export const EmployeesTable: React.FC<EmployeesTableProps> = props => {
                     employee={employee}
                     permissions={props.permissions}
                     isResending={props.resendingId === employee.id}
+                    canMove={props.canMove?.(employee) ?? false}
+                    onMove={props.onMove}
                     onOpen={props.onOpen}
                     onNotices={props.onNotices}
                     onPassword={props.onPassword}

@@ -12,7 +12,8 @@ const message = (error: unknown, fallback: string) =>
  */
 export const useEmployeeListActions = () => {
   const { toast } = useToast();
-  const { employees, isLoading, deleteEmployee, toggleStatus, resendInvite } = useEmployees();
+  const { employees, isLoading, deleteEmployee, toggleStatus, resendInvite, refetch } =
+    useEmployees();
   const [noticesFor, setNoticesFor] = useState<Employee | null>(null);
   const [passwordFor, setPasswordFor] = useState<Employee | null>(null);
   const [deleteFor, setDeleteFor] = useState<Employee | null>(null);
@@ -80,6 +81,7 @@ export const useEmployeeListActions = () => {
   return {
     employees,
     isLoading,
+    refetch,
     noticesFor,
     setNoticesFor,
     passwordFor,

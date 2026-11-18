@@ -4,6 +4,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { PAGE_SIZES } from '@/lib/constants';
+import { friendlyEmployeeWriteError } from '../lib/employeeWriteError';
 
 type Employee = Database['public']['Tables']['employees']['Row'];
 type EmployeeInsert = Database['public']['Tables']['employees']['Insert'];
@@ -102,18 +103,21 @@ export const employeeService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      return { data: null, error };
+      return { data: null, error: friendlyEmployeeWriteError(error) };
     }
   },
 
   /**
-   * Atualizar colaborador
+   * Atualizar colaborador. Nunca muda a empresa: isso faz-se com rz_transfer_employee ("Mover
+   * para empresa…"), que valida e audita. O `company_id` que vier aqui é descartado.
    */
   update: async (id: string, employee: EmployeeUpdate) => {
     try {
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- descartado de propósito
+      const { company_id: _company, ...fields } = employee;
       const { data, error } = await supabase
         .from('employees')
-        .update({ ...employee, updated_at: new Date().toISOString() })
+        .update({ ...fields, updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single();
@@ -121,7 +125,7 @@ export const employeeService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      return { data: null, error };
+      return { data: null, error: friendlyEmployeeWriteError(error) };
     }
   },
 
@@ -167,7 +171,7 @@ export const employeeService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      return { data: null, error };
+      return { data: null, error: friendlyEmployeeWriteError(error) };
     }
   },
 

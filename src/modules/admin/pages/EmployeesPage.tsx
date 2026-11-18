@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus } from 'lucide-react';
+import { ArrowRightLeft, Plus } from 'lucide-react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
 import EmployeeAvisoDialog from '@/components/admin/EmployeeAvisoDialog';
@@ -18,6 +18,8 @@ import { MissingBirthdatesNotice } from '../components/employees/MissingBirthdat
 import { EmployeesToolbar, type StatusFilter } from '../components/employees/EmployeesToolbar';
 import { EmployeesTable, type SortField } from '../components/employees/EmployeesTable';
 import { PendingDocumentsDialog } from '../components/employees/PendingDocumentsDialog';
+import { MoveEmployeesDialog, type MoveSubject } from '../components/employees/MoveEmployeesDialog';
+import { useMoveAccess } from '../hooks/useCompanyMembership';
 import { useDocumentAlerts } from '../hooks/useDocumentAlerts';
 import { useEmployeeAvatars } from '../hooks/useEmployeeAvatars';
 import { useEmployeeLastSignIn } from '../hooks/useEmployeeLastSignIn';
@@ -47,6 +49,10 @@ const EmployeesPage = () => {
   const documentAlerts = useDocumentAlerts();
   const [sortField, setSortField] = useState<SortField>('name');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
+  // Mover para outra empresa: só as fichas cuja empresa atual o utilizador administra.
+  const moveAccess = useMoveAccess();
+  const [selected, setSelected] = useState<ReadonlySet<string>>(new Set());
+  const [moving, setMoving] = useState<MoveSubject[] | null>(null);
 
   const search = params.get('q') || '';
   const status = (
@@ -145,6 +151,37 @@ const EmployeesPage = () => {
   };
   const open = (employee: Employee) => navigate(`${ROUTES.ADMIN.EMPLOYEES}/${employee.id}`);
 
+  const canMove = (employee: Employee) =>
+    permissions.canEdit && employee.is_active && moveAccess.canOfferMove(employee);
+  const subjectOf = (employee: Employee): MoveSubject => ({
+    id: employee.id,
+    name: employee.name,
+    company_id: employee.company_id,
+    user_id: employee.user_id,
+    is_active: employee.is_active,
+    companyName: companyName(employee),
+  });
+  // A seleção só conta fichas que ainda se veem e se podem mover (os filtros mudam a lista).
+  const selectedEmployees = visible.filter(
+    employee => selected.has(employee.id) && canMove(employee)
+  );
+  const toggleSelected = (employeeId: string) =>
+    setSelected(previous => {
+      const next = new Set(previous);
+      if (next.has(employeeId)) next.delete(employeeId);
+      else next.add(employeeId);
+      return next;
+    });
+  const toggleAllSelected = (ids: string[], select: boolean) =>
+    setSelected(previous => {
+      const next = new Set(previous);
+      for (const id of ids) {
+        if (select) next.add(id);
+        else next.delete(id);
+      }
+      return next;
+    });
+
   return (
     <div className="space-y-5">
       <AdminPageHeader
@@ -206,6 +243,30 @@ const EmployeesPage = () => {
           onCompanyChange={value => setParam('empresa', value, 'all')}
           count={visible.length}
         />
+        {selectedEmployees.length > 0 && (
+          <div className="flex flex-wrap items-center gap-3 border-b border-rz-line bg-rz-primary-soft/60 px-4 py-2.5 text-[13.5px]">
+            <span className="font-semibold">
+              {selectedEmployees.length === 1
+                ? '1 colaborador selecionado'
+                : `${selectedEmployees.length} colaboradores selecionados`}
+            </span>
+            <Button
+              size="sm"
+              className="rounded-full"
+              onClick={() => setMoving(selectedEmployees.map(subjectOf))}
+            >
+              <ArrowRightLeft className="h-4 w-4" /> Mover para empresa…
+            </Button>
+            <Button
+              size="sm"
+              variant="ghost"
+              className="rounded-full"
+              onClick={() => setSelected(new Set())}
+            >
+              Limpar seleção
+            </Button>
+          </div>
+        )}
         <EmployeesTable
           employees={visible}
           accessOf={accessOf}
@@ -220,6 +281,9 @@ const EmployeesPage = () => {
             expiring: documentAlerts.expiringOf(employeeId).length,
             pending: documentAlerts.pendingOf(employeeId).length,
           })}
+          canMove={canMove}
+          selection={{ ids: selected, onToggle: toggleSelected, onToggleAll: toggleAllSelected }}
+          onMove={employee => setMoving([subjectOf(employee)])}
           onOpen={open}
           onNotices={actions.setNoticesFor}
           onPassword={actions.setPasswordFor}
@@ -229,6 +293,14 @@ const EmployeesPage = () => {
         />
       </section>
 
+      <MoveEmployeesDialog
+        employees={moving}
+        onClose={() => setMoving(null)}
+        onMoved={() => {
+          setSelected(new Set());
+          void actions.refetch();
+        }}
+      />
       <EmployeeAvisoDialog
         open={!!actions.noticesFor}
         onOpenChange={value => !value && actions.setNoticesFor(null)}

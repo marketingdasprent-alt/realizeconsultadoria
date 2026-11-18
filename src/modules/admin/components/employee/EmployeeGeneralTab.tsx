@@ -13,10 +13,14 @@ import { formatIban } from '@/lib/utils';
 import { employeeService } from '@/modules/admin/services/employeeService';
 import { equipmentService } from '@/modules/admin/services/equipmentService';
 import { DOCUMENT_CATEGORIES } from '@/lib/documents';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { AdminUploadDocumentDialog } from '@/modules/documents/components/admin/AdminUploadDocumentDialog';
 import { useDocumentDownload } from '@/modules/documents/hooks/useDocumentDownload';
 import { useEmployeeDocuments } from '@/modules/documents/hooks/useEmployeeDocuments';
 import { slotStates, type RegistrationSlot } from '../../lib/registrationSlots';
+import { buildEmployeeDetails } from '../../lib/employeeDetails';
+import { useMoveAccess } from '../../hooks/useCompanyMembership';
+import { MoveEmployeesDialog } from '../employees/MoveEmployeesDialog';
 import { InlineDocumentSlot } from './files/InlineDocumentSlot';
 import { FormSection } from './FormSection';
 import { EmployeeAccessFields } from './sections/EmployeeAccessFields';
@@ -58,6 +62,8 @@ interface EmployeeGeneralTabProps {
   companies: { id: string; name: string }[];
   isEditMode: boolean;
   onSaved: () => void;
+  /** Depois de mover o colaborador de empresa (para voltar a ler a ficha). */
+  onMoved?: () => void;
   onCreated: (employeeId: string) => void;
 }
 
@@ -100,12 +106,23 @@ const EmployeeGeneralTab = ({
   companies,
   isEditMode,
   onSaved,
+  onMoved,
   onCreated,
 }: EmployeeGeneralTabProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [attachFor, setAttachFor] = useState<RegistrationSlot | null>(null);
+  const [moveOpen, setMoveOpen] = useState(false);
+  const { canExecuteTopic } = useAdminPermissions();
+  const moveAccess = useMoveAccess();
+  // Em edição a empresa não se escolhe aqui: muda-se com "Mover para empresa…".
+  const canMove =
+    isEditMode &&
+    !!employee &&
+    employee.is_active &&
+    canExecuteTopic('employees', 'edit') &&
+    moveAccess.canOfferMove(employee);
 
   // Documentos de registo ao lado dos campos (identificação, IBAN): ver, anexar, substituir.
   const documents = useEmployeeDocuments(isEditMode ? (employee?.id ?? null) : null);
@@ -141,25 +158,14 @@ const EmployeeGeneralTab = ({
   const onSubmit = async (data: FormValues) => {
     setIsSubmitting(true);
     try {
-      const details = {
-        name: data.name,
-        phone: data.phone || null,
-        position: data.position || null,
-        department: data.department?.trim() || null,
-        company_id: data.company_id,
-        nationality: data.nationality || null,
-        document_number: data.document_number || null,
-        iban: data.iban || null,
-        cartao_da: data.cartao_da || null,
-        cartao_refeicao: data.cartao_refeicao || null,
-        safety_checkup_date: isoDate(data.safety_checkup_date),
-        safety_checkup_renewal_months: data.safety_checkup_renewal_months
-          ? parseInt(data.safety_checkup_renewal_months)
-          : null,
-        birth_date: isoDate(data.birth_date),
-        hire_date: data.hire_date || null,
-        notes: data.notes?.trim() || null,
-      };
+      const details = buildEmployeeDetails(
+        {
+          ...data,
+          safety_checkup_date_iso: isoDate(data.safety_checkup_date),
+          birth_date_iso: isoDate(data.birth_date),
+        },
+        isEditMode ? 'edit' : 'create'
+      );
 
       if (isEditMode && employee) {
         const email = data.email.toLowerCase().trim();
@@ -241,6 +247,17 @@ const EmployeeGeneralTab = ({
                 errors={errors}
                 companyId={watch('company_id')}
                 companies={companies}
+                currentCompany={
+                  isEditMode
+                    ? {
+                        name:
+                          employee?.companies?.name ??
+                          companies.find(company => company.id === employee?.company_id)?.name ??
+                          '',
+                        onMove: canMove ? () => setMoveOpen(true) : undefined,
+                      }
+                    : undefined
+                }
                 position={watch('position') ?? ''}
                 department={watch('department') ?? ''}
               />
@@ -310,6 +327,27 @@ const EmployeeGeneralTab = ({
           onUploaded={documents.refetch}
           categories={DOCUMENT_CATEGORIES.filter(c => attachFor?.categories.includes(c.value))}
           initialCategory={attachFor?.categories.length === 1 ? attachFor.categories[0] : undefined}
+        />
+      )}
+
+      {employee && isEditMode && (
+        <MoveEmployeesDialog
+          employees={
+            moveOpen
+              ? [
+                  {
+                    id: employee.id,
+                    name: employee.name,
+                    company_id: employee.company_id,
+                    user_id: employee.user_id,
+                    is_active: employee.is_active,
+                    companyName: employee.companies?.name,
+                  },
+                ]
+              : null
+          }
+          onClose={() => setMoveOpen(false)}
+          onMoved={() => onMoved?.()}
         />
       )}
     </FormProvider>

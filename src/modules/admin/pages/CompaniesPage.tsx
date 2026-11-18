@@ -31,6 +31,7 @@ import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useCompanies } from '@/hooks/useCompanies';
 import { CompanyForm } from '../components/CompanyForm';
+import { CompanyAdminsSection } from '../components/CompanyAdminsSection';
 import type { Company } from '@/modules/admin/services/companyService';
 import type { CreateCompanyInput } from '@/lib/schemas';
 
@@ -153,7 +154,7 @@ const CompaniesPage = () => {
                 </Button>
               </DialogTrigger>
             )}
-            <DialogContent className="max-w-lg">
+            <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
               <DialogHeader>
                 <DialogTitle className="text-2xl">
                   {editingCompany ? 'Editar Empresa' : 'Nova Empresa'}
@@ -165,6 +166,13 @@ const CompaniesPage = () => {
                 onCancel={() => setIsDialogOpen(false)}
                 isLoading={isActionLoading}
               />
+              {editingCompany && (
+                <div className="border-t pt-4">
+                  <CompanyAdminsSection
+                    company={{ id: editingCompany.id, name: editingCompany.name }}
+                  />
+                </div>
+              )}
             </DialogContent>
           </Dialog>
         </div>

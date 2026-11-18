@@ -34,7 +34,7 @@ export const MAIL_ERRORS: Record<string, string> = {
   reauth: 'A autorização desta caixa expirou. Volte a ligá-la.',
   imap_login_failed: 'Não foi possível entrar com estes dados. Confirme o email e a palavra-passe.',
   smtp_port_blocked: 'O envio só funciona por SMTP com SSL na porta 465.',
-  too_large: 'Os anexos ultrapassam 18 MB.',
+  too_large: 'Os anexos ultrapassam 14 MB.',
   not_found: 'Esta caixa de correio já não existe.',
 };
 

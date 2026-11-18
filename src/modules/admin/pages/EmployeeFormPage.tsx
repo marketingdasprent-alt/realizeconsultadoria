@@ -155,6 +155,7 @@ const EmployeeFormPage = () => {
             defaultCompanyId={params.get('empresa') ?? undefined}
             isEditMode={isEditMode}
             onSaved={handleSaved}
+            onMoved={fetchData}
             onCreated={newId => navigate(`${ROUTES.ADMIN.EMPLOYEES}/${newId}`)}
           />
           {isEditMode && employee && canEdit && (

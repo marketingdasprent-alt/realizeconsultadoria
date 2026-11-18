@@ -23,29 +23,30 @@ const send = (attachments: object[], over: Record<string, unknown> = {}) =>
     ...over,
   });
 
-describe('limite de envio: 18 MB', () => {
-  it('o limite do envio é 18 MiB, igual ao total com os anexos do original', () => {
-    expect(MAX_SEND_BYTES).toBe(18 * MIB);
-    expect(MAX_TOTAL_BYTES).toBe(MAX_SEND_BYTES);
+describe('limite de envio: 14 MB', () => {
+  it('o limite do envio é 14 MiB e não passa o total com os anexos do original (18 MiB)', () => {
+    expect(MAX_SEND_BYTES).toBe(14 * MIB);
+    expect(MAX_TOTAL_BYTES).toBe(18 * MIB);
+    expect(MAX_SEND_BYTES).toBeLessThanOrEqual(MAX_TOTAL_BYTES);
   });
 
-  it('a mensagem de "grande demais" diz 18 MB', () => {
-    expect(MAIL_ERROR_MESSAGES.too_large).toContain('18 MB');
-    expect(MAIL_ERROR_MESSAGES.too_large).not.toContain('10 MB');
+  it('a mensagem de "grande demais" diz 14 MB', () => {
+    expect(MAIL_ERROR_MESSAGES.too_large).toContain('14 MB');
+    expect(MAIL_ERROR_MESSAGES.too_large).not.toContain('18 MB');
   });
 
-  it('um anexo de 18 MiB exatos passa', () => {
+  it('um anexo de 14 MiB exatos passa', () => {
     const result = send([attachment(MAX_SEND_BYTES)]);
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.value.attachmentBytes[0].length).toBe(MAX_SEND_BYTES);
   });
 
-  it('18 MiB + 1 byte falha com too_large', () => {
+  it('14 MiB + 1 byte falha com too_large', () => {
     expect(send([attachment(MAX_SEND_BYTES + 1)])).toEqual({ ok: false, code: 'too_large' });
   });
 
   it('o texto e o HTML contam para o limite', () => {
-    // 18 MiB menos 10 bytes de anexo + 10 bytes de texto: no limite
+    // 14 MiB menos 10 bytes de anexo + 10 bytes de texto: no limite
     expect(send([attachment(MAX_SEND_BYTES - 10)], { text: '0123456789' }).ok).toBe(true);
     // mais um byte de HTML: acima
     expect(send([attachment(MAX_SEND_BYTES - 10)], { text: '0123456789', html: 'x' })).toEqual({
@@ -54,9 +55,9 @@ describe('limite de envio: 18 MB', () => {
     });
   });
 
-  it('vários anexos somam: 9 + 9 MiB passa, 9 + 9 MiB + 1 byte falha', () => {
-    expect(send([attachment(9 * MIB), attachment(9 * MIB)]).ok).toBe(true);
-    expect(send([attachment(9 * MIB), attachment(9 * MIB + 1)])).toEqual({
+  it('vários anexos somam: 7 + 7 MiB passa, 7 + 7 MiB + 1 byte falha', () => {
+    expect(send([attachment(7 * MIB), attachment(7 * MIB)]).ok).toBe(true);
+    expect(send([attachment(7 * MIB), attachment(7 * MIB + 1)])).toEqual({
       ok: false,
       code: 'too_large',
     });
@@ -71,7 +72,8 @@ describe('limite de envio: 18 MB', () => {
     expect(send([huge])).toEqual({ ok: false, code: 'too_large' });
   });
 
-  it('os 10 MB de antes passam agora', () => {
+  it('os 10 MB de antes passam e 15 MiB já não', () => {
     expect(send([attachment(10 * MIB + 400_000)]).ok).toBe(true);
+    expect(send([attachment(15 * MIB)])).toEqual({ ok: false, code: 'too_large' });
   });
 });

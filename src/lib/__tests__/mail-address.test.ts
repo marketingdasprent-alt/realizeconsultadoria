@@ -122,7 +122,7 @@ describe('validação dos pedidos ao mail-api', () => {
     expect(parseRecipients(undefined)).toEqual([]);
   });
 
-  it('recusa envios sem destinatários, com anexos inválidos ou acima de 18 MB', () => {
+  it('recusa envios sem destinatários, com anexos inválidos ou acima de 14 MB', () => {
     expect(parseSendRequest({ to: [], subject: 'x', html: '', text: 'x' })).toEqual({
       ok: false,
       code: 'invalid_recipient',
@@ -133,7 +133,7 @@ describe('validação dos pedidos ao mail-api', () => {
         attachments: [{ filename: 'a.txt', mime: 'text/plain', base64: '***' }],
       })
     ).toEqual({ ok: false, code: 'bad_request' });
-    // 26 MiB de base64 = ~19,5 MiB de ficheiro (o limite é 18 MiB)
+    // 26 MiB de base64 = ~19,5 MiB de ficheiro (o limite é 14 MiB)
     const big = 'A'.repeat(26 * 1024 * 1024);
     expect(
       parseSendRequest({

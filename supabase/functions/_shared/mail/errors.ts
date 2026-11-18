@@ -41,7 +41,7 @@ export const MAIL_ERROR_MESSAGES: Record<MailErrorCode, string> = {
   smtp_port_blocked:
     'O envio só funciona pela porta SMTP 465 (SSL/TLS); as portas 25 e 587 estão bloqueadas no servidor.',
   smtp_failed: 'O servidor SMTP recusou o envio.',
-  too_large: 'A mensagem ultrapassa o limite de 18 MB.',
+  too_large: 'A mensagem ultrapassa o limite de 14 MB.',
   invalid_recipient: 'Há destinatários com endereço inválido.',
   not_supported: 'Operação não suportada nesta caixa.',
   shared_account: 'Esta caixa é partilhada pela empresa: só o administrador a pode retirar.',

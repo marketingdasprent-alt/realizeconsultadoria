@@ -6,11 +6,12 @@ import { base64ToBytes, utf8Encode } from './mime.ts';
 import type { MailAddress, MailListFilters, MailProviderKey, OutgoingAttachment } from './types.ts';
 
 /**
- * Máximo (em bytes, já descodificados) de texto, HTML e anexos novos de um email. 18 MiB viram
- * ~24,6 MiB no email (base64 + quebras de linha), por baixo dos 25 MB que Gmail e Outlook aceitam.
- * Igual a MAX_TOTAL_BYTES de remoteAttachments.ts (anexos do original incluídos).
+ * Máximo (em bytes, já descodificados) de texto, HTML e anexos novos de um email: 14 MiB, que viram
+ * ~19,2 MiB no email. É o teto que a função aguenta com folga (medido: o pico de memória ronda 13
+ * vezes o tamanho; a 18 MiB aproxima-se dos 256 MB). Os anexos do original (reencaminhar) têm o
+ * seu limite, MAX_TOTAL_BYTES (18 MiB, em remoteAttachments.ts).
  */
-export const MAX_SEND_BYTES = 18 * 1024 * 1024;
+export const MAX_SEND_BYTES = 14 * 1024 * 1024;
 export const MAX_ATTACHMENTS = 100;
 export const DEFAULT_LIST_LIMIT = 25;
 export const MAX_LIST_LIMIT = 50;
@@ -128,7 +129,7 @@ export type SendValidation =
   | { ok: true; value: SendRequest }
   | { ok: false; code: 'bad_request' | 'invalid_recipient' | 'too_large' };
 
-/** Valida o pedido de envio: destinatários, anexos em base64 e limite total de 18 MB (MAX_SEND_BYTES). */
+/** Valida o pedido de envio: destinatários, anexos em base64 e limite total de 14 MB (MAX_SEND_BYTES). */
 /** Com `draft`, aceita-se sem destinatários (um rascunho ainda a meio). */
 export const parseSendRequest = (
   body: Record<string, unknown>,

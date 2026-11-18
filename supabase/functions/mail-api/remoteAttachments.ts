@@ -1,7 +1,7 @@
 // Reencaminhar sem passar os anexos pelo browser: o pedido de envio diz "anexos A, B, C do email
 // X da caixa Y" e o servidor vai buscá-los à caixa e junta-os ao email. Assim o compositor abre
-// logo e os anexos do original não contam para o limite do pedido (MAX_SEND_BYTES, 18 MB);
-// o total, com os do original, é limitado por MAX_TOTAL_BYTES.
+// logo e os anexos do original não contam para o limite do pedido (MAX_SEND_BYTES, 14 MB);
+// o total, com os do original, é limitado por MAX_TOTAL_BYTES (18 MB).
 
 import { mailError } from '../_shared/mail/errors.ts';
 import { base64ToBytes } from '../_shared/mail/mime.ts';

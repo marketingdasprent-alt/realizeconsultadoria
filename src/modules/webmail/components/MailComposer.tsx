@@ -42,7 +42,8 @@ import { RecipientField } from './RecipientField';
 import { SendCheckDialog } from './SendCheckDialog';
 import { RzSelect } from '@/modules/workspace/components/RzSelect';
 
-const MAX_BYTES = 10 * 1024 * 1024;
+/** Anexos novos: 18 MB ficam ~25 MB no email, o máximo que os servidores de quem recebe aceitam. */
+const MAX_BYTES = 18 * 1024 * 1024;
 /** Total com os anexos do email original (juntos pelo servidor ao enviar). */
 // Igual ao servidor: 18 MB de ficheiros ficam ~25 MB depois de codificados no email
 const MAX_TOTAL_BYTES = 18 * 1024 * 1024;
@@ -84,7 +85,7 @@ const Row: React.FC<{ label: string; children: React.ReactNode }> = ({ label, ch
   </label>
 );
 
-/** Escrever, responder ou reencaminhar (com assinatura da caixa e anexos até 10 MB). */
+/** Escrever, responder ou reencaminhar (com assinatura da caixa e anexos até 18 MB). */
 export const MailComposer: React.FC<MailComposerProps> = ({
   draft,
   accounts,
@@ -824,7 +825,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
         {(size > MAX_BYTES || totalSize > MAX_TOTAL_BYTES) && (
           <span className="text-[12.5px] font-semibold text-rose-600">
             {size > MAX_BYTES
-              ? 'Anexos novos acima de 10 MB.'
+              ? 'Anexos novos acima de 18 MB (no email ficam com mais de 25 MB, o limite dos servidores). Para ficheiros maiores, envie uma ligação (OneDrive, Google Drive…).'
               : 'Anexos acima de 18 MB (no email ficam com mais de 25 MB, o limite dos servidores).'}
           </span>
         )}

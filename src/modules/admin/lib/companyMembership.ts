@@ -240,12 +240,20 @@ export const ADMIN_ROLE_OPTIONS: { value: AdminRole; label: string; hint: string
 /** Quem vem da equipa da plataforma não se retira aqui: é gerido pela administração da plataforma. */
 export const canRemoveViewer = (viewer: CompanyViewer): boolean => viewer.kind !== 'super_admin';
 
+/**
+ * Conta como administrador da empresa quem tem pertença de administrador ativa: também um super
+ * admin que a tenha (a lista mostra-o como equipa da plataforma). Sem o campo (resposta antiga),
+ * conta pelo tipo.
+ */
+export const countsAsAdmin = (viewer: CompanyViewer): boolean =>
+  viewer.is_company_admin ?? viewer.kind === 'admin_empresa';
+
 export const adminCount = (viewers: readonly CompanyViewer[]): number =>
-  viewers.filter(viewer => viewer.kind === 'admin_empresa').length;
+  viewers.filter(countsAsAdmin).length;
 
 /** É o único administrador da empresa: a base recusa retirá-lo (a empresa nunca fica sem). */
 export const isLastAdmin = (viewers: readonly CompanyViewer[], viewer: CompanyViewer): boolean =>
-  viewer.kind === 'admin_empresa' && adminCount(viewers) <= 1;
+  countsAsAdmin(viewer) && adminCount(viewers) <= 1;
 
 export const LAST_ADMIN_RULE =
   'Uma empresa tem de ter sempre pelo menos um administrador. Para retirar o último, adicione primeiro outro.';

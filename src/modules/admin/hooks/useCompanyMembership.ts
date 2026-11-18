@@ -1,4 +1,4 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
 import { companyMembershipService } from '../services/companyMembershipService';
@@ -8,6 +8,7 @@ import {
   membershipErrorText,
   manageableCompanies,
 } from '../lib/companyMembership';
+import { isReauthRequired } from '../lib/sharing';
 import { useMyCompanies, useRefreshSharing } from './useSharing';
 
 /**
@@ -36,18 +37,42 @@ export const useCompanyEmployeesWithAccount = (company: string) =>
 
 /**
  * Executa uma escrita de administradores: mostra o resultado, relê quem tem acesso à empresa e,
- * se falhar, mostra o texto em português da base (nunca o código técnico).
+ * se a base pedir a palavra-passe outra vez (`reauth_required`), abre o diálogo e repete a
+ * chamada uma vez. Se falhar, mostra o texto em português da base (nunca o código técnico).
+ * O ecrã tem de mostrar `<ReauthDialog open={reauthOpen} onDone={finishReauth} />`.
  */
 export const useMembershipAction = () => {
   const { toast } = useToast();
   const refresh = useRefreshSharing();
   const [pending, setPending] = useState(false);
+  const [reauthOpen, setReauthOpen] = useState(false);
+  const resolver = useRef<((ok: boolean) => void) | null>(null);
 
+  const askReauth = () =>
+    new Promise<boolean>(resolve => {
+      resolver.current = resolve;
+      setReauthOpen(true);
+    });
+
+  const finishReauth = useCallback((ok: boolean) => {
+    resolver.current?.(ok);
+    resolver.current = null;
+    setReauthOpen(false);
+  }, []);
+
+  /** Devolve o resultado, ou `undefined` se falhou ou a pessoa desistiu da palavra-passe. */
   const run = useCallback(
     async <T>(action: () => Promise<T>, success: string): Promise<T | undefined> => {
       setPending(true);
       try {
-        const result = await action();
+        let result: T;
+        try {
+          result = await action();
+        } catch (error) {
+          if (!isReauthRequired(error)) throw error;
+          if (!(await askReauth())) return undefined;
+          result = await action();
+        }
         toast({ title: success });
         await refresh();
         return result;
@@ -65,5 +90,5 @@ export const useMembershipAction = () => {
     [toast, refresh]
   );
 
-  return { run, pending };
+  return { run, pending, reauthOpen, finishReauth };
 };

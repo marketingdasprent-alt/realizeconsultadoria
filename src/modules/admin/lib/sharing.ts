@@ -28,6 +28,11 @@ export interface CompanyViewer {
   email: string;
   kind: ViewerKind;
   role: string;
+  /**
+   * Tem pertença de administrador ativa nesta empresa, mesmo que apareça como super admin. É por
+   * aqui que se conta o último administrador. Falta em respostas antigas da base.
+   */
+  is_company_admin?: boolean;
 }
 
 export const VIEWER_KIND_LABEL: Record<ViewerKind, string> = {

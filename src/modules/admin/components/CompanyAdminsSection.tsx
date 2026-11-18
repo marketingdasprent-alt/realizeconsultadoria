@@ -19,6 +19,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { QueryState } from './sharing/QueryState';
+import { ReauthDialog } from './sharing/ReauthDialog';
 import {
   useCompanyEmployeesWithAccount,
   useMembershipAction,
@@ -31,6 +32,7 @@ import {
   adminCandidates,
   canManageCompany,
   canRemoveViewer,
+  countsAsAdmin,
   isLastAdmin,
   viewerRoleText,
   type AdminRole,
@@ -77,6 +79,11 @@ const ViewerRow: React.FC<{
       >
         {viewerRoleText(viewer)}
       </Badge>
+      {viewer.kind === 'super_admin' && countsAsAdmin(viewer) && (
+        <Badge variant="secondary" className="self-start whitespace-nowrap sm:self-center">
+          Administrador da empresa
+        </Badge>
+      )}
       {removable ? (
         <Button
           type="button"
@@ -136,6 +143,7 @@ const AdminsPanel: React.FC<CompanyAdminsSectionProps> = ({ company }) => {
 
   return (
     <section aria-labelledby="company-admins" className="space-y-4">
+      <ReauthDialog open={action.reauthOpen} onDone={action.finishReauth} />
       <div>
         <h3 id="company-admins" className="text-base font-semibold">
           Administradores

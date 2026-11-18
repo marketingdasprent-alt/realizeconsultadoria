@@ -4,6 +4,12 @@ Migração: `supabase/migrations/20261118110000_multiempresa_fase_c_funcoes.sql`
 Reversão: `supabase/rollbacks/20261118110000_multiempresa_fase_c_funcoes_rollback.sql`
 Ensaio: `supabase/tests/multiempresa_fase_c_ensaio.sql`
 
+> **Atualizado pela Fase D0** (`docs/multiempresa/FASE-D0.md`): `rz_company_viewers` devolve `is_company_admin`;
+> `rz_add_company_admin` e `rz_remove_company_admin` exigem login recente (`reauth_required`);
+> `rz_add_company_admin` só aceita quem tem ficha ativa na empresa ou já tem pertença nela;
+> `rz_remove_company_admin` avisa em português antes do 23505; `rz_transfer_employees` devolve
+> `unknown` para erros técnicos.
+
 Todas as funções são `SECURITY DEFINER`, `search_path = public, pg_temp`, `EXECUTE` só para
 `authenticated` e `service_role`. Chamam-se com `supabase.rpc(...)`. Os erros vêm do `rz_fail`:
 a mensagem é o código (`error.message`) e o texto em português está em `error.details`.

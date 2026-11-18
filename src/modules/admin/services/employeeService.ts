@@ -4,6 +4,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import type { Database } from '@/integrations/supabase/types';
 import { PAGE_SIZES } from '@/lib/constants';
+import { friendlyEmployeeWriteError } from '../lib/employeeWriteError';
 
 type Employee = Database['public']['Tables']['employees']['Row'];
 type EmployeeInsert = Database['public']['Tables']['employees']['Insert'];
@@ -102,7 +103,7 @@ export const employeeService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      return { data: null, error };
+      return { data: null, error: friendlyEmployeeWriteError(error) };
     }
   },
 
@@ -124,7 +125,7 @@ export const employeeService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      return { data: null, error };
+      return { data: null, error: friendlyEmployeeWriteError(error) };
     }
   },
 
@@ -170,7 +171,7 @@ export const employeeService = {
       if (error) throw error;
       return { data, error: null };
     } catch (error) {
-      return { data: null, error };
+      return { data: null, error: friendlyEmployeeWriteError(error) };
     }
   },
 

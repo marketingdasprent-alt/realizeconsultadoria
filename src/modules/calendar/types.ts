@@ -24,7 +24,14 @@ export interface CalendarEvent {
 }
 
 export type CalendarLayer =
-  'mine' | 'invites' | 'company' | 'absences' | 'team' | 'holidays' | 'health' | 'tasks';
+  | 'mine'
+  | 'invites'
+  | 'company'
+  | 'absences'
+  | 'team'
+  | 'holidays'
+  | 'health'
+  | 'tasks';
 
 /** Detalhe de blocos que não são eventos (abre na lateral, como um evento). */
 export type CalendarInfo =

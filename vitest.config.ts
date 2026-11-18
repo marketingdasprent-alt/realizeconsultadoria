@@ -9,6 +9,11 @@ export default defineConfig({
     environment: 'jsdom',
     globals: true,
     setupFiles: ['./src/setupTests.ts'],
+    // Valores de substituição: o cliente Supabase falha ao importar sem URL/chave (CI sem .env).
+    env: {
+      VITE_SUPABASE_URL: 'https://placeholder-url.supabase.co',
+      VITE_SUPABASE_PUBLISHABLE_KEY: 'placeholder-key',
+    },
     // .claude/worktrees: cópias do projeto de outras sessões (não são testes deste).
     exclude: ['e2e/**', '**/node_modules/**', '.claude/**', 'dist/**'],
     coverage: {

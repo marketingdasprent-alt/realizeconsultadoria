@@ -133,8 +133,7 @@ export const useFloatingWindow = (active: boolean, onTearOff?: (at: TearOffPoint
         panelNow.style.transform = moveTo(latest);
         // Fora do navegador: a janela fica meio transparente (ao largar abre noutra janela).
         panelNow.style.opacity = outside ? '0.5' : '';
-      }
-      else setPosition(latest); // primeiro movimento: passa de modal a solta
+      } else setPosition(latest); // primeiro movimento: passa de modal a solta
     };
     // Ouvintes na janela, não na barra: ao soltar, a janela passa de modal a solta e os
     // seus elementos são recriados a meio do arrasto.
@@ -159,7 +158,11 @@ export const useFloatingWindow = (active: boolean, onTearOff?: (at: TearOffPoint
       if (latest) setPosition(latest);
       // Largada fora do navegador: abre noutra janela, onde o rato está.
       const up = event as PointerEvent | undefined;
-      if (moved && up?.type === 'pointerup' && isOutsideViewport(up.clientX, up.clientY, viewportNow()))
+      if (
+        moved &&
+        up?.type === 'pointerup' &&
+        isOutsideViewport(up.clientX, up.clientY, viewportNow())
+      )
         tearOffRef.current?.({ screenX: up.screenX, screenY: up.screenY });
     };
     window.addEventListener('pointermove', onMove);

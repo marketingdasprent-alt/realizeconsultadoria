@@ -1,7 +1,13 @@
 // Formatação do Webmail: nomes, datas, respostas, assinaturas e o HTML seguro do leitor.
 import { format, isSameYear, isToday } from 'date-fns';
 import { pt } from 'date-fns/locale';
-import { forwardedHtml, forwardedText, repliedHtml, stripQuoteMarkers } from './forward';
+import {
+  cleanPlainText,
+  forwardedHtml,
+  forwardedText,
+  repliedHtml,
+  stripQuoteMarkers,
+} from './forward';
 import type { ComposeDraft, MailAddress, MailFolder, MailMessage, MailSummary } from '../types';
 
 export const FOLDERS: { key: MailFolder; label: string }[] = [
@@ -74,7 +80,7 @@ const prefixed = (prefix: 'Re' | 'Fwd', subject: string) => {
 const quote = (message: MailMessage) => {
   const when = format(new Date(message.date), "d 'de' MMMM 'de' yyyy, HH:mm", { locale: pt });
   // Os "> " do email original (texto simples citado pelo programa de quem respondeu) saem
-  const body = stripQuoteMarkers(message.text ?? htmlToText(message.html ?? '')).trim();
+  const body = cleanPlainText(stripQuoteMarkers(message.text ?? htmlToText(message.html ?? '')));
   // Sem "> " no início das linhas: na caixa de escrever lê-se como texto normal (com a barra
   // ao lado), e o email sai com a citação em HTML (repliedHtml).
   return `\n\nEm ${when}, ${nameOf(message.from)} escreveu:\n${body}`;
@@ -90,7 +96,7 @@ export const draftFrom = (
     return {
       accountId: message.accountId,
       subject: prefixed('Fwd', message.subject),
-      body: forwardedText(message, message.text ?? htmlToText(message.html ?? '')),
+      body: forwardedText(message, cleanPlainText(message.text ?? htmlToText(message.html ?? ''))),
       forward: {
         messageId: message.id,
         messageKey: message.messageKey ?? null,

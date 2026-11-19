@@ -18,11 +18,14 @@ import {
   type ScopeGroup,
 } from '../lib/companyScope';
 
+/** Chave da lista de empresas ativas (invalidar depois de criar ou alterar uma empresa). */
+export const COMPANIES_ACTIVE_KEY = ['admin', 'companies-active'] as const;
+
 /** Empresas ativas que a conta vê (a base já limita as de cada admin). */
 export const useActiveCompanies = (enabled = true) =>
   useQuery({
     enabled,
-    queryKey: ['admin', 'companies-active'],
+    queryKey: COMPANIES_ACTIVE_KEY,
     queryFn: async (): Promise<ScopeCompany[]> => {
       const { data, error } = await supabase
         .from('companies')

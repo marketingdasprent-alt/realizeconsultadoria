@@ -96,6 +96,7 @@ interface AdminUser {
 const SettingsPage = () => {
   const { toast } = useToast();
   const [isLoading, setIsLoading] = useState(false);
+  const [authEmailsVerified, setAuthEmailsVerified] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [profile, setProfile] = useState({
     name: '',
@@ -198,6 +199,7 @@ const SettingsPage = () => {
 
       // Get auth emails to detect conflicts
       let authEmails: Record<string, string> = {};
+      let verified = false;
       try {
         const { data: authData, error: authError } = await supabase.functions.invoke(
           'get-admin-auth-emails',
@@ -207,10 +209,13 @@ const SettingsPage = () => {
         );
         if (!authError && authData?.auth_emails) {
           authEmails = authData.auth_emails;
+          verified = true;
         }
       } catch (e) {
         console.error('Error fetching auth emails:', e);
       }
+      // Só o super admin pode ler os emails de login: sem isso o conflito fica por verificar
+      setAuthEmailsVerified(verified);
 
       // Combine data
       const adminUsers: AdminUser[] = adminRoles.map(role => {
@@ -539,7 +544,16 @@ const SettingsPage = () => {
         body: { user_id: userId },
       });
 
-      if (error) throw error;
+      if (error) {
+        let message = 'Não foi possível remover o administrador.';
+        try {
+          const body = await (error as { context?: Response }).context?.json();
+          if (typeof body?.error === 'string' && body.error) message = body.error;
+        } catch {
+          /* o corpo não é JSON: fica a mensagem geral */
+        }
+        throw new Error(message);
+      }
       if (data?.error) throw new Error(data.error);
 
       await fetchAdmins();
@@ -798,6 +812,11 @@ const SettingsPage = () => {
                                     <AlertTriangle className="h-3 w-3" />
                                     <span>Conflito de email</span>
                                   </div>
+                                )}
+                                {!authEmailsVerified && (
+                                  <span className="text-xs text-muted-foreground">
+                                    Email de login não verificado
+                                  </span>
                                 )}
                               </div>
                             </TableCell>

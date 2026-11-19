@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { authenticatedCaller, denyUnlessEmployeeAdmin } from '../_shared/admin-caller.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -21,53 +22,15 @@ serve(async (req: Request) => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const brevoApiKey = Deno.env.get('BREVO_API_KEY');
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Validate caller is admin using getClaims (same pattern as invite-admin)
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader?.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Não autorizado' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: claimsData, error: claimsError } = await supabaseUser.auth.getClaims(token);
-
-    if (claimsError || !claimsData?.claims?.sub) {
-      console.error('Token validation error:', claimsError);
-      return new Response(JSON.stringify({ error: 'Token inválido' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const requesterId = claimsData.claims.sub;
-
-    // Check if caller is admin
-    const { data: adminRole } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', requesterId)
-      .eq('role', 'admin')
-      .maybeSingle();
-
-    if (!adminRole) {
-      return new Response(
-        JSON.stringify({ error: 'Apenas administradores podem alterar senhas' }),
-        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    // Sessão válida de administrador (cliente do utilizador para as verificações por empresa)
+    const caller = await authenticatedCaller(req, corsHeaders);
+    if (caller instanceof Response) return caller;
 
     const { employee_id, new_password, send_email }: ChangePasswordRequest = await req.json();
 
@@ -84,6 +47,10 @@ serve(async (req: Request) => {
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
+
+    // Só quem administra a empresa do colaborador (inexistente e de outra empresa: 404 igual)
+    const notAllowed = await denyUnlessEmployeeAdmin(caller, corsHeaders, employee_id);
+    if (notAllowed) return notAllowed;
 
     // Get employee data
     const { data: employee, error: employeeError } = await supabaseAdmin

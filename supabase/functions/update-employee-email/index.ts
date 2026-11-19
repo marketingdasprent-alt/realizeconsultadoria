@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.2';
-import { denyUnlessAdmin } from '../_shared/admin-caller.ts';
+import { authenticatedCaller, denyUnlessEmployeeAdmin } from '../_shared/admin-caller.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -18,8 +18,8 @@ serve(async req => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const denied = await denyUnlessAdmin(req, corsHeaders);
-  if (denied) return denied;
+  const caller = await authenticatedCaller(req, corsHeaders);
+  if (caller instanceof Response) return caller;
 
   try {
     const supabaseAdmin = createClient(
@@ -45,6 +45,10 @@ serve(async req => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
+
+    // Só quem administra a empresa do colaborador (inexistente e de outra empresa: 404 igual)
+    const notAllowed = await denyUnlessEmployeeAdmin(caller, corsHeaders, employee_id);
+    if (notAllowed) return notAllowed;
 
     // Get employee data
     const { data: employee, error: employeeError } = await supabaseAdmin
@@ -79,11 +83,19 @@ serve(async req => {
     const oldEmail = employeeData.email;
     const normalizedNewEmail = new_email.toLowerCase().trim();
 
-    // Check if email already exists in employees table (different employee)
+    // O PostgREST trata * como curinga no ilike e não o deixa escapar: um email nunca o tem
+    if (normalizedNewEmail.includes('*')) {
+      return new Response(JSON.stringify({ error: 'Email inválido' }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Sem distinção de maiúsculas, mas % e _ do email não valem como curingas (escapados)
     const { data: existingEmployee } = await supabaseAdmin
       .from('employees')
       .select('id')
-      .ilike('email', normalizedNewEmail)
+      .ilike('email', normalizedNewEmail.replace(/[\\%_]/g, '\\$&'))
       .neq('id', employee_id)
       .maybeSingle();
 

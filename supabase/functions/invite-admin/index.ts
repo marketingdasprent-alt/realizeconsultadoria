@@ -1,5 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { authenticatedCaller, denyUnlessSuperAdmin } from '../_shared/admin-caller.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -20,55 +21,23 @@ const handler = async (req: Request): Promise<Response> => {
   try {
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
     const brevoApiKey = Deno.env.get('BREVO_API_KEY');
 
     const supabaseAdmin = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Verify the requester is an admin
-    const authHeader = req.headers.get('Authorization');
-    if (!authHeader || !authHeader.startsWith('Bearer ')) {
-      return new Response(JSON.stringify({ error: 'Não autorizado' }), {
+    // Cria uma conta de administrador global: só super admin. Mantém o contrato (200 com error).
+    const caller = await authenticatedCaller(req, corsHeaders);
+    const denied =
+      caller instanceof Response ? caller : await denyUnlessSuperAdmin(caller, corsHeaders);
+    if (denied) {
+      return new Response(await denied.text(), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-
-    // Create client with user's auth context to validate token
-    const supabaseUser = createClient(supabaseUrl, supabaseAnonKey, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const token = authHeader.replace('Bearer ', '');
-    const { data: userData, error: userError } = await supabaseUser.auth.getUser(token);
-
-    if (userError || !userData?.user) {
-      console.error('Token validation error:', userError);
-      return new Response(JSON.stringify({ error: 'Token inválido' }), {
-        status: 200,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    const requesterId = userData.user.id;
-    const requesterEmail = userData.user.email;
-
-    // Check if requester is admin
-    const { data: requesterRole } = await supabaseAdmin
-      .from('user_roles')
-      .select('role')
-      .eq('user_id', requesterId)
-      .eq('role', 'admin')
-      .maybeSingle();
-
-    if (!requesterRole) {
-      return new Response(
-        JSON.stringify({ error: 'Apenas administradores podem criar novos admins' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
+    const requesterEmail = (caller as { email: string | null }).email;
 
     const { email, name, password }: InviteAdminRequest = await req.json();
     const normalizedEmail = email.toLowerCase().trim();

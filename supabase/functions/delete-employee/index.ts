@@ -1,6 +1,7 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { denyUnlessAdmin } from '../_shared/admin-caller.ts';
+import { authenticatedCaller, denyUnlessEmployeeAdmin } from '../_shared/admin-caller.ts';
+import { shouldBanAccount } from '../_shared/company-access.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -12,8 +13,8 @@ serve(async req => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const denied = await denyUnlessAdmin(req, corsHeaders);
-  if (denied) return denied;
+  const caller = await authenticatedCaller(req, corsHeaders);
+  if (caller instanceof Response) return caller;
 
   try {
     const supabaseAdmin = createClient(
@@ -31,10 +32,14 @@ serve(async req => {
       });
     }
 
+    // Só quem administra a empresa do colaborador (inexistente e de outra empresa: 404 igual)
+    const notAllowed = await denyUnlessEmployeeAdmin(caller, corsHeaders, employee_id);
+    if (notAllowed) return notAllowed;
+
     // Fetch employee to get the associated auth user_id
     const { data: employee, error: fetchError } = await supabaseAdmin
       .from('employees')
-      .select('id, name, user_id')
+      .select('id, name, user_id, company_id')
       .eq('id', employee_id)
       .single();
 
@@ -61,8 +66,33 @@ serve(async req => {
 
     console.log('[delete-employee] Employee deactivated:', employee_id);
 
-    // Ban the auth user so they can no longer login
+    // Só se bane a conta quando não tem outra ficha ativa nem outra pertença ativa (outra empresa,
+    // ou admin); senão desativa-se só esta ficha. Se não der para ler, não se bane.
+    let ban = false;
     if (employee.user_id) {
+      const [otherEmployees, otherMemberships] = await Promise.all([
+        supabaseAdmin
+          .from('employees')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', employee.user_id)
+          .eq('is_active', true)
+          .neq('id', employee_id),
+        supabaseAdmin
+          .from('company_memberships')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', employee.user_id)
+          .eq('status', 'ativo')
+          .or(`company_id.neq.${employee.company_id},role.eq.admin`),
+      ]);
+      if (otherEmployees.error || otherMemberships.error) {
+        console.warn('[delete-employee] Could not check other access, account not banned');
+      } else {
+        ban = shouldBanAccount(otherEmployees.count ?? 0, otherMemberships.count ?? 0);
+      }
+    }
+
+    // Ban the auth user so they can no longer login
+    if (employee.user_id && ban) {
       const { error: banError } = await supabaseAdmin.auth.admin.updateUserById(
         employee.user_id,
         { ban_duration: '876000h' } // ~100 years

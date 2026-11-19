@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
+import { functionErrorMessage } from '@/lib/functionError';
 
 interface RepairMixedAccountDialogProps {
   open: boolean;
@@ -67,7 +68,9 @@ const RepairMixedAccountDialog = ({
         },
       });
 
-      if (error) throw error;
+      if (error) {
+        throw new Error(await functionErrorMessage(error, 'Não foi possível reparar a conta'));
+      }
       if (data?.error) throw new Error(data.error);
 
       toast({

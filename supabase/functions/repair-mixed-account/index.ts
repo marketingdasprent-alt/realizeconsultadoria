@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { denyUnlessAdmin } from '../_shared/admin-caller.ts';
+import { authenticatedCaller, denyUnlessSuperAdmin } from '../_shared/admin-caller.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,8 +17,11 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const denied = await denyUnlessAdmin(req, corsHeaders);
-  if (denied) return denied;
+  const caller = await authenticatedCaller(req, corsHeaders);
+  if (caller instanceof Response) return caller;
+  // Conta de administrador global: só super admin
+  const notSuper = await denyUnlessSuperAdmin(caller, corsHeaders);
+  if (notSuper) return notSuper;
 
   try {
     const { admin_user_id, employee_password }: RepairMixedAccountRequest = await req.json();

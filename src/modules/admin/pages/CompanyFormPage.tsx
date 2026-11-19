@@ -12,6 +12,7 @@ import { companyService, type Company } from '@/modules/admin/services/companySe
 import { COMPANIES_ACTIVE_KEY } from '../context/CompanyScopeContext';
 import { CompanyForm } from '../components/CompanyForm';
 import { CompanyAdminsSection } from '../components/CompanyAdminsSection';
+import { CompanyEmployeesSection } from '../components/CompanyEmployeesSection';
 
 const BackButton = ({ onClick }: { onClick: () => void }) => (
   <button
@@ -235,6 +236,17 @@ const CompanyFormPage = () => {
           {/* A secção traz o seu próprio título "Administradores" */}
           <CardContent className="pt-6">
             <CompanyAdminsSection company={{ id: company.id, name: company.name }} />
+          </CardContent>
+        </Card>
+      )}
+
+      {company && (
+        <Card className="max-w-4xl shadow-card">
+          {/* A secção traz o seu próprio título "Colaboradores" */}
+          <CardContent className="pt-6">
+            <CompanyEmployeesSection
+              company={{ id: company.id, name: company.name, isActive: company.is_active }}
+            />
           </CardContent>
         </Card>
       )}

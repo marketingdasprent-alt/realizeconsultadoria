@@ -9,6 +9,7 @@ import {
   canRemoveViewer,
   commonOrigin,
   describePendingEffects,
+  filterByName,
   isLastAdmin,
   manageableCompanies,
   membershipErrorText,
@@ -320,5 +321,24 @@ describe('administradores', () => {
     );
     expect(candidates.map(c => c.userId)).toEqual(['u8', 'u9']);
     expect(candidates[0].name).toBe('Ana');
+  });
+});
+
+describe('filterByName', () => {
+  const people = [{ name: 'José Antunes' }, { name: 'Ana Sá' }, { name: 'Joana Reis' }];
+
+  it('ignora acentos, maiúsculas e espaços à volta', () => {
+    expect(filterByName(people, '  jose ')).toEqual([{ name: 'José Antunes' }]);
+    expect(filterByName(people, 'SA')).toEqual([{ name: 'Ana Sá' }]);
+  });
+
+  it('texto vazio devolve todas, sem alterar a lista original', () => {
+    const result = filterByName(people, '   ');
+    expect(result).toEqual(people);
+    expect(result).not.toBe(people);
+  });
+
+  it('sem correspondência devolve vazio', () => {
+    expect(filterByName(people, 'zzz')).toEqual([]);
   });
 });

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import { ArrowRightLeft, CheckCircle2, Info, Loader2, TriangleAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,6 +41,8 @@ interface MoveEmployeesDialogProps {
   onClose: () => void;
   /** Chamado assim que a base confirma (para voltar a ler a lista ou a ficha). */
   onMoved: () => void;
+  /** Destino já decidido (ex.: "Adicionar colaboradores" na página da empresa): não se escolhe. */
+  fixedDestination?: { id: string; name: string };
 }
 
 type Outcome = { destination: string } & (
@@ -122,13 +124,15 @@ const MoveBody: React.FC<{
   employees: MoveSubject[];
   onClose: () => void;
   onMoved: () => void;
-}> = ({ employees: opened, onClose, onMoved }) => {
+  fixedDestination?: { id: string; name: string };
+}> = ({ employees: opened, onClose, onMoved, fixedDestination }) => {
   // As fichas ficam como estavam ao abrir: depois de mover, a lista muda mas o resumo não.
   const [employees] = useState(opened);
   const access = useMoveAccess();
   const { toast } = useToast();
   const refreshSharing = useRefreshSharing();
-  const [target, setTarget] = useState('');
+  const [target, setTarget] = useState(fixedDestination?.id ?? '');
+  const submitting = useRef(false);
   const [pending, setPending] = useState(false);
   const [outcome, setOutcome] = useState<Outcome | null>(null);
 
@@ -137,15 +141,22 @@ const MoveBody: React.FC<{
     [employees, access.companies]
   );
   const destinations = useMemo(
-    () => transferTargets(access.companies, movable.length ? movable : employees),
-    [access.companies, movable, employees]
+    () =>
+      fixedDestination
+        ? []
+        : transferTargets(access.companies, movable.length ? movable : employees),
+    [fixedDestination, access.companies, movable, employees]
   );
   const destinationName = companyLabel(
-    destinations.find(company => company.company_id === target)?.name ?? ''
+    fixedDestination?.name ??
+      destinations.find(company => company.company_id === target)?.name ??
+      ''
   );
 
   const submit = async () => {
-    if (!target || movable.length === 0) return;
+    // O ref apanha o duplo clique antes de o botão chegar a ficar desativado
+    if (!target || movable.length === 0 || submitting.current) return;
+    submitting.current = true;
     setPending(true);
     try {
       if (movable.length === 1) {
@@ -173,6 +184,7 @@ const MoveBody: React.FC<{
         variant: 'destructive',
       });
     } finally {
+      submitting.current = false;
       setPending(false);
     }
   };
@@ -184,9 +196,11 @@ const MoveBody: React.FC<{
       <DialogHeader>
         <DialogTitle className="flex items-center gap-2">
           <ArrowRightLeft className="h-5 w-5" />
-          {single
-            ? `Mover ${single.name} para outra empresa`
-            : `Mover ${employees.length} colaboradores para outra empresa`}
+          {fixedDestination
+            ? `Adicionar ${employees.length === 1 ? employees[0].name : `${employees.length} colaboradores`} a ${destinationName}`
+            : single
+              ? `Mover ${single.name} para outra empresa`
+              : `Mover ${employees.length} colaboradores para outra empresa`}
         </DialogTitle>
         <DialogDescription>
           A pessoa muda de empresa e passa a aparecer na empresa de destino.
@@ -218,27 +232,33 @@ const MoveBody: React.FC<{
             </div>
           )}
 
-          <div className="space-y-1.5">
-            <label htmlFor="move-target" className="text-sm font-medium">
-              Empresa de destino
-            </label>
-            <CompanySelect
-              id="move-target"
-              companies={destinations.map(company => ({
-                id: company.company_id,
-                name: company.name,
-              }))}
-              value={target}
-              onChange={setTarget}
-              placeholder="Escolher a empresa"
-              disabled={pending || access.isLoading || movable.length === 0}
-            />
-            {!access.isLoading && destinations.length === 0 && (
-              <p className="text-xs text-muted-foreground">
-                Não há outra empresa que administre para onde mover.
-              </p>
-            )}
-          </div>
+          {fixedDestination ? (
+            <p className="text-sm text-muted-foreground">
+              Empresa de destino: <strong>{destinationName}</strong>
+            </p>
+          ) : (
+            <div className="space-y-1.5">
+              <label htmlFor="move-target" className="text-sm font-medium">
+                Empresa de destino
+              </label>
+              <CompanySelect
+                id="move-target"
+                companies={destinations.map(company => ({
+                  id: company.company_id,
+                  name: company.name,
+                }))}
+                value={target}
+                onChange={setTarget}
+                placeholder="Escolher a empresa"
+                disabled={pending || access.isLoading || movable.length === 0}
+              />
+              {!access.isLoading && destinations.length === 0 && (
+                <p className="text-xs text-muted-foreground">
+                  Não há outra empresa que administre para onde mover.
+                </p>
+              )}
+            </div>
+          )}
 
           <div className="flex items-start gap-2 rounded-lg border bg-muted/40 p-3 text-sm">
             <Info className="mt-0.5 h-4 w-4 shrink-0 text-muted-foreground" />
@@ -283,6 +303,7 @@ export const MoveEmployeesDialog: React.FC<MoveEmployeesDialogProps> = ({
   employees,
   onClose,
   onMoved,
+  fixedDestination,
 }) => {
   const open = !!employees && employees.length > 0;
   return (
@@ -294,6 +315,7 @@ export const MoveEmployeesDialog: React.FC<MoveEmployeesDialogProps> = ({
             employees={employees}
             onClose={onClose}
             onMoved={onMoved}
+            fixedDestination={fixedDestination}
           />
         )}
       </DialogContent>

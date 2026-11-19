@@ -172,6 +172,30 @@ export const canOfferMove = (
 ): boolean =>
   canManageCompany(mine, employee.company_id) && transferTargets(mine, [employee]).length > 0;
 
+/** Ficha mostrada na secção "Colaboradores" da empresa (e no seletor de fichas de outras empresas). */
+export interface CompanyEmployee extends MovableEmployee {
+  email: string;
+  position: string | null;
+  department: string | null;
+  /** Nome da empresa atual (só nas fichas de outras empresas). */
+  companyName?: string | null;
+}
+
+/** Texto sem acentos nem maiúsculas, para pesquisar por nome. */
+const plain = (text: string): string => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+
+/** Fichas cujo nome contém o texto (ignora acentos e maiúsculas); texto vazio devolve todas. */
+export const filterByName = <T extends { name: string }>(
+  items: readonly T[],
+  query: string
+): T[] => {
+  const needle = plain(query.trim());
+  return needle ? items.filter(item => plain(item.name).includes(needle)) : [...items];
+};
+
+/** A partir de quantas fichas a lista da empresa passa a ter pesquisa. */
+export const SEARCH_THRESHOLD = 10;
+
 // --------------------------------------------------------------------------- resumo do que fica por tratar
 
 const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;

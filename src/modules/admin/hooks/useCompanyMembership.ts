@@ -1,6 +1,7 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
+import { COMPANIES_ACTIVE_KEY } from '../context/CompanyScopeContext';
 import { companyMembershipService } from '../services/companyMembershipService';
 import {
   canManageCompany,
@@ -34,6 +35,43 @@ export const useCompanyEmployeesWithAccount = (company: string) =>
     queryFn: () => companyMembershipService.companyEmployeesWithAccount(company),
     staleTime: 30_000,
   });
+
+/** Raiz das listas de fichas por empresa (a da própria empresa e a dos candidatos de fora). */
+export const COMPANY_EMPLOYEES_KEY = ['admin', 'company-employees'] as const;
+
+/** Colaboradores ativos de uma empresa, para a secção "Colaboradores" da página da empresa. */
+export const useCompanyEmployees = (company: string) =>
+  useQuery({
+    queryKey: [...COMPANY_EMPLOYEES_KEY, 'list', company],
+    queryFn: () => companyMembershipService.companyEmployees(company),
+    staleTime: 30_000,
+  });
+
+/** Fichas ativas das outras empresas; só se lê quando o seletor está aberto. */
+export const useEmployeesOutsideCompany = (company: string, enabled: boolean) =>
+  useQuery({
+    queryKey: [...COMPANY_EMPLOYEES_KEY, 'outside', company],
+    queryFn: () => companyMembershipService.employeesOutsideCompany(company),
+    enabled,
+    staleTime: 0,
+  });
+
+/**
+ * Depois de mover fichas: relê as listas de colaboradores por empresa, os candidatos a administrador
+ * (dependem de quem é da empresa) e o seletor de empresa do admin.
+ */
+export const useRefreshCompanyEmployees = () => {
+  const queryClient = useQueryClient();
+  return useCallback(
+    () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: COMPANY_EMPLOYEES_KEY }),
+        queryClient.invalidateQueries({ queryKey: ['admin', 'company-employees-with-account'] }),
+        queryClient.invalidateQueries({ queryKey: COMPANIES_ACTIVE_KEY }),
+      ]),
+    [queryClient]
+  );
+};
 
 /**
  * Executa uma escrita de administradores: mostra o resultado, relê quem tem acesso à empresa e,

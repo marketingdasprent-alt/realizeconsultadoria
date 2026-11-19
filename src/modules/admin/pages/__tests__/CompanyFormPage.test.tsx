@@ -33,6 +33,18 @@ vi.mock('../../components/CompanyAdminsSection', () => ({
   ),
 }));
 
+vi.mock('../../components/CompanyEmployeesSection', () => ({
+  CompanyEmployeesSection: ({
+    company,
+  }: {
+    company: { id: string; name: string; isActive: boolean };
+  }) => (
+    <div data-testid="employees-section">
+      Colaboradores de {company.name} ({company.id}, {company.isActive ? 'ativa' : 'inativa'})
+    </div>
+  ),
+}));
+
 const COMPANY = {
   id: 'c1',
   name: 'Acme Lda',
@@ -132,11 +144,23 @@ describe('CompanyFormPage — edição', () => {
     expect(screen.getByTestId('admins-section')).toHaveTextContent('Acme Lda');
   });
 
+  it('mostra a secção Colaboradores, por baixo dos administradores, com o estado da empresa', async () => {
+    getById.mockResolvedValue({ data: { ...COMPANY, is_active: false }, error: null });
+    renderAt('/admin/empresas/c1');
+    const employees = await screen.findByTestId('employees-section');
+    expect(employees).toHaveTextContent('Colaboradores de Acme Lda (c1, inativa)');
+    const admins = screen.getByTestId('admins-section');
+    expect(
+      admins.compareDocumentPosition(employees) & Node.DOCUMENT_POSITION_FOLLOWING
+    ).toBeTruthy();
+  });
+
   it('empresa não encontrada: mensagem e voltar à lista', async () => {
     getById.mockResolvedValue({ data: null, error: PGRST116 });
     renderAt('/admin/empresas/xx');
     expect(await screen.findByText('Empresa não encontrada')).toBeInTheDocument();
     expect(screen.queryByTestId('admins-section')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('employees-section')).not.toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /voltar às empresas/i }));
     expect(screen.getByTestId('where')).toHaveTextContent('/admin/empresas');
     expect(screen.getByText('Lista de empresas')).toBeInTheDocument();
@@ -184,6 +208,7 @@ describe('CompanyFormPage — edição', () => {
     expect(await screen.findByText(/não tem permissão/i)).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: /guardar alterações/i })).not.toBeInTheDocument();
     expect(screen.queryByTestId('admins-section')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('employees-section')).not.toBeInTheDocument();
     expect(getById).not.toHaveBeenCalled();
   });
 
@@ -198,11 +223,12 @@ describe('CompanyFormPage — edição', () => {
 });
 
 describe('CompanyFormPage — criação', () => {
-  it('mostra o formulário vazio e não mostra os administradores', async () => {
+  it('mostra o formulário vazio e não mostra os administradores nem os colaboradores', async () => {
     renderAt('/admin/empresas/nova');
     expect(await screen.findByRole('heading', { name: 'Nova empresa' })).toBeInTheDocument();
     expect(getById).not.toHaveBeenCalled();
     expect(screen.queryByTestId('admins-section')).not.toBeInTheDocument();
+    expect(screen.queryByTestId('employees-section')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: /criar empresa/i })).toBeInTheDocument();
   });
 

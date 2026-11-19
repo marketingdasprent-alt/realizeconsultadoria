@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.49.2';
-import { denyUnlessAdmin } from '../_shared/admin-caller.ts';
+import { authenticatedCaller, denyUnlessEmployeeAdmin } from '../_shared/admin-caller.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,8 +25,8 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const denied = await denyUnlessAdmin(req, corsHeaders);
-  if (denied) return denied;
+  const caller = await authenticatedCaller(req, corsHeaders);
+  if (caller instanceof Response) return caller;
 
   try {
     const { employee_id }: ResendWelcomeRequest = await req.json();
@@ -38,6 +38,10 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
+    // Só quem administra a empresa do colaborador (inexistente e de outra empresa: 404 igual)
+    const notAllowed = await denyUnlessEmployeeAdmin(caller, corsHeaders, employee_id);
+    if (notAllowed) return notAllowed;
+
     const supabaseAdmin = createClient(
       Deno.env.get('SUPABASE_URL') ?? '',
       Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -47,7 +51,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Get employee details
     const { data: employee, error: employeeError } = await supabaseAdmin
       .from('employees')
-      .select('name, email')
+      .select('name, email, user_id')
       .eq('id', employee_id)
       .single();
 
@@ -61,14 +65,17 @@ const handler = async (req: Request): Promise<Response> => {
 
     const newPassword = generateRandomPassword();
 
-    // Find the user in Auth
-    const { data: users, error: listError } = await supabaseAdmin.auth.admin.listUsers();
-    if (listError) {
-      console.error('[resend-welcome-email] Error listing users:', listError);
-      throw listError;
+    // A conta é a ligada à ficha (user_id), nunca a que calha ter o mesmo email
+    if (!employee.user_id) {
+      return new Response(
+        JSON.stringify({ error: 'Colaborador não tem conta de utilizador associada' }),
+        { status: 400, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
     }
-
-    const authUser = users.users.find(u => u.email?.toLowerCase() === employee.email.toLowerCase());
+    const { data: authData, error: authError } = await supabaseAdmin.auth.admin.getUserById(
+      employee.user_id
+    );
+    const authUser = authError ? null : authData?.user;
 
     if (!authUser) {
       return new Response(JSON.stringify({ error: 'Utilizador auth não encontrado' }), {
@@ -106,7 +113,7 @@ const handler = async (req: Request): Promise<Response> => {
               <h2>Olá ${employee.name},</h2>
               <p>Conforme solicitado, re-enviamos as suas credenciais de acesso ao portal da Realize Consultadoria.</p>
               <div style="background-color: #f8f9fa; border-radius: 8px; padding: 20px; border-left: 4px solid #d5b884;">
-                <p>📧 <strong>Email:</strong> ${employee.email}</p>
+                <p>📧 <strong>Email:</strong> ${authUser.email}</p>
                 <p>🔐 <strong>Nova Senha:</strong> ${newPassword}</p>
               </div>
               <p>Aceda aqui: <a href="${loginUrl}">${loginUrl}</a></p>
@@ -127,7 +134,7 @@ const handler = async (req: Request): Promise<Response> => {
           },
           body: JSON.stringify({
             sender: { name: 'Realize Consultadoria', email: 'noreply@dasprent.pt' },
-            to: [{ email: employee.email, name: employee.name }],
+            to: [{ email: authUser.email ?? employee.email, name: employee.name }],
             subject: 'Credenciais de Acesso - Realize Consultadoria',
             htmlContent: emailHtml,
           }),

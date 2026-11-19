@@ -182,14 +182,15 @@ export const broadcastService = {
       },
     });
     if (error || !data) {
-      return {
-        ok: false,
-        sent: 0,
-        failed: [],
-        requested: 0,
-        notices: 0,
-        error: 'Não foi possível enviar.',
-      };
+      // A função recusa com 403/400 e um motivo em português no corpo: mostrá-lo
+      let reason = 'Não foi possível enviar.';
+      try {
+        const body = await (error as { context?: Response } | null)?.context?.json();
+        if (typeof body?.error === 'string' && body.error) reason = body.error;
+      } catch {
+        /* o corpo não é JSON: fica a mensagem geral */
+      }
+      return { ok: false, sent: 0, failed: [], requested: 0, notices: 0, error: reason };
     }
     return data;
   },

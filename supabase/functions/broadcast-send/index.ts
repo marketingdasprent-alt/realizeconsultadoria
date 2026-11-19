@@ -14,11 +14,16 @@
 // POST { action: 'remind', noticeIds: string[], employeeIds: string[] } → volta a mandar a
 // notificação do comunicado a quem ainda não confirmou (só as pessoas indicadas) → { ok, sent }
 //
+// Âmbito por empresa: só se envia a colaboradores (e se publica em empresas) que o chamador
+// administra; senão 403 e nada é enviado nem gravado. O aviso para todos (company_id nulo) e os
+// avisos globais só para super admin.
+//
 // Só administradores com o módulo Comunicados (marketing → email, executar) ou super admins.
 
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient, type SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { adminCaller } from '../_shared/admin-caller.ts';
+import { authenticatedCaller, denyUnlessScope, type AdminCaller } from '../_shared/admin-caller.ts';
+import { broadcastScope, remindScope, type ScopeNeeds } from '../_shared/company-access.ts';
 import { broadcastEmailHtml, cleanSignatureHtml } from '../_shared/broadcast-email.ts';
 
 const SENDER_EMAIL = 'marketing@dasprent.pt';
@@ -60,21 +65,53 @@ interface BroadcastRequest {
   test?: boolean;
 }
 
+/** Resposta de recusa no formato desta função, ou null se o âmbito é todo do chamador. */
+const denyScope = async (caller: AdminCaller, scope: ScopeNeeds) => {
+  const denied = await denyUnlessScope(caller, corsHeaders, scope);
+  if (!denied) return null;
+  const detail = (await denied.json().catch(() => null)) as { error?: string } | null;
+  return json({ ok: false, error: detail?.error ?? 'Sem permissão.' }, denied.status);
+};
+
 /** Lembrar quem falta: a notificação outra vez, só para essas pessoas (push-send). */
-const remind = async (db: SupabaseClient, body: BroadcastRequest) => {
+const remind = async (db: SupabaseClient, caller: AdminCaller, body: BroadcastRequest) => {
   const token = Deno.env.get('MAIL_SYSTEM_TOKEN');
   const noticeIds = [...new Set(body.noticeIds ?? [])].slice(0, 500);
   const employeeIds = [...new Set(body.employeeIds ?? [])].slice(0, 2000);
   if (!token || !noticeIds.length || !employeeIds.length) {
     return json({ ok: false, error: 'Nada para lembrar.' }, 400);
   }
-  const { data: people } = await db
+  // Âmbito: as empresas das pessoas e dos avisos têm de ser administradas por quem chama
+  const { data: scopePeople, error: scopePeopleError } = await db
     .from('employees')
-    .select('user_id')
-    .in('id', employeeIds)
-    .eq('is_active', true)
-    .not('user_id', 'is', null);
-  const userIds = (people ?? []).map(person => person.user_id as string);
+    .select('user_id, company_id, is_active')
+    .in('id', employeeIds);
+  const { data: notices, error: noticesError } = await db
+    .from('notifications')
+    .select('id, company_id, employee_id')
+    .in('id', noticeIds);
+  if (scopePeopleError || noticesError) {
+    return json({ ok: false, error: 'Não foi possível verificar o âmbito.' }, 500);
+  }
+  const noticeEmployeeIds = (notices ?? []).flatMap(n =>
+    n.company_id || !n.employee_id ? [] : [n.employee_id as string]
+  );
+  const { data: noticePeople } = noticeEmployeeIds.length
+    ? await db.from('employees').select('id, company_id').in('id', noticeEmployeeIds)
+    : { data: [] as { id: string; company_id: string | null }[] };
+  const outside = await denyScope(
+    caller,
+    remindScope({
+      peopleCompanyIds: (scopePeople ?? []).map(p => p.company_id as string | null),
+      notices: (notices ?? []) as { company_id: string | null; employee_id: string | null }[],
+      requestedNotices: noticeIds.length,
+      companyOfEmployee: new Map((noticePeople ?? []).map(p => [p.id, p.company_id])),
+    })
+  );
+  if (outside) return outside;
+
+  const people = (scopePeople ?? []).filter(p => p.is_active && p.user_id);
+  const userIds = people.map(person => person.user_id as string);
   let sent = 0;
   for (const noticeId of noticeIds) {
     const res = await fetch(`${Deno.env.get('SUPABASE_URL')}/functions/v1/push-send`, {
@@ -88,11 +125,11 @@ const remind = async (db: SupabaseClient, body: BroadcastRequest) => {
   return json({ ok: true, sent, people: userIds.length });
 };
 
-serve(async (req: Request) => {
+const handle = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: corsHeaders });
   if (req.method !== 'POST') return json({ ok: false, error: 'method_not_allowed' }, 405);
 
-  const caller = await adminCaller(req, corsHeaders);
+  const caller = await authenticatedCaller(req, corsHeaders);
   if (caller instanceof Response) return caller;
 
   const db = createClient(
@@ -114,7 +151,7 @@ serve(async (req: Request) => {
   if (!brevoKey) return json({ ok: false, error: 'Configuração de email em falta.' }, 500);
 
   const body = (await req.json().catch(() => null)) as BroadcastRequest | null;
-  if (body?.action === 'remind') return remind(db, body);
+  if (body?.action === 'remind') return remind(db, caller, body);
   const subject = body?.subject?.trim().slice(0, 200) ?? '';
   const message = body?.message?.trim().slice(0, 20000) ?? '';
   const senderName = body?.senderName?.trim().slice(0, 120) ?? '';
@@ -133,6 +170,18 @@ serve(async (req: Request) => {
         .in('id', ids.length ? ids : ['00000000-0000-0000-0000-000000000000'])
         .eq('is_active', true);
   if (peopleError) return json({ ok: false, error: 'Não foi possível ler os colaboradores.' }, 500);
+  // Âmbito: nenhuma pessoa nem empresa fora das que o chamador administra (antes de enviar nada)
+  const outside = await denyScope(
+    caller,
+    broadcastScope({
+      test,
+      publishInApp: body?.publishInApp === true,
+      audienceMode: body?.audience?.mode,
+      audienceCompanyIds: body?.audience?.companyIds ?? [],
+      peopleCompanyIds: (people ?? []).map(person => person.company_id as string | null),
+    })
+  );
+  if (outside) return outside;
   // Só na app: ninguém recebe email (o teste continua a ir por email a quem o pede).
   const appOnly = !test && body?.sendEmail === false;
   if (appOnly && !body?.publishInApp) {
@@ -263,4 +312,14 @@ serve(async (req: Request) => {
   if (historyError) console.error('[broadcast-send] histórico', historyError.message);
 
   return json({ ok: sent > 0 || notices > 0, sent, failed, requested: emails.length, notices });
+};
+
+serve(async (req: Request) => {
+  try {
+    return await handle(req);
+  } catch (error) {
+    // Qualquer exceção (rede, RPC): 500 geral, com CORS e sem detalhe interno
+    console.error('[broadcast-send]', error instanceof Error ? error.name : 'erro');
+    return json({ ok: false, error: 'Erro interno.' }, 500);
+  }
 });

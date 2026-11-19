@@ -1,6 +1,6 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { denyUnlessAdmin } from '../_shared/admin-caller.ts';
+import { authenticatedCaller, denyUnlessCompanyAdmin } from '../_shared/admin-caller.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -29,8 +29,8 @@ const handler = async (req: Request): Promise<Response> => {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const denied = await denyUnlessAdmin(req, corsHeaders);
-  if (denied) return denied;
+  const caller = await authenticatedCaller(req, corsHeaders);
+  if (caller instanceof Response) return caller;
 
   try {
     const requestData: CreateEmployeeRequest = await req.json();
@@ -63,6 +63,21 @@ const handler = async (req: Request): Promise<Response> => {
 
     if (password.length < 8) {
       return new Response(JSON.stringify({ error: 'A senha deve ter pelo menos 8 caracteres' }), {
+        status: 400,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
+
+    // Só se cria colaborador numa empresa que o chamador administra, e que exista e esteja ativa
+    const notAllowed = await denyUnlessCompanyAdmin(caller, corsHeaders, company_id);
+    if (notAllowed) return notAllowed;
+    const { data: company } = await caller.db
+      .from('companies')
+      .select('is_active')
+      .eq('id', company_id)
+      .maybeSingle();
+    if (!company || company.is_active === false) {
+      return new Response(JSON.stringify({ error: 'Empresa não encontrada ou inativa' }), {
         status: 400,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
       });

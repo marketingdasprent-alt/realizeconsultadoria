@@ -98,12 +98,16 @@ export interface GroupOverviewRow {
   company_id: string;
   company_name: string;
   joined_at: string;
-  origin: 'pedido' | 'migracao';
+  origin: 'pedido' | 'migracao' | 'manual';
+  /** Falta em respostas de uma base sem o Lote 2: conta como vazio. */
+  default_capabilities?: string[];
 }
 
 export interface GroupOverview {
   id: string;
   name: string;
+  /** Módulos que as empresas do grupo veem umas das outras por defeito (só configuração). */
+  defaultCapabilities: string[];
   members: {
     companyId: string;
     name: string;
@@ -123,6 +127,7 @@ export const groupOverview = (rows: readonly GroupOverviewRow[]): GroupOverview[
     const group = groups.get(row.group_id) ?? {
       id: row.group_id,
       name: row.group_name,
+      defaultCapabilities: row.default_capabilities ?? [],
       members: [],
     };
     group.members.push({
@@ -157,6 +162,7 @@ export const isSuperAdminAccount = (companies: readonly MyCompany[]): boolean =>
 export const GROUP_ORIGIN_LABEL: Record<GroupOverviewRow['origin'], string> = {
   migracao: 'Definido pela Realize',
   pedido: 'Por pedido aprovado',
+  manual: 'Definido por um administrador',
 };
 
 export interface GroupMember {
@@ -164,8 +170,9 @@ export interface GroupMember {
   company_id: string;
   name: string;
   joined_at: string;
-  origin: 'pedido' | 'migracao';
+  origin: 'pedido' | 'migracao' | 'manual';
   is_me: boolean;
+  default_capabilities?: string[];
 }
 
 export type RequestDirection = 'received' | 'sent';
@@ -312,3 +319,50 @@ export const needsLegacyConfirmation = (share: Share): boolean =>
   share.origin === 'legado' &&
   share.status === 'aprovado' &&
   !share.legacy_confirmed_at;
+
+// --------------------------------------------------------------------------- gestão de grupos
+
+/** Módulos que um grupo novo mostra por defeito: o diretório e o Feed (o resto só com partilha aprovada). */
+export const GROUP_DEFAULT_CAPABILITIES = ['directory.read', 'feed.read'] as const;
+
+/** Enquanto a regra de leitura não estiver ativa (Lote 3), os módulos do grupo só ficam guardados. */
+export const GROUP_DEFAULTS_NOTE =
+  'Os módulos do grupo ainda não têm efeito: só passam a valer quando a regra de leitura for ativada.';
+
+/** Só o que um grupo pode mostrar por defeito: leitura, partilhável e não sensível (como a base exige). */
+export const groupableCapabilities = (catalog: readonly Capability[]): Capability[] =>
+  catalog.filter(item => item.kind === 'read' && item.grantable && !item.sensitive);
+
+/** Os módulos por defeito do grupo em palavras ("Colaboradores, Comunicados de grupo"). */
+export const groupDefaultsText = (capabilities: readonly string[] | undefined): string => {
+  const modules = [...new Set((capabilities ?? []).map(code => code.split('.')[0]))];
+  return modules.length === 0 ? 'Nada por defeito' : modules.map(moduleLabel).join(', ');
+};
+
+export interface CompanyAvailability {
+  id: string;
+  name: string;
+  /** Porque não se pode escolher (já está noutro grupo); vazio se está livre. */
+  reason?: string;
+}
+
+/**
+ * As empresas para escolher num grupo, por ordem de nome. As que já estão noutro grupo ficam
+ * recusadas, com o nome desse grupo; `currentGroup` é o grupo que se está a gerir (null se é novo).
+ */
+export const companyAvailability = (
+  all: readonly MyCompany[],
+  rows: readonly GroupOverviewRow[],
+  currentGroup: string | null
+): CompanyAvailability[] => {
+  const groupOf = new Map(rows.map(row => [row.company_id, row]));
+  return sortCompanies(all).map(company => {
+    const row = groupOf.get(company.company_id);
+    const taken = row && row.group_id !== currentGroup ? row : undefined;
+    return {
+      id: company.company_id,
+      name: companyLabel(company.name),
+      ...(taken ? { reason: `Já pertence ao grupo ${taken.group_name}` } : {}),
+    };
+  });
+};

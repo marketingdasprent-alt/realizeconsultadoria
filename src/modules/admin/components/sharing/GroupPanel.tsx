@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useGroup } from '../../hooks/useSharing';
 import { useSharingAction } from '../../hooks/useSharingAction';
+import { GROUP_DEFAULTS_NOTE, groupDefaultsText } from '../../lib/sharing';
 import { sharingService } from '../../services/sharingService';
 import { QueryState } from './QueryState';
 import { ReauthDialog } from './ReauthDialog';
@@ -40,6 +41,12 @@ export const GroupPanel: React.FC<{ company: string }> = ({ company }) => {
         emptyHint="O grupo nasce quando um pedido de ligação entre duas empresas é aprovado."
         onRetry={() => query.refetch()}
       >
+        <div className="space-y-1">
+          <p className="text-sm font-medium">
+            {`O seu grupo mostra por defeito: ${groupDefaultsText(members[0]?.default_capabilities)}`}
+          </p>
+          <p className="text-xs text-muted-foreground">{GROUP_DEFAULTS_NOTE}</p>
+        </div>
         <ul className="grid gap-2 sm:grid-cols-2">
           {members.map(member => (
             <li

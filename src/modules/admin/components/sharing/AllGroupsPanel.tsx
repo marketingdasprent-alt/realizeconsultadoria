@@ -1,34 +1,96 @@
-import React from 'react';
-import { Building2 } from 'lucide-react';
+import React, { useState } from 'react';
+import {
+  ArrowRightLeft,
+  Building2,
+  Network,
+  Pencil,
+  Plus,
+  SlidersHorizontal,
+  Trash2,
+} from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { useAllGroups, useMyCompanies } from '../../hooks/useSharing';
 import {
+  GROUP_DEFAULTS_NOTE,
   GROUP_ORIGIN_LABEL,
   companiesWithoutGroup,
   companyLabel,
+  groupDefaultsText,
   groupOverview,
+  type GroupOverview,
   type MyCompany,
 } from '../../lib/sharing';
+import { DissolveGroupDialog } from './DissolveGroupDialog';
+import { GroupDialog, type GroupDialogState } from './GroupDialog';
 import { QueryState } from './QueryState';
 
 const date = (iso: string) => new Date(iso).toLocaleDateString('pt-PT');
 
 const Heading: React.FC<{ title: string; count: number }> = ({ title, count }) => (
   <div className="flex min-w-0 items-center justify-between gap-2">
-    <h2 className="truncate text-base font-semibold">{title}</h2>
+    <h3 className="truncate text-base font-semibold">{title}</h3>
     <Badge variant="secondary" className="shrink-0">
       {count === 1 ? '1 empresa' : `${count} empresas`}
     </Badge>
   </div>
 );
 
+const GroupActions: React.FC<{
+  group: GroupOverview;
+  onEdit: (state: GroupDialogState) => void;
+  onDissolve: (group: GroupOverview) => void;
+}> = ({ group, onEdit, onDissolve }) => (
+  <div className="flex flex-wrap gap-2">
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      aria-label={`Renomear ${group.name}`}
+      onClick={() => onEdit({ kind: 'rename', group })}
+    >
+      <Pencil className="mr-1.5 h-4 w-4" /> Renomear
+    </Button>
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      aria-label={`Gerir empresas de ${group.name}`}
+      onClick={() => onEdit({ kind: 'members', group })}
+    >
+      <ArrowRightLeft className="mr-1.5 h-4 w-4" /> Gerir empresas
+    </Button>
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      aria-label={`Módulos de ${group.name}`}
+      onClick={() => onEdit({ kind: 'capabilities', group })}
+    >
+      <SlidersHorizontal className="mr-1.5 h-4 w-4" /> Módulos
+    </Button>
+    <Button
+      type="button"
+      size="sm"
+      variant="outline"
+      aria-label={`Dissolver ${group.name}`}
+      onClick={() => onDissolve(group)}
+    >
+      <Trash2 className="mr-1.5 h-4 w-4" /> Dissolver
+    </Button>
+  </div>
+);
+
 /**
- * Todos os grupos de empresas de uma vez (só Super Admin): cada grupo com as suas empresas, e as
- * que ainda não estão em nenhum. Entrar num grupo não dá acesso a nada: o acesso vem das partilhas.
+ * Todos os grupos de empresas (só Super Admin): criar, renomear, juntar ou retirar empresas,
+ * escolher os módulos do grupo e dissolver. Os módulos só ficam guardados; a regra de leitura que
+ * os aplica vem noutro lote (ver GROUP_DEFAULTS_NOTE).
  */
 export const AllGroupsPanel: React.FC = () => {
   const groups = useAllGroups(true);
   const companies = useMyCompanies();
+  const [dialog, setDialog] = useState<GroupDialogState | null>(null);
+  const [dissolving, setDissolving] = useState<GroupOverview | null>(null);
   const rows = groups.data ?? [];
   const overview = groupOverview(rows);
   const all: MyCompany[] = companies.data ?? [];
@@ -36,16 +98,34 @@ export const AllGroupsPanel: React.FC = () => {
 
   return (
     <div className="space-y-6">
-      <p className="max-w-2xl text-sm text-muted-foreground">
-        Os grupos de empresas e as empresas que fazem parte de cada um. Pertencer a um grupo não dá
-        acesso aos dados das outras empresas: o acesso só existe se uma empresa o partilhar.
-      </p>
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+        <div className="max-w-2xl space-y-1">
+          <h2 className="flex items-center gap-2 text-lg font-semibold">
+            <Network className="h-5 w-5" aria-hidden /> Grupos de empresas
+          </h2>
+          <p className="text-sm text-muted-foreground">
+            Os módulos do grupo definem o que as empresas veem umas das outras (só leitura); o resto
+            só com partilha aprovada.
+          </p>
+          <p className="text-xs text-muted-foreground">{GROUP_DEFAULTS_NOTE}</p>
+        </div>
+        <Button
+          type="button"
+          variant="gold"
+          className="self-start"
+          disabled={groups.isLoading || !!groups.error}
+          onClick={() => setDialog({ kind: 'create' })}
+        >
+          <Plus className="mr-2 h-4 w-4" /> Novo grupo
+        </Button>
+      </div>
+
       <QueryState
         isLoading={groups.isLoading || companies.isLoading}
         error={groups.error ?? companies.error}
         isEmpty={overview.length === 0 && alone.length === 0}
         emptyTitle="Ainda não há grupos"
-        emptyHint="Os grupos aparecem aqui quando forem criados."
+        emptyHint="Crie o primeiro grupo em «Novo grupo»."
         onRetry={() => {
           void groups.refetch();
           void companies.refetch();
@@ -60,6 +140,9 @@ export const AllGroupsPanel: React.FC = () => {
               className="min-w-0 space-y-3 rounded-lg border p-4"
             >
               <Heading title={group.name} count={group.members.length} />
+              <p className="text-sm text-muted-foreground">
+                Módulos do grupo: <strong>{groupDefaultsText(group.defaultCapabilities)}</strong>
+              </p>
               <ul className="space-y-2">
                 {group.members.map(member => (
                   <li
@@ -75,6 +158,7 @@ export const AllGroupsPanel: React.FC = () => {
                   </li>
                 ))}
               </ul>
+              <GroupActions group={group} onEdit={setDialog} onDissolve={setDissolving} />
             </section>
           ))}
           {alone.length > 0 && (
@@ -103,6 +187,9 @@ export const AllGroupsPanel: React.FC = () => {
           )}
         </div>
       </QueryState>
+
+      <GroupDialog state={dialog} rows={rows} companies={all} onClose={() => setDialog(null)} />
+      <DissolveGroupDialog group={dissolving} onClose={() => setDissolving(null)} />
     </div>
   );
 };

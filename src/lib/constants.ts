@@ -47,6 +47,8 @@ export const ROUTES = {
     DASHBOARD: '/admin',
     LEGAL: '/admin/juridico',
     COMPANIES: '/admin/empresas',
+    COMPANY_NEW: '/admin/empresas/nova',
+    COMPANY_EDIT: '/admin/empresas/:id',
     /** Partilha entre empresas: código, pedidos de ligação, quem tem acesso e grupo. */
     SHARING: '/admin/partilha',
     EMPLOYEES: '/admin/colaboradores',

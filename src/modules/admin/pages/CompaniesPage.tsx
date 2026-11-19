@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Edit, Trash2, MoreHorizontal, Loader2 } from 'lucide-react';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
@@ -13,13 +14,6 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-  DialogTrigger,
-} from '@/components/ui/dialog';
-import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -30,56 +24,26 @@ import { useToast } from '@/hooks/use-toast';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useCompanies } from '@/hooks/useCompanies';
-import { CompanyForm } from '../components/CompanyForm';
-import { CompanyAdminsSection } from '../components/CompanyAdminsSection';
 import type { Company } from '@/modules/admin/services/companyService';
-import type { CreateCompanyInput } from '@/lib/schemas';
+import { ROUTES } from '@/lib/constants';
 
 const CompaniesPage = () => {
   const { toast } = useToast();
+  const navigate = useNavigate();
   const { canExecuteTopic } = useAdminPermissions();
   const canManage = canExecuteTopic('companies', 'manage');
 
-  const { companies, isLoading, createCompany, updateCompany, deleteCompany, toggleStatus } =
-    useCompanies();
+  const { companies, isLoading, deleteCompany, toggleStatus } = useCompanies();
 
   const [searchTerm, setSearchTerm] = useState('');
-  const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editingCompany, setEditingCompany] = useState<Company | null>(null);
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [companyToDelete, setCompanyToDelete] = useState<Company | null>(null);
   const [isActionLoading, setIsActionLoading] = useState(false);
 
-  const handleSubmit = async (data: CreateCompanyInput) => {
-    setIsActionLoading(true);
-    try {
-      if (editingCompany) {
-        const { error } = await updateCompany(editingCompany.id, data);
-        if (error) throw error;
-        toast({ title: 'Empresa atualizada com sucesso!' });
-      } else {
-        const { error } = await createCompany(data);
-        if (error) throw error;
-        toast({ title: 'Empresa criada com sucesso!' });
-      }
-      setIsDialogOpen(false);
-      setEditingCompany(null);
-    } catch (error: any) {
-      toast({
-        title: 'Erro',
-        description: error.message || 'Ocorreu um erro ao guardar.',
-        variant: 'destructive',
-      });
-    } finally {
-      setIsActionLoading(false);
-    }
-  };
-
-  const handleEdit = (company: Company) => {
-    setEditingCompany(company);
-    setIsDialogOpen(true);
-  };
+  // Criar e editar abrem a página completa da empresa (não há pop-up)
+  const handleEdit = (company: Company) =>
+    navigate(ROUTES.ADMIN.COMPANY_EDIT.replace(':id', company.id));
 
   const openDeleteDialog = (company: Company) => {
     setCompanyToDelete(company);
@@ -139,42 +103,12 @@ const CompaniesPage = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <AdminPageTitle title="Empresas" description="Gerir empresas clientes" />
 
-          <Dialog
-            open={isDialogOpen}
-            onOpenChange={open => {
-              setIsDialogOpen(open);
-              if (!open) setEditingCompany(null);
-            }}
-          >
-            {canManage && (
-              <DialogTrigger asChild>
-                <Button variant="gold">
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Empresa
-                </Button>
-              </DialogTrigger>
-            )}
-            <DialogContent className="max-h-[90vh] max-w-lg overflow-y-auto">
-              <DialogHeader>
-                <DialogTitle className="text-2xl">
-                  {editingCompany ? 'Editar Empresa' : 'Nova Empresa'}
-                </DialogTitle>
-              </DialogHeader>
-              <CompanyForm
-                initialData={editingCompany}
-                onSubmit={handleSubmit}
-                onCancel={() => setIsDialogOpen(false)}
-                isLoading={isActionLoading}
-              />
-              {editingCompany && (
-                <div className="border-t pt-4">
-                  <CompanyAdminsSection
-                    company={{ id: editingCompany.id, name: editingCompany.name }}
-                  />
-                </div>
-              )}
-            </DialogContent>
-          </Dialog>
+          {canManage && (
+            <Button variant="gold" onClick={() => navigate(ROUTES.ADMIN.COMPANY_NEW)}>
+              <Plus className="h-4 w-4 mr-2" />
+              Nova Empresa
+            </Button>
+          )}
         </div>
 
         {/* Search */}

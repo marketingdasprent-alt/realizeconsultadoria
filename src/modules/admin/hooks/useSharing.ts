@@ -39,10 +39,11 @@ export const useAllGroups = (enabled: boolean) =>
     retry: retryTransient,
   });
 
-export const useCapabilities = () =>
+export const useCapabilities = (enabled = true) =>
   useQuery({
     queryKey: [...KEY, 'capabilities'],
     queryFn: sharingService.capabilities,
+    enabled,
     staleTime: 30 * 60_000,
     retry: retryTransient,
   });

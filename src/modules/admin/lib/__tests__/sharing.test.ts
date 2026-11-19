@@ -2,10 +2,13 @@ import { describe, expect, it } from 'vitest';
 import {
   SharingError,
   companiesWithoutGroup,
+  companyAvailability,
   companyLabel,
   formatShareCode,
   groupOverview,
+  groupDefaultsText,
   groupGrantable,
+  groupableCapabilities,
   isSuperAdminAccount,
   normalizeShareCode,
   sharingErrorText,
@@ -209,5 +212,92 @@ describe('nomes e ordem das empresas', () => {
     const original = [named('B'), named('A')];
     sortCompanies(original);
     expect(original.map(c => c.name)).toEqual(['B', 'A']);
+  });
+});
+
+describe('módulos por defeito de um grupo', () => {
+  const catalog: Capability[] = [
+    cap({ capability: 'directory.read', module: 'directory', description: 'Ver colaboradores' }),
+    cap({ capability: 'feed.read', module: 'feed', description: 'Ver comunicados' }),
+    cap({ capability: 'tickets.write', module: 'tickets', kind: 'write' }),
+    cap({ capability: 'access.reveal', module: 'access', kind: 'read', sensitive: true }),
+    cap({ capability: 'hr.read', module: 'hr', kind: 'read', grantable: false }),
+  ];
+
+  it('só entram permissões de leitura, partilháveis e não sensíveis', () => {
+    expect(groupableCapabilities(catalog).map(item => item.capability)).toEqual([
+      'directory.read',
+      'feed.read',
+    ]);
+  });
+
+  it('o texto lista os módulos sem repetir, ou diz que não há nada por defeito', () => {
+    expect(groupDefaultsText(['directory.read', 'feed.read', 'directory.write'])).toBe(
+      'Colaboradores, Comunicados de grupo'
+    );
+    expect(groupDefaultsText([])).toBe('Nada por defeito');
+    expect(groupDefaultsText(undefined)).toBe('Nada por defeito');
+  });
+
+  it('a vista de todos os grupos traz os módulos (vazio se a base ainda não os devolve)', () => {
+    const base = {
+      group_name: 'G',
+      group_created_at: '2026-11-17T10:00:00Z',
+      joined_at: '2026-11-17T10:00:00Z',
+      origin: 'manual' as const,
+    };
+    const [withCaps, without] = groupOverview([
+      {
+        ...base,
+        group_id: 'g1',
+        company_id: 'a',
+        company_name: 'A',
+        default_capabilities: ['feed.read'],
+      },
+      { ...base, group_id: 'g2', group_name: 'H', company_id: 'b', company_name: 'B' },
+    ]);
+    expect(withCaps.defaultCapabilities).toEqual(['feed.read']);
+    expect(without.defaultCapabilities).toEqual([]);
+  });
+});
+
+describe('companyAvailability', () => {
+  const mine = (id: string, name: string): MyCompany => ({
+    company_id: id,
+    name,
+    role: 'super_admin',
+    status: 'ativo',
+    origin: 'x',
+    is_group_member: false,
+  });
+  const row = (group: string, company: string): GroupOverviewRow => ({
+    group_id: group,
+    group_name: `Grupo ${group}`,
+    group_created_at: '2026-11-17T10:00:00Z',
+    company_id: company,
+    company_name: company,
+    joined_at: '2026-11-17T10:00:00Z',
+    origin: 'manual',
+  });
+  const all = [mine('a', 'Alfa'), mine('b', 'Beta'), mine('c', 'Gama')];
+
+  it('empresas sem grupo ficam livres; as de outro grupo ficam recusadas com o nome do grupo', () => {
+    const result = companyAvailability(all, [row('g1', 'a')], null);
+    expect(result.find(item => item.id === 'b')?.reason).toBeUndefined();
+    expect(result.find(item => item.id === 'a')?.reason).toBe('Já pertence ao grupo Grupo g1');
+  });
+
+  it('as empresas do próprio grupo que se está a gerir não ficam recusadas', () => {
+    const result = companyAvailability(all, [row('g1', 'a'), row('g2', 'c')], 'g1');
+    expect(result.find(item => item.id === 'a')?.reason).toBeUndefined();
+    expect(result.find(item => item.id === 'c')?.reason).toBe('Já pertence ao grupo Grupo g2');
+  });
+
+  it('vem por ordem de nome', () => {
+    expect(companyAvailability(all, [], null).map(item => item.name)).toEqual([
+      'Alfa',
+      'Beta',
+      'Gama',
+    ]);
   });
 });

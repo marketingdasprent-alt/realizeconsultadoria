@@ -131,11 +131,44 @@ export const sharingService = {
     }),
 
   listGroup: async (company: string): Promise<GroupMember[]> =>
-    list(await call<GroupMember[] | null>('rz_list_group', { p_company: company })),
+    list(await call<GroupMember[] | null>('rz_list_group', { p_company: company })).map(row => ({
+      ...row,
+      default_capabilities: row.default_capabilities ?? [],
+    })),
 
   /** Todos os grupos e as suas empresas (só Super Admin). */
   listAllGroups: async (): Promise<GroupOverviewRow[]> =>
-    list(await call<GroupOverviewRow[] | null>('rz_list_groups')),
+    list(await call<GroupOverviewRow[] | null>('rz_list_groups')).map(row => ({
+      ...row,
+      default_capabilities: row.default_capabilities ?? [],
+    })),
+
+  // Gestão de grupos: só Super Admin, com a palavra-passe confirmada há pouco (reauth_required).
+  createGroup: (name: string, companies: string[], capabilities: string[]) =>
+    call<{ group_id: string }>('rz_create_group', {
+      p_name: name,
+      p_companies: companies,
+      p_capabilities: capabilities,
+    }),
+
+  renameGroup: (group: string, name: string) =>
+    call<{ group_id: string; name: string }>('rz_rename_group', { p_group: group, p_name: name }),
+
+  /** Define o conjunto completo de empresas; as retiradas perdem as partilhas com as outras do grupo. */
+  setGroupMembers: (group: string, companies: string[]) =>
+    call<{ group_id: string; added: number; removed: number; revoked: number }>(
+      'rz_set_group_members',
+      { p_group: group, p_companies: companies }
+    ),
+
+  setGroupCapabilities: (group: string, capabilities: string[]) =>
+    call<{ group_id: string; capabilities: string[] }>('rz_set_group_capabilities', {
+      p_group: group,
+      p_capabilities: capabilities,
+    }),
+
+  dissolveGroup: (group: string) =>
+    call<{ group_id: string; revoked: number }>('rz_dissolve_group', { p_group: group }),
 
   leaveGroup: (company: string) =>
     call<{ revoked: number }>('rz_leave_group', { p_company: company }),

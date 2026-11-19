@@ -188,4 +188,65 @@ describe('companyMembershipService', () => {
       expect(result.role).toBe('colaborador');
     });
   });
+
+  describe('listas de colaboradores da empresa', () => {
+    /** Cadeia do query builder do Supabase: cada passo devolve a cadeia; `await` dá o resultado. */
+    const chain = (result: unknown) => {
+      const calls: [string, unknown[]][] = [];
+      const proxy: unknown = new Proxy(
+        {},
+        {
+          get: (_target, name: string) => {
+            if (name === 'then') return (resolve: (value: unknown) => void) => resolve(result);
+            return (...args: unknown[]) => {
+              calls.push([name, args]);
+              return proxy;
+            };
+          },
+        }
+      );
+      return { proxy, calls };
+    };
+    const from = vi.mocked(supabase.from) as unknown as ReturnType<typeof vi.fn>;
+
+    it('companyEmployees lê só as fichas ativas da empresa, por nome', async () => {
+      const row = { id: 'e1', name: 'Ana', email: 'a@x.pt', company_id: 'c1', user_id: null };
+      const { proxy, calls } = chain({ data: [row], error: null });
+      from.mockReturnValue(proxy);
+      expect(await companyMembershipService.companyEmployees('c1')).toEqual([row]);
+      expect(from).toHaveBeenCalledWith('employees');
+      expect(calls).toContainEqual(['eq', ['company_id', 'c1']]);
+      expect(calls).toContainEqual(['eq', ['is_active', true]]);
+      expect(calls).toContainEqual(['order', ['name']]);
+    });
+
+    it('companyEmployees falha com erro desconhecido quando a leitura falha', async () => {
+      from.mockReturnValue(chain({ data: null, error: { message: 'x' } }).proxy);
+      await expect(companyMembershipService.companyEmployees('c1')).rejects.toBeInstanceOf(
+        SharingError
+      );
+    });
+
+    it('employeesOutsideCompany lê as fichas ativas das outras empresas e traz o nome da empresa', async () => {
+      const row = {
+        id: 'e2',
+        name: 'Dina',
+        email: 'd@x.pt',
+        company_id: 'c2',
+        user_id: 'u2',
+        is_active: true,
+        position: null,
+        department: null,
+        companies: { name: 'Beta Lda' },
+      };
+      const { proxy, calls } = chain({ data: [row], error: null });
+      from.mockReturnValue(proxy);
+      const result = await companyMembershipService.employeesOutsideCompany('c1');
+      expect(calls).toContainEqual(['neq', ['company_id', 'c1']]);
+      expect(calls).toContainEqual(['eq', ['is_active', true]]);
+      expect(result).toHaveLength(1);
+      expect(result[0]).toMatchObject({ id: 'e2', companyName: 'Beta Lda' });
+      expect(result[0]).not.toHaveProperty('companies');
+    });
+  });
 });

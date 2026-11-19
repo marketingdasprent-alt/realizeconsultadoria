@@ -11,6 +11,7 @@ import {
   type AdminRole,
   type BulkTransferResult,
   type CandidateSource,
+  type CompanyEmployee,
   type TransferResult,
 } from '../lib/companyMembership';
 
@@ -89,5 +90,35 @@ export const companyMembershipService = {
       .order('name');
     if (error) throw new SharingError('unknown');
     return data ?? [];
+  },
+
+  /** Colaboradores ativos da empresa (com ou sem conta), por nome. */
+  companyEmployees: async (company: string): Promise<CompanyEmployee[]> => {
+    const { data, error } = await supabase
+      .from('employees')
+      .select('id, name, email, company_id, user_id, is_active, position, department')
+      .eq('company_id', company)
+      .eq('is_active', true)
+      .order('name');
+    if (error) throw new SharingError('unknown');
+    return data ?? [];
+  },
+
+  /** Fichas ativas das outras empresas (candidatas a passar para esta); a base filtra pela RLS. */
+  employeesOutsideCompany: async (company: string): Promise<CompanyEmployee[]> => {
+    const { data, error } = await supabase
+      .from('employees')
+      .select(
+        'id, name, email, company_id, user_id, is_active, position, department, companies(name)'
+      )
+      .neq('company_id', company)
+      .eq('is_active', true)
+      .order('name')
+      .limit(1000);
+    if (error) throw new SharingError('unknown');
+    return (data ?? []).map(({ companies, ...employee }) => ({
+      ...employee,
+      companyName: companies?.name ?? null,
+    }));
   },
 };

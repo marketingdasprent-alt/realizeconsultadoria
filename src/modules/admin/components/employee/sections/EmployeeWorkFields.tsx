@@ -8,6 +8,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { ROUTES } from '@/lib/constants';
 import { CatalogCombobox } from '../CatalogCombobox';
 import { Field } from '../FormSection';
+import { ManagerSelect } from './ManagerSelect';
 
 interface EmployeeWorkFieldsProps {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -24,6 +25,11 @@ interface EmployeeWorkFieldsProps {
   currentCompany?: { name: string; onMove?: () => void };
   position: string;
   department: string;
+  /** Ficha aberta (null ao criar). */
+  employeeId: string | null;
+  managerId: string;
+  /** Alcance de equipa: só estas pessoas podem ser responsáveis. */
+  managerAllowedIds?: ReadonlySet<string> | null;
 }
 
 /** Empresa, função e departamento (das listas geridas), data de admissão e notas internas. */
@@ -36,6 +42,9 @@ export const EmployeeWorkFields = ({
   currentCompany,
   position,
   department,
+  employeeId,
+  managerId,
+  managerAllowedIds,
 }: EmployeeWorkFieldsProps) => (
   <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
     {currentCompany ? (
@@ -85,6 +94,22 @@ export const EmployeeWorkFields = ({
         placeholder="Escolher departamento"
         value={department}
         onChange={value => setValue('department', value, { shouldDirty: true })}
+      />
+    </Field>
+    <Field
+      label="Responsável direto"
+      htmlFor="employee-manager"
+      hint="Quem chefia esta pessoa. Define a equipa de cada chefe e o organograma."
+      error={errors.manager_id?.message as string | undefined}
+      className="md:col-span-2"
+    >
+      <ManagerSelect
+        id="employee-manager"
+        companyId={companyId}
+        employeeId={employeeId}
+        value={managerId}
+        onChange={value => setValue('manager_id', value, { shouldDirty: true })}
+        allowedIds={managerAllowedIds}
       />
     </Field>
     <p className="-mt-2 text-xs text-rz-muted md:col-span-2">

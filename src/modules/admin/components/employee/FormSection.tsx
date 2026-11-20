@@ -38,6 +38,8 @@ export const FormSection: React.FC<FormSectionProps> = ({
 );
 
 interface FieldProps {
+  /** Id do controlo: dá ao campo o nome do rótulo (leitores de ecrã). */
+  htmlFor?: string;
   label: string;
   error?: string;
   hint?: string;
@@ -46,9 +48,18 @@ interface FieldProps {
 }
 
 /** Campo com etiqueta, ajuda e erro por baixo. */
-export const Field: React.FC<FieldProps> = ({ label, error, hint, className, children }) => (
+export const Field: React.FC<FieldProps> = ({
+  label,
+  error,
+  hint,
+  className,
+  children,
+  htmlFor,
+}) => (
   <div className={className}>
-    <label className="mb-1 block text-[13px] font-semibold text-rz-ink">{label}</label>
+    <label htmlFor={htmlFor} className="mb-1 block text-[13px] font-semibold text-rz-ink">
+      {label}
+    </label>
     {children}
     {error ? (
       <p className="mt-1 text-xs text-red-500">{error}</p>

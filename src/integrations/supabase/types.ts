@@ -291,6 +291,7 @@ export type Database = {
           group_id: string;
           id: string;
           module_key: string;
+          scope: string;
           topic_key: string | null;
         };
         Insert: {
@@ -301,6 +302,7 @@ export type Database = {
           group_id: string;
           id?: string;
           module_key: string;
+          scope?: string;
           topic_key?: string | null;
         };
         Update: {
@@ -311,6 +313,7 @@ export type Database = {
           group_id?: string;
           id?: string;
           module_key?: string;
+          scope?: string;
           topic_key?: string | null;
         };
         Relationships: [
@@ -1527,6 +1530,7 @@ export type Database = {
           iban: string | null;
           id: string;
           is_active: boolean;
+          manager_id: string | null;
           name: string;
           nationality: string | null;
           notes: string | null;
@@ -1551,6 +1555,7 @@ export type Database = {
           iban?: string | null;
           id?: string;
           is_active?: boolean;
+          manager_id?: string | null;
           name: string;
           nationality?: string | null;
           notes?: string | null;
@@ -1575,6 +1580,7 @@ export type Database = {
           iban?: string | null;
           id?: string;
           is_active?: boolean;
+          manager_id?: string | null;
           name?: string;
           nationality?: string | null;
           notes?: string | null;
@@ -1591,6 +1597,13 @@ export type Database = {
             columns: ['company_id'];
             isOneToOne: false;
             referencedRelation: 'companies';
+            referencedColumns: ['id'];
+          },
+          {
+            foreignKeyName: 'employees_manager_id_fkey';
+            columns: ['manager_id'];
+            isOneToOne: false;
+            referencedRelation: 'employees';
             referencedColumns: ['id'];
           },
         ];
@@ -4066,6 +4079,7 @@ export type Database = {
           department: string;
           email: string;
           employee_id: string;
+          manager_employee_id: string | null;
           name: string;
           phone: string;
           position: string;
@@ -4300,6 +4314,7 @@ export type Database = {
         };
         Returns: Json;
       };
+      rz_my_team_employee_ids: { Args: never; Returns: string[] };
       rz_team_absences: {
         Args: { p_from: string; p_to: string };
         Returns: {

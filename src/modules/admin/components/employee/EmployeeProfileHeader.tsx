@@ -73,7 +73,10 @@ export const EmployeeProfileHeader = ({
   onChanged,
 }: EmployeeProfileHeaderProps) => {
   const navigate = useNavigate();
-  const { canExecuteTopic } = useAdminPermissions();
+  const { canExecuteTopicFor } = useAdminPermissions();
+  // Cada ação respeita o alcance (com "Só a minha equipa", só para quem está abaixo na chefia).
+  const canExecuteTopic = (moduleKey: string, topicKey: string) =>
+    canExecuteTopicFor(moduleKey, topicKey, employee.id);
   const actions = useEmployeeProfileActions(employee, onChanged);
   const [noticesOpen, setNoticesOpen] = useState(false);
   const [passwordOpen, setPasswordOpen] = useState(false);

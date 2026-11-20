@@ -4,6 +4,8 @@ import { MemoryRouter } from 'react-router-dom';
 import { EmployeeWorkFields } from '../EmployeeWorkFields';
 
 vi.mock('../../CatalogCombobox', () => ({ CatalogCombobox: () => <div /> }));
+// O Responsável direto lê os colaboradores do servidor; aqui só interessa a empresa.
+vi.mock('../ManagerSelect', () => ({ ManagerSelect: () => <div /> }));
 
 const base = {
   register: () => ({}) as never,
@@ -13,6 +15,8 @@ const base = {
   companies: [{ id: 'c1', name: 'Alfa, Lda' }],
   position: '',
   department: '',
+  employeeId: null,
+  managerId: '',
 };
 
 const renderFields = (props: Partial<Parameters<typeof EmployeeWorkFields>[0]> = {}) =>

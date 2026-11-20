@@ -337,3 +337,14 @@ export const MODULE_LABELS: Record<string, string> = Object.fromEntries(
 );
 
 export const ALL_MODULE_KEYS = getAllModuleKeys();
+
+/**
+ * Alcance de uma permissão: toda a empresa ou só a equipa de quem a tem (os colaboradores
+ * abaixo dela na cadeia de responsável direto). Ver docs/chefe-de-equipa.md.
+ */
+export type PermissionScope = 'all' | 'team';
+
+/** Módulos cujas funcionalidades podem ficar limitadas à equipa. */
+export const SCOPABLE_MODULES: readonly string[] = ['employees'];
+
+export const isScopableModule = (moduleKey: string) => SCOPABLE_MODULES.includes(moduleKey);

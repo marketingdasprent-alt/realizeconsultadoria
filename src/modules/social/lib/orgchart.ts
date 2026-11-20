@@ -83,3 +83,85 @@ export const buildOrgChart = (people: DirectoryPerson[], search = ''): OrgChart 
   const total = (board?.people.length ?? 0) + departments.reduce((n, d) => n + d.people.length, 0);
   return { board, departments, total };
 };
+
+// ─── Árvore pela chefia real (responsável direto) ────────────────────────────────────────────
+
+export interface OrgNode {
+  person: DirectoryPerson;
+  children: OrgNode[];
+  /** Pessoas abaixo (diretas e indiretas). */
+  teamSize: number;
+}
+
+export interface OrgTree {
+  /** Topo: quem chefia alguém e não tem responsável direto (no diretório). */
+  roots: OrgNode[];
+  /** Sem responsável direto e sem ninguém abaixo. */
+  unassigned: DirectoryPerson[];
+  total: number;
+}
+
+/** Há chefia preenchida: pelo menos uma pessoa tem o responsável no diretório. */
+export const hasManagerChain = (people: DirectoryPerson[]): boolean => {
+  const ids = new Set(people.map(p => p.employeeId));
+  return people.some(p => !!p.managerEmployeeId && ids.has(p.managerEmployeeId));
+};
+
+/**
+ * Árvore do organograma pelo responsável direto. Com pesquisa ficam as pessoas que correspondem
+ * e quem está acima delas (para se perceber onde estão). Resiste a ciclos.
+ */
+export const buildOrgTree = (people: DirectoryPerson[], search = ''): OrgTree => {
+  const term = search.trim();
+  const byId = new Map(people.map(p => [p.employeeId, p]));
+  const managerOf = (p: DirectoryPerson) =>
+    p.managerEmployeeId && p.managerEmployeeId !== p.employeeId && byId.has(p.managerEmployeeId)
+      ? p.managerEmployeeId
+      : null;
+
+  // Com pesquisa: quem corresponde e a sua cadeia acima.
+  let keep: Set<string> | null = null;
+  if (term) {
+    keep = new Set();
+    for (const person of people) {
+      if (!matches(person, term)) continue;
+      let id: string | null = person.employeeId;
+      while (id && !keep.has(id)) {
+        keep.add(id);
+        id = managerOf(byId.get(id)!);
+      }
+    }
+  }
+  const visible = keep ? people.filter(p => keep!.has(p.employeeId)) : people;
+
+  const childrenOf = new Map<string, DirectoryPerson[]>();
+  for (const person of visible) {
+    const manager = managerOf(person);
+    if (manager) childrenOf.set(manager, [...(childrenOf.get(manager) ?? []), person]);
+  }
+
+  const seen = new Set<string>();
+  const build = (person: DirectoryPerson): OrgNode => {
+    seen.add(person.employeeId);
+    const children = (childrenOf.get(person.employeeId) ?? [])
+      .filter(child => !seen.has(child.employeeId))
+      .sort((a, b) => compareText(a.name, b.name))
+      .map(build);
+    return {
+      person,
+      children,
+      teamSize: children.reduce((n, child) => n + 1 + child.teamSize, 0),
+    };
+  };
+
+  const tops = visible.filter(p => !managerOf(p)).sort((a, b) => compareText(a.name, b.name));
+  const roots = tops.filter(p => childrenOf.has(p.employeeId)).map(build);
+  const unassigned = tops.filter(p => !childrenOf.has(p.employeeId));
+  // Ciclos (A chefia B e B chefia A) ficam fora das raízes: entram como raiz para não sumirem.
+  for (const person of visible)
+    if (!seen.has(person.employeeId) && !unassigned.includes(person)) roots.push(build(person));
+  // Mais grandes primeiro: o topo da empresa abre o organograma.
+  roots.sort((a, b) => b.teamSize - a.teamSize || compareText(a.person.name, b.person.name));
+
+  return { roots, unassigned, total: visible.length };
+};

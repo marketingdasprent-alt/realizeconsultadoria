@@ -29,7 +29,8 @@ interface EmployeesTableProps extends EmployeeActionHandlers {
   sortField: SortField;
   sortDirection: 'asc' | 'desc';
   onSort: (field: SortField) => void;
-  permissions: EmployeeActionPermissions;
+  /** Ações permitidas sobre cada colaborador (o alcance pode limitar à equipa). */
+  permissionsOf: (employee: Employee) => EmployeeActionPermissions;
   resendingId: string | null;
   /** Documentos a expirar (ou expirados) e por aprovar de cada colaborador. */
   alertsOf: (employeeId: string) => { expiring: number; pending: number };
@@ -124,13 +125,14 @@ export const EmployeesTable: React.FC<EmployeesTableProps> = props => {
         <tbody>
           {employees.map(employee => {
             const alerts = props.alertsOf(employee.id);
+            const permissions = props.permissionsOf(employee);
             return (
               <tr
                 key={employee.id}
-                onClick={() => props.permissions.canEdit && props.onOpen(employee)}
+                onClick={() => permissions.canEdit && props.onOpen(employee)}
                 className={cn(
                   'border-b border-rz-line last:border-0 transition-colors',
-                  props.permissions.canEdit && 'cursor-pointer hover:bg-rz-primary-soft/60',
+                  permissions.canEdit && 'cursor-pointer hover:bg-rz-primary-soft/60',
                   // Documento perto de expirar: a linha fica vermelha até ser renovado.
                   alerts.expiring > 0 && 'bg-red-50 shadow-[inset_3px_0_0_#ef4444] hover:bg-red-100'
                 )}
@@ -225,7 +227,7 @@ export const EmployeesTable: React.FC<EmployeesTableProps> = props => {
                 <td className="px-2 py-2.5" onClick={event => event.stopPropagation()}>
                   <EmployeeRowActions
                     employee={employee}
-                    permissions={props.permissions}
+                    permissions={permissions}
                     isResending={props.resendingId === employee.id}
                     canMove={props.canMove?.(employee) ?? false}
                     onMove={props.onMove}

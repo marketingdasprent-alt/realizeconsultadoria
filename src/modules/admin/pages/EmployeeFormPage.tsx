@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -6,7 +6,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { ROUTES } from '@/lib/constants';
-import EmployeeGeneralTab, { type EmployeeRecord } from '../components/employee/EmployeeGeneralTab';
+import EmployeeGeneralTab, {
+  type EmployeeRecord,
+  type ManagerScope,
+} from '../components/employee/EmployeeGeneralTab';
 import EmployeeVacationTab from '../components/employee/EmployeeVacationTab';
 import EmployeeDocumentsTab from '../components/employee/EmployeeDocumentsTab';
 import EmployeeAttachmentsTab from '../components/employee/EmployeeAttachmentsTab';
@@ -34,7 +37,7 @@ const EmployeeFormPage = () => {
   const navigate = useNavigate();
   const [params] = useSearchParams();
   const { toast } = useToast();
-  const { canExecuteTopic } = useAdminPermissions();
+  const permissions = useAdminPermissions();
   const avatarOf = useEmployeeAvatars();
 
   const isEditMode = !!id;
@@ -45,8 +48,24 @@ const EmployeeFormPage = () => {
   // Validades e documentos por aprovar (aviso no topo); volta a ler ao mudar de separador.
   const documents = useEmployeeDocuments(id ?? null);
 
-  const canEdit = canExecuteTopic('employees', 'edit');
-  const canVacation = canExecuteTopic('employees', 'vacation');
+  // Com alcance de equipa, cada funcionalidade vale só para quem está abaixo na chefia.
+  const canEdit = !!id && permissions.canExecuteTopicFor('employees', 'edit', id);
+  const canVacation = !!id && permissions.canExecuteTopicFor('employees', 'vacation', id);
+  const outOfScope =
+    !!id &&
+    !permissions.isLoading &&
+    !permissions.canViewTopicFor('employees', 'view', id) &&
+    permissions.scopeOf('employees', 'view') === 'team';
+
+  // Criar ou editar só na equipa: o responsável direto escolhe-se entre a própria pessoa e a equipa.
+  const { scopeOf, teamEmployeeIds, ownEmployeeIds } = permissions;
+  const managerScope = useMemo<ManagerScope | null>(
+    () =>
+      scopeOf('employees', id ? 'edit' : 'create') === 'team'
+        ? { allowedIds: new Set([...ownEmployeeIds, ...teamEmployeeIds]), ownEmployeeIds }
+        : null,
+    [scopeOf, id, teamEmployeeIds, ownEmployeeIds]
+  );
 
   const fetchData = useCallback(async () => {
     try {
@@ -82,10 +101,28 @@ const EmployeeFormPage = () => {
     fetchData();
   };
 
-  if (isLoading) {
+  if (isLoading || permissions.isLoading) {
     return (
       <div className="flex min-h-[400px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-rz-primary" />
+      </div>
+    );
+  }
+
+  if (outOfScope) {
+    return (
+      <div className="mx-auto flex max-w-md flex-col items-center gap-3 py-16 text-center">
+        <h1 className="text-xl font-bold">Esta ficha não é da sua equipa</h1>
+        <p className="text-sm text-rz-muted">
+          O seu acesso a colaboradores está limitado a quem está abaixo de si na chefia.
+        </p>
+        <button
+          type="button"
+          onClick={() => navigate(ROUTES.ADMIN.EMPLOYEES)}
+          className="mt-2 rounded-full bg-rz-primary px-5 py-2.5 text-sm font-semibold text-white hover:bg-rz-primary/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rz-primary/40"
+        >
+          Voltar aos colaboradores
+        </button>
       </div>
     );
   }
@@ -157,6 +194,7 @@ const EmployeeFormPage = () => {
             onSaved={handleSaved}
             onMoved={fetchData}
             onCreated={newId => navigate(`${ROUTES.ADMIN.EMPLOYEES}/${newId}`)}
+            managerScope={managerScope}
           />
           {isEditMode && employee && canEdit && (
             <EmployeeAdminAccountCard employee={employee} onChanged={fetchData} />

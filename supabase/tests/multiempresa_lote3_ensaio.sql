@@ -11,6 +11,7 @@
 --   3. este ensaio DEPOIS da migração   -> esperado: todos ok, 0 falhas (ver a linha RESULTADO).
 -- Qualquer falha, ou "ERRO NA PREPARACAO", deve parar tudo.
 -- Pré-requisitos: migrações até ao Lote 2 e o gatilho employees_sync_membership da Fase B.
+-- Uma conta admin precisa de role admin em user_roles; o ensaio cria-a.
 --
 -- Sem ids nem emails de pessoas: os utilizadores criam-se em auth.users com email @invalid.example e o
 -- super admin é uma linha sintética em platform_admins (tudo anulado no fim).
@@ -79,6 +80,7 @@ BEGIN
            (cD, uD1, 'ZZ L3 D1', 'zz-l3-d1@invalid.example', 'Vendas'),
            (cE, uE1, 'ZZ L3 E1', 'zz-l3-e1@invalid.example', 'Vendas'),
            (cH, uH1, 'ZZ L3 H1', 'zz-l3-h1@invalid.example', 'Vendas');
+    INSERT INTO public.user_roles (user_id, role) VALUES (uAf, 'admin');
     INSERT INTO public.employees (company_id, user_id, admin_user_id, name, email, department)
     VALUES (cD, uCf, uAf, 'ZZ L3 CF', 'zz-l3-cf@invalid.example', 'Compras');
     INSERT INTO public.company_memberships (company_id, user_id, role, origin, status)

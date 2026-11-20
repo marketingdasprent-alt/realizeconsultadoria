@@ -38,6 +38,10 @@ export const writeDeviceCache = (name: string, userId: string | null, value: unk
   }
 };
 
+/** A sessão já é outra desde que `requester` fez o pedido? (sem dono conhecido, não há o que comparar) */
+export const sessionChangedSince = (requester: string | null): boolean =>
+  !!requester && sessionUserId() !== requester;
+
 /** Grava só se a sessão ainda for a de `ownerId` (para escritas depois de um pedido à rede). */
 export const writeDeviceCacheIfSession = (name: string, ownerId: string | null, value: unknown) => {
   if (ownerId && sessionUserId() === ownerId) writeDeviceCache(name, ownerId, value);
@@ -54,18 +58,32 @@ export const clearDeviceCache = () => {
   }
 };
 
-/** Tudo o que a app guarda por utilizador: cache, emails, conversa com a IA e papel. */
-const USER_DATA_PREFIXES = [PREFIX, 'rz-mail-cache:', 'rz-ai-chat:', 'rz.role.'];
+/** Chaves por utilizador: o prefixo é seguido do id (e, às vezes, de `:` e do resto). */
+const USER_DATA_PREFIXES = [PREFIX, 'rz-mail-cache:', 'rz-ai-chat:', 'rz.role.', 'rz-tabs:'];
+/** Chaves sem utilizador (rascunhos, recentes…): ficam para a conta seguinte, por isso saem sempre. */
+const GLOBAL_KEYS = [
+  'rz.admin.broadcast.draft',
+  'rz.people.recent',
+  'rz.mail.supportCompany',
+  'rz-last-punch-at',
+];
+
+const isKeptKey = (key: string, keepUserId: string) =>
+  USER_DATA_PREFIXES.some(
+    prefix => key === prefix + keepUserId || key.startsWith(`${prefix}${keepUserId}:`)
+  );
 
 /**
  * Apaga tudo o que a app guarda por utilizador no aparelho (não toca na sessão nem no tema).
- * `keepUserId` poupa o utilizador que acabou de entrar.
+ * `keepUserId` poupa as chaves exatas do utilizador que acabou de entrar.
  */
 export const clearAllDeviceData = (keepUserId?: string | null) => {
   try {
     Object.keys(localStorage)
-      .filter(k => USER_DATA_PREFIXES.some(prefix => k.startsWith(prefix)))
-      .filter(k => !keepUserId || !k.includes(keepUserId))
+      .filter(
+        k => GLOBAL_KEYS.includes(k) || USER_DATA_PREFIXES.some(prefix => k.startsWith(prefix))
+      )
+      .filter(k => !keepUserId || !isKeptKey(k, keepUserId))
       .forEach(k => localStorage.removeItem(k));
   } catch {
     // ignora

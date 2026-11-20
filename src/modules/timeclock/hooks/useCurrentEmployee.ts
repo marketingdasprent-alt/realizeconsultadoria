@@ -1,5 +1,10 @@
 import { useEffect, useState } from 'react';
-import { readDeviceCache, sessionUserId, writeDeviceCacheIfSession } from '@/lib/device-cache';
+import {
+  readDeviceCache,
+  sessionChangedSince,
+  sessionUserId,
+  writeDeviceCacheIfSession,
+} from '@/lib/device-cache';
 import { timeClockService, type CurrentEmployee } from '../services/timeClockService';
 
 interface UseCurrentEmployeeResult {
@@ -22,7 +27,8 @@ export const useCurrentEmployee = (): UseCurrentEmployeeResult => {
     let cancelled = false;
     const requester = sessionUserId();
     timeClockService.getCurrentEmployee().then(({ data, error }) => {
-      if (cancelled) return;
+      // Cancelado ou a conta mudou durante o pedido: a resposta é da conta anterior.
+      if (cancelled || sessionChangedSince(requester)) return;
       // Sem rede: fica o guardado.
       if (!error) {
         setEmployee(data);

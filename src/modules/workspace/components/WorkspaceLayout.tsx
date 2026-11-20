@@ -7,6 +7,7 @@ import {
   clearDeviceCache,
   readDeviceCache,
   sessionUserId,
+  sessionChangedSince,
   writeDeviceCacheIfSession,
 } from '@/lib/device-cache';
 import { resetCompanyScopedQueries, shouldResetCompanyQueries } from '@/lib/query-persist';
@@ -78,6 +79,8 @@ const WorkspaceLayout: React.FC = () => {
     // Quem pediu: se a conta mudar durante o pedido, a ficha não vai para a cache da nova.
     const requester = sessionUserId();
     const { data } = await employeeProfileService.getCurrent();
+    // A conta mudou durante o pedido: a resposta é da conta anterior.
+    if (sessionChangedSince(requester)) return;
     if (!data) {
       navigate(ROUTES.EMPLOYEE.LOGIN);
       return;

@@ -192,10 +192,17 @@ const EmployeeGeneralTab = ({
       if (created?.error) throw new Error(created.error);
       // A criação (função do servidor) não guarda a admissão nem as notas: completam-se já.
       if (created?.employeeId && (details.hire_date || details.notes)) {
-        await employeeService.update(created.employeeId, {
+        const { error: detailsError } = await employeeService.update(created.employeeId, {
           hire_date: details.hire_date,
           notes: details.notes,
         });
+        if (detailsError) {
+          toast({
+            title: 'Data de admissão não guardada',
+            description: 'O colaborador foi criado, mas preencha a admissão na ficha.',
+            variant: 'destructive',
+          });
+        }
       }
       toast({
         title: 'Colaborador criado',

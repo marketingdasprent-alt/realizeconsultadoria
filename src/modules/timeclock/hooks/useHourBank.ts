@@ -33,12 +33,14 @@ export const useHourBank = (month: Date, employeeId: string | null, enabled = tr
   const extra = useQuery({
     queryKey: ['timeclock', 'hour-bank', from, employeeId ?? 'all'],
     queryFn: async () => {
-      const [absences, holidays] = await Promise.all([
+      const [absences, holidays, starts] = await Promise.all([
         hourBankService.getAbsences(from, to, employeeId),
         holidayService.getRange(from, to),
+        hourBankService.getStarts(employeeId),
       ]);
       if (absences.error) throw absences.error;
-      return { absences: absences.data, holidays: holidays.data };
+      // Sem datas de início o saldo cai no comportamento antigo, em vez de falhar.
+      return { absences: absences.data, holidays: holidays.data, starts: starts.data };
     },
     enabled,
     staleTime: 60_000,
@@ -57,11 +59,18 @@ export const useHourBank = (month: Date, employeeId: string | null, enabled = tr
         absences,
         holidays: data.holidays,
         settings: rules,
+        employeeStart: data.starts[person] ?? null,
       });
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps -- o mês resume-se em `from`
     [data, rules, from]
   );
 
-  return { bankFor, settings: rules, isLoading: extra.isLoading || settings.isLoading };
+  /** Primeiro dia do ponto da pessoa (admissão ou criação da ficha); null se desconhecido. */
+  const startFor = useCallback(
+    (person: string): string | null => data?.starts[person] ?? null,
+    [data]
+  );
+
+  return { bankFor, startFor, settings: rules, isLoading: extra.isLoading || settings.isLoading };
 };

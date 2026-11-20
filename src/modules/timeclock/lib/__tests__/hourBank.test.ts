@@ -1,5 +1,12 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_HOUR_BANK, formatBalance, monthHourBank, type BankAbsence } from '../hourBank';
+import {
+  DEFAULT_HOUR_BANK,
+  effectiveStart,
+  employeeStartDate,
+  formatBalance,
+  monthHourBank,
+  type BankAbsence,
+} from '../hourBank';
 
 // Outubro 2026: dia 1 é quinta; dia 5 é feriado. Conta até dia 8 (exclusive): úteis 1, 2, 6, 7.
 const base = {
@@ -120,6 +127,91 @@ describe('início do banco de horas', () => {
     });
     expect(bank.days.map(d => d.date)).toEqual(['2026-10-07']);
     expect(bank.balance).toBe(0);
+  });
+});
+
+describe('início na data de admissão', () => {
+  const run = (employeeStart: string | null, workedByDay = new Map<string, number>(), extra = {}) =>
+    monthHourBank({ ...base, workedByDay, absences: [], employeeStart, ...extra });
+
+  it('sem data de início mantém o comportamento atual', () => {
+    expect(run(null).days).toHaveLength(4);
+    expect(run('2026-09-15').balance).toBe(-4 * 480);
+  });
+
+  it('admissão a meio do mês: previsto só a partir desse dia', () => {
+    const bank = run('2026-10-06');
+    expect(bank.days.map(d => d.date)).toEqual(['2026-10-06', '2026-10-07']);
+    expect(bank.balance).toBe(-2 * 480);
+  });
+
+  it('colaborador criado hoje, sem registos: saldo 0h00 e nenhum dia', () => {
+    const bank = run('2026-10-08');
+    expect(bank.days).toEqual([]);
+    expect(bank.balance).toBe(0);
+  });
+
+  it('mês inteiro anterior à admissão: lista vazia', () => {
+    const bank = run('2026-11-10');
+    expect(bank.days).toEqual([]);
+    expect(bank.expected).toBe(0);
+  });
+
+  it('dia com registo antes da admissão aparece com as horas, sem previsto', () => {
+    const bank = run('2026-10-06', new Map([['2026-10-01', 300]]));
+    const day = bank.days.find(d => d.date === '2026-10-01');
+    expect(day).toMatchObject({ expected: 0, worked: 300, balance: 300 });
+    expect(bank.balance).toBe(300 - 2 * 480);
+  });
+
+  it('feriados e ausências continuam a valer depois da admissão', () => {
+    const vacation = absence({
+      absence_type: 'vacation',
+      start_date: '2026-10-06',
+      end_date: '2026-10-06',
+    });
+    const bank = monthHourBank({
+      ...base,
+      workedByDay: new Map([['2026-10-07', 480]]),
+      absences: [vacation],
+      employeeStart: '2026-10-02',
+    });
+    // 2 (falta), 5 feriado (fora), 6 férias justificadas, 7 feito.
+    expect(bank.days.map(d => d.date)).toEqual(['2026-10-02', '2026-10-06', '2026-10-07']);
+    expect(bank.balance).toBe(-480);
+  });
+
+  it('o startsOn global continua a aplicar-se (vale o mais tardio)', () => {
+    const settings = { ...DEFAULT_HOUR_BANK, startsOn: '2026-10-07' };
+    expect(run('2026-10-02', new Map(), { settings }).days.map(d => d.date)).toEqual([
+      '2026-10-07',
+    ]);
+    expect(run('2026-10-07', new Map(), { settings }).days).toHaveLength(1);
+  });
+});
+
+describe('employeeStartDate', () => {
+  it('usa a data de admissão quando existe', () => {
+    expect(employeeStartDate('2026-10-06', '2026-11-20T23:30:00Z')).toBe('2026-10-06');
+  });
+
+  it('sem admissão usa o dia (local) da criação da ficha', () => {
+    const created = new Date(2026, 10, 20, 9, 0).toISOString();
+    expect(employeeStartDate(null, created)).toBe('2026-11-20');
+  });
+
+  it('sem nada devolve null', () => {
+    expect(employeeStartDate(null, null)).toBeNull();
+    expect(employeeStartDate(null, 'lixo')).toBeNull();
+  });
+});
+
+describe('effectiveStart', () => {
+  it('é a mais tardia entre as datas', () => {
+    expect(effectiveStart('2026-10-07', '2026-10-02')).toBe('2026-10-07');
+    expect(effectiveStart('2026-10-01', '2026-10-02')).toBe('2026-10-02');
+    expect(effectiveStart(null, '2026-10-02')).toBe('2026-10-02');
+    expect(effectiveStart(null, null)).toBeNull();
   });
 });
 

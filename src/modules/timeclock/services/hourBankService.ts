@@ -3,6 +3,7 @@ import {
   DEFAULT_HOUR_BANK,
   parseAbsenceRules,
   type BankAbsence,
+  employeeStartDate,
   type HourBankSettings,
 } from '../lib/hourBank';
 
@@ -55,5 +56,18 @@ export const hourBankService = {
     if (employeeId) query = query.eq('employee_id', employeeId);
     const { data, error } = await query;
     return { data: (data ?? []) as unknown as BankAbsence[], error };
+  },
+
+  /** Primeiro dia do ponto de cada pessoa (admissão, ou criação da ficha); uma pessoa ou todas. */
+  getStarts: async (employeeId: string | null) => {
+    let query = supabase.from('employees').select('id, hire_date, created_at');
+    if (employeeId) query = query.eq('id', employeeId);
+    const { data, error } = await query.range(0, 4999);
+    const starts: Record<string, string> = {};
+    for (const row of data ?? []) {
+      const start = employeeStartDate(row.hire_date, row.created_at);
+      if (start) starts[row.id] = start;
+    }
+    return { data: starts, error };
   },
 };

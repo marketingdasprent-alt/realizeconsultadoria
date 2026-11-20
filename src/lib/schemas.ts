@@ -78,6 +78,11 @@ export const createEmployeeSchema = z
   .refine(data => data.password === data.confirmPassword, {
     message: 'As senhas não coincidem',
     path: ['confirmPassword'],
+  })
+  // O ponto e o banco de horas começam na data de admissão.
+  .refine(data => !!data.hire_date, {
+    message: 'Data de admissão é obrigatória',
+    path: ['hire_date'],
   });
 
 export const updateEmployeeSchema = z.object(baseEmployeeFields).partial();

@@ -10,7 +10,7 @@ import { WorkdayPanel } from './WorkdayPanel';
 import { useWorkday } from '../../context/useWorkday';
 import { useMyTimeClock } from '../../hooks/useMyTimeClock';
 import { useHourBank } from '../../hooks/useHourBank';
-import { formatBalance } from '../../lib/hourBank';
+import { effectiveStart, formatBalance } from '../../lib/hourBank';
 
 /** Dia sem registos (falta ou ausência) para aparecer na lista com o saldo. */
 const emptyDay = (date: string): DaySummary => ({
@@ -66,9 +66,14 @@ export const MyTimeClockPanel: React.FC = () => {
   const worked = days.filter(d => d.workedMinutes > 0).length;
   const incomplete = days.filter(d => d.incomplete).length;
   // Saldo até ontem: horas feitas + ausências justificadas − previstas.
-  const { bankFor } = hourBank;
+  const { bankFor, startFor } = hourBank;
   const startsOn = hourBank.settings.startsOn;
-  const started = !startsOn || startsOn < format(new Date(), 'yyyy-MM-dd');
+  const employeeStart = startFor(user.employeeId);
+  const todayKey = format(new Date(), 'yyyy-MM-dd');
+  // O global só conta a partir do dia seguinte; o da pessoa conta desde o próprio dia (saldo 0h00).
+  const started =
+    (!startsOn || startsOn < todayKey) && (!employeeStart || employeeStart <= todayKey);
+  const bankStart = effectiveStart(startsOn, employeeStart);
   const bank = useMemo(
     () => (isPreview ? null : bankFor(user.employeeId, days)),
     [isPreview, bankFor, user.employeeId, days]
@@ -108,8 +113,8 @@ export const MyTimeClockPanel: React.FC = () => {
             value={bank && started ? formatBalance(bank.balance) : '—'}
             tone={bank && bank.balance < 0 ? 'text-rose-500' : 'text-emerald-500'}
             hint={
-              !started && startsOn
-                ? `O banco de horas começa a ${format(new Date(`${startsOn}T12:00:00`), "d 'de' MMMM", { locale: pt })}.`
+              !started && bankStart
+                ? `O banco de horas começa a ${format(new Date(`${bankStart}T12:00:00`), "d 'de' MMMM", { locale: pt })}.`
                 : bank
                   ? `Até ontem: ${formatMinutes(bank.worked)} feitas + ${formatMinutes(bank.justified)} de ausências justificadas, de ${formatMinutes(bank.expected)} previstas (${formatMinutes(hourBank.settings.dailyMinutes)} por dia).`
                   : undefined

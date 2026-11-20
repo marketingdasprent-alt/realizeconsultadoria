@@ -4,7 +4,12 @@
 // antigos). Só as áreas do dia a dia; nada de documentos pessoais, recibos ou dados financeiros.
 import { dehydrate, hydrate, type DehydratedState, type QueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
-import { clearDeviceCache, readDeviceCache, sessionUserId, writeDeviceCache } from './device-cache';
+import {
+  clearAllDeviceData,
+  readDeviceCache,
+  sessionUserId,
+  writeDeviceCache,
+} from './device-cache';
 
 const NAME = 'queries';
 const VERSION = 1;
@@ -80,7 +85,7 @@ const COMPANY_SCOPED: readonly (readonly string[])[] = [
   ['feed'],
   ['appreciations'],
   ['company-files'],
-  ['calendar', 'team'],
+  ['calendar'],
 ];
 
 /**
@@ -146,7 +151,7 @@ export const persistQueries = (client: QueryClient) => {
   const { data } = supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
       stopTimer();
-      clearDeviceCache();
+      clearAllDeviceData();
       client.clear();
       owner = null;
       return;
@@ -155,7 +160,10 @@ export const persistQueries = (client: QueryClient) => {
     if (!userId) return;
     if (owner && owner !== userId) {
       stopTimer();
-      client.clear();
+      // O que ficou no aparelho da conta anterior sai; as listas montadas voltam ao início e
+      // vão buscar os dados da conta nova.
+      clearAllDeviceData(userId);
+      void client.resetQueries();
     }
     owner = userId;
   });

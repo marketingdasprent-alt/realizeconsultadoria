@@ -38,11 +38,34 @@ export const writeDeviceCache = (name: string, userId: string | null, value: unk
   }
 };
 
+/** Grava só se a sessão ainda for a de `ownerId` (para escritas depois de um pedido à rede). */
+export const writeDeviceCacheIfSession = (name: string, ownerId: string | null, value: unknown) => {
+  if (ownerId && sessionUserId() === ownerId) writeDeviceCache(name, ownerId, value);
+};
+
 /** Ao terminar a sessão: nada fica no aparelho. */
 export const clearDeviceCache = () => {
   try {
     Object.keys(localStorage)
       .filter(k => k.startsWith(PREFIX))
+      .forEach(k => localStorage.removeItem(k));
+  } catch {
+    // ignora
+  }
+};
+
+/** Tudo o que a app guarda por utilizador: cache, emails, conversa com a IA e papel. */
+const USER_DATA_PREFIXES = [PREFIX, 'rz-mail-cache:', 'rz-ai-chat:', 'rz.role.'];
+
+/**
+ * Apaga tudo o que a app guarda por utilizador no aparelho (não toca na sessão nem no tema).
+ * `keepUserId` poupa o utilizador que acabou de entrar.
+ */
+export const clearAllDeviceData = (keepUserId?: string | null) => {
+  try {
+    Object.keys(localStorage)
+      .filter(k => USER_DATA_PREFIXES.some(prefix => k.startsWith(prefix)))
+      .filter(k => !keepUserId || !k.includes(keepUserId))
       .forEach(k => localStorage.removeItem(k));
   } catch {
     // ignora

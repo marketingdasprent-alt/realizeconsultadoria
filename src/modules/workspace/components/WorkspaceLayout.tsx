@@ -7,7 +7,7 @@ import {
   clearDeviceCache,
   readDeviceCache,
   sessionUserId,
-  writeDeviceCache,
+  writeDeviceCacheIfSession,
 } from '@/lib/device-cache';
 import { resetCompanyScopedQueries, shouldResetCompanyQueries } from '@/lib/query-persist';
 import { clearMailCache } from '@/modules/webmail/lib/mailCache';
@@ -75,6 +75,8 @@ const WorkspaceLayout: React.FC = () => {
   useRzTheme();
 
   const refresh = useCallback(async () => {
+    // Quem pediu: se a conta mudar durante o pedido, a ficha não vai para a cache da nova.
+    const requester = sessionUserId();
     const { data } = await employeeProfileService.getCurrent();
     if (!data) {
       navigate(ROUTES.EMPLOYEE.LOGIN);
@@ -89,7 +91,7 @@ const WorkspaceLayout: React.FC = () => {
     setSessionEmail(data.email);
     setIsLoading(false);
     if (data.employee)
-      writeDeviceCache(USER_CACHE, sessionUserId(), toUser(data.employee, data.email));
+      writeDeviceCacheIfSession(USER_CACHE, requester, toUser(data.employee, data.email));
   }, [navigate, queryClient]);
 
   useEffect(() => {

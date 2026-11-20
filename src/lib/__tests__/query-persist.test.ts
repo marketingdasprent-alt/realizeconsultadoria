@@ -1,4 +1,4 @@
-import { QueryClient } from '@tanstack/react-query';
+import { QueryClient, QueryObserver } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 type AuthListener = (event: string, session: { user?: { id: string } } | null) => void;
@@ -16,10 +16,12 @@ vi.mock('@/integrations/supabase/client', () => ({
 }));
 
 import {
+  clearAllDeviceData,
   clearDeviceCache,
   readDeviceCache,
   sessionUserId,
   writeDeviceCache,
+  writeDeviceCacheIfSession,
 } from '../device-cache';
 import {
   isPersisted,
@@ -125,7 +127,7 @@ describe('mudança de empresa', () => {
     expect(client.getQueryData(['calendar', 'team', 'a'])).toBeUndefined();
     expect(client.getQueryData(['tasks', 'mine'])).toEqual([{ id: 't1' }]);
     expect(client.getQueryData(['notifications'])).toEqual([{ id: 'n1' }]);
-    expect(client.getQueryData(['calendar', 'events', 'a'])).toEqual([1]);
+    expect(client.getQueryData(['calendar', 'events', 'a'])).toBeUndefined();
   });
 });
 
@@ -233,6 +235,10 @@ describe('empresa ativa', () => {
 
     expect(after.getQueryData(['chat', 'directory', 'empresa-a'])).toBeUndefined();
     expect(after.getQueryData(['chat', 'directory', 'empresa-b'])).toBeUndefined();
+    // O diretório da empresa anterior sai da cache (não fica só reposto) para não ser pedido na chave velha.
+    expect(
+      after.getQueryCache().find({ queryKey: ['chat', 'directory', 'empresa-a'] })
+    ).toBeUndefined();
     expect(after.getQueryData(['feed', 'posts'])).toBeUndefined();
     expect(after.getQueryData(['tasks', 'mine'])).toEqual([{ id: 't1' }]);
   });
@@ -254,5 +260,108 @@ describe('shouldResetCompanyQueries', () => {
   it('ficha sem empresa: não faz nada', () => {
     expect(shouldResetCompanyQueries('a', null)).toBe(false);
     expect(shouldResetCompanyQueries(null, null)).toBe(false);
+  });
+});
+
+describe('limpar tudo o que é do utilizador no aparelho', () => {
+  afterEach(() => localStorage.clear());
+
+  const fill = (id: string) => {
+    localStorage.setItem(`rz-cache:${id}:queries`, '{}');
+    localStorage.setItem(`rz-mail-cache:${id}:inbox`, '{}');
+    localStorage.setItem(`rz-ai-chat:${id}`, '[]');
+    localStorage.setItem(`rz.role.${id}`, 'admin');
+  };
+  const keysOf = (id: string) => Object.keys(localStorage).filter(k => k.includes(id));
+
+  it('apaga cache, emails, chat IA e papel, e deixa o resto (sessão, tema)', () => {
+    fill('u1');
+    localStorage.setItem('sb-proj-auth-token', '{}');
+    localStorage.setItem('theme', 'dark');
+
+    clearAllDeviceData();
+
+    expect(keysOf('u1')).toEqual([]);
+    expect(localStorage.getItem('sb-proj-auth-token')).toBe('{}');
+    expect(localStorage.getItem('theme')).toBe('dark');
+  });
+
+  it('pode poupar o utilizador que acabou de entrar', () => {
+    fill('u1');
+    fill('u2');
+
+    clearAllDeviceData('u2');
+
+    expect(keysOf('u1')).toEqual([]);
+    expect(keysOf('u2')).toHaveLength(4);
+  });
+
+  it('só grava se a sessão ainda for a de quem pediu', () => {
+    session('u1');
+    writeDeviceCacheIfSession('x', 'u1', { a: 1 });
+    expect(readDeviceCache('x', 'u1')).toEqual({ a: 1 });
+
+    session('u2');
+    writeDeviceCacheIfSession('x', 'u1', { a: 2 });
+    expect(readDeviceCache('x', 'u1')).toEqual({ a: 1 });
+    expect(readDeviceCache('x', 'u2')).toBeNull();
+  });
+});
+
+describe('sessão: limpeza completa e observadores montados', () => {
+  let stop: (() => void) | null = null;
+  afterEach(() => {
+    stop?.();
+    stop = null;
+    auth.listener = null;
+    localStorage.clear();
+  });
+
+  it('terminar a sessão limpa também emails, chat IA e papel (sessão expirada, outro separador)', () => {
+    session('u1');
+    localStorage.setItem('rz-mail-cache:u1:inbox', '{}');
+    localStorage.setItem('rz-ai-chat:u1', '[]');
+    localStorage.setItem('rz.role.u1', 'admin');
+    stop = persistQueries(new QueryClient());
+
+    auth.listener?.('SIGNED_OUT', null);
+
+    expect(localStorage.getItem('rz-mail-cache:u1:inbox')).toBeNull();
+    expect(localStorage.getItem('rz-ai-chat:u1')).toBeNull();
+    expect(localStorage.getItem('rz.role.u1')).toBeNull();
+  });
+
+  it('outra conta a entrar apaga o que ficou no aparelho da anterior e mantém o da nova', () => {
+    session('u1');
+    localStorage.setItem('rz-mail-cache:u1:inbox', '{}');
+    localStorage.setItem('rz.role.u2', 'colaborador');
+    stop = persistQueries(new QueryClient());
+
+    session('u2');
+    auth.listener?.('SIGNED_IN', { user: { id: 'u2' } });
+
+    expect(localStorage.getItem('rz-mail-cache:u1:inbox')).toBeNull();
+    expect(localStorage.getItem('rz.role.u2')).toBe('colaborador');
+  });
+
+  it('outra conta a entrar com uma lista montada: a lista é pedida de novo, sem dados da anterior', async () => {
+    session('u1');
+    const client = new QueryClient();
+    const queryFn = vi
+      .fn()
+      .mockResolvedValueOnce(['da-conta-1'])
+      .mockResolvedValueOnce(['da-conta-2']);
+    const observer = new QueryObserver(client, { queryKey: ['feed', 'posts'], queryFn });
+    const seen: unknown[] = [];
+    const unsubscribe = observer.subscribe(result => seen.push(result.data));
+    await vi.waitFor(() => expect(client.getQueryData(['feed', 'posts'])).toEqual(['da-conta-1']));
+    stop = persistQueries(client);
+
+    session('u2');
+    auth.listener?.('SIGNED_IN', { user: { id: 'u2' } });
+    await vi.waitFor(() => expect(client.getQueryData(['feed', 'posts'])).toEqual(['da-conta-2']));
+
+    expect(queryFn).toHaveBeenCalledTimes(2);
+    unsubscribe();
   });
 });

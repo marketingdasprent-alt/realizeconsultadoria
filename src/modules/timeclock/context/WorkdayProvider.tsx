@@ -2,7 +2,7 @@
 // tag): registos recentes do colaborador e a ação em curso.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, startOfDay } from 'date-fns';
-import { readDeviceCache, sessionUserId, writeDeviceCache } from '@/lib/device-cache';
+import { readDeviceCache, sessionUserId, writeDeviceCacheIfSession } from '@/lib/device-cache';
 import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
 import { ACTION_ENTRY, deriveWorkday, type WorkdayAction } from '@/lib/workday';
 import { useCurrentEmployee } from '../hooks/useCurrentEmployee';
@@ -62,6 +62,7 @@ export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ child
 
   const refetch = useCallback(async () => {
     if (!employeeId) return;
+    const requester = sessionUserId();
     const today = startOfDay(new Date());
     const { data, error } = await timeClockService.getMyEntries(
       employeeId,
@@ -71,7 +72,7 @@ export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ child
     if (!error) {
       setEntries(data);
       loadedAt.current = Date.now();
-      writeDeviceCache(ENTRIES_CACHE, sessionUserId(), data);
+      writeDeviceCacheIfSession(ENTRIES_CACHE, requester, data);
     }
     setEntriesLoaded(true);
   }, [employeeId]);

@@ -36,6 +36,11 @@ export interface FeedPost {
   subjectName?: string | null;
   /** Pessoas marcadas (@Nome) no texto. */
   mentions?: MentionPerson[];
+  /** Empresa da publicação (a base antiga não a devolve). */
+  companyId?: string | null;
+  companyName?: string | null;
+  /** Publicação de outra empresa do mesmo grupo: só leitura. */
+  isOtherCompany?: boolean;
 }
 
 export interface FeedComment {

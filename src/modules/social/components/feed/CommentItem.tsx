@@ -13,6 +13,8 @@ interface CommentItemProps {
   onRemove: (id: string) => void;
   /** Resposta: mais pequena e encostada à direita do comentário principal. */
   isReply?: boolean;
+  /** Só leitura (publicação de outra empresa): sem Responder. */
+  readOnly?: boolean;
 }
 
 /** Um comentário do Feed: autor, texto, há quanto tempo, Responder e (meu) Eliminar. */
@@ -21,6 +23,7 @@ export const CommentItem: React.FC<CommentItemProps> = ({
   onReply,
   onRemove,
   isReply = false,
+  readOnly = false,
 }) => (
   <div className={cn('group flex gap-2.5', isReply && 'ml-9')}>
     <UserAvatar name={comment.authorName} userId={comment.authorId} size="xs" />
@@ -35,13 +38,15 @@ export const CommentItem: React.FC<CommentItemProps> = ({
       </div>
       <div className="ml-2 mt-0.5 flex items-center gap-3 text-[11.5px] text-rz-muted">
         <span>{formatDistanceToNowStrict(new Date(comment.createdAt), { locale: pt })}</span>
-        <button
-          type="button"
-          onClick={() => onReply(comment)}
-          className="font-semibold hover:text-rz-primary"
-        >
-          Responder
-        </button>
+        {!readOnly && (
+          <button
+            type="button"
+            onClick={() => onReply(comment)}
+            className="font-semibold hover:text-rz-primary"
+          >
+            Responder
+          </button>
+        )}
         {comment.isMine && (
           <button
             type="button"

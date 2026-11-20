@@ -325,9 +325,9 @@ export const needsLegacyConfirmation = (share: Share): boolean =>
 /** Módulos que um grupo novo mostra por defeito: o diretório e o Feed (o resto só com partilha aprovada). */
 export const GROUP_DEFAULT_CAPABILITIES = ['directory.read', 'feed.read'] as const;
 
-/** Enquanto a regra de leitura não estiver ativa (Lote 3), os módulos do grupo só ficam guardados. */
+/** O Feed do grupo já funciona (Lote 3); os outros módulos, como Colaboradores, ainda só ficam guardados. */
 export const GROUP_DEFAULTS_NOTE =
-  'Os módulos do grupo ainda não têm efeito: só passam a valer quando a regra de leitura for ativada.';
+  'O Feed do grupo já mostra as publicações «para toda a empresa» das outras empresas (só leitura). Os restantes módulos, como Colaboradores, ainda não têm efeito.';
 
 /** Só o que um grupo pode mostrar por defeito: leitura, partilhável e não sensível (como a base exige). */
 export const groupableCapabilities = (catalog: readonly Capability[]): Capability[] =>

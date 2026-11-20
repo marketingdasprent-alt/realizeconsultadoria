@@ -5,6 +5,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
 import { useDirectory } from '../../hooks/useDirectory';
+import { useFeedPeople } from '../../hooks/useFeedPeople';
 import { groupReactors } from '../../lib/feed';
 import { feedService } from '../../services/feedService';
 
@@ -15,6 +16,8 @@ interface ReactorsPopoverProps {
   unavailable?: boolean;
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
+  /** Como se mostra cada pessoa (outra empresa: Nome - Empresa); por defeito, o diretório. */
+  labelOf?: (userId: string | null) => string;
 }
 
 /** "Quem reagiu": as pessoas agrupadas por emoji. */
@@ -25,8 +28,10 @@ export const ReactorsPopover: React.FC<ReactorsPopoverProps> = ({
   unavailable,
   open,
   onOpenChange,
+  labelOf,
 }) => {
   const { nameOf } = useDirectory();
+  const label = labelOf ?? nameOf;
   const groups = groupReactors(rows);
 
   return (
@@ -54,8 +59,8 @@ export const ReactorsPopover: React.FC<ReactorsPopoverProps> = ({
               <ul className="space-y-1">
                 {group.userIds.map(userId => (
                   <li key={userId} className="flex items-center gap-2 text-[13.5px]">
-                    <UserAvatar name={nameOf(userId)} userId={userId} size="sm" />
-                    <span className="truncate">{nameOf(userId)}</span>
+                    <UserAvatar name={label(userId)} userId={userId} size="sm" />
+                    <span className="truncate">{label(userId)}</span>
                   </li>
                 ))}
               </ul>
@@ -69,12 +74,15 @@ export const ReactorsPopover: React.FC<ReactorsPopoverProps> = ({
 
 interface PostReactorsProps {
   postId: string;
+  /** Publicação de outra empresa do grupo: os nomes vêm como Nome - Empresa. */
+  companyName?: string | null;
 }
 
 /** "Quem reagiu" numa publicação (carrega só quando se abre). */
-export const PostReactors: React.FC<PostReactorsProps> = ({ postId }) => {
+export const PostReactors: React.FC<PostReactorsProps> = ({ postId, companyName }) => {
   const { isPreview } = useWorkspace();
   const [open, setOpen] = useState(false);
+  const people = useFeedPeople(postId, companyName, open);
   const { data, isLoading, isError } = useQuery({
     queryKey: ['feed', 'reactors', postId],
     queryFn: async () => {
@@ -93,6 +101,7 @@ export const PostReactors: React.FC<PostReactorsProps> = ({ postId }) => {
       unavailable={isPreview}
       open={open}
       onOpenChange={setOpen}
+      labelOf={companyName ? people.labelOf : undefined}
     />
   );
 };

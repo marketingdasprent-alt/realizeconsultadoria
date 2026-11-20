@@ -47,6 +47,8 @@ export const PostCard: React.FC<PostCardProps> = ({
   const [showComments, setShowComments] = useState(!!isFocused);
   const AudienceIcon = post.audience === 'department' ? Users : Building2;
   const isBirthday = post.kind === 'birthday';
+  // Publicação de outra empresa do grupo: só se lê.
+  const readOnly = !!post.isOtherCompany;
 
   return (
     <article
@@ -81,9 +83,18 @@ export const PostCard: React.FC<PostCardProps> = ({
               <AudienceIcon className="h-3 w-3" />
               {post.audience === 'department' ? post.department : 'Toda a empresa'}
             </span>
+            {readOnly && post.companyName && (
+              <span
+                data-company-badge
+                className="inline-flex items-center gap-1 rounded-full bg-rz-primary-soft px-2 py-0.5 font-semibold text-rz-primary"
+              >
+                <Building2 className="h-3 w-3" />
+                {post.companyName}
+              </span>
+            )}
           </p>
         </div>
-        {post.isMine && (
+        {post.isMine && !readOnly && (
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <button
@@ -127,8 +138,10 @@ export const PostCard: React.FC<PostCardProps> = ({
           <button
             key={reaction.emoji}
             type="button"
-            onClick={() => onReact(post, reaction.emoji)}
+            disabled={readOnly}
+            onClick={() => !readOnly && onReact(post, reaction.emoji)}
             className={cn(
+              readOnly && 'cursor-default',
               'rounded-full px-2.5 py-1 text-[13px] font-semibold ring-1 transition-colors',
               reaction.mine
                 ? 'bg-rz-primary-soft text-rz-primary ring-rz-primary/30'
@@ -138,45 +151,56 @@ export const PostCard: React.FC<PostCardProps> = ({
             {reaction.emoji} {reaction.count}
           </button>
         ))}
-        <Popover>
-          <PopoverTrigger asChild>
-            <button
-              type="button"
-              className="flex h-8 w-8 items-center justify-center rounded-full text-rz-muted ring-1 ring-rz-line hover:bg-rz-canvas hover:text-rz-primary"
-              aria-label="Reagir"
-            >
-              <SmilePlus className="h-4 w-4" />
-            </button>
-          </PopoverTrigger>
-          <PopoverContent side="top" className="flex w-auto gap-1 rounded-full p-1.5 shadow-rz-pop">
-            {FEED_REACTIONS.map(emoji => (
+        {!readOnly && (
+          <Popover>
+            <PopoverTrigger asChild>
               <button
-                key={emoji}
                 type="button"
-                onClick={() => onReact(post, emoji)}
-                className="flex h-9 w-9 items-center justify-center rounded-full text-xl transition-transform hover:scale-125"
+                className="flex h-8 w-8 items-center justify-center rounded-full text-rz-muted ring-1 ring-rz-line hover:bg-rz-canvas hover:text-rz-primary"
+                aria-label="Reagir"
               >
-                {emoji}
+                <SmilePlus className="h-4 w-4" />
               </button>
-            ))}
-          </PopoverContent>
-        </Popover>
-        {post.reactions.length > 0 && <PostReactors postId={post.id} />}
-        <button
-          type="button"
-          onClick={() => setShowComments(open => !open)}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
-        >
-          <MessageCircle className="h-4 w-4" />
-          {post.commentCount > 0
-            ? `${post.commentCount} comentário${post.commentCount > 1 ? 's' : ''}`
-            : isBirthday
-              ? 'Dar os parabéns'
-              : 'Comentar'}
-        </button>
+            </PopoverTrigger>
+            <PopoverContent
+              side="top"
+              className="flex w-auto gap-1 rounded-full p-1.5 shadow-rz-pop"
+            >
+              {FEED_REACTIONS.map(emoji => (
+                <button
+                  key={emoji}
+                  type="button"
+                  onClick={() => onReact(post, emoji)}
+                  className="flex h-9 w-9 items-center justify-center rounded-full text-xl transition-transform hover:scale-125"
+                >
+                  {emoji}
+                </button>
+              ))}
+            </PopoverContent>
+          </Popover>
+        )}
+        {post.reactions.length > 0 && (
+          <PostReactors postId={post.id} companyName={readOnly ? post.companyName : undefined} />
+        )}
+        {(!readOnly || post.commentCount > 0) && (
+          <button
+            type="button"
+            onClick={() => setShowComments(open => !open)}
+            className="ml-auto inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[13px] font-semibold text-rz-muted hover:bg-rz-canvas hover:text-rz-ink"
+          >
+            <MessageCircle className="h-4 w-4" />
+            {post.commentCount > 0
+              ? `${post.commentCount} comentário${post.commentCount > 1 ? 's' : ''}`
+              : isBirthday
+                ? 'Dar os parabéns'
+                : 'Comentar'}
+          </button>
+        )}
       </footer>
 
-      {showComments && <PostComments postId={post.id} />}
+      {showComments && (
+        <PostComments postId={post.id} readOnly={readOnly} companyName={post.companyName} />
+      )}
     </article>
   );
 };

@@ -4158,8 +4158,12 @@ export type Database = {
           attachments: Json;
           audience: string;
           author_id: string;
+          /** Lote 3 (Feed por grupo): opcionais, a base antiga não os devolve. */
+          author_name?: string | null;
           body: string;
           comment_count: number;
+          company_id?: string | null;
+          company_name?: string | null;
           created_at: string;
           department: string;
           edited_at: string;
@@ -4168,6 +4172,15 @@ export type Database = {
           mentions: string[];
           reactions: Json;
           subject_id: string | null;
+        }[];
+      };
+      feed_post_people: {
+        Args: { p_post_id: string };
+        Returns: {
+          company_id: string | null;
+          company_name: string | null;
+          name: string;
+          user_id: string;
         }[];
       };
       get_admin_permissions: {

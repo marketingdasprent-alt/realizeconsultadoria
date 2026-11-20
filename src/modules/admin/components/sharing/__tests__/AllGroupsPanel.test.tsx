@@ -148,6 +148,7 @@ describe('AllGroupsPanel — leitura', () => {
       )
     ).toBeInTheDocument();
     expect(screen.getByText(/ainda não têm efeito/)).toBeInTheDocument();
+    expect(screen.getByText(/O Feed do grupo já mostra/)).toBeInTheDocument();
     expect(screen.queryByText(/não dá acesso/)).not.toBeInTheDocument();
   });
 

@@ -40,6 +40,12 @@ export interface MailSummary {
   snippet: string;
   /** ISO 8601. */
   date: string;
+  /**
+   * ISO 8601: quando o email chegou à caixa (INTERNALDATE no IMAP), que o remetente não controla.
+   * `date` pode ser a do cabeçalho Date (o remetente escolhe-a); os avisos de email novo usam esta.
+   * Ausente nos fornecedores em que `date` já é a data de chegada.
+   */
+  received_at?: string | null;
   unread: boolean;
   starred: boolean;
   has_attachments: boolean;

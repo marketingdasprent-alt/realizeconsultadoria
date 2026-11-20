@@ -104,6 +104,12 @@ const toIso = (...values: (Date | string | undefined | null)[]): string => {
   return new Date(0).toISOString();
 };
 
+/** Data de chegada (INTERNALDATE) em ISO, ou null se o servidor não a deu ou for inválida. */
+const arrivalIso = (value: Date | string | undefined | null): string | null => {
+  const ms = value instanceof Date ? value.getTime() : value ? Date.parse(value) : NaN;
+  return Number.isFinite(ms) && ms > 0 ? new Date(ms).toISOString() : null;
+};
+
 const hasFlag = (flags: Iterable<string> | undefined, flag: string): boolean => {
   for (const f of flags ?? []) if (f.toLowerCase() === flag.toLowerCase()) return true;
   return false;
@@ -126,6 +132,7 @@ export const imapSummary = (input: {
     subject: input.envelope?.subject?.trim() ?? '',
     snippet: input.snippet ?? '',
     date: toIso(input.envelope?.date, input.internalDate),
+    received_at: arrivalIso(input.internalDate),
     unread: !hasFlag(input.flags, '\\Seen'),
     starred: hasFlag(input.flags, '\\Flagged'),
     has_attachments: imapHasAttachments(input.bodyStructure),

@@ -12,6 +12,7 @@ import { errorMessage, mapWithGroupLimit } from '../_shared/mail-server/http.ts'
 import { activeRulesByAccount, applyRules, type MailRule } from './rules.ts';
 import { inBackground, pruneCached, writeCached } from './messageCache.ts';
 import { bounceNotice, explainBounce, isBounce } from '../_shared/mail/bounce.ts';
+import { pickFresh } from './pollFresh.ts';
 
 const PER_ACCOUNT = 10;
 /** Intervalo mínimo entre leituras da mesma caixa (as IMAP limitam logins: 2 em 2 minutos). */
@@ -80,19 +81,16 @@ const pollAccount = async (
     limit: PER_ACCOUNT,
     withoutSnippets: true,
   });
-  // Datas no futuro (relógio errado ou spam com "Date: 2030") contam como "agora": senão o
-  // notified_until saltava para lá e esta caixa deixava de dar avisos de vez.
-  const cap = Date.now() + 5 * 60_000;
-  const dateOf = (mail: { date: string }) => Math.min(Date.parse(mail.date) || 0, cap);
-  const stored = account.notified_until ? Math.min(Date.parse(account.notified_until), cap) : null;
-  const newest = messages.reduce((max, mail) => Math.max(max, dateOf(mail)), stored ?? 0);
-  const since = stored;
-  const fresh =
-    since === null
-      ? []
-      : messages
-          .filter(mail => mail.unread && !ruled?.moved.has(mail.id) && dateOf(mail) > since)
-          .sort((a, b) => a.date.localeCompare(b.date));
+  // "Novo" decide-se pela data de chegada à caixa, não pela do cabeçalho Date do remetente (ver
+  // pollFresh.ts). Datas no futuro contam como "agora": senão o notified_until saltava para lá e
+  // a caixa deixava de dar avisos de vez.
+  const since = account.notified_until ? Date.parse(account.notified_until) : null;
+  const { fresh, newest } = pickFresh(
+    messages,
+    since !== null && Number.isFinite(since) ? since : null,
+    ruled?.moved,
+    Date.now()
+  );
 
   // Marca primeiro até onde se avisou (só se ninguém o mudou entretanto) e só depois avisa: se
   // a função for cortada a meio, ou correrem duas passagens, os mesmos emails não avisam 2 vezes.

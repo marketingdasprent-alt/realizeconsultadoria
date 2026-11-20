@@ -9,7 +9,7 @@ interface MailBodyProps {
   onOpenAttachment: (message: MailMessage, attachment: MailAttachmentInfo) => void;
 }
 
-/** Corpo do email isolado num iframe (sem scripts) e os anexos em miniatura. */
+/** Os anexos em miniatura no topo (como no Gmail) e, por baixo, o corpo do email isolado num iframe (sem scripts). */
 export const MailBody: React.FC<MailBodyProps> = ({ message, onDownload, onOpenAttachment }) => {
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(320);
@@ -46,18 +46,8 @@ export const MailBody: React.FC<MailBodyProps> = ({ message, onDownload, onOpenA
 
   return (
     <>
-      <iframe
-        ref={frame}
-        title="Conteúdo do email"
-        // Sem allow-scripts: o HTML do email nunca corre código.
-        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
-        srcDoc={readerDocument(message)}
-        onLoad={onFrameLoad}
-        style={{ height }}
-        className="rz-keep-light mt-5 w-full rounded-xl border-0 bg-white"
-      />
       {message.attachments.length > 0 && (
-        <ul className="mt-4 flex flex-wrap gap-2">
+        <ul className="mt-4 flex flex-wrap gap-2" aria-label="Anexos">
           {message.attachments.map((attachment, index) => (
             <li key={attachment.id}>
               <AttachmentThumb
@@ -72,6 +62,16 @@ export const MailBody: React.FC<MailBodyProps> = ({ message, onDownload, onOpenA
           ))}
         </ul>
       )}
+      <iframe
+        ref={frame}
+        title="Conteúdo do email"
+        // Sem allow-scripts: o HTML do email nunca corre código.
+        sandbox="allow-same-origin allow-popups allow-popups-to-escape-sandbox"
+        srcDoc={readerDocument(message)}
+        onLoad={onFrameLoad}
+        style={{ height }}
+        className={`rz-keep-light w-full rounded-xl border-0 bg-white ${message.attachments.length > 0 ? 'mt-4' : 'mt-5'}`}
+      />
     </>
   );
 };

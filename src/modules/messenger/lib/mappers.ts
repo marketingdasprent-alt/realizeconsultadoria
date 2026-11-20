@@ -26,6 +26,7 @@ export const toPerson = (row: DirectoryRow): DirectoryPerson => ({
   department: row.department,
   email: row.email,
   phone: row.phone ?? null,
+  managerEmployeeId: row.manager_employee_id ?? null,
 });
 
 const lastMessageText = (row: ConversationRow): string => {

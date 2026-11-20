@@ -15,6 +15,8 @@ export interface DirectoryPerson {
   email: string | null;
   /** Telemóvel da empresa atribuído (lista de telefones). */
   phone?: string | null;
+  /** Ficha do responsável direto (chefia real; organograma). */
+  managerEmployeeId?: string | null;
 }
 
 export interface ConversationSummary {

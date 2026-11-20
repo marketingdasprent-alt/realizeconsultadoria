@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
-import { ArrowRightLeft, Plus } from 'lucide-react';
+import { ArrowRightLeft, Plus, Users } from 'lucide-react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
 import { Button } from '@/components/ui/button';
 import EmployeeAvisoDialog from '@/components/admin/EmployeeAvisoDialog';
@@ -40,7 +40,15 @@ const SORTERS: Record<SortField, (a: Employee, b: Employee) => number> = {
 /** Colaboradores: números da equipa, filtros (no endereço) e a lista pessoal ou financeira. */
 const EmployeesPage = () => {
   const navigate = useNavigate();
-  const { canExecuteTopic } = useAdminPermissions();
+  const {
+    canExecuteTopic,
+    canExecuteTopicFor,
+    scopeOf,
+    teamEmployeeIds,
+    isLoading: permissionsLoading,
+  } = useAdminPermissions();
+  /** "Ver colaboradores" limitado à equipa: a lista só mostra quem está abaixo na chefia. */
+  const teamOnly = scopeOf('employees', 'view') === 'team';
   const actions = useEmployeeListActions();
   const avatarOf = useEmployeeAvatars();
   const { accessOf } = useEmployeeLastSignIn();
@@ -81,17 +89,33 @@ const EmployeesPage = () => {
       { replace: true }
     );
 
-  const permissions = {
-    canEdit: canExecuteTopic('employees', 'edit'),
-    canDelete: canExecuteTopic('employees', 'delete'),
-    canNotifications: canExecuteTopic('employees', 'notifications'),
-    canResetPassword: canExecuteTopic('employees', 'reset_password'),
-  };
+  // Cada ação respeita o seu alcance: "Só a minha equipa" vale só para quem está abaixo na chefia.
+  const permissionsOf = (employee: Employee) => ({
+    canEdit: canExecuteTopicFor('employees', 'edit', employee.id),
+    canDelete: canExecuteTopicFor('employees', 'delete', employee.id),
+    canNotifications: canExecuteTopicFor('employees', 'notifications', employee.id),
+    canResetPassword: canExecuteTopicFor('employees', 'reset_password', employee.id),
+  });
+  // Documentos por aprovar: só de quem pode editar (e, com alcance de equipa, só dessa equipa).
+  const canEditAny = canExecuteTopic('employees', 'edit');
+  // Com Editar limitado à equipa, só se reveem os documentos da equipa (mesmo vendo todos).
+  const pendingDocuments = useMemo(
+    () =>
+      documentAlerts.pending.filter(
+        doc =>
+          (!teamOnly || teamEmployeeIds.has(doc.employee_id)) &&
+          (!canEditAny || canExecuteTopicFor('employees', 'edit', doc.employee_id))
+      ),
+    [documentAlerts.pending, teamOnly, teamEmployeeIds, canEditAny, canExecuteTopicFor]
+  );
 
   // O menu pode limitar a uma empresa ou grupo: só as pessoas e empresas dessa escolha.
   const employees = useMemo(
-    () => filterByScope(actions.employees, scopeCtx.ids, e => e.company_id),
-    [actions.employees, scopeCtx.ids]
+    () =>
+      filterByScope(actions.employees, scopeCtx.ids, e => e.company_id).filter(
+        e => !teamOnly || teamEmployeeIds.has(e.id)
+      ),
+    [actions.employees, scopeCtx.ids, teamOnly, teamEmployeeIds]
   );
   // Todas as empresas ativas (e não só as que já têm colaboradores): para filtrar e criar numa vazia.
   // O hook partilhado traz também as inativas; aqui só interessam as ativas, como na ficha.
@@ -209,6 +233,19 @@ const EmployeesPage = () => {
       />
 
       <CompanyScopeNotice />
+      {teamOnly && !permissionsLoading && (
+        <div
+          role="status"
+          className="flex items-center gap-3 rounded-2xl bg-white px-4 py-2.5 text-[13px] text-rz-ink shadow-rz-soft ring-1 ring-rz-line"
+        >
+          <Users className="h-4 w-4 shrink-0 text-rz-primary" aria-hidden />
+          <span className="min-w-0 flex-1">
+            {teamEmployeeIds.size === 0
+              ? 'Ainda não tem ninguém na sua equipa. Peça a um administrador para indicar o responsável direto nas fichas.'
+              : `A ver só a sua equipa: ${teamEmployeeIds.size} ${teamEmployeeIds.size === 1 ? 'pessoa' : 'pessoas'} abaixo de si na chefia.`}
+          </span>
+        </div>
+      )}
 
       <EmployeesStats
         active={searched.filter(e => e.is_active).length}
@@ -218,7 +255,7 @@ const EmployeesPage = () => {
         onlyBirthdays={onlyBirthdays}
         onStatusChange={value => setParam('status', value, 'active')}
         onBirthdaysChange={value => setParam('aniversarios', value ? '1' : '0', '0')}
-        pendingDocuments={documentAlerts.pending.length}
+        pendingDocuments={pendingDocuments.length}
         onPendingDocuments={() => setPendingOpen(true)}
         notUsing={searched.filter(notUsing).length}
         onlyNotUsing={onlyNotUsing}
@@ -275,7 +312,7 @@ const EmployeesPage = () => {
           sortField={sortField}
           sortDirection={sortDirection}
           onSort={sort}
-          permissions={permissions}
+          permissionsOf={permissionsOf}
           resendingId={actions.resendingId}
           alertsOf={employeeId => ({
             expiring: documentAlerts.expiringOf(employeeId).length,
@@ -325,8 +362,8 @@ const EmployeesPage = () => {
       <PendingDocumentsDialog
         open={pendingOpen}
         onOpenChange={setPendingOpen}
-        pending={documentAlerts.pending}
-        canReview={permissions.canEdit}
+        pending={pendingDocuments}
+        canReview={canEditAny}
         onChanged={() => documentAlerts.refetch()}
       />
       <ResendInviteSuccessDialog

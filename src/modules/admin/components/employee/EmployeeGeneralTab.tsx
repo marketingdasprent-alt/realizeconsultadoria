@@ -10,6 +10,7 @@ import { useToast } from '@/hooks/use-toast';
 import { ROUTES } from '@/lib/constants';
 import { createEmployeeSchema, updateEmployeeSchema } from '@/lib/schemas';
 import { formatIban } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
 import { employeeService } from '@/modules/admin/services/employeeService';
 import { equipmentService } from '@/modules/admin/services/equipmentService';
 import { DOCUMENT_CATEGORIES } from '@/lib/documents';
@@ -52,7 +53,17 @@ export interface EmployeeRecord {
   birth_date: string | null;
   hire_date: string | null;
   notes: string | null;
+  /** Responsável direto (outro colaborador da mesma empresa). */
+  manager_id?: string | null;
   companies?: { name: string };
+}
+
+/** Limite do responsável direto quando quem edita só gere a sua equipa. */
+export interface ManagerScope {
+  /** Quem pode ser escolhido (a própria pessoa e a sua equipa). */
+  allowedIds: ReadonlySet<string>;
+  /** Fichas de quem está a editar: o colaborador novo fica na sua equipa. */
+  ownEmployeeIds: readonly string[];
 }
 
 interface EmployeeGeneralTabProps {
@@ -65,9 +76,15 @@ interface EmployeeGeneralTabProps {
   /** Depois de mover o colaborador de empresa (para voltar a ler a ficha). */
   onMoved?: () => void;
   onCreated: (employeeId: string) => void;
+  /** Só com alcance de equipa (criar ou editar limitado a "Só a minha equipa"). */
+  managerScope?: ManagerScope | null;
 }
 
-const toFormValues = (employee: EmployeeRecord | null, defaultCompanyId = '') => ({
+const toFormValues = (
+  employee: EmployeeRecord | null,
+  defaultCompanyId = '',
+  defaultManagerId = ''
+) => ({
   name: employee?.name || '',
   email: employee?.email || '',
   phone: employee?.phone || '',
@@ -78,6 +95,7 @@ const toFormValues = (employee: EmployeeRecord | null, defaultCompanyId = '') =>
   document_number: employee?.document_number || '',
   hire_date: employee?.hire_date || '',
   notes: employee?.notes || '',
+  manager_id: employee ? employee.manager_id || '' : defaultManagerId,
   password: '',
   confirmPassword: '',
   vacation_days: '22',
@@ -94,6 +112,12 @@ const toFormValues = (employee: EmployeeRecord | null, defaultCompanyId = '') =>
 
 type FormValues = ReturnType<typeof toFormValues>;
 
+/** Mensagem de um erro (também os da BD, que não são Error; ex.: ciclo na chefia). */
+const errorMessage = (error: unknown, fallback: string) =>
+  error && typeof error === 'object' && typeof (error as { message?: unknown }).message === 'string'
+    ? (error as { message: string }).message
+    : fallback;
+
 const isoDate = (date: Date | undefined) => (date ? format(date, 'yyyy-MM-dd') : null);
 
 /**
@@ -108,6 +132,7 @@ const EmployeeGeneralTab = ({
   onSaved,
   onMoved,
   onCreated,
+  managerScope,
 }: EmployeeGeneralTabProps) => {
   const navigate = useNavigate();
   const { toast } = useToast();
@@ -142,7 +167,34 @@ const EmployeeGeneralTab = ({
     resolver: zodResolver(isEditMode ? updateEmployeeSchema : createEmployeeSchema),
     defaultValues: toFormValues(employee, defaultCompanyId),
   });
-  const { register, handleSubmit, formState, reset, control, watch, setValue } = methods;
+  const { register, handleSubmit, formState, reset, control, watch, setValue, getValues } = methods;
+  const companyId = watch('company_id');
+
+  // Criar com alcance de equipa: o colaborador novo fica abaixo de quem o cria (a ficha dessa
+  // pessoa na empresa escolhida). Muda com a empresa, porque a chefia é dentro da mesma empresa.
+  const ownIdsKey = managerScope?.ownEmployeeIds.join(',') ?? '';
+  useEffect(() => {
+    if (isEditMode || !managerScope || !companyId) return;
+    let cancelled = false;
+    const own = managerScope.ownEmployeeIds;
+    (async () => {
+      const { data } = own.length
+        ? await supabase
+            .from('employees')
+            .select('id')
+            .in('id', [...own])
+            .eq('company_id', companyId)
+        : { data: [] as { id: string }[] };
+      if (cancelled) return;
+      const current = getValues('manager_id');
+      if (!current || !managerScope.allowedIds.has(current))
+        setValue('manager_id', data?.[0]?.id ?? '', { shouldDirty: false });
+    })();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- ownIdsKey representa managerScope
+  }, [isEditMode, companyId, ownIdsKey]);
   const errors = formState.errors as FieldErrors;
 
   useEffect(() => {
@@ -166,6 +218,18 @@ const EmployeeGeneralTab = ({
         },
         isEditMode ? 'edit' : 'create'
       );
+      const managerId = data.manager_id || null;
+      // Quem só gere a equipa não pode deixar a pessoa fora dela (sem responsável).
+      if (managerScope && !managerId) {
+        toast({
+          title: 'Falta o responsável direto',
+          description: 'Escolha alguém da sua equipa, ou a si, como responsável direto.',
+          variant: 'destructive',
+        });
+        return;
+      }
+      // Só se grava quando muda: a ficha continua a gravar mesmo antes de a coluna existir.
+      const managerChanged = managerId !== (employee?.manager_id ?? null);
 
       if (isEditMode && employee) {
         const email = data.email.toLowerCase().trim();
@@ -173,14 +237,19 @@ const EmployeeGeneralTab = ({
           const { error } = await employeeService.updateEmail(employee.id, email);
           if (error) throw error;
         }
-        const { error } = await employeeService.update(employee.id, details);
+        const { error } = await employeeService.update(
+          employee.id,
+          managerChanged ? { ...details, manager_id: managerId } : details
+        );
         if (error) throw error;
         onSaved();
         return;
       }
 
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars -- o responsável grava-se depois de criar
+      const { manager_id: _manager, ...createData } = data;
       const { data: created, error } = await employeeService.createWithPassword({
-        ...data,
+        ...createData,
         vacation_days: parseFloat(data.vacation_days) || 22,
         self_schedulable_days: data.self_schedulable_days
           ? parseFloat(data.self_schedulable_days)
@@ -191,15 +260,16 @@ const EmployeeGeneralTab = ({
       if (error) throw error;
       if (created?.error) throw new Error(created.error);
       // A criação (função do servidor) não guarda a admissão nem as notas: completam-se já.
-      if (created?.employeeId && (details.hire_date || details.notes)) {
+      if (created?.employeeId && (details.hire_date || details.notes || managerId)) {
         const { error: detailsError } = await employeeService.update(created.employeeId, {
           hire_date: details.hire_date,
           notes: details.notes,
+          ...(managerId ? { manager_id: managerId } : {}),
         });
         if (detailsError) {
           toast({
-            title: 'Data de admissão não guardada',
-            description: 'O colaborador foi criado, mas preencha a admissão na ficha.',
+            title: 'Colaborador criado, mas falta completar a ficha',
+            description: 'Abra a ficha e preencha a admissão e o responsável direto.',
             variant: 'destructive',
           });
         }
@@ -216,7 +286,7 @@ const EmployeeGeneralTab = ({
     } catch (error: unknown) {
       toast({
         title: 'Erro',
-        description: error instanceof Error ? error.message : 'Ocorreu um erro inesperado.',
+        description: errorMessage(error, 'Ocorreu um erro inesperado.'),
         variant: 'destructive',
       });
     } finally {
@@ -252,7 +322,7 @@ const EmployeeGeneralTab = ({
                 register={register}
                 setValue={setValue}
                 errors={errors}
-                companyId={watch('company_id')}
+                companyId={companyId}
                 companies={companies}
                 currentCompany={
                   isEditMode
@@ -267,6 +337,9 @@ const EmployeeGeneralTab = ({
                 }
                 position={watch('position') ?? ''}
                 department={watch('department') ?? ''}
+                employeeId={employee?.id ?? null}
+                managerId={watch('manager_id') ?? ''}
+                managerAllowedIds={managerScope?.allowedIds ?? null}
               />
             </FormSection>
             {!isEditMode && (

@@ -97,7 +97,7 @@ export const EmployeeWorkFields = ({
       </Link>
       .
     </p>
-    <Field label="Data de admissão">
+    <Field label="Data de admissão" error={errors.hire_date?.message as string | undefined}>
       <Input type="date" {...register('hire_date')} />
     </Field>
     <Field

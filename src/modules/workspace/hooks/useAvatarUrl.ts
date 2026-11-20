@@ -1,6 +1,6 @@
 import { useContext } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CHAT_KEYS } from '@/modules/messenger/lib/cache';
+import { CHAT_KEYS, directoryStaleTime } from '@/modules/messenger/lib/cache';
 import { messengerService } from '@/modules/messenger/services/messengerService';
 import { WorkspaceContext } from '../context/workspaceContext';
 import { avatarUrl } from '../lib/avatars';
@@ -17,12 +17,13 @@ const fetchDirectory = async () => {
  */
 export const useAvatarUrl = (userId: string | null | undefined): string | null => {
   // Fora da área do colaborador (ex.: admin) não há contexto: o avatar recebe a foto em src.
-  const isPreview = useContext(WorkspaceContext)?.isPreview ?? false;
+  const workspace = useContext(WorkspaceContext);
+  const isPreview = workspace?.isPreview ?? false;
   const { data } = useQuery({
-    queryKey: CHAT_KEYS.directory,
+    queryKey: CHAT_KEYS.directoryFor(workspace?.user?.companyId),
     queryFn: fetchDirectory,
     enabled: !isPreview && !!userId,
-    staleTime: 5 * 60_000,
+    staleTime: directoryStaleTime,
     select: rows => rows.find(row => row.user_id === userId)?.avatar_path ?? null,
   });
   return avatarUrl(data);

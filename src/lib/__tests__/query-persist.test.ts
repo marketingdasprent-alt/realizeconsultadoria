@@ -1,10 +1,16 @@
 import { QueryClient } from '@tanstack/react-query';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
+type AuthListener = (event: string, session: { user?: { id: string } } | null) => void;
+const auth = vi.hoisted(() => ({ listener: null as AuthListener | null }));
+
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
     auth: {
-      onAuthStateChange: vi.fn(() => ({ data: { subscription: { unsubscribe: vi.fn() } } })),
+      onAuthStateChange: vi.fn((listener: AuthListener) => {
+        auth.listener = listener;
+        return { data: { subscription: { unsubscribe: vi.fn() } } };
+      }),
     },
   },
 }));
@@ -15,7 +21,13 @@ import {
   sessionUserId,
   writeDeviceCache,
 } from '../device-cache';
-import { isPersisted, restoreQueries, snapshot } from '../query-persist';
+import {
+  isPersisted,
+  persistQueries,
+  resetCompanyScopedQueries,
+  restoreQueries,
+  snapshot,
+} from '../query-persist';
 
 const session = (userId: string) =>
   localStorage.setItem('sb-proj-auth-token', JSON.stringify({ user: { id: userId } }));
@@ -88,5 +100,126 @@ describe('cache no aparelho', () => {
     const old = new QueryClient();
     restoreQueries(old);
     expect(old.getQueryData(['tasks'])).toBeUndefined();
+  });
+});
+
+describe('mudança de empresa', () => {
+  it('limpa o que é da empresa e mantém o que é pessoal', async () => {
+    const client = new QueryClient();
+    client.setQueryData(['chat', 'conversations'], [{ id: 'c1' }]);
+    client.setQueryData(['chat', 'directory', 'antiga'], []);
+    client.setQueryData(['feed', 'posts'], [{ id: 'p1' }]);
+    client.setQueryData(['company-files', 'X'], [1]);
+    client.setQueryData(['calendar', 'team', 'a'], [1]);
+    client.setQueryData(['tasks', 'mine'], [{ id: 't1' }]);
+    client.setQueryData(['notifications'], [{ id: 'n1' }]);
+    client.setQueryData(['calendar', 'events', 'a'], [1]);
+
+    await resetCompanyScopedQueries(client);
+
+    expect(client.getQueryData(['chat', 'conversations'])).toBeUndefined();
+    expect(client.getQueryData(['chat', 'directory', 'antiga'])).toBeUndefined();
+    expect(client.getQueryData(['feed', 'posts'])).toBeUndefined();
+    expect(client.getQueryData(['company-files', 'X'])).toBeUndefined();
+    expect(client.getQueryData(['calendar', 'team', 'a'])).toBeUndefined();
+    expect(client.getQueryData(['tasks', 'mine'])).toEqual([{ id: 't1' }]);
+    expect(client.getQueryData(['notifications'])).toEqual([{ id: 'n1' }]);
+    expect(client.getQueryData(['calendar', 'events', 'a'])).toEqual([1]);
+  });
+});
+
+describe('sessão: nada de uma conta passa para a outra', () => {
+  let stop: (() => void) | null = null;
+
+  const hideTab = () => {
+    Object.defineProperty(document, 'visibilityState', { value: 'hidden', configurable: true });
+    document.dispatchEvent(new Event('visibilitychange'));
+  };
+
+  afterEach(() => {
+    stop?.();
+    stop = null;
+    auth.listener = null;
+    localStorage.clear();
+    Object.defineProperty(document, 'visibilityState', { value: 'visible', configurable: true });
+  });
+
+  it('terminar a sessão limpa a cache guardada e a cache em memória', () => {
+    session('u1');
+    const client = new QueryClient();
+    client.setQueryData(['chat', 'directory', 'empresa-a'], [{ user_id: 'x' }]);
+    client.setQueryData(['tasks', 'mine'], [{ id: 't1' }]);
+    stop = persistQueries(client);
+    hideTab();
+    expect(readDeviceCache('queries', 'u1')).not.toBeNull();
+
+    auth.listener?.('SIGNED_OUT', null);
+
+    expect(readDeviceCache('queries', 'u1')).toBeNull();
+    expect(client.getQueryData(['chat', 'directory', 'empresa-a'])).toBeUndefined();
+    expect(client.getQueryData(['tasks', 'mine'])).toBeUndefined();
+  });
+
+  it('outra conta a entrar no mesmo separador não vê dados da anterior', () => {
+    session('u1');
+    const client = new QueryClient();
+    client.setQueryData(['feed', 'posts'], [{ id: 'p1' }]);
+    stop = persistQueries(client);
+
+    session('u2');
+    auth.listener?.('SIGNED_IN', { user: { id: 'u2' } });
+
+    expect(client.getQueryData(['feed', 'posts'])).toBeUndefined();
+  });
+
+  it('a mesma conta a renovar o token mantém a cache', () => {
+    session('u1');
+    const client = new QueryClient();
+    client.setQueryData(['feed', 'posts'], [{ id: 'p1' }]);
+    stop = persistQueries(client);
+
+    auth.listener?.('TOKEN_REFRESHED', { user: { id: 'u1' } });
+    auth.listener?.('SIGNED_IN', { user: { id: 'u1' } });
+
+    expect(client.getQueryData(['feed', 'posts'])).toEqual([{ id: 'p1' }]);
+  });
+
+  it('nunca grava dados em memória de uma conta na chave de outra', () => {
+    session('u1');
+    const client = new QueryClient();
+    client.setQueryData(['chat', 'conversations'], [{ id: 'c-da-conta-1' }]);
+    stop = persistQueries(client);
+
+    // A sessão do aparelho passou para u2 sem o evento ter chegado ainda.
+    session('u2');
+    hideTab();
+
+    expect(readDeviceCache('queries', 'u2')).toBeNull();
+  });
+});
+
+describe('empresa ativa', () => {
+  afterEach(() => localStorage.clear());
+
+  it('na mesma conta, ao mudar de empresa a lista guardada da anterior desaparece', async () => {
+    session('u1');
+    const before = new QueryClient();
+    before.setQueryData(['chat', 'directory', 'empresa-a'], [{ user_id: 'colega-a' }]);
+    before.setQueryData(['feed', 'posts'], [{ id: 'post-a' }]);
+    before.setQueryData(['tasks', 'mine'], [{ id: 't1' }]);
+    writeDeviceCache('queries', 'u1', { version: 1, savedAt: Date.now(), state: snapshot(before) });
+
+    const after = new QueryClient();
+    restoreQueries(after, 'u1');
+    expect(after.getQueryData(['chat', 'directory', 'empresa-a'])).toEqual([
+      { user_id: 'colega-a' },
+    ]);
+
+    await resetCompanyScopedQueries(after);
+
+    expect(after.getQueryData(['chat', 'directory', 'empresa-a'])).toBeUndefined();
+    expect(after.getQueryData(['chat', 'directory', 'empresa-b'])).toBeUndefined();
+    expect(after.getQueryData(['feed', 'posts'])).toBeUndefined();
+    expect(after.getQueryData(['tasks', 'mine'])).toEqual([{ id: 't1' }]);
   });
 });

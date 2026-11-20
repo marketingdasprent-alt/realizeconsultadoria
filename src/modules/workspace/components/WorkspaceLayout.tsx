@@ -1,4 +1,5 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +9,7 @@ import {
   sessionUserId,
   writeDeviceCache,
 } from '@/lib/device-cache';
+import { resetCompanyScopedQueries } from '@/lib/query-persist';
 import { clearMailCache } from '@/modules/webmail/lib/mailCache';
 import { ROUTES } from '@/lib/constants';
 import ChangePasswordDialog from '@/components/employee/ChangePasswordDialog';
@@ -67,6 +69,9 @@ const WorkspaceLayout: React.FC = () => {
     readDeviceCache<WorkspaceContextValue['user']>(USER_CACHE, sessionUserId())
   );
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const queryClient = useQueryClient();
+  // Empresa da ficha da última vez: se mudou, a cache de conversas, Feed… é da empresa anterior.
+  const knownCompanyId = useRef<string | null>(cachedUser?.companyId ?? null);
   useRzTheme();
 
   const refresh = useCallback(async () => {
@@ -75,12 +80,17 @@ const WorkspaceLayout: React.FC = () => {
       navigate(ROUTES.EMPLOYEE.LOGIN);
       return;
     }
+    const companyId = data.employee?.company_id ?? null;
+    if (companyId && knownCompanyId.current && knownCompanyId.current !== companyId) {
+      void resetCompanyScopedQueries(queryClient);
+    }
+    if (companyId) knownCompanyId.current = companyId;
     setEmployee(data.employee);
     setSessionEmail(data.email);
     setIsLoading(false);
     if (data.employee)
       writeDeviceCache(USER_CACHE, sessionUserId(), toUser(data.employee, data.email));
-  }, [navigate]);
+  }, [navigate, queryClient]);
 
   useEffect(() => {
     refresh();

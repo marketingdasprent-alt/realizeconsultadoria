@@ -1,6 +1,6 @@
 import { useCallback, useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { CHAT_KEYS } from '@/modules/messenger/lib/cache';
+import { CHAT_KEYS, directoryStaleTime } from '@/modules/messenger/lib/cache';
 import { DEMO_DIRECTORY } from '@/modules/messenger/lib/demoData';
 import { FORMER_COLLEAGUE, toPerson } from '@/modules/messenger/lib/mappers';
 import { messengerService } from '@/modules/messenger/services/messengerService';
@@ -14,7 +14,7 @@ import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 export const useDirectory = () => {
   const { isPreview, user, mailOnly } = useWorkspace();
   const query = useQuery({
-    queryKey: CHAT_KEYS.directory,
+    queryKey: CHAT_KEYS.directoryFor(user.companyId),
     queryFn: async () => {
       const { data, error } = await messengerService.getDirectory();
       if (error) throw error;
@@ -22,7 +22,7 @@ export const useDirectory = () => {
     },
     // Na app de email (clientes de fora) não há colegas
     enabled: !isPreview && !mailOnly,
-    staleTime: 5 * 60_000,
+    staleTime: directoryStaleTime,
   });
 
   const people: DirectoryPerson[] = useMemo(

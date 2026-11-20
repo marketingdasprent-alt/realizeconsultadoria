@@ -150,6 +150,7 @@ export const persistQueries = (client: QueryClient) => {
   document.addEventListener('visibilitychange', onHidden);
   const { data } = supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
+      void client.cancelQueries();
       stopTimer();
       clearAllDeviceData();
       client.clear();
@@ -158,12 +159,15 @@ export const persistQueries = (client: QueryClient) => {
     }
     const userId = session?.user?.id ?? null;
     if (!userId) return;
-    if (owner && owner !== userId) {
+    if (owner !== userId) {
       stopTimer();
-      // O que ficou no aparelho da conta anterior sai; as listas montadas voltam ao início e
-      // vão buscar os dados da conta nova.
+      // O que ficou no aparelho da conta anterior (ou de uma sessão que desapareceu sem
+      // SIGNED_OUT) sai; as listas montadas voltam ao início e vão buscar os dados da conta nova.
       clearAllDeviceData(userId);
-      void client.resetQueries();
+      if (owner) {
+        client.getMutationCache().clear();
+        void client.resetQueries();
+      }
     }
     owner = userId;
   });

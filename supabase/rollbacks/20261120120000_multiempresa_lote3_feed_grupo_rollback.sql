@@ -4,6 +4,9 @@
 -- depois): sem as funções novas essa capacidade deixa de ter efeito no Feed. Repõe o default da coluna
 -- default_capabilities para '{}'.
 --
+-- ATENÇÃO: reaplicar a migração depois deste rollback volta a correr o backfill (volta a ligar
+-- 'feed.read' em todos os grupos, incluindo os que o super admin tenha desligado entretanto).
+--
 -- Aplicar no SQL Editor, numa única chamada.
 
 DROP POLICY IF EXISTS "Feed: ver publicações" ON public.feed_posts;

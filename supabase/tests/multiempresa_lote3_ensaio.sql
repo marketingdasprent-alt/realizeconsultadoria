@@ -22,10 +22,10 @@
 
 DO $t$
 DECLARE
-  uA1 uuid; uA2 uuid; uB1 uuid; uD1 uuid; uE1 uuid; uH1 uuid; uAdm uuid; uCf uuid; uAf uuid; uSp uuid;
-  cA uuid; cB uuid; cC uuid; cD uuid; cE uuid; cF uuid; cH uuid; cI uuid;
-  g1 uuid; g2 uuid; g3 uuid;
-  pA uuid; pAd uuid; pB uuid; pBd uuid; pBx uuid; pBb uuid; pC uuid; pD uuid; pE uuid; pI uuid; pDb uuid; pIb uuid;
+  uA1 uuid; uA2 uuid; uB1 uuid; uD1 uuid; uE1 uuid; uH1 uuid; uJ1 uuid; uK1 uuid; uL1 uuid; uM1 uuid; uX uuid; uAdm uuid; uCf uuid; uAf uuid; uSp uuid;
+  cA uuid; cB uuid; cC uuid; cD uuid; cE uuid; cF uuid; cH uuid; cI uuid; cJ uuid; cK uuid; cL uuid; cM uuid;
+  g1 uuid; g2 uuid; g3 uuid; g4 uuid; g5 uuid;
+  pA uuid; pAd uuid; pB uuid; pBd uuid; pBx uuid; pBb uuid; pC uuid; pD uuid; pE uuid; pI uuid; pDb uuid; pIb uuid; pJ uuid; pK uuid; pM uuid; pX uuid;
   v_nif text := 'ZZ' || substr(upper(md5(gen_random_uuid()::text)), 1, 8);
   v_defs text[];
   v_i integer;
@@ -38,7 +38,7 @@ DECLARE
   v_fail integer := 0;
   v_name text;
   v_expect text;
-  v_newu text[] := ARRAY['a1','a2','b1','d1','e1','h1','adm','cf','af','sp'];
+  v_newu text[] := ARRAY['a1','a2','b1','d1','e1','h1','adm','cf','af','sp','j1','k1','l1','m1','x'];
   v_ids uuid[];
   v_k integer;
   v_pub text := 'ARRAY[''public.feed_can_read(uuid)'', ''public.feed_can_read_row(uuid, text, text, uuid)'', ''public.feed_list_posts(timestamptz, integer)'', ''public.feed_post_people(uuid)'']';
@@ -54,6 +54,7 @@ BEGIN
     END LOOP;
     uA1 := v_ids[1]; uA2 := v_ids[2]; uB1 := v_ids[3]; uD1 := v_ids[4]; uE1 := v_ids[5];
     uH1 := v_ids[6]; uAdm := v_ids[7]; uCf := v_ids[8]; uAf := v_ids[9]; uSp := v_ids[10];
+    uJ1 := v_ids[11]; uK1 := v_ids[12]; uL1 := v_ids[13]; uM1 := v_ids[14]; uX := v_ids[15];
 
     INSERT INTO public.companies (name, nif, email) VALUES ('ZZ L3 A', v_nif || 'A', 'a@invalid.example') RETURNING id INTO cA;
     INSERT INTO public.companies (name, nif, email) VALUES ('ZZ L3 B', v_nif || 'B', 'b@invalid.example') RETURNING id INTO cB;
@@ -64,9 +65,19 @@ BEGIN
     INSERT INTO public.companies (name, nif, email) VALUES ('ZZ L3 H', v_nif || 'H', 'h@invalid.example') RETURNING id INTO cH;
     INSERT INTO public.companies (name, nif, email) VALUES ('ZZ L3 I', v_nif || 'I', 'i@invalid.example') RETURNING id INTO cI;
 
+    INSERT INTO public.companies (name, nif, email) VALUES ('ZZ L3 J', v_nif || 'J', 'j@invalid.example') RETURNING id INTO cJ;
+    INSERT INTO public.companies (name, nif, email) VALUES ('ZZ L3 K', v_nif || 'K', 'k@invalid.example') RETURNING id INTO cK;
+    INSERT INTO public.companies (name, nif, email) VALUES ('ZZ L3 L', v_nif || 'L', 'l@invalid.example') RETURNING id INTO cL;
+    INSERT INTO public.companies (name, nif, email) VALUES ('ZZ L3 M', v_nif || 'M', 'm@invalid.example') RETURNING id INTO cM;
     INSERT INTO public.company_groups (name, default_capabilities) VALUES ('ZZ L3 G1', ARRAY['feed.read']) RETURNING id INTO g1;
     INSERT INTO public.company_groups (name, default_capabilities) VALUES ('ZZ L3 G2', ARRAY['feed.read']) RETURNING id INTO g2;
     INSERT INTO public.company_groups (name, default_capabilities) VALUES ('ZZ L3 G3', ARRAY[]::text[]) RETURNING id INTO g3;
+    -- G4 nasceu de um pedido de partilha (origin pedido): nao conta para o Feed. G5 e da migracao.
+    INSERT INTO public.company_groups (name, default_capabilities) VALUES ('ZZ L3 G4', ARRAY['feed.read']) RETURNING id INTO g4;
+    INSERT INTO public.company_groups (name, default_capabilities) VALUES ('ZZ L3 G5', ARRAY['feed.read']) RETURNING id INTO g5;
+    INSERT INTO public.company_group_members (group_id, company_id, status, origin)
+    VALUES (g4, cJ, 'ativo', 'pedido'), (g4, cK, 'ativo', 'pedido'),
+           (g5, cL, 'ativo', 'migracao'), (g5, cM, 'ativo', 'migracao');
     INSERT INTO public.company_group_members (group_id, company_id, status, origin)
     VALUES (g1, cA, 'ativo', 'manual'), (g1, cB, 'ativo', 'manual'), (g1, cC, 'ativo', 'manual'),
            (g2, cE, 'ativo', 'manual'), (g2, cF, 'saiu', 'manual'),
@@ -80,6 +91,16 @@ BEGIN
            (cD, uD1, 'ZZ L3 D1', 'zz-l3-d1@invalid.example', 'Vendas'),
            (cE, uE1, 'ZZ L3 E1', 'zz-l3-e1@invalid.example', 'Vendas'),
            (cH, uH1, 'ZZ L3 H1', 'zz-l3-h1@invalid.example', 'Vendas');
+    INSERT INTO public.employees (company_id, user_id, name, email, department)
+    VALUES (cJ, uJ1, 'ZZ L3 J1', 'zz-l3-j1@invalid.example', 'Vendas'),
+           (cK, uK1, 'ZZ L3 K1', 'zz-l3-k1@invalid.example', 'Vendas'),
+           (cL, uL1, 'ZZ L3 L1', 'zz-l3-l1@invalid.example', 'Vendas'),
+           (cM, uM1, 'ZZ L3 M1', 'zz-l3-m1@invalid.example', 'Vendas');
+    -- uX tem duas fichas: a ativa (primeira) em D, fora do grupo, e a da empresa B (inativa).
+    INSERT INTO public.employees (company_id, user_id, name, email, department)
+    VALUES (cD, uX, 'ZZ L3 X Outra', 'zz-l3-x@invalid.example', 'Vendas');
+    INSERT INTO public.employees (company_id, user_id, name, email, department, is_active)
+    VALUES (cB, uX, 'ZZ L3 X', 'zz-l3-x2@invalid.example', 'Vendas', false);
     INSERT INTO public.user_roles (user_id, role) VALUES (uAf, 'admin');
     INSERT INTO public.employees (company_id, user_id, admin_user_id, name, email, department)
     VALUES (cD, uCf, uAf, 'ZZ L3 CF', 'zz-l3-cf@invalid.example', 'Compras');
@@ -101,6 +122,12 @@ BEGIN
     VALUES (cD, NULL, 'D parabens', 'company', 'birthday', uD1, current_date) RETURNING id INTO pDb;
     INSERT INTO public.feed_posts (company_id, author_id, body, audience, kind, subject_id, subject_day)
     VALUES (cI, NULL, 'I parabens', 'company', 'birthday', uH1, current_date) RETURNING id INTO pIb;
+    INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cJ, uJ1, 'J toda', 'company') RETURNING id INTO pJ;
+    INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cK, uK1, 'K toda', 'company') RETURNING id INTO pK;
+    INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cM, uM1, 'M toda', 'company') RETURNING id INTO pM;
+    INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cB, uX, 'B do X', 'company') RETURNING id INTO pX;
+    UPDATE public.feed_posts SET created_at = now() - interval '2 hours' WHERE id IN (pJ, pK, pM, pX);
+    INSERT INTO public.feed_comments (post_id, author_id, body) VALUES (pK, uK1, 'comentario de K');
     INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cC, uB1, 'C inativa', 'company') RETURNING id INTO pC;
     INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cD, uD1, 'D toda', 'company') RETURNING id INTO pD;
     INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cE, uE1, 'E toda', 'company') RETURNING id INTO pE;
@@ -186,6 +213,24 @@ BEGIN
       format('SELECT (SELECT count(*) FROM public.feed_list_posts(NULL, 50) WHERE id IN (%L,%L,%L,%L)) = 1', pA, pB, pD, pE)],
     ARRAY['contar novidades: inclui o par (A toda, A dept, B toda e o aniversario de B)', uA1::text, 'q', 'authenticated', 'true',
       'SELECT public.feed_unread_count() = 4'],
+    -- ===== origem do grupo: so os geridos pelo super admin contam (manual, migracao)
+    ARRAY['origem: grupo criado por pedido nao le posts do par', uJ1::text, 'q', 'authenticated', 'false',
+      format('SELECT EXISTS (SELECT 1 FROM public.feed_posts WHERE id = %L)', pK)],
+    ARRAY['origem: grupo criado por pedido nao le comentarios do par', uJ1::text, 'q', 'authenticated', 'false',
+      format('SELECT EXISTS (SELECT 1 FROM public.feed_comments WHERE post_id = %L)', pK)],
+    ARRAY['origem: grupo criado por pedido nao ve nomes (feed_post_people)', uJ1::text, 'q', 'authenticated', 'true',
+      format('SELECT count(*) = 0 FROM public.feed_post_people(%L)', pK)],
+    ARRAY['origem: grupo criado por pedido nao lista posts do par', uJ1::text, 'q', 'authenticated', 'false',
+      format('SELECT EXISTS (SELECT 1 FROM public.feed_list_posts(NULL, 50) WHERE id = %L)', pK)],
+    ARRAY['origem: grupo criado por pedido continua a ver a propria empresa', uJ1::text, 'q', 'authenticated', 'true',
+      format('SELECT EXISTS (SELECT 1 FROM public.feed_posts WHERE id = %L)', pJ)],
+    ARRAY['origem: grupo da migracao le', uL1::text, 'q', 'authenticated', 'true',
+      format('SELECT EXISTS (SELECT 1 FROM public.feed_posts WHERE id = %L)', pM)],
+    -- ===== pessoa com duas fichas: vale a da empresa do post
+    ARRAY['pessoas: com duas fichas aparece com a empresa do post', uA1::text, 'q', 'authenticated', 'true',
+      format('SELECT count(*) = 1 AND bool_and(name = %L AND company_name = %L AND company_id = %L) FROM public.feed_post_people(%L)', 'ZZ L3 X', 'ZZ L3 B', cB, pX)],
+    ARRAY['listar: autor com duas fichas vem com o nome e a empresa do post', uA1::text, 'q', 'authenticated', 'true',
+      format('SELECT EXISTS (SELECT 1 FROM public.feed_list_posts(NULL, 50) WHERE id = %L AND author_name = %L AND company_id = %L AND company_name = %L)', pX, 'ZZ L3 X', cB, 'ZZ L3 B')],
     -- ===== quem escreveu, comentou ou reagiu
     ARRAY['pessoas: post do par devolve so nome e empresa de quem la esta', uA1::text, 'q', 'authenticated', 'true',
       format('SELECT count(*) = 1 AND bool_and(name = %L AND company_name = %L AND company_id = %L) FROM public.feed_post_people(%L)', 'ZZ L3 B1', 'ZZ L3 B', cB, pB)],

@@ -9,7 +9,6 @@ export const FEED_KEYS = {
   posts: ['feed', 'posts'] as const,
   comments: (postId: string) => ['feed', 'comments', postId] as const,
   people: (postId: string) => ['feed', 'people', postId] as const,
-  people: (postId: string) => ['feed', 'people', postId] as const,
   notices: ['feed', 'notices'] as const,
   unread: ['feed', 'unread'] as const,
   appreciations: ['appreciations'] as const,

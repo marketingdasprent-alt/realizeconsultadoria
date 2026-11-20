@@ -26,6 +26,10 @@
 -- pessoa pode ler (as pessoas de outra empresa não estão no diretório). Nunca devolve email, telefone,
 -- cargo nem departamento.
 --
+-- Só contam grupos geridos pelo super admin: pertenças com origin 'manual' (Lote 2) ou 'migracao'. Grupos
+-- nascidos de um pedido de partilha (origin 'pedido', via rz_approve_share) NÃO leem nem expõem o Feed,
+-- porque seria o consentimento de uma só empresa a abrir o Feed a todas as do grupo.
+--
 -- Mudanças de dados:
 --   * company_groups.default_capabilities passa a nascer com {feed.read} (antes {}), e os grupos que
 --     já existem recebem 'feed.read' UMA vez (só na primeira aplicação desta migração; repetir não volta
@@ -65,6 +69,9 @@ ALTER TABLE public.company_groups
 -- 2. Empresas pares (interna)
 -- ============================================================================================
 -- As empresas ativas dos grupos ativos das MINHAS empresas, em que o grupo tem p_cap. Exclui as minhas.
+-- Só contam pertenças de grupos geridos pelo super admin (origin 'manual' ou 'migracao'): as de origin
+-- 'pedido' (rz_approve_share junta uma empresa ao grupo da alvo, ou cria um, com o aval de uma só
+-- empresa) não abrem o Feed às outras empresas do grupo.
 CREATE OR REPLACE FUNCTION public.rz_group_peer_companies(p_cap text)
  RETURNS uuid[]
  LANGUAGE sql
@@ -75,11 +82,12 @@ AS $function$
   SELECT coalesce(array_agg(DISTINCT m2.company_id), ARRAY[]::uuid[])
   FROM mine
   JOIN public.company_group_members m1
-    ON m1.status = 'ativo' AND m1.company_id = ANY (mine.ids)
+    ON m1.status = 'ativo' AND m1.origin IN ('manual', 'migracao') AND m1.company_id = ANY (mine.ids)
   JOIN public.company_groups g
     ON g.id = m1.group_id AND p_cap = ANY (g.default_capabilities)
   JOIN public.company_group_members m2
-    ON m2.group_id = m1.group_id AND m2.status = 'ativo' AND NOT (m2.company_id = ANY (mine.ids))
+    ON m2.group_id = m1.group_id AND m2.status = 'ativo' AND m2.origin IN ('manual', 'migracao')
+   AND NOT (m2.company_id = ANY (mine.ids))
   JOIN public.companies c
     ON c.id = m2.company_id AND c.is_active;
 $function$;
@@ -159,6 +167,7 @@ RETURNS TABLE(id uuid, author_id uuid, body text, audience text, department text
               company_id uuid, company_name text, author_name text)
 LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $$
+  WITH peers AS (SELECT public.rz_group_peer_companies('feed.read') AS ids)
   SELECT p.id, p.author_id, p.body, p.audience, p.department, p.attachments,
          p.created_at, p.edited_at,
          (SELECT count(*)::int FROM feed_comments c WHERE c.post_id = p.id AND c.deleted_at IS NULL),
@@ -169,10 +178,12 @@ AS $$
          p.kind, p.subject_id, p.mentions,
          p.company_id, co.name,
          (SELECT e.name FROM employees e WHERE e.user_id = p.author_id
-           ORDER BY e.is_active DESC, e.created_at LIMIT 1)
-  FROM feed_posts p
+           ORDER BY (e.company_id = p.company_id) DESC, e.is_active DESC, e.created_at LIMIT 1)
+  FROM peers, feed_posts p
   LEFT JOIN companies co ON co.id = p.company_id
-  WHERE public.feed_can_read(p.id)
+  WHERE (public.feed_can_see(p.id)
+         OR (p.deleted_at IS NULL AND p.audience = 'company'
+             AND p.company_id = ANY (peers.ids)))
     AND (_before IS NULL OR p.created_at < _before)
   ORDER BY p.created_at DESC
   LIMIT least(greatest(coalesce(_limit, 20), 1), 50);
@@ -202,7 +213,8 @@ AS $function$
     SELECT x.user_id, x.name, x.company_id
     FROM public.employees x
     WHERE x.user_id = ids.uid
-    ORDER BY x.is_active DESC, x.created_at
+    ORDER BY (x.company_id = (SELECT fp.company_id FROM public.feed_posts fp WHERE fp.id = p_post_id)) DESC NULLS LAST,
+             x.is_active DESC, x.created_at
     LIMIT 1
   ) e
   LEFT JOIN public.companies co ON co.id = e.company_id

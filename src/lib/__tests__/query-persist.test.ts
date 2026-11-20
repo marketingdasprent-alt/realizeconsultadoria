@@ -26,6 +26,7 @@ import {
   persistQueries,
   resetCompanyScopedQueries,
   restoreQueries,
+  shouldResetCompanyQueries,
   snapshot,
 } from '../query-persist';
 
@@ -184,6 +185,19 @@ describe('sessão: nada de uma conta passa para a outra', () => {
     expect(client.getQueryData(['feed', 'posts'])).toEqual([{ id: 'p1' }]);
   });
 
+  it('depois de terminar a sessão não volta a gravar nada', () => {
+    session('u1');
+    const client = new QueryClient();
+    client.setQueryData(['chat', 'conversations'], [{ id: 'c1' }]);
+    stop = persistQueries(client);
+
+    auth.listener?.('SIGNED_OUT', null);
+    client.setQueryData(['chat', 'conversations'], [{ id: 'c-novo' }]);
+    hideTab();
+
+    expect(readDeviceCache('queries', 'u1')).toBeNull();
+  });
+
   it('nunca grava dados em memória de uma conta na chave de outra', () => {
     session('u1');
     const client = new QueryClient();
@@ -221,5 +235,24 @@ describe('empresa ativa', () => {
     expect(after.getQueryData(['chat', 'directory', 'empresa-b'])).toBeUndefined();
     expect(after.getQueryData(['feed', 'posts'])).toBeUndefined();
     expect(after.getQueryData(['tasks', 'mine'])).toEqual([{ id: 't1' }]);
+  });
+});
+
+describe('shouldResetCompanyQueries', () => {
+  it('muda de empresa: limpa', () => {
+    expect(shouldResetCompanyQueries('a', 'b')).toBe(true);
+  });
+
+  it('mesma empresa: mantém', () => {
+    expect(shouldResetCompanyQueries('a', 'a')).toBe(false);
+  });
+
+  it('empresa anterior desconhecida: limpa, porque a cache guardada pode ser de outra', () => {
+    expect(shouldResetCompanyQueries(null, 'a')).toBe(true);
+  });
+
+  it('ficha sem empresa: não faz nada', () => {
+    expect(shouldResetCompanyQueries('a', null)).toBe(false);
+    expect(shouldResetCompanyQueries(null, null)).toBe(false);
   });
 });

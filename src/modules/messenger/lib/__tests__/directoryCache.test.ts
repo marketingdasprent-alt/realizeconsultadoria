@@ -1,5 +1,5 @@
 import { QueryClient } from '@tanstack/react-query';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {
@@ -11,9 +11,21 @@ vi.mock('@/integrations/supabase/client', () => ({
 
 import { isPersisted, restoreQueries, snapshot } from '@/lib/query-persist';
 import { writeDeviceCache } from '@/lib/device-cache';
-import { CHAT_KEYS, DIRECTORY_STALE_MS, directoryStaleTime } from '../cache';
+import {
+  CHAT_KEYS,
+  DIRECTORY_EMPTY_STALE_MS,
+  DIRECTORY_STALE_MS,
+  directoryStaleTime,
+} from '../cache';
 
 describe('chave do diretório por empresa', () => {
+  afterEach(() => localStorage.clear());
+
+  it('sem empresa usa uma chave própria', () => {
+    expect(CHAT_KEYS.directoryFor(null)).toEqual(['chat', 'directory', 'sem-empresa']);
+    expect(CHAT_KEYS.directoryFor(undefined)).toEqual(['chat', 'directory', 'sem-empresa']);
+  });
+
   it('inclui a empresa e difere entre empresas', () => {
     expect(CHAT_KEYS.directoryFor('empresa-a')).toEqual(['chat', 'directory', 'empresa-a']);
     expect(CHAT_KEYS.directoryFor('empresa-a')).not.toEqual(CHAT_KEYS.directoryFor('empresa-b'));
@@ -32,7 +44,7 @@ describe('chave do diretório por empresa', () => {
     expect(client.getQueryState(CHAT_KEYS.directoryFor('b'))?.isInvalidated).toBe(true);
   });
 
-  it('a lista guardada de outra empresa não é usada', () => {
+  it('a lista guardada de uma empresa só aparece na chave dessa empresa', () => {
     localStorage.setItem('sb-proj-auth-token', JSON.stringify({ user: { id: 'u1' } }));
     const before = new QueryClient();
     before.setQueryData(CHAT_KEYS.directoryFor('antiga'), []);
@@ -42,16 +54,20 @@ describe('chave do diretório por empresa', () => {
     restoreQueries(after, 'u1');
     expect(after.getQueryData(CHAT_KEYS.directoryFor('antiga'))).toEqual([]);
     expect(after.getQueryData(CHAT_KEYS.directoryFor('nova'))).toBeUndefined();
-    localStorage.clear();
   });
 });
 
 describe('directoryStaleTime', () => {
-  const query = (data: unknown) => ({ state: { data } }) as never;
+  const query = (data: unknown) => ({ state: { data } });
 
-  it('lista vazia conta como antiga: vai sempre buscar de novo', () => {
-    expect(directoryStaleTime(query([]))).toBe(0);
+  it('sem dados vai sempre buscar', () => {
     expect(directoryStaleTime(query(undefined))).toBe(0);
+  });
+
+  it('lista vazia conta como antiga muito depressa, sem pedir a cada montagem', () => {
+    expect(directoryStaleTime(query([]))).toBe(DIRECTORY_EMPTY_STALE_MS);
+    expect(DIRECTORY_EMPTY_STALE_MS).toBeGreaterThan(0);
+    expect(DIRECTORY_EMPTY_STALE_MS).toBeLessThan(DIRECTORY_STALE_MS);
   });
 
   it('lista com pessoas fica fresca 5 minutos', () => {

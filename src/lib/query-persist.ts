@@ -84,11 +84,23 @@ const COMPANY_SCOPED: readonly (readonly string[])[] = [
 ];
 
 /**
- * Ao mudar a ficha de empresa: o que estava guardado da empresa anterior (conversas, Feed,
- * diretório, pastas…) volta ao início e as listas visíveis vão buscar os dados novos.
+ * A empresa da ficha mudou face à última vez? Se a anterior é desconhecida, a cache guardada
+ * pode ser de outra empresa: limpa-se (só custa um pedido).
  */
-export const resetCompanyScopedQueries = (client: QueryClient) =>
-  Promise.all(COMPANY_SCOPED.map(queryKey => client.resetQueries({ queryKey })));
+export const shouldResetCompanyQueries = (
+  known: string | null | undefined,
+  current: string | null | undefined
+): boolean => !!current && known !== current;
+
+/**
+ * Ao mudar a ficha de empresa: o que estava guardado da empresa anterior (conversas, Feed,
+ * diretório, pastas…) volta ao início e as listas visíveis vão buscar os dados novos. O diretório
+ * muda de chave com a empresa, por isso sai da cache em vez de ser pedido outra vez na chave velha.
+ */
+export const resetCompanyScopedQueries = (client: QueryClient) => {
+  client.removeQueries({ queryKey: ['chat', 'directory'] });
+  return Promise.all(COMPANY_SCOPED.map(queryKey => client.resetQueries({ queryKey })));
+};
 
 /** Põe na cache o que ficou guardado deste utilizador (antes de a app desenhar). */
 export const restoreQueries = (client: QueryClient, userId = sessionUserId()) => {

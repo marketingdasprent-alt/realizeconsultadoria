@@ -57,7 +57,7 @@ export const useLiveMessenger = (user: LiveMessengerUser): MessengerApi => {
   const directoryQ = useQuery({
     queryKey: CHAT_KEYS.directoryFor(user.companyId),
     queryFn: () => unwrap(messengerService.getDirectory()),
-    staleTime: directoryStaleTime,
+    staleTime: query => directoryStaleTime(query),
   });
   const thread = useInfiniteQuery({
     queryKey: CHAT_KEYS.thread(activeId),

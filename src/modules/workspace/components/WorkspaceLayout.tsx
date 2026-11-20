@@ -9,7 +9,7 @@ import {
   sessionUserId,
   writeDeviceCache,
 } from '@/lib/device-cache';
-import { resetCompanyScopedQueries } from '@/lib/query-persist';
+import { resetCompanyScopedQueries, shouldResetCompanyQueries } from '@/lib/query-persist';
 import { clearMailCache } from '@/modules/webmail/lib/mailCache';
 import { ROUTES } from '@/lib/constants';
 import ChangePasswordDialog from '@/components/employee/ChangePasswordDialog';
@@ -81,7 +81,7 @@ const WorkspaceLayout: React.FC = () => {
       return;
     }
     const companyId = data.employee?.company_id ?? null;
-    if (companyId && knownCompanyId.current && knownCompanyId.current !== companyId) {
+    if (shouldResetCompanyQueries(knownCompanyId.current, companyId)) {
       void resetCompanyScopedQueries(queryClient);
     }
     if (companyId) knownCompanyId.current = companyId;

@@ -23,7 +23,7 @@ export const useAvatarUrl = (userId: string | null | undefined): string | null =
     queryKey: CHAT_KEYS.directoryFor(workspace?.user?.companyId),
     queryFn: fetchDirectory,
     enabled: !isPreview && !!userId,
-    staleTime: directoryStaleTime,
+    staleTime: query => directoryStaleTime(query),
     select: rows => rows.find(row => row.user_id === userId)?.avatar_path ?? null,
   });
   return avatarUrl(data);

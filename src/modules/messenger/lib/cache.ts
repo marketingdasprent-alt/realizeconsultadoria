@@ -1,5 +1,5 @@
 // Chaves do React Query do Messenger e atualização da cache de mensagens.
-import type { InfiniteData, Query } from '@tanstack/react-query';
+import type { InfiniteData } from '@tanstack/react-query';
 import type { MessageRow } from '../services/messengerService';
 
 export const CHAT_KEYS = {
@@ -16,10 +16,19 @@ export const CHAT_KEYS = {
 };
 
 export const DIRECTORY_STALE_MS = 5 * 60_000;
+/** Lista vazia: volta a pedir passado pouco tempo, mas não a cada montagem de um avatar. */
+export const DIRECTORY_EMPTY_STALE_MS = 15_000;
 
-/** Lista vazia (ou ainda sem dados) conta como antiga: nunca fica como definitiva. */
-export const directoryStaleTime = (query: Query<unknown[], unknown, unknown[]>): number =>
-  Array.isArray(query.state.data) && query.state.data.length > 0 ? DIRECTORY_STALE_MS : 0;
+/**
+ * Genérica de propósito: com um tipo fixo (`Query<unknown[], …>` ou `{ data: unknown }`) o React
+ * Query passava a inferir as linhas do diretório como `unknown`. Sem dados pede logo; lista
+ * vazia nunca fica como definitiva.
+ */
+export const directoryStaleTime = <T>(query: { state: { data: T | undefined } }): number => {
+  const { data } = query.state;
+  if (!Array.isArray(data)) return 0;
+  return data.length > 0 ? DIRECTORY_STALE_MS : DIRECTORY_EMPTY_STALE_MS;
+};
 
 /** Junta (ou substitui) uma mensagem nas páginas em cache da conversa (mais recente primeiro). */
 export const upsertThreadRow = (

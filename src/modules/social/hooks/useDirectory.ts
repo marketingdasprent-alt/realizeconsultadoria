@@ -22,7 +22,7 @@ export const useDirectory = () => {
     },
     // Na app de email (clientes de fora) não há colegas
     enabled: !isPreview && !mailOnly,
-    staleTime: directoryStaleTime,
+    staleTime: query => directoryStaleTime(query),
   });
 
   const people: DirectoryPerson[] = useMemo(

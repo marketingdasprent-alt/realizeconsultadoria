@@ -1,4 +1,5 @@
-import React, { Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
 import { Outlet, useNavigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
@@ -6,8 +7,9 @@ import {
   clearDeviceCache,
   readDeviceCache,
   sessionUserId,
-  writeDeviceCache,
+  writeDeviceCacheIfSession,
 } from '@/lib/device-cache';
+import { resetCompanyScopedQueries, shouldResetCompanyQueries } from '@/lib/query-persist';
 import { clearMailCache } from '@/modules/webmail/lib/mailCache';
 import { ROUTES } from '@/lib/constants';
 import ChangePasswordDialog from '@/components/employee/ChangePasswordDialog';
@@ -67,20 +69,30 @@ const WorkspaceLayout: React.FC = () => {
     readDeviceCache<WorkspaceContextValue['user']>(USER_CACHE, sessionUserId())
   );
   const [isChangePasswordOpen, setIsChangePasswordOpen] = useState(false);
+  const queryClient = useQueryClient();
+  // Empresa da ficha da última vez: se mudou, a cache de conversas, Feed… é da empresa anterior.
+  const knownCompanyId = useRef<string | null>(cachedUser?.companyId ?? null);
   useRzTheme();
 
   const refresh = useCallback(async () => {
+    // Quem pediu: se a conta mudar durante o pedido, a ficha não vai para a cache da nova.
+    const requester = sessionUserId();
     const { data } = await employeeProfileService.getCurrent();
     if (!data) {
       navigate(ROUTES.EMPLOYEE.LOGIN);
       return;
     }
+    const companyId = data.employee?.company_id ?? null;
+    if (shouldResetCompanyQueries(knownCompanyId.current, companyId)) {
+      void resetCompanyScopedQueries(queryClient);
+    }
+    if (companyId) knownCompanyId.current = companyId;
     setEmployee(data.employee);
     setSessionEmail(data.email);
     setIsLoading(false);
     if (data.employee)
-      writeDeviceCache(USER_CACHE, sessionUserId(), toUser(data.employee, data.email));
-  }, [navigate]);
+      writeDeviceCacheIfSession(USER_CACHE, requester, toUser(data.employee, data.email));
+  }, [navigate, queryClient]);
 
   useEffect(() => {
     refresh();

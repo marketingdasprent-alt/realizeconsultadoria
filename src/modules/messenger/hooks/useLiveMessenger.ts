@@ -6,7 +6,7 @@ import {
   useQueryClient,
   type InfiniteData,
 } from '@tanstack/react-query';
-import { CHAT_KEYS, upsertThreadRow } from '../lib/cache';
+import { CHAT_KEYS, directoryStaleTime, upsertThreadRow } from '../lib/cache';
 import { toConversation, toMessage, toPerson } from '../lib/mappers';
 import {
   messengerService,
@@ -55,9 +55,9 @@ export const useLiveMessenger = (user: LiveMessengerUser): MessengerApi => {
     enabled: boot.isSuccess,
   });
   const directoryQ = useQuery({
-    queryKey: CHAT_KEYS.directory,
+    queryKey: CHAT_KEYS.directoryFor(user.companyId),
     queryFn: () => unwrap(messengerService.getDirectory()),
-    staleTime: 5 * 60_000,
+    staleTime: query => directoryStaleTime(query),
   });
   const thread = useInfiniteQuery({
     queryKey: CHAT_KEYS.thread(activeId),

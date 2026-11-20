@@ -86,6 +86,8 @@ export const monthHourBank = (params: {
   absences: BankAbsence[];
   holidays: { date: string; name: string }[];
   settings: HourBankSettings;
+  /** Primeiro dia da pessoa (yyyy-MM-dd): antes disso não há previsto, só as horas feitas. */
+  employeeStart?: string | null;
 }): MonthBank => {
   const { settings } = params;
   const todayKey = format(params.today, 'yyyy-MM-dd');
@@ -103,8 +105,11 @@ export const monthHourBank = (params: {
     if (date >= todayKey) break;
     if (settings.startsOn && date < settings.startsOn) continue;
     const holiday = holidays.get(date) ?? null;
+    const beforeEmployeeStart = !!params.employeeStart && date < params.employeeStart;
     const expected =
-      !holiday && settings.workdays.includes(getISODay(day)) ? settings.dailyMinutes : 0;
+      !beforeEmployeeStart && !holiday && settings.workdays.includes(getISODay(day))
+        ? settings.dailyMinutes
+        : 0;
     const worked = params.workedByDay.get(date) ?? 0;
 
     let absent = 0;
@@ -146,6 +151,29 @@ export const monthHourBank = (params: {
     justified: sum('justified'),
     balance: sum('balance'),
   };
+};
+
+/**
+ * Dia (yyyy-MM-dd) em que o ponto da pessoa começa: a admissão ou, sem ela, o dia (local) em que
+ * a ficha foi criada.
+ */
+export const employeeStartDate = (
+  hireDate: string | null | undefined,
+  createdAt: string | null | undefined
+): string | null => {
+  if (hireDate) return hireDate.slice(0, 10);
+  if (!createdAt) return null;
+  const created = new Date(createdAt);
+  return Number.isNaN(created.getTime()) ? null : format(created, 'yyyy-MM-dd');
+};
+
+/** O mais tardio entre o início global do banco de horas e o da pessoa. */
+export const effectiveStart = (
+  startsOn: string | null | undefined,
+  employeeStart: string | null | undefined
+): string | null => {
+  if (startsOn && employeeStart) return startsOn > employeeStart ? startsOn : employeeStart;
+  return startsOn || employeeStart || null;
 };
 
 /** "+1h20", "−0h45", "0h00". */

@@ -6,7 +6,8 @@ import { WorkspacePage } from '@/modules/workspace/components/WorkspacePage';
 import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { OrgDepartmentCard } from '../components/OrgDepartmentCard';
 import { useDirectory } from '../hooks/useDirectory';
-import { buildOrgChart } from '../lib/orgchart';
+import { OrgTreeView } from '../components/OrgTreeView';
+import { buildOrgChart, buildOrgTree, hasManagerChain } from '../lib/orgchart';
 
 /** Linha vertical entre níveis (só em ecrãs largos, onde a árvore é horizontal). */
 const Stem: React.FC = () => <div className="mx-auto hidden h-6 w-0.5 bg-rz-primary/25 md:block" />;
@@ -32,7 +33,13 @@ const OrgChartPage: React.FC = () => {
       });
     return list;
   }, [byId, user]);
+  // Com o responsável direto preenchido, o organograma segue a chefia real; sem ele, departamentos.
+  const byChain = useMemo(() => hasManagerChain(people), [people]);
   const chart = useMemo(() => buildOrgChart(people, query), [people, query]);
+  const tree = useMemo(
+    () => (byChain ? buildOrgTree(people, query) : null),
+    [byChain, people, query]
+  );
   const searching = !!query.trim();
 
   const profilePath = useCallback(
@@ -51,7 +58,9 @@ const OrgChartPage: React.FC = () => {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-[26px] font-extrabold">Organograma</h1>
-          <p className="text-sm text-rz-muted">Departamentos e equipas da empresa</p>
+          <p className="text-sm text-rz-muted">
+            {byChain ? 'Chefias e equipas da empresa' : 'Departamentos e equipas da empresa'}
+          </p>
         </div>
         <label className="flex h-11 w-full items-center gap-2 rounded-full bg-white px-4 text-rz-muted ring-1 ring-rz-line focus-within:ring-rz-primary/40 sm:w-80">
           <Search className="h-4 w-4" />
@@ -77,13 +86,16 @@ const OrgChartPage: React.FC = () => {
                 {user.companyName || 'A empresa'}
               </span>
               <span className="block text-[12.5px] text-white/85">
-                {chart.total} pessoas · {chart.departments.length + (chart.board ? 1 : 0)}{' '}
-                departamentos
+                {tree
+                  ? `${tree.total} pessoas · ${tree.roots.length} ${tree.roots.length === 1 ? 'chefia de topo' : 'chefias de topo'}`
+                  : `${chart.total} pessoas · ${chart.departments.length + (chart.board ? 1 : 0)} departamentos`}
               </span>
             </span>
           </div>
 
-          {chart.board && (
+          {tree && <OrgTreeView tree={tree} {...cardProps} />}
+
+          {!tree && chart.board && (
             <>
               <Stem />
               <div className="mx-auto mt-4 w-full max-w-sm md:mt-0">
@@ -92,7 +104,7 @@ const OrgChartPage: React.FC = () => {
             </>
           )}
 
-          {chart.departments.length > 0 && (
+          {!tree && chart.departments.length > 0 && (
             <>
               <Stem />
               <div className="mt-4 overflow-x-auto pb-2 md:mt-0">
@@ -110,7 +122,7 @@ const OrgChartPage: React.FC = () => {
             </>
           )}
 
-          {chart.total === 0 && (
+          {(tree ? tree.total : chart.total) === 0 && (
             <p className="mt-10 text-center text-rz-muted">Ninguém corresponde à pesquisa.</p>
           )}
         </div>

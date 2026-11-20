@@ -1,7 +1,14 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { PERMISSIONS_CONFIG, MODULE_LABELS, ALL_MODULE_KEYS } from '@/lib/permissions-config';
+import {
+  PERMISSIONS_CONFIG,
+  MODULE_LABELS,
+  ALL_MODULE_KEYS,
+  getTopicConfig,
+  isScopableModule,
+  type PermissionScope,
+} from '@/lib/permissions-config';
 
 export interface TopicPermission {
   module_key: string;
@@ -9,6 +16,14 @@ export interface TopicPermission {
   can_view: boolean;
   can_edit: boolean;
   can_execute: boolean;
+  /** 'team' se Ver ou Executar ficou limitado à equipa (decide se é preciso ler a equipa). */
+  scope: PermissionScope;
+  /**
+   * Alcance de Ver e de Executar, em separado: um grupo com Ver em Todos não alarga o Executar
+   * em equipa de outro grupo. Entre grupos que dão o mesmo, Todos ganha a equipa.
+   */
+  view_scope?: PermissionScope;
+  execute_scope?: PermissionScope;
 }
 
 export interface AdminPermissions {
@@ -19,13 +34,51 @@ export interface AdminPermissions {
   canEdit: (moduleKey: string) => boolean;
   canViewTopic: (moduleKey: string, topicKey: string) => boolean;
   canExecuteTopic: (moduleKey: string, topicKey: string) => boolean;
+  /** Alcance da funcionalidade (sem permissão, 'all': quem decide é canViewTopic/canExecuteTopic). */
+  scopeOf: (moduleKey: string, topicKey: string, field?: 'view' | 'execute') => PermissionScope;
+  /** Colaboradores abaixo de quem tem sessão, pela cadeia de responsável direto. */
+  teamEmployeeIds: ReadonlySet<string>;
+  /** Fichas de quem tem sessão (só carregadas quando alguma funcionalidade usa a equipa). */
+  ownEmployeeIds: readonly string[];
+  /** Pode ver/executar a funcionalidade sobre este colaborador (respeita o alcance). */
+  canViewTopicFor: (moduleKey: string, topicKey: string, employeeId: string) => boolean;
+  canExecuteTopicFor: (moduleKey: string, topicKey: string, employeeId: string) => boolean;
   refetch: () => Promise<void>;
 }
+
+/** Alcance gravado na linha (coluna scope; sem ela, ou fora dos módulos com alcance, é 'all'). */
+const scopeOfRow = (row: { module_key: string; scope?: unknown }): PermissionScope =>
+  row.scope === 'team' && isScopableModule(row.module_key) ? 'team' : 'all';
+
+/** Junta o alcance de duas fontes do mesmo direito (undefined = essa fonte não o dá). */
+const mergeScope = (
+  a: PermissionScope | undefined,
+  b: PermissionScope | undefined
+): PermissionScope | undefined => (a === 'all' || b === 'all' ? 'all' : (a ?? b));
+
+/** Alcance de cada direito numa linha de grupo (só para os direitos que ela dá). */
+const rowScopes = (p: {
+  module_key: string;
+  scope?: unknown;
+  can_view: boolean;
+  can_execute: boolean;
+}) => {
+  const scope = scopeOfRow(p);
+  return {
+    view_scope: p.can_view ? scope : undefined,
+    execute_scope: p.can_execute ? scope : undefined,
+  };
+};
+
+const overallScope = (view?: PermissionScope, execute?: PermissionScope): PermissionScope =>
+  view === 'team' || execute === 'team' ? 'team' : 'all';
 
 export const useAdminPermissions = (): AdminPermissions => {
   const [permissions, setPermissions] = useState<TopicPermission[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [teamEmployeeIds, setTeamEmployeeIds] = useState<ReadonlySet<string>>(new Set());
+  const [ownEmployeeIds, setOwnEmployeeIds] = useState<readonly string[]>([]);
 
   const fetchPermissions = useCallback(async () => {
     try {
@@ -74,6 +127,7 @@ export const useAdminPermissions = (): AdminPermissions => {
         can_view: true,
         can_edit: false,
         can_execute: false,
+        scope: 'all',
       });
 
       // 2. If Super Admin, add everything except 'legal'
@@ -88,6 +142,7 @@ export const useAdminPermissions = (): AdminPermissions => {
             can_view: true,
             can_edit: true,
             can_execute: true,
+            scope: 'all',
           });
         });
 
@@ -102,6 +157,7 @@ export const useAdminPermissions = (): AdminPermissions => {
               can_view: true,
               can_edit: true,
               can_execute: true,
+              scope: 'all',
             });
           });
         });
@@ -118,9 +174,7 @@ export const useAdminPermissions = (): AdminPermissions => {
 
         const { data: groupPermissions } = await supabase
           .from('admin_group_permissions')
-          .select(
-            'module_key, topic_key, can_view, can_edit, can_execute, admin_groups!inner(is_active)'
-          )
+          .select('*, admin_groups!inner(is_active)')
           .in('group_id', groupIds);
 
         groupPermissions?.forEach((p: any) => {
@@ -128,25 +182,55 @@ export const useAdminPermissions = (): AdminPermissions => {
             const key = `${p.module_key}:${p.topic_key || ''}`;
             const existing = permissionMap.get(key);
 
-            if (existing) {
-              permissionMap.set(key, {
-                module_key: p.module_key,
-                topic_key: p.topic_key,
-                can_view: existing.can_view || p.can_view,
-                can_edit: existing.can_edit || p.can_edit,
-                can_execute: existing.can_execute || p.can_execute,
-              });
-            } else {
-              permissionMap.set(key, {
-                module_key: p.module_key,
-                topic_key: p.topic_key,
-                can_view: p.can_view,
-                can_edit: p.can_edit,
-                can_execute: p.can_execute,
-              });
-            }
+            const row = rowScopes(p);
+            // Super Admin e entradas fixas não têm alcance por direito: valem como Todos.
+            const before = existing
+              ? {
+                  view_scope: existing.can_view ? (existing.view_scope ?? 'all') : undefined,
+                  execute_scope: existing.can_execute
+                    ? (existing.execute_scope ?? 'all')
+                    : undefined,
+                }
+              : { view_scope: undefined, execute_scope: undefined };
+            const view_scope = mergeScope(before.view_scope, row.view_scope);
+            const execute_scope = mergeScope(before.execute_scope, row.execute_scope);
+            permissionMap.set(key, {
+              module_key: p.module_key,
+              topic_key: p.topic_key,
+              can_view: (existing?.can_view ?? false) || p.can_view,
+              can_edit: (existing?.can_edit ?? false) || p.can_edit,
+              can_execute: (existing?.can_execute ?? false) || p.can_execute,
+              scope: overallScope(view_scope, execute_scope),
+              view_scope,
+              execute_scope,
+            });
           }
         });
+      }
+
+      // Equipa: só é preciso quando alguma funcionalidade ficou limitada a ela.
+      const usesTeam = [...permissionMap.values()].some(p => p.scope === 'team');
+      if (usesTeam) {
+        const ids = userIds.join(',');
+        const [{ data: team, error: teamError }, { data: own }] = await Promise.all([
+          untyped.rpc('rz_my_team_employee_ids'),
+          supabase
+            .from('employees')
+            .select('id')
+            .or(`user_id.in.(${ids}),admin_user_id.in.(${ids})`),
+        ]);
+        if (teamError) console.error('Error fetching team:', teamError);
+        setOwnEmployeeIds((own ?? []).map(row => row.id));
+        setTeamEmployeeIds(
+          new Set(
+            (Array.isArray(team) ? team : []).map((row: unknown) =>
+              typeof row === 'string' ? row : String(Object.values(row as object)[0])
+            )
+          )
+        );
+      } else {
+        setTeamEmployeeIds(new Set());
+        setOwnEmployeeIds([]);
       }
 
       // If no permissions at all (not super admin and no groups), give basic dashboard
@@ -158,6 +242,7 @@ export const useAdminPermissions = (): AdminPermissions => {
             can_view: true,
             can_edit: false,
             can_execute: false,
+            scope: 'all',
           },
         ]);
       } else {
@@ -172,6 +257,7 @@ export const useAdminPermissions = (): AdminPermissions => {
           can_view: true,
           can_edit: false,
           can_execute: false,
+          scope: 'all',
         },
       ]);
     } finally {
@@ -225,6 +311,36 @@ export const useAdminPermissions = (): AdminPermissions => {
     [permissions]
   );
 
+  /** Sem `field`: Executar nas funcionalidades de executar (ex.: edit), Ver nas de ver. */
+  const scopeOf = useCallback(
+    (moduleKey: string, topicKey: string, field?: 'view' | 'execute'): PermissionScope => {
+      const topicPerm = permissions.find(
+        p => p.module_key === moduleKey && p.topic_key === topicKey
+      );
+      if (!topicPerm) return 'all';
+      const kind = field ?? (getTopicConfig(moduleKey, topicKey)?.hasExecute ? 'execute' : 'view');
+      return (kind === 'view' ? topicPerm.view_scope : topicPerm.execute_scope) ?? 'all';
+    },
+    [permissions]
+  );
+
+  const canViewTopicFor = useCallback(
+    (moduleKey: string, topicKey: string, employeeId: string) =>
+      canViewTopic(moduleKey, topicKey) &&
+      (scopeOf(moduleKey, topicKey, 'view') === 'all' ||
+        teamEmployeeIds.has(employeeId) ||
+        // A própria ficha vê-se sempre (não conta para a equipa nem para executar).
+        ownEmployeeIds.includes(employeeId)),
+    [canViewTopic, scopeOf, teamEmployeeIds, ownEmployeeIds]
+  );
+
+  const canExecuteTopicFor = useCallback(
+    (moduleKey: string, topicKey: string, employeeId: string) =>
+      canExecuteTopic(moduleKey, topicKey) &&
+      (scopeOf(moduleKey, topicKey, 'execute') === 'all' || teamEmployeeIds.has(employeeId)),
+    [canExecuteTopic, scopeOf, teamEmployeeIds]
+  );
+
   return {
     permissions,
     isLoading,
@@ -233,6 +349,11 @@ export const useAdminPermissions = (): AdminPermissions => {
     canEdit,
     canViewTopic,
     canExecuteTopic,
+    scopeOf,
+    teamEmployeeIds,
+    ownEmployeeIds,
+    canViewTopicFor,
+    canExecuteTopicFor,
     refetch: fetchPermissions,
   };
 };

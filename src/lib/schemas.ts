@@ -64,6 +64,8 @@ const baseEmployeeFields = {
   safety_checkup_renewal_months: z.string().optional(),
   birth_date: z.date().optional().nullable(),
   notes: z.string().optional().nullable(),
+  /** Responsável direto ('' = sem responsável). */
+  manager_id: z.string().optional().nullable(),
   is_active: z.boolean().default(true),
 };
 

@@ -48,7 +48,14 @@ import {
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
-import { PERMISSIONS_CONFIG, MODULE_LABELS, ALL_MODULE_KEYS } from '@/lib/permissions-config';
+import {
+  PERMISSIONS_CONFIG,
+  MODULE_LABELS,
+  ALL_MODULE_KEYS,
+  isScopableModule,
+  type PermissionScope,
+} from '@/lib/permissions-config';
+import { PermissionScopeToggle } from '@/components/admin/PermissionScopeToggle';
 
 interface AdminGroup {
   id: string;
@@ -64,13 +71,56 @@ interface TopicPermission {
   topic_key: string | null;
   can_view: boolean;
   can_execute: boolean;
+  scope: PermissionScope;
 }
+
+/** Linha a gravar; o alcance só vai quando é "só a equipa" (o padrão da BD é toda a empresa). */
+const toPermissionRow = (groupId: string, p: TopicPermission) => ({
+  group_id: groupId,
+  module_key: p.module_key,
+  topic_key: p.topic_key,
+  can_view: p.can_view,
+  can_edit: p.can_execute, // Backwards compatibility: can_edit = can_execute for module-level
+  can_execute: p.can_execute,
+  ...(p.scope === 'team' && isScopableModule(p.module_key) ? { scope: 'team' as const } : {}),
+});
 
 interface SupportDepartment {
   id: string;
   name: string;
   is_active: boolean;
 }
+
+/** Topo de um módulo com alcance: explica e muda o alcance de todas as funcionalidades. */
+const ModuleScopeBar = ({
+  moduleLabel,
+  scope,
+  onChange,
+}: {
+  moduleLabel: string;
+  scope: PermissionScope | 'mixed' | null;
+  onChange: (scope: PermissionScope) => void;
+}) => (
+  <div className="flex flex-col gap-2 border-b px-4 py-3 sm:flex-row sm:items-center sm:justify-between sm:pl-12">
+    <div>
+      <p className="text-sm font-medium">Alcance</p>
+      <p className="text-xs text-muted-foreground">
+        {scope === null
+          ? 'Ative uma funcionalidade para escolher o alcance.'
+          : scope === 'mixed'
+            ? 'Cada funcionalidade tem o seu alcance. Escolha aqui para mudar todas.'
+            : '«Só a minha equipa» limita aos colaboradores abaixo de quem está no grupo, pelo responsável direto da ficha.'}
+      </p>
+    </div>
+    <PermissionScopeToggle
+      label={`Alcance de todas as funcionalidades de ${moduleLabel}`}
+      value={scope === 'all' || scope === 'team' ? scope : null}
+      disabled={scope === null}
+      onChange={onChange}
+      className="shrink-0 self-start sm:self-auto"
+    />
+  </div>
+);
 
 const AdminGroupsManager = () => {
   const { toast } = useToast();
@@ -100,6 +150,7 @@ const AdminGroupsManager = () => {
           topic_key: topic.key,
           can_view: false,
           can_execute: false,
+          scope: 'all',
         });
       });
     });
@@ -174,7 +225,7 @@ const AdminGroupsManager = () => {
       // Fetch permissions for this group
       const { data: perms } = await supabase
         .from('admin_group_permissions')
-        .select('module_key, topic_key, can_view, can_execute')
+        .select('*')
         .eq('group_id', group.id);
 
       const initialPerms = initializePermissions();
@@ -185,6 +236,7 @@ const AdminGroupsManager = () => {
         if (idx !== -1) {
           initialPerms[idx].can_view = p.can_view;
           initialPerms[idx].can_execute = p.can_execute;
+          initialPerms[idx].scope = (p as { scope?: string }).scope === 'team' ? 'team' : 'all';
         }
       });
       setPermissions(initialPerms);
@@ -240,6 +292,30 @@ const AdminGroupsManager = () => {
         return { ...p, [field]: value };
       })
     );
+  };
+
+  /** topicKey null: todas as funcionalidades do módulo. */
+  const handleScopeChange = (
+    moduleKey: string,
+    topicKey: string | null,
+    scope: PermissionScope
+  ) => {
+    setPermissions(prev =>
+      prev.map(p =>
+        p.module_key === moduleKey && (topicKey === null || p.topic_key === topicKey)
+          ? { ...p, scope }
+          : p
+      )
+    );
+  };
+
+  /** Alcance das funcionalidades ativas do módulo: 'mixed' se diferem, null se nenhuma ativa. */
+  const getModuleScope = (moduleKey: string): PermissionScope | 'mixed' | null => {
+    const active = permissions.filter(
+      p => p.module_key === moduleKey && (p.can_view || p.can_execute)
+    );
+    if (active.length === 0) return null;
+    return active.every(p => p.scope === active[0].scope) ? active[0].scope : 'mixed';
   };
 
   const handleModuleToggleAll = (
@@ -333,14 +409,7 @@ const AdminGroupsManager = () => {
 
           const permissionsToInsert = permissions
             .filter(p => p.can_view || p.can_execute)
-            .map(p => ({
-              group_id: editingGroup.id,
-              module_key: p.module_key,
-              topic_key: p.topic_key,
-              can_view: p.can_view,
-              can_edit: p.can_execute, // Backwards compatibility: can_edit = can_execute for module-level
-              can_execute: p.can_execute,
-            }));
+            .map(p => toPermissionRow(editingGroup.id, p));
 
           if (permissionsToInsert.length > 0) {
             const { error: permError } = await supabase
@@ -397,14 +466,7 @@ const AdminGroupsManager = () => {
         if (!isSuperAdmin && newGroup) {
           const permissionsToInsert = permissions
             .filter(p => p.can_view || p.can_execute)
-            .map(p => ({
-              group_id: newGroup.id,
-              module_key: p.module_key,
-              topic_key: p.topic_key,
-              can_view: p.can_view,
-              can_edit: p.can_execute,
-              can_execute: p.can_execute,
-            }));
+            .map(p => toPermissionRow(newGroup.id, p));
 
           if (permissionsToInsert.length > 0) {
             const { error: permError } = await supabase
@@ -760,6 +822,15 @@ const AdminGroupsManager = () => {
                           </CollapsibleTrigger>
                           <CollapsibleContent>
                             <div className="bg-muted/30 border-t">
+                              {isScopableModule(module.moduleKey) && (
+                                <ModuleScopeBar
+                                  moduleLabel={module.moduleLabel}
+                                  scope={getModuleScope(module.moduleKey)}
+                                  onChange={scope =>
+                                    handleScopeChange(module.moduleKey, null, scope)
+                                  }
+                                />
+                              )}
                               <Table>
                                 <TableHeader>
                                   <TableRow className="hover:bg-transparent">
@@ -784,6 +855,22 @@ const AdminGroupsManager = () => {
                                             <p className="text-xs text-muted-foreground">
                                               {topic.description}
                                             </p>
+                                            {isScopableModule(module.moduleKey) &&
+                                              perm &&
+                                              (perm.can_view || perm.can_execute) && (
+                                                <PermissionScopeToggle
+                                                  label={`Alcance de ${topic.label}`}
+                                                  value={perm.scope}
+                                                  onChange={scope =>
+                                                    handleScopeChange(
+                                                      module.moduleKey,
+                                                      topic.key,
+                                                      scope
+                                                    )
+                                                  }
+                                                  className="mt-2"
+                                                />
+                                              )}
                                           </div>
                                         </TableCell>
                                         <TableCell className="text-center">

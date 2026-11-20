@@ -28,6 +28,15 @@ export const feedService = {
     return { data: data ?? [], error };
   },
 
+  /**
+   * Nome e empresa de quem escreveu, comentou ou reagiu numa publicação (para quem não está no
+   * diretório: pessoas de outras empresas do grupo). A base antiga não tem a função: devolve erro.
+   */
+  listPeople: async (postId: string) => {
+    const { data, error } = await supabase.rpc('feed_post_people', { p_post_id: postId });
+    return { data: data ?? [], error };
+  },
+
   /** Aniversários dos colegas de hoje até daqui a `days` dias (sem ano nem idade). */
   upcomingBirthdays: async (days: number) => {
     const { data, error } = await supabase.rpc('rz_upcoming_birthdays', { _days: days });

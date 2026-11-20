@@ -8,6 +8,8 @@ import { richTextParts } from './richText';
 export const FEED_KEYS = {
   posts: ['feed', 'posts'] as const,
   comments: (postId: string) => ['feed', 'comments', postId] as const,
+  people: (postId: string) => ['feed', 'people', postId] as const,
+  people: (postId: string) => ['feed', 'people', postId] as const,
   notices: ['feed', 'notices'] as const,
   unread: ['feed', 'unread'] as const,
   appreciations: ['appreciations'] as const,
@@ -54,34 +56,63 @@ export const toPost = (
   row: FeedPostRow,
   myUserId: string,
   nameOf: (id: string | null) => string,
-  byId: Map<string, DirectoryPerson>
-): FeedPost => ({
-  id: row.id,
-  authorId: row.author_id,
-  // Aniversário: publicação automática, assinada pela Realize IA
-  authorName: row.kind === 'birthday' ? REALIZE_AI_NAME : nameOf(row.author_id),
-  authorRole:
-    row.kind === 'birthday'
-      ? 'Assistente da empresa'
-      : row.author_id
-        ? roleOf(byId.get(row.author_id))
-        : null,
-  isMine: row.author_id === myUserId,
-  body: row.body,
-  audience: row.audience === 'department' ? 'department' : 'company',
-  department: row.department,
-  attachments: Array.isArray(row.attachments)
-    ? (row.attachments as unknown as FeedAttachment[])
-    : [],
-  createdAt: row.created_at,
-  editedAt: row.edited_at,
-  commentCount: row.comment_count,
-  reactions: Array.isArray(row.reactions) ? (row.reactions as unknown as FeedReaction[]) : [],
-  kind: row.kind === 'birthday' ? 'birthday' : 'post',
-  subjectId: row.subject_id ?? null,
-  subjectName: row.subject_id ? nameOf(row.subject_id) : null,
-  mentions: mentionsOf(row.mentions, nameOf),
-});
+  byId: Map<string, DirectoryPerson>,
+  myCompanyId?: string | null
+): FeedPost => {
+  // Publicação de outra empresa do grupo (só leitura). A resposta antiga não traz a empresa.
+  const isOtherCompany = !!row.company_id && !!myCompanyId && row.company_id !== myCompanyId;
+  return {
+    id: row.id,
+    authorId: row.author_id,
+    // Aniversário: publicação automática, assinada pela Realize IA
+    authorName:
+      row.kind === 'birthday'
+        ? REALIZE_AI_NAME
+        : isOtherCompany && row.author_name
+          ? personLabel(row.author_name, row.company_name)
+          : nameOf(row.author_id),
+    authorRole:
+      row.kind === 'birthday'
+        ? 'Assistente da empresa'
+        : isOtherCompany
+          ? (row.company_name ?? null)
+          : row.author_id
+            ? roleOf(byId.get(row.author_id))
+            : null,
+    isMine: row.author_id === myUserId,
+    body: row.body,
+    audience: row.audience === 'department' ? 'department' : 'company',
+    department: row.department,
+    attachments: Array.isArray(row.attachments)
+      ? (row.attachments as unknown as FeedAttachment[])
+      : [],
+    createdAt: row.created_at,
+    editedAt: row.edited_at,
+    commentCount: row.comment_count,
+    reactions: Array.isArray(row.reactions) ? (row.reactions as unknown as FeedReaction[]) : [],
+    kind: row.kind === 'birthday' ? 'birthday' : 'post',
+    subjectId: row.subject_id ?? null,
+    subjectName: row.subject_id ? nameOf(row.subject_id) : null,
+    mentions: mentionsOf(row.mentions, nameOf),
+    companyId: row.company_id ?? null,
+    companyName: row.company_name ?? null,
+    isOtherCompany,
+  };
+};
+
+/** "Nome - Empresa": como se mostra quem é de outra empresa do grupo. */
+export const personLabel = (name: string, companyName: string | null | undefined): string =>
+  companyName ? `${name} - ${companyName}` : name;
+
+export type FeedScope = 'all' | 'mine';
+
+/** Há publicações de outras empresas do grupo? (só então o filtro aparece) */
+export const hasOtherCompanyPosts = (posts: FeedPost[]): boolean =>
+  posts.some(post => post.isOtherCompany);
+
+/** "Só a minha empresa" tira as publicações de outras empresas; "Todas" deixa tudo. */
+export const filterByScope = (posts: FeedPost[], scope: FeedScope): FeedPost[] =>
+  scope === 'mine' ? posts.filter(post => !post.isOtherCompany) : posts;
 
 /** Ids marcados → pessoas com nome (para destacar "@Nome" no texto). */
 export const mentionsOf = (

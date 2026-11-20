@@ -31,14 +31,18 @@ export const useFeedPosts = () => {
     getNextPageParam: last =>
       last.length === FEED_PAGE_SIZE ? last[last.length - 1].created_at : undefined,
     enabled: !isPreview,
+    // Publicações de outras empresas do grupo: ao voltar ao separador atualiza (se passou 1 min).
+    refetchOnWindowFocus: true,
   });
 
   const posts = useMemo(
     () =>
       isPreview
         ? demoPosts
-        : (live.data?.pages.flat() ?? []).map(row => toPost(row, user.userId, nameOf, byId)),
-    [isPreview, demoPosts, live.data, user.userId, nameOf, byId]
+        : (live.data?.pages.flat() ?? []).map(row =>
+            toPost(row, user.userId, nameOf, byId, user.companyId)
+          ),
+    [isPreview, demoPosts, live.data, user.userId, user.companyId, nameOf, byId]
   );
   const refresh = useCallback(() => qc.invalidateQueries({ queryKey: FEED_KEYS.posts }), [qc]);
 

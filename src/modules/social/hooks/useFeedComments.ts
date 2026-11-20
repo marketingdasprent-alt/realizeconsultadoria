@@ -8,8 +8,13 @@ import { FEED_KEYS, mentionsOf } from '../lib/feed';
 import { feedService } from '../services/feedService';
 import type { FeedComment } from '../types';
 import { useDirectory } from './useDirectory';
+import { useFeedPeople } from './useFeedPeople';
 
-export const useFeedComments = (postId: string, enabled: boolean) => {
+export const useFeedComments = (
+  postId: string,
+  enabled: boolean,
+  otherCompanyName?: string | null
+) => {
   const { isPreview, user } = useWorkspace();
   const { nameOf } = useDirectory();
   const qc = useQueryClient();
@@ -25,6 +30,9 @@ export const useFeedComments = (postId: string, enabled: boolean) => {
     enabled: enabled && !isPreview,
   });
 
+  // Quem comenta numa publicação de outra empresa não está no meu diretório: "Nome - Empresa".
+  const { labelOf: authorNameOf } = useFeedPeople(postId, otherCompanyName);
+
   const comments: FeedComment[] = useMemo(
     () =>
       isPreview
@@ -33,14 +41,14 @@ export const useFeedComments = (postId: string, enabled: boolean) => {
             id: row.id,
             postId: row.post_id,
             authorId: row.author_id,
-            authorName: nameOf(row.author_id),
+            authorName: authorNameOf(row.author_id),
             isMine: row.author_id === user.userId,
             body: row.body,
             createdAt: row.created_at,
             mentions: mentionsOf(row.mentions, nameOf),
             parentId: row.parent_id ?? null,
           })),
-    [isPreview, demo, live.data, nameOf, user.userId]
+    [isPreview, demo, live.data, nameOf, authorNameOf, user.userId]
   );
 
   const refresh = () =>

@@ -40,6 +40,7 @@ describe('GroupPanel — o que o grupo mostra por defeito (só leitura)', () => 
       await screen.findByText('O seu grupo mostra por defeito: Colaboradores, Comunicados de grupo')
     ).toBeInTheDocument();
     expect(screen.getByText(/ainda não têm efeito/)).toBeInTheDocument();
+    expect(screen.getByText(/O Feed do grupo já mostra/)).toBeInTheDocument();
   });
 
   it('sem módulos diz que não há nada por defeito', async () => {

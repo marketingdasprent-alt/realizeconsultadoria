@@ -17,6 +17,7 @@ import { useProtectImages } from '../hooks/useProtectImages';
 import { useFeedRealtime } from '../hooks/useFeedRealtime';
 import { useNotices } from '../hooks/useNotices';
 import { useNoticeReactions } from '../hooks/useNoticeReactions';
+import { filterByScope, hasOtherCompanyPosts, type FeedScope } from '../lib/feed';
 import { buildTimeline, FEED_FILTERS, topHashtags, type FeedFilter } from '../lib/timeline';
 import type { FeedPost } from '../types';
 
@@ -36,20 +37,27 @@ const FeedPage: React.FC = () => {
     params.get('filtro') === 'comunicados' ? 'notices' : 'all'
   );
   const [query, setQuery] = useState('');
+  // Todas as empresas do grupo, ou só a minha (o filtro só aparece com publicações de outras).
+  const [scope, setScope] = useState<FeedScope>('all');
+  const showScope = hasOtherCompanyPosts(feed.posts);
+  const visiblePosts = useMemo(
+    () => filterByScope(feed.posts, showScope ? scope : 'all'),
+    [feed.posts, scope, showScope]
+  );
   const [hashtag, setHashtag] = useState<string | null>(null);
   const [toDelete, setToDelete] = useState<FeedPost | null>(null);
 
   const timeline = useMemo(
     () =>
       buildTimeline({
-        posts: feed.posts,
+        posts: visiblePosts,
         notices,
         recognitions: recognitions.items,
         filter,
         query,
         hashtag,
       }),
-    [feed.posts, notices, recognitions.items, filter, query, hashtag]
+    [visiblePosts, notices, recognitions.items, filter, query, hashtag]
   );
 
   // Está a ver o Feed: o que há de novo conta como visto.
@@ -103,6 +111,28 @@ const FeedPage: React.FC = () => {
                 {option.label}
               </button>
             ))}
+            {showScope &&
+              (
+                [
+                  { key: 'all', label: 'Todas as empresas' },
+                  { key: 'mine', label: 'Só a minha empresa' },
+                ] as const
+              ).map(option => (
+                <button
+                  key={option.key}
+                  type="button"
+                  aria-pressed={scope === option.key}
+                  onClick={() => setScope(option.key)}
+                  className={cn(
+                    'shrink-0 rounded-full px-4 py-2 text-[13px] font-semibold transition-colors',
+                    scope === option.key
+                      ? 'bg-rz-primary text-white'
+                      : 'bg-white text-rz-muted ring-1 ring-rz-line'
+                  )}
+                >
+                  {option.label}
+                </button>
+              ))}
             {hashtag && (
               <button
                 type="button"
@@ -171,7 +201,7 @@ const FeedPage: React.FC = () => {
         </div>
         <FeedSidebar
           notices={notices}
-          hashtags={topHashtags(feed.posts)}
+          hashtags={topHashtags(visiblePosts)}
           recognitions={recognitions.items}
           onShowNotices={() => setFilter('notices')}
           onHashtag={setHashtag}

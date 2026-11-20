@@ -134,3 +134,6 @@ jobs:
 
       - name: Build (to verify env vars are loaded)
         run: pnpm run build
+
+      - name: Run E2E tests
+        run: pnpm run test:e2e

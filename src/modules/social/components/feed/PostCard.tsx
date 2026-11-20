@@ -20,6 +20,7 @@ import {
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import { UserAvatar } from '@/modules/workspace/components/UserAvatar';
+import { useFeedPeople } from '../../hooks/useFeedPeople';
 import { FEED_REACTIONS } from '../../lib/feed';
 import type { FeedPost } from '../../types';
 import { RichText } from '../RichText';
@@ -49,6 +50,13 @@ export const PostCard: React.FC<PostCardProps> = ({
   const isBirthday = post.kind === 'birthday';
   // Publicação de outra empresa do grupo: só se lê.
   const readOnly = !!post.isOtherCompany;
+  const { labelOf } = useFeedPeople(
+    post.id,
+    readOnly ? post.companyName : undefined,
+    readOnly && isBirthday && !!post.subjectId
+  );
+  const subjectName =
+    readOnly && isBirthday && post.subjectId ? labelOf(post.subjectId) : post.subjectName;
 
   return (
     <article
@@ -127,8 +135,8 @@ export const PostCard: React.FC<PostCardProps> = ({
       )}
       {isBirthday && post.subjectId && (
         <div className="mt-3 flex items-center gap-3 rounded-2xl bg-white p-3 ring-1 ring-pink-200">
-          <UserAvatar name={post.subjectName ?? ''} userId={post.subjectId} size="md" />
-          <p className="min-w-0 truncate text-[15px] font-bold">{post.subjectName} 🎂</p>
+          <UserAvatar name={subjectName ?? ''} userId={post.subjectId} size="md" />
+          <p className="min-w-0 truncate text-[15px] font-bold">{subjectName} 🎂</p>
         </div>
       )}
       <PostAttachments attachments={post.attachments} />

@@ -25,17 +25,24 @@ export const useCurrentEmployee = (): UseCurrentEmployeeResult => {
 
   useEffect(() => {
     let cancelled = false;
-    const requester = sessionUserId();
-    timeClockService.getCurrentEmployee().then(({ data, error }) => {
-      // Cancelado ou a conta mudou durante o pedido: a resposta é da conta anterior.
-      if (cancelled || sessionChangedSince(requester)) return;
-      // Sem rede: fica o guardado.
-      if (!error) {
-        setEmployee(data);
-        writeDeviceCacheIfSession(CACHE, requester, data);
-      }
-      setIsLoading(false);
-    });
+    const load = () => {
+      const requester = sessionUserId();
+      timeClockService.getCurrentEmployee().then(({ data, error }) => {
+        if (cancelled) return;
+        // A conta mudou durante o pedido: a resposta é da anterior, pede-se de novo.
+        if (sessionChangedSince(requester)) {
+          load();
+          return;
+        }
+        // Sem rede: fica o guardado.
+        if (!error) {
+          setEmployee(data);
+          writeDeviceCacheIfSession(CACHE, requester, data);
+        }
+        setIsLoading(false);
+      });
+    };
+    load();
     return () => {
       cancelled = true;
     };

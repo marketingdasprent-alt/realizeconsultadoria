@@ -28,17 +28,21 @@ describe('useCurrentEmployee', () => {
     expect(readDeviceCache('current-employee', 'u1')).toEqual({ id: 'e1' });
   });
 
-  it('se a conta mudar durante o pedido, a resposta da anterior não é usada nem guardada', async () => {
+  it('se a conta mudar durante o pedido, ignora a resposta da anterior e pede de novo para a nova', async () => {
     session('u1');
-    let answer: (value: unknown) => void = () => undefined;
-    getCurrentEmployee.mockReturnValue(new Promise(resolve => (answer = resolve)));
+    let answerFirst: (value: unknown) => void = () => undefined;
+    getCurrentEmployee
+      .mockReturnValueOnce(new Promise(resolve => (answerFirst = resolve)))
+      .mockResolvedValueOnce({ data: { id: 'e-da-conta-2' }, error: null });
 
     const { result } = renderHook(() => useCurrentEmployee());
     session('u2');
-    await act(async () => answer({ data: { id: 'e-da-conta-1' }, error: null }));
+    await act(async () => answerFirst({ data: { id: 'e-da-conta-1' }, error: null }));
+    await waitFor(() => expect(result.current.employee).toEqual({ id: 'e-da-conta-2' }));
 
-    expect(result.current.employee).toBeNull();
+    expect(result.current.isLoading).toBe(false);
+    expect(getCurrentEmployee).toHaveBeenCalledTimes(2);
     expect(readDeviceCache('current-employee', 'u1')).toBeNull();
-    expect(readDeviceCache('current-employee', 'u2')).toBeNull();
+    expect(readDeviceCache('current-employee', 'u2')).toEqual({ id: 'e-da-conta-2' });
   });
 });

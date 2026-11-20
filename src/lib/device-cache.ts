@@ -66,6 +66,8 @@ const GLOBAL_KEYS = [
   'rz.people.recent',
   'rz.mail.supportCompany',
   'rz-last-punch-at',
+  'rz.mail.contacts.backfilled',
+  'rz.admin.company-scope',
 ];
 
 const isKeptKey = (key: string, keepUserId: string) =>

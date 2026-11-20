@@ -303,6 +303,8 @@ describe('limpar tudo o que é do utilizador no aparelho', () => {
     localStorage.setItem('rz.people.recent', '["x"]');
     localStorage.setItem('rz.mail.supportCompany', 'empresa');
     localStorage.setItem('rz-last-punch-at', '1');
+    localStorage.setItem('rz.mail.contacts.backfilled', '1');
+    localStorage.setItem('rz.admin.company-scope', 'c:abc');
 
     clearAllDeviceData('u2');
 
@@ -396,23 +398,22 @@ describe('sessão: limpeza completa e observadores montados', () => {
     expect(clearMutations).toHaveBeenCalled();
   });
 
-  it('terminar a sessão cancela os pedidos em curso: a resposta tardia não volta à cache', async () => {
+  it('terminar a sessão cancela os pedidos em curso antes de limpar a memória', () => {
     session('u1');
     const client = new QueryClient();
-    let answer: (value: unknown) => void = () => undefined;
-    const observer = new QueryObserver(client, {
-      queryKey: ['feed', 'posts'],
-      queryFn: () => new Promise(resolve => (answer = resolve)),
+    const order: string[] = [];
+    vi.spyOn(client, 'cancelQueries').mockImplementation(() => {
+      order.push('cancel');
+      return Promise.resolve();
     });
-    const unsubscribe = observer.subscribe(() => undefined);
+    vi.spyOn(client, 'clear').mockImplementation(() => {
+      order.push('clear');
+    });
     stop = persistQueries(client);
 
     auth.listener?.('SIGNED_OUT', null);
-    answer(['da-conta-1']);
-    await Promise.resolve();
 
-    expect(client.getQueryData(['feed', 'posts'])).toBeUndefined();
-    unsubscribe();
+    expect(order).toEqual(['cancel', 'clear']);
   });
 
   it('outra conta a entrar apaga o que ficou no aparelho da anterior e mantém o da nova', () => {

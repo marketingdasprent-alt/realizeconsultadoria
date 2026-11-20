@@ -150,9 +150,9 @@ export const persistQueries = (client: QueryClient) => {
   document.addEventListener('visibilitychange', onHidden);
   const { data } = supabase.auth.onAuthStateChange((event, session) => {
     if (event === 'SIGNED_OUT') {
+      void client.cancelQueries();
       stopTimer();
       clearAllDeviceData();
-      void client.cancelQueries();
       client.clear();
       owner = null;
       return;

@@ -126,6 +126,7 @@ describe('mensagens IMAP', () => {
       subject: 'Fatura',
       snippet: 'Olá',
       date: '2026-10-15T09:00:00.000Z',
+      received_at: null,
       unread: true,
       starred: true,
       has_attachments: true,

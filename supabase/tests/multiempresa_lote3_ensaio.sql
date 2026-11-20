@@ -25,7 +25,7 @@ DECLARE
   uA1 uuid; uA2 uuid; uB1 uuid; uD1 uuid; uE1 uuid; uH1 uuid; uJ1 uuid; uK1 uuid; uL1 uuid; uM1 uuid; uX uuid; uAdm uuid; uCf uuid; uAf uuid; uSp uuid;
   cA uuid; cB uuid; cC uuid; cD uuid; cE uuid; cF uuid; cH uuid; cI uuid; cJ uuid; cK uuid; cL uuid; cM uuid;
   g1 uuid; g2 uuid; g3 uuid; g4 uuid; g5 uuid;
-  pA uuid; pAd uuid; pB uuid; pBd uuid; pBx uuid; pBb uuid; pC uuid; pD uuid; pE uuid; pI uuid; pDb uuid; pIb uuid; pJ uuid; pK uuid; pM uuid; pX uuid;
+  pA uuid; pAd uuid; pB uuid; pBd uuid; pBx uuid; pBb uuid; pC uuid; pD uuid; pE uuid; pI uuid; pDb uuid; pIb uuid; pJ uuid; pK uuid; pKb uuid; pM uuid; pX uuid;
   v_nif text := 'ZZ' || substr(upper(md5(gen_random_uuid()::text)), 1, 8);
   v_defs text[];
   v_i integer;
@@ -124,9 +124,11 @@ BEGIN
     VALUES (cI, NULL, 'I parabens', 'company', 'birthday', uH1, current_date) RETURNING id INTO pIb;
     INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cJ, uJ1, 'J toda', 'company') RETURNING id INTO pJ;
     INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cK, uK1, 'K toda', 'company') RETURNING id INTO pK;
+    INSERT INTO public.feed_posts (company_id, author_id, body, audience, kind, subject_id, subject_day)
+    VALUES (cK, NULL, 'K parabens', 'company', 'birthday', uK1, current_date) RETURNING id INTO pKb;
     INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cM, uM1, 'M toda', 'company') RETURNING id INTO pM;
     INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cB, uX, 'B do X', 'company') RETURNING id INTO pX;
-    UPDATE public.feed_posts SET created_at = now() - interval '2 hours' WHERE id IN (pJ, pK, pM, pX);
+    UPDATE public.feed_posts SET created_at = now() - interval '2 hours' WHERE id IN (pJ, pK, pKb, pM, pX);
     INSERT INTO public.feed_comments (post_id, author_id, body) VALUES (pK, uK1, 'comentario de K');
     INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cC, uB1, 'C inativa', 'company') RETURNING id INTO pC;
     INSERT INTO public.feed_posts (company_id, author_id, body, audience) VALUES (cD, uD1, 'D toda', 'company') RETURNING id INTO pD;
@@ -232,6 +234,12 @@ BEGIN
     ARRAY['listar: autor com duas fichas vem com o nome e a empresa do post', uA1::text, 'q', 'authenticated', 'true',
       format('SELECT EXISTS (SELECT 1 FROM public.feed_list_posts(NULL, 50) WHERE id = %L AND author_name = %L AND company_id = %L AND company_name = %L)', pX, 'ZZ L3 X', cB, 'ZZ L3 B')],
     -- ===== quem escreveu, comentou ou reagiu
+    ARRAY['pessoas: aniversario do par devolve nome e empresa do aniversariante', uA1::text, 'q', 'authenticated', 'true',
+      format('SELECT count(*) = 1 AND bool_and(user_id = %L AND name = %L AND company_name = %L AND company_id = %L) FROM public.feed_post_people(%L)', uB1, 'ZZ L3 B1', 'ZZ L3 B', cB, pBb)],
+    ARRAY['pessoas: aniversario do par bloqueado para quem nao le o post (fora do grupo)', uD1::text, 'q', 'authenticated', 'true',
+      format('SELECT count(*) = 0 FROM public.feed_post_people(%L)', pBb)],
+    ARRAY['pessoas: aniversario em grupo por pedido bloqueado em feed_post_people', uJ1::text, 'q', 'authenticated', 'true',
+      format('SELECT count(*) = 0 FROM public.feed_post_people(%L)', pKb)],
     ARRAY['pessoas: post do par devolve so nome e empresa de quem la esta', uA1::text, 'q', 'authenticated', 'true',
       format('SELECT count(*) = 1 AND bool_and(name = %L AND company_name = %L AND company_id = %L) FROM public.feed_post_people(%L)', 'ZZ L3 B1', 'ZZ L3 B', cB, pB)],
     ARRAY['pessoas: a minha empresa tambem', uA1::text, 'q', 'authenticated', 'true',

@@ -149,9 +149,14 @@ const AdminGroupMembersManager = ({
   const handleRemoveFromGroup = async (membershipId: string) => {
     setIsRemoving(membershipId);
     try {
-      const { error } = await supabase.from('admin_group_members').delete().eq('id', membershipId);
+      const { data: rows, error } = await supabase
+        .from('admin_group_members')
+        .delete()
+        .eq('id', membershipId)
+        .select('id');
 
       if (error) throw error;
+      if (!rows?.length) throw new Error('Sem permissão para remover deste grupo.');
 
       toast({ title: 'Administrador removido do grupo' });
       fetchData();

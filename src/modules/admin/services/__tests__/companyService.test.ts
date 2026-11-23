@@ -49,6 +49,41 @@ describe('companyService — criar e apagar só pelas funções do super admin',
     expect(result).toEqual({ data: { id: 'c9' }, error: null });
   });
 
+  it('createWithAdmin grava a seguir os dados de contacto que a função não recebe', async () => {
+    invoke.mockResolvedValue({ data: { company_id: 'c9' }, error: null });
+    const eq = vi.fn().mockResolvedValue({ error: null });
+    const update = vi.fn().mockReturnValue({ eq });
+    from.mockReturnValue({ update });
+    await companyService.createWithAdmin({ ...INPUT, phone: '910000000', city: 'Porto' });
+    expect(from).toHaveBeenCalledWith('companies');
+    expect(update).toHaveBeenCalledWith(
+      expect.objectContaining({ phone: '910000000', city: 'Porto', address: null })
+    );
+    expect(eq).toHaveBeenCalledWith('id', 'c9');
+  });
+
+  it('createWithAdmin sem id devolvido é erro', async () => {
+    invoke.mockResolvedValue({ data: { company_id: null }, error: null });
+    const result = await companyService.createWithAdmin(INPUT);
+    expect(result.data).toBeNull();
+  });
+
+  it('update só envia colunas da empresa (nunca campos de administrador ou grupo)', async () => {
+    const single = vi.fn().mockResolvedValue({ data: { id: 'c1' }, error: null });
+    const select = vi.fn().mockReturnValue({ single });
+    const eq = vi.fn().mockReturnValue({ select });
+    const update = vi.fn().mockReturnValue({ eq });
+    from.mockReturnValue({ update });
+    await companyService.update('c1', {
+      name: 'X',
+      group_name: '',
+      group_id: '',
+      admin_email: 'a@b.pt',
+    } as never);
+    const sent = update.mock.calls[0][0] as Record<string, unknown>;
+    expect(Object.keys(sent).sort()).toEqual(['name', 'updated_at']);
+  });
+
   it('createWithAdmin devolve o erro da função (ex.: NIF repetido)', async () => {
     invoke.mockResolvedValue({
       data: { error: 'Já existe uma empresa com este NIF.' },

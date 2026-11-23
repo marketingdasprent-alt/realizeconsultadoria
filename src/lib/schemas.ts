@@ -56,10 +56,23 @@ export const newCompanyAdminSchema = z.object({
   group_name: z.string().optional().nullable(),
 });
 
-export const createCompanyWithAdminSchema = z.object({
-  ...companyShape,
-  ...newCompanyAdminSchema.shape,
-});
+/** Valor do select de grupo que significa "criar um grupo novo" (o nome vai em group_name). */
+export const NEW_GROUP_VALUE = '__novo__';
+
+export const createCompanyWithAdminSchema = z
+  .object({
+    ...companyShape,
+    ...newCompanyAdminSchema.shape,
+  })
+  .superRefine((data, ctx) => {
+    if (data.group_id === NEW_GROUP_VALUE && (data.group_name ?? '').trim().length < 2) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['group_name'],
+        message: 'Indique o nome do grupo novo',
+      });
+    }
+  });
 
 // ─── Colaborador ─────────────────────────────────────────────────────────────
 

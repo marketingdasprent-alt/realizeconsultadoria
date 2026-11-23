@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import {
   createCompanySchema,
   createCompanyWithAdminSchema,
+  NEW_GROUP_VALUE,
   type CreateCompanyWithAdminInput,
 } from '@/lib/schemas';
 import { useAllGroups } from '../hooks/useSharing';
@@ -32,10 +33,11 @@ interface FieldProps {
   type?: string;
   /** Ocupa a linha toda a partir de `sm`. */
   wide?: boolean;
+  autoComplete?: string;
 }
 
 /** Rótulo ligado ao campo (htmlFor/id) e erro anunciado (aria-invalid/aria-describedby). */
-const Field: React.FC<FieldProps> = ({ label, registration, error, type, wide }) => {
+const Field: React.FC<FieldProps> = ({ label, registration, error, type, wide, autoComplete }) => {
   const id = useId();
   const errorId = `${id}-erro`;
   return (
@@ -46,6 +48,7 @@ const Field: React.FC<FieldProps> = ({ label, registration, error, type, wide })
       <Input
         id={id}
         type={type}
+        autoComplete={autoComplete}
         aria-invalid={error ? true : undefined}
         aria-describedby={error ? errorId : undefined}
         {...registration}
@@ -79,7 +82,7 @@ const safeZodResolver =
   };
 
 const NO_GROUP = '__nenhum__';
-const NEW_GROUP = '__novo__';
+const NEW_GROUP = NEW_GROUP_VALUE;
 
 /** Primeiro administrador e grupo opcional da empresa nova (só o super admin cria empresas). */
 const NewCompanyAdminFields: React.FC<{
@@ -111,18 +114,21 @@ const NewCompanyAdminFields: React.FC<{
           label="Nome do administrador *"
           registration={register('admin_name')}
           error={errors.admin_name}
+          autoComplete="off"
         />
         <Field
           label="Email do administrador *"
           type="email"
           registration={register('admin_email')}
           error={errors.admin_email}
+          autoComplete="off"
         />
         <Field
           label="Palavra-passe inicial * (mínimo 8 caracteres)"
           type="password"
           registration={register('admin_password')}
           error={errors.admin_password}
+          autoComplete="new-password"
           wide
         />
       </div>
@@ -144,7 +150,9 @@ const NewCompanyAdminFields: React.FC<{
             onChange={e => onGroupChange(e.target.value === NO_GROUP ? '' : e.target.value)}
             className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
           >
-            <option value={NO_GROUP}>Sem grupo</option>
+            <option value={NO_GROUP}>
+              {groups.isLoading ? 'A carregar grupos…' : 'Sem grupo'}
+            </option>
             {uniqueGroups.map(group => (
               <option key={group.id} value={group.id}>
                 {group.name}
@@ -153,8 +161,19 @@ const NewCompanyAdminFields: React.FC<{
             <option value={NEW_GROUP}>Criar um grupo novo…</option>
           </select>
         </div>
+        {groups.isError && (
+          <p role="alert" className="text-xs text-destructive sm:col-span-2">
+            Não foi possível carregar os grupos. Feche e volte a abrir esta página antes de criar um
+            grupo novo, para não duplicar um que já existe.
+          </p>
+        )}
         {groupId === NEW_GROUP && (
-          <Field label="Nome do grupo novo *" registration={register('group_name')} />
+          <Field
+            label="Nome do grupo novo *"
+            registration={register('group_name')}
+            error={errors.group_name}
+            autoComplete="off"
+          />
         )}
       </div>
     </>
@@ -215,11 +234,14 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({
   return (
     <form
       onSubmit={handleSubmit(data =>
-        onSubmit({
-          ...data,
-          group_id: data.group_id === NEW_GROUP ? '' : data.group_id,
-          group_name: data.group_id === NEW_GROUP ? (data.group_name ?? '').trim() : '',
-        })
+        // Em edição só seguem os campos da empresa (os do administrador e do grupo são da criação).
+        initialData
+          ? onSubmit(data)
+          : onSubmit({
+              ...data,
+              group_id: data.group_id === NEW_GROUP ? '' : data.group_id,
+              group_name: data.group_id === NEW_GROUP ? (data.group_name ?? '').trim() : '',
+            })
       )}
       className="space-y-4 mt-4"
     >

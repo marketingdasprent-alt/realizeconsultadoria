@@ -130,4 +130,33 @@ describe('CompanyForm — empresa nova com primeiro administrador e grupo', () =
     await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
     expect(onSubmit.mock.calls[0][0]).toMatchObject({ group_id: '', group_name: 'Grupo Externo' });
   });
+
+  it('grupo novo sem nome não envia e pede o nome', async () => {
+    const onSubmit = vi.fn();
+    render(<CompanyForm onSubmit={onSubmit} onCancel={vi.fn()} />);
+    fillCompany();
+    fillAdmin();
+    fireEvent.change(screen.getByLabelText('Grupo'), { target: { value: '__novo__' } });
+    fireEvent.click(screen.getByRole('button', { name: /criar empresa/i }));
+    expect(await screen.findByText('Indique o nome do grupo novo')).toBeInTheDocument();
+    expect(onSubmit).not.toHaveBeenCalled();
+  });
+
+  it('em edição só segue os campos da empresa (sem administrador nem grupo)', async () => {
+    const onSubmit = vi.fn();
+    render(<CompanyForm initialData={COMPANY} onSubmit={onSubmit} onCancel={vi.fn()} />);
+    fireEvent.click(screen.getByRole('button', { name: /guardar alterações/i }));
+    await waitFor(() => expect(onSubmit).toHaveBeenCalledTimes(1));
+    const sent = onSubmit.mock.calls[0][0] as Record<string, unknown>;
+    expect(Object.keys(sent).filter(key => /^(admin_|group_)/.test(key))).toEqual([]);
+  });
+
+  it('os campos do administrador novo não deixam o browser preencher credenciais', () => {
+    render(<CompanyForm onSubmit={vi.fn()} onCancel={vi.fn()} />);
+    expect(screen.getByLabelText(/palavra-passe inicial/i)).toHaveAttribute(
+      'autocomplete',
+      'new-password'
+    );
+    expect(screen.getByLabelText(/email do administrador/i)).toHaveAttribute('autocomplete', 'off');
+  });
 });

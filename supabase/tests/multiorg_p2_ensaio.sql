@@ -14,6 +14,7 @@ DECLARE
   sa uuid; adA uuid; adB uuid; adE uuid; nu uuid; nu2 uuid; nu3 uuid; emA uuid;
   cA uuid; cB uuid; cE uuid; gM uuid;
   v_ids uuid[] := ARRAY[]::uuid[];
+  v_d text := lpad(floor(random() * 10000000)::bigint::text, 7, '0');
   v_k integer;
   v_nif text := 'ZZ' || substr(upper(md5(gen_random_uuid()::text)), 1, 8);
   v_defs text[];
@@ -55,20 +56,21 @@ BEGIN
   END;
 
   v_defs := ARRAY[
-    ARRAY['criar: so o super admin (admin de empresa recusado)', adA::text, 'f', 'authenticated', '42501', format('SELECT public.rz_create_company(''ZZ P2 X'', %L, ''x@invalid.example'', NULL, NULL, %L)', v_nif || 'X1', nu), '', ''],
-    ARRAY['criar: colaborador recusado', emA::text, 'f', 'authenticated', '42501', format('SELECT public.rz_create_company(''ZZ P2 X'', %L, ''x@invalid.example'', NULL, NULL, %L)', v_nif || 'X2', nu), '', ''],
-    ARRAY['criar: super admin cria empresa com primeiro admin', sa::text, 'f', 'authenticated', 'ok', format('SELECT public.rz_create_company(''ZZ P2 N1'', %L, ''n1@invalid.example'', NULL, NULL, %L)', v_nif || 'N1', nu), '', ''],
-    ARRAY['criar: o primeiro admin ficou ligado a empresa nova (so a ela)', '', 'q', '', 'true', format('SELECT (SELECT count(*) FROM public.company_memberships m JOIN public.companies c ON c.id = m.company_id WHERE m.user_id = %L AND m.role = ''admin'' AND m.status = ''ativo'') = 1 AND EXISTS (SELECT 1 FROM public.companies c WHERE c.nif = %L AND c.status = ''ativa'')', nu, v_nif || 'N1'), '', ''],
-    ARRAY['criar: o admin da empresa nova ve so a sua', nu::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.companies WHERE id IN (%L, %L)) = 0 AND (SELECT count(*) FROM public.companies WHERE nif = %L) = 1', cA, cB, v_nif || 'N1'), '', ''],
-    ARRAY['criar: NIF repetido', sa::text, 'f', 'authenticated', '22023', format('SELECT public.rz_create_company(''ZZ P2 N1b'', %L, ''n1@invalid.example'', NULL, NULL, %L)', v_nif || 'N1', nu2), '', ''],
-    ARRAY['criar: conta que ja administra outra empresa nao pode ser primeiro admin', sa::text, 'f', 'authenticated', '23514', format('SELECT public.rz_create_company(''ZZ P2 N2'', %L, ''n2@invalid.example'', NULL, NULL, %L)', v_nif || 'N2', adA), '', 'só gere uma empresa'],
-    ARRAY['criar: sem admin indicado', sa::text, 'f', 'authenticated', '22023', format('SELECT public.rz_create_company(''ZZ P2 N3'', %L, ''n3@invalid.example'', NULL, NULL, NULL)', v_nif || 'N3'), '', ''],
-    ARRAY['criar: com grupo novo (origem manual)', sa::text, 'f', 'authenticated', 'ok', format('SELECT public.rz_create_company(''ZZ P2 N4'', %L, ''n4@invalid.example'', NULL, ''ZZ P2 grupo novo'', %L)', v_nif || 'N4', nu2), '', ''],
-    ARRAY['criar: a empresa entrou no grupo novo com origem manual', '', 'q', '', 'true', format('SELECT EXISTS (SELECT 1 FROM public.company_group_members m JOIN public.companies c ON c.id = m.company_id WHERE c.nif = %L AND m.origin = ''manual'' AND m.status = ''ativo'')', v_nif || 'N4'), '', ''],
-    ARRAY['criar: com grupo existente (origem manual)', sa::text, 'f', 'authenticated', 'ok', format('SELECT public.rz_create_company(''ZZ P2 N5'', %L, ''n5@invalid.example'', %L, NULL, %L)', v_nif || 'N5', gM, nu3), '', ''],
-    ARRAY['criar: a empresa entrou no grupo existente com origem manual', '', 'q', '', 'true', format('SELECT EXISTS (SELECT 1 FROM public.company_group_members m JOIN public.companies c ON c.id = m.company_id WHERE c.nif = %L AND m.group_id = %L AND m.origin = ''manual'')', v_nif || 'N5', gM), '', ''],
-    ARRAY['criar: grupo e nome ao mesmo tempo', sa::text, 'f', 'authenticated', '22023', format('SELECT public.rz_create_company(''ZZ P2 N6'', %L, ''n6@invalid.example'', %L, ''ZZ nome'', %L)', v_nif || 'N6', gM, emA), '', ''],
-    ARRAY['criar: INSERT direto em companies fechado ate ao super admin', sa::text, 'f', 'authenticated', '42501', format('INSERT INTO public.companies (name, nif, email) VALUES (''ZZ P2 direto'', %L, ''d@invalid.example'')', v_nif || 'D1'), '', ''],
+    ARRAY['criar: so o super admin (admin de empresa recusado)', adA::text, 'f', 'authenticated', '42501', format('SELECT public.rz_create_company(''ZZ P2 X'', %L, ''x@invalid.example'', NULL, NULL, %L)', '97' || v_d, nu), '', ''],
+    ARRAY['criar: colaborador recusado', emA::text, 'f', 'authenticated', '42501', format('SELECT public.rz_create_company(''ZZ P2 X'', %L, ''x@invalid.example'', NULL, NULL, %L)', '98' || v_d, nu), '', ''],
+    ARRAY['criar: super admin cria empresa com primeiro admin', sa::text, 'f', 'authenticated', 'ok', format('SELECT public.rz_create_company(''ZZ P2 N1'', %L, ''n1@invalid.example'', NULL, NULL, %L)', '91' || v_d, nu), '', ''],
+    ARRAY['criar: o primeiro admin ficou ligado a empresa nova (so a ela)', '', 'q', '', 'true', format('SELECT (SELECT count(*) FROM public.company_memberships m JOIN public.companies c ON c.id = m.company_id WHERE m.user_id = %L AND m.role = ''admin'' AND m.status = ''ativo'') = 1 AND EXISTS (SELECT 1 FROM public.companies c WHERE c.nif = %L AND c.status = ''ativa'')', nu, '91' || v_d), '', ''],
+    ARRAY['criar: o admin da empresa nova ve so a sua', nu::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.companies WHERE id IN (%L, %L)) = 0 AND (SELECT count(*) FROM public.companies WHERE nif = %L) = 1', cA, cB, '91' || v_d), '', ''],
+    ARRAY['criar: NIF repetido', sa::text, 'f', 'authenticated', '22023', format('SELECT public.rz_create_company(''ZZ P2 N1b'', %L, ''n1@invalid.example'', NULL, NULL, %L)', '91' || v_d, nu2), '', ''],
+    ARRAY['criar: conta que ja administra outra empresa nao pode ser primeiro admin', sa::text, 'f', 'authenticated', '23514', format('SELECT public.rz_create_company(''ZZ P2 N2'', %L, ''n2@invalid.example'', NULL, NULL, %L)', '92' || v_d, adA), '', 'só gere uma empresa'],
+    ARRAY['criar: NIF invalido (so 9 digitos)', sa::text, 'f', 'authenticated', '22023', format('SELECT public.rz_create_company(''ZZ P2 N0'', ''ABC'', ''n0@invalid.example'', NULL, NULL, %L)', nu3), '', ''],
+    ARRAY['criar: sem admin indicado', sa::text, 'f', 'authenticated', '22023', format('SELECT public.rz_create_company(''ZZ P2 N3'', %L, ''n3@invalid.example'', NULL, NULL, NULL)', '93' || v_d), '', ''],
+    ARRAY['criar: com grupo novo (origem manual)', sa::text, 'f', 'authenticated', 'ok', format('SELECT public.rz_create_company(''ZZ P2 N4'', %L, ''n4@invalid.example'', NULL, ''ZZ P2 grupo novo'', %L)', '94' || v_d, nu2), '', ''],
+    ARRAY['criar: a empresa entrou no grupo novo com origem manual', '', 'q', '', 'true', format('SELECT EXISTS (SELECT 1 FROM public.company_group_members m JOIN public.companies c ON c.id = m.company_id WHERE c.nif = %L AND m.origin = ''manual'' AND m.status = ''ativo'')', '94' || v_d), '', ''],
+    ARRAY['criar: com grupo existente (origem manual)', sa::text, 'f', 'authenticated', 'ok', format('SELECT public.rz_create_company(''ZZ P2 N5'', %L, ''n5@invalid.example'', %L, NULL, %L)', '95' || v_d, gM, nu3), '', ''],
+    ARRAY['criar: a empresa entrou no grupo existente com origem manual', '', 'q', '', 'true', format('SELECT EXISTS (SELECT 1 FROM public.company_group_members m JOIN public.companies c ON c.id = m.company_id WHERE c.nif = %L AND m.group_id = %L AND m.origin = ''manual'')', '95' || v_d, gM), '', ''],
+    ARRAY['criar: grupo e nome ao mesmo tempo', sa::text, 'f', 'authenticated', '22023', format('SELECT public.rz_create_company(''ZZ P2 N6'', %L, ''n6@invalid.example'', %L, ''ZZ nome'', %L)', '96' || v_d, gM, emA), '', ''],
+    ARRAY['criar: INSERT direto em companies fechado ate ao super admin', sa::text, 'f', 'authenticated', '42501', format('INSERT INTO public.companies (name, nif, email) VALUES (''ZZ P2 direto'', %L, ''d@invalid.example'')', '99' || v_d), '', ''],
     ARRAY['apagar: DELETE direto fechado ate ao super admin', sa::text, 'q', 'authenticated', 'true', format('WITH d AS (DELETE FROM public.companies WHERE id = %L RETURNING 1) SELECT count(*) = 0 FROM d', cB), '', ''],
     ARRAY['apagar: admin de empresa recusado', adA::text, 'f', 'authenticated', '42501', format('SELECT public.rz_delete_company(%L)', cE), '', ''],
     ARRAY['apagar: com colaboradores recusado', sa::text, 'f', 'authenticated', '22023', format('SELECT public.rz_delete_company(%L)', cA), '', 'colaboradores'],

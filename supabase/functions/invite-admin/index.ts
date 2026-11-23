@@ -132,13 +132,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     const displayName = cleanName || normalizedEmail.split('@')[0];
 
-    // Se o email já tem conta (listUsers só devolve a primeira página; o createUser abaixo falha em duplicados)
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(
-      u => u.email?.toLowerCase() === normalizedEmail
-    );
-    if (existingUser) {
-      return taken('Este email já está em uso no sistema. Por favor utilize um email diferente.');
+    // NIF repetido: verifica antes de criar a conta (evita criar e apagar uma conta à toa).
+    if (new_company) {
+      const { count: nifCount, error: nifError } = await supabaseAdmin
+        .from('companies')
+        .select('id', { count: 'exact', head: true })
+        .eq('nif', new_company.nif);
+      if (nifError) return json({ error: 'Não foi possível verificar o NIF. Tente novamente.' });
+      if ((nifCount ?? 0) > 0) return json({ error: 'Já existe uma empresa com este NIF.' });
     }
 
     let userId: string;
@@ -154,11 +155,13 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (createError) {
-      console.error('Error creating user:', createError);
-      return new Response(
-        JSON.stringify({ error: `Erro ao criar utilizador: ${createError.message}` }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('invite-admin: falhou a criação da conta');
+      // Email já registado (ou outro erro do Auth): a mesma resposta para quem não é super admin.
+      const duplicate =
+        createError.status === 422 || /already|registered|exists/i.test(createError.message ?? '');
+      return duplicate
+        ? taken('Este email já está em uso no sistema. Por favor utilize um email diferente.')
+        : json({ error: 'Não foi possível criar a conta. Tente novamente.' });
     }
 
     userId = newUser.user.id;
@@ -200,7 +203,9 @@ const handler = async (req: Request): Promise<Response> => {
       if (cleanupError) {
         console.error('invite-admin: falhou a limpeza da conta criada', userId);
       }
-      return json({ error: `Erro ao ligar o administrador à empresa: ${linkError.message}` });
+      // As funções da BD põem o texto em português em `details` (message é só o código).
+      const reason = (linkError as { details?: string }).details || linkError.message;
+      return json({ error: `Erro ao ligar o administrador à empresa: ${reason}` });
     }
 
     // Create profile

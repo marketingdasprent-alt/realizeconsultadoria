@@ -9,6 +9,26 @@ import type { CreateCompanyWithAdminInput } from '@/lib/schemas';
 type Company = Database['public']['Tables']['companies']['Row'];
 type CompanyUpdate = Database['public']['Tables']['companies']['Update'];
 
+/** Só as colunas da empresa: o formulário pode trazer campos de outra coisa (administrador, grupo). */
+const COMPANY_COLUMNS = [
+  'name',
+  'nif',
+  'email',
+  'phone',
+  'address',
+  'city',
+  'postal_code',
+  'country',
+  'domain',
+  'notes',
+  'is_active',
+] as const;
+
+const pickCompanyColumns = (company: CompanyUpdate): CompanyUpdate =>
+  Object.fromEntries(
+    COMPANY_COLUMNS.filter(key => key in company).map(key => [key, company[key]])
+  ) as CompanyUpdate;
+
 export const companyService = {
   /**
    * Obter todas as empresas ordenadas por nome
@@ -76,7 +96,29 @@ export const companyService = {
       });
       if (error) throw error;
       if (data?.error) throw new Error(data.error);
-      return { data: { id: String(data?.company_id ?? '') }, error: null };
+      const id = typeof data?.company_id === 'string' ? data.company_id : '';
+      if (!id)
+        throw new Error('A empresa foi criada mas não foi possível abri-la. Atualize a página.');
+      // rz_create_company só recebe nome, NIF e email: os restantes dados gravam-se a seguir.
+      const extra = {
+        phone: input.phone || null,
+        address: input.address || null,
+        city: input.city || null,
+        postal_code: input.postal_code || null,
+        notes: input.notes || null,
+      };
+      if (Object.values(extra).some(value => value !== null)) {
+        const { error: extraError } = await supabase.from('companies').update(extra).eq('id', id);
+        if (extraError) {
+          return {
+            data: { id },
+            error: null,
+            warning:
+              'Empresa criada, mas não foi possível guardar os dados de contacto. Edite a empresa para os preencher.',
+          };
+        }
+      }
+      return { data: { id }, error: null };
     } catch (error) {
       return { data: null, error };
     }
@@ -89,7 +131,7 @@ export const companyService = {
     try {
       const { data, error } = await supabase
         .from('companies')
-        .update({ ...company, updated_at: new Date().toISOString() })
+        .update({ ...pickCompanyColumns(company), updated_at: new Date().toISOString() })
         .eq('id', id)
         .select()
         .single();

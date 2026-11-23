@@ -44,7 +44,7 @@ $pre$;
 -- ------------------------------------------------------------------ funções de âmbito
 CREATE OR REPLACE FUNCTION public.rz_is_platform_staff()
  RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
-AS $function$ SELECT public.rz_is_super_admin() OR public.rz_is_admin() $function$;
+AS $function$ SELECT public.rz_is_super_admin() OR public.has_role(auth.uid(), 'admin'::public.app_role) $function$;
 
 CREATE OR REPLACE FUNCTION public.rz_admin_of_employee(p_employee uuid)
  RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
@@ -121,7 +121,8 @@ CREATE OR REPLACE FUNCTION public.rz_legal_scope(p_company uuid)
  RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $function$
   SELECT public.rz_is_super_admin()
-      OR (public.rz_is_admin() AND p_company IS NOT NULL AND p_company = ANY (public.rz_my_company_ids()));
+      OR (public.has_module_permission(auth.uid(), 'legal', 'view') AND p_company IS NOT NULL
+          AND p_company = ANY (public.rz_my_company_ids()));
 $function$;
 
 CREATE OR REPLACE FUNCTION public.rz_legal_scope_client(p_client uuid)
@@ -131,18 +132,27 @@ AS $function$
                   WHERE l.id = p_client AND public.rz_legal_scope(l.company_id));
 $function$;
 
+-- Jurídico sem empresa (agenda, ficheiros): super admin ou quem tem a permissão do módulo jurídico.
+CREATE OR REPLACE FUNCTION public.rz_legal_global()
+ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT public.rz_is_super_admin() OR public.has_module_permission(auth.uid(), 'legal', 'view');
+$function$;
+
 -- Primeiro id (uuid) seguido de '/' no caminho de um ficheiro: o colaborador nos documentos.
 CREATE OR REPLACE FUNCTION public.rz_path_uuid(p_name text)
  RETURNS uuid LANGUAGE sql IMMUTABLE SET search_path TO 'public', 'pg_temp'
 AS $function$
   SELECT CASE WHEN m[1] IS NULL THEN NULL ELSE m[1]::uuid END
-  FROM (SELECT regexp_match(p_name, '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})/') AS m) x;
+  FROM (SELECT regexp_match(split_part(p_name, '/', 1), '([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$') AS m) x;
 $function$;
 
 CREATE OR REPLACE FUNCTION public.rz_admin_of_employee_path(p_name text)
  RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $function$
-  SELECT public.rz_is_super_admin() OR public.rz_admin_of_employee(public.rz_path_uuid(p_name));
+  SELECT public.rz_is_super_admin()
+      OR public.rz_admin_of_employee(public.rz_path_uuid(p_name))
+      OR public.rz_admin_of_user(public.rz_path_uuid(p_name));
 $function$;
 
 -- Equipa de suporte: o administrador da empresa do ticket, ou quem está no departamento da equipa mas
@@ -173,7 +183,7 @@ BEGIN
     'rz_admin_of_assignment(uuid)', 'rz_admin_of_ticket(uuid)', 'rz_admin_of_event(uuid)',
     'rz_admin_of_mail_account(uuid)', 'rz_admin_of_user(uuid)', 'rz_member_of_employee_company(uuid)',
     'rz_hr_of_employee(uuid)', 'rz_legal_scope(uuid)', 'rz_legal_scope_client(uuid)', 'rz_path_uuid(text)',
-    'rz_admin_of_employee_path(text)', 'rz_feed_peer_companies()'] LOOP
+    'rz_admin_of_employee_path(text)', 'rz_feed_peer_companies()', 'rz_legal_global()'] LOOP
     EXECUTE format('REVOKE ALL ON FUNCTION public.%s FROM PUBLIC, anon', s);
     EXECUTE format('GRANT EXECUTE ON FUNCTION public.%s TO authenticated, service_role', s);
   END LOOP;
@@ -352,6 +362,13 @@ CREATE POLICY "Jurídico: clientes só do admin jurídico da empresa" ON public.
   USING (public.rz_legal_scope(company_id))
   WITH CHECK (public.rz_legal_scope(company_id));
 
+-- ---- legal_agenda_events
+DROP POLICY IF EXISTS "Jurídico: só administradores" ON public.legal_agenda_events;
+CREATE POLICY "Jurídico: agenda só do jurídico" ON public.legal_agenda_events
+  FOR ALL TO authenticated
+  USING (public.rz_legal_global())
+  WITH CHECK (public.rz_legal_global());
+
 -- ---- legal_installments
 DROP POLICY IF EXISTS "Jurídico: só administradores" ON public.legal_installments;
 CREATE POLICY "Jurídico: prestações só do admin jurídico da empresa" ON public.legal_installments
@@ -374,6 +391,8 @@ CREATE POLICY "Mail: ver as próprias partilhas (ou admin da empresa da caixa)" 
 
 -- ---- marketing_emails
 DROP POLICY IF EXISTS "Admins can manage marketing emails" ON public.marketing_emails;
+DROP POLICY IF EXISTS "Admins with marketing access can insert emails" ON public.marketing_emails;
+DROP POLICY IF EXISTS "Admins with marketing access can view emails" ON public.marketing_emails;
 CREATE POLICY "Marketing: super admin ou admin da empresa" ON public.marketing_emails
   FOR ALL TO authenticated
   USING ((SELECT public.rz_is_super_admin()) OR (company_id IS NOT NULL AND public.rz_is_company_admin(company_id)))
@@ -421,7 +440,7 @@ CREATE POLICY "Avisos: ver os da minha empresa, do grupo ou pessoais" ON public.
 CREATE POLICY "Avisos: o admin da empresa gere" ON public.notifications
   FOR ALL TO authenticated
   USING ((SELECT public.rz_is_super_admin()) OR (employee_id IS NOT NULL AND public.rz_admin_of_employee(employee_id)) OR (company_id IS NOT NULL AND public.rz_is_company_admin(company_id)))
-  WITH CHECK ((SELECT public.rz_is_super_admin()) OR (employee_id IS NOT NULL AND public.rz_admin_of_employee(employee_id)) OR (company_id IS NOT NULL AND public.rz_is_company_admin(company_id)));
+  WITH CHECK ((SELECT public.rz_is_super_admin()) OR (employee_id IS NOT NULL AND public.rz_admin_of_employee(employee_id) AND (company_id IS NULL OR company_id = (SELECT e0.company_id FROM public.employees e0 WHERE e0.id = employee_id))) OR (employee_id IS NULL AND company_id IS NOT NULL AND public.rz_is_company_admin(company_id)));
 
 -- ---- phones
 DROP POLICY IF EXISTS "Admins can manage all phones" ON public.phones;
@@ -580,6 +599,71 @@ CREATE POLICY "Tickets: ler anexos" ON storage.objects
   FOR SELECT TO authenticated, mail_client
   USING (bucket_id = 'ticket-attachments'
          AND (public.rz_admin_of_ticket(ticket_path_ticket(name)) OR ticket_is_mine(ticket_path_ticket(name))));
+
+-- jurídico (ficheiros) e faturas de equipamento
+DROP POLICY IF EXISTS "Documentos jurídicos: administradores apagam" ON storage.objects;
+DROP POLICY IF EXISTS "Documentos jurídicos: administradores enviam" ON storage.objects;
+DROP POLICY IF EXISTS "Documentos jurídicos: administradores veem" ON storage.objects;
+CREATE POLICY "Documentos jurídicos: só o jurídico apaga" ON storage.objects
+  FOR DELETE TO authenticated USING (bucket_id = 'legal_documents' AND public.rz_legal_global());
+CREATE POLICY "Documentos jurídicos: só o jurídico envia" ON storage.objects
+  FOR INSERT TO authenticated WITH CHECK (bucket_id = 'legal_documents' AND public.rz_legal_global());
+CREATE POLICY "Documentos jurídicos: só o jurídico vê" ON storage.objects
+  FOR SELECT TO authenticated USING (bucket_id = 'legal_documents' AND public.rz_legal_global());
+DROP POLICY IF EXISTS "Faturas de equipamento: só administradores" ON storage.objects;
+CREATE POLICY "Faturas de equipamento: só a equipa da plataforma" ON storage.objects
+  FOR ALL TO authenticated
+  USING (bucket_id = 'equipment_invoices' AND public.rz_is_platform_staff())
+  WITH CHECK (bucket_id = 'equipment_invoices' AND public.rz_is_platform_staff());
+
+-- ------------------------------------------------------------------ funções que contornavam o RLS (SECURITY DEFINER)
+-- Remendam a definição real (pg_get_functiondef) para não copiar corpos longos.
+DO $fx$
+DECLARE
+  v_def text;
+BEGIN
+  -- Palavras-passe dos acessos: só o admin da empresa do acesso (ou o serviço).
+  SELECT pg_get_functiondef('public.access_password(uuid)'::regprocedure) INTO v_def;
+  IF position('NOT has_role(auth.uid(), ''admin'') THEN' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: access_password mudou'; END IF;
+  EXECUTE replace(v_def, 'NOT has_role(auth.uid(), ''admin'') THEN',
+    'NOT COALESCE((SELECT public.rz_is_company_admin(a0.company_id) FROM public.accesses a0 WHERE a0.id = _access_id), false) THEN');
+
+  -- PIN/PUK dos cartões: só se todos os telefones pedidos são de empresas que o admin gere.
+  SELECT pg_get_functiondef('public.phone_codes(uuid[])'::regprocedure) INTO v_def;
+  IF position('IF NOT has_role(auth.uid(), ''admin'') THEN' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: phone_codes mudou'; END IF;
+  EXECUTE replace(v_def, 'IF NOT has_role(auth.uid(), ''admin'') THEN',
+    'IF NOT (SELECT public.rz_is_super_admin()) AND EXISTS (SELECT 1 FROM public.phones p0 WHERE p0.id = ANY(_phone_ids) AND NOT public.rz_is_company_admin(p0.company_id)) THEN');
+
+  -- Remarcar férias: admin = admin da empresa do colaborador.
+  SELECT pg_get_functiondef('public.reschedule_vacation(uuid,jsonb,text)'::regprocedure) INTO v_def;
+  IF position('v_is_admin := public.has_role(auth.uid(), ''admin''::public.app_role);' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: reschedule_vacation mudou'; END IF;
+  EXECUTE replace(v_def, 'v_is_admin := public.has_role(auth.uid(), ''admin''::public.app_role);',
+    'v_is_admin := public.rz_admin_of_employee(v_absence.employee_id);');
+
+  -- Rever documentos: admin da empresa do colaborador do documento.
+  SELECT pg_get_functiondef('public.review_employee_document(uuid,text,text,text,date,date,date,text)'::regprocedure) INTO v_def;
+  IF position('IF NOT public.has_role(auth.uid(), ''admin''::app_role) THEN' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: review_employee_document mudou'; END IF;
+  EXECUTE replace(v_def, 'IF NOT public.has_role(auth.uid(), ''admin''::app_role) THEN',
+    'IF NOT COALESCE((SELECT public.rz_admin_of_employee(d0.employee_id) FROM public.employee_documents d0 WHERE d0.id = _document_id), false) THEN');
+
+  -- Estado das caixas de email: só as da empresa que o admin gere.
+  SELECT pg_get_functiondef('public.mail_access_status()'::regprocedure) INTO v_def;
+  IF position('AND has_role(auth.uid(), ''admin'')' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: mail_access_status mudou'; END IF;
+  EXECUTE replace(v_def, 'AND has_role(auth.uid(), ''admin'')', 'AND public.rz_is_company_admin(m.company_id)');
+END
+$fx$;
+
+-- Último login dos colaboradores: só os das empresas que o admin gere.
+CREATE OR REPLACE FUNCTION public.admin_employee_last_sign_in()
+ RETURNS TABLE(employee_id uuid, last_sign_in_at timestamp with time zone)
+ LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $function$
+  SELECT e.id, u.last_sign_in_at
+  FROM employees e
+  LEFT JOIN auth.users u ON u.id = e.user_id
+  WHERE public.rz_is_company_admin(e.company_id)
+     OR (public.rz_is_admin() AND e.company_id = ANY (public.rz_my_company_ids()));
+$function$;
 
 -- ------------------------------------------------------------------ dados
 DO $d$

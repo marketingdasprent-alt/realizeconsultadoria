@@ -15,7 +15,7 @@
 DO $t$
 DECLARE
   sa uuid; adA uuid; adB uuid; ext uuid; emA uuid; emB uuid; emX uuid; rhA uuid; leg uuid;
-  cA uuid; cB uuid; cX uuid; gG uuid; gRH uuid;
+  cA uuid; cB uuid; cX uuid; gG uuid; gRH uuid; gJ uuid;
   eA uuid; eB uuid; eX uuid; eR uuid;
   abA uuid; abB uuid; pdA uuid; pdB uuid; acA uuid; acB uuid; phA uuid; phB uuid; eqA uuid; eqB uuid;
   asA uuid; asB uuid; tkA uuid; tkB uuid; ntA uuid; ntB uuid; ntG uuid; ntP uuid; dcA uuid; dcB uuid;
@@ -67,6 +67,9 @@ BEGIN
       INSERT INTO public.admin_group_permissions (group_id, module_key, can_view, can_edit, can_execute) VALUES (gRH, 'employees', true, true, true);
     END IF;
     INSERT INTO public.admin_group_members (group_id, user_id) VALUES (gRH, rhA);
+    INSERT INTO public.admin_groups (name, is_super_admin, is_active) VALUES ('ZZ P3 juridico', false, true) RETURNING id INTO gJ;
+    INSERT INTO public.admin_group_permissions (group_id, module_key, can_view, can_edit, can_execute) VALUES (gJ, 'legal', true, true, true);
+    INSERT INTO public.admin_group_members (group_id, user_id) VALUES (gJ, rhA);
 
     INSERT INTO public.absences (employee_id, company_id, absence_type, start_date, end_date) VALUES (eA, cA, 'vacation', current_date + 30, current_date + 30) RETURNING id INTO abA;
     INSERT INTO public.absences (employee_id, company_id, absence_type, start_date, end_date) VALUES (eB, cB, 'vacation', current_date + 30, current_date + 30) RETURNING id INTO abB;
@@ -173,7 +176,8 @@ BEGIN
     ARRAY['ponto: admin de A ve so o da sua empresa', adA::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.time_clock_entries WHERE id = %L) = 1 AND (SELECT count(*) FROM public.time_clock_entries WHERE id = %L) = 0', tcA, tcB), '', ''],
     ARRAY['ponto: ext nao ve', ext::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.time_clock_entries WHERE id IN (%L, %L)) = 0', tcA, tcB), '', ''],
     ARRAY['juridico: admin antigo sem pertenca nao ve', leg::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.legal_clients WHERE id IN (%L, %L)) = 0', lcA, lcB), '', ''],
-    ARRAY['juridico: grupo de admin com pertenca em A ve so o de A', rhA::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.legal_clients WHERE id = %L) = 1 AND (SELECT count(*) FROM public.legal_clients WHERE id = %L) = 0', lcA, lcB), '', ''],
+    ARRAY['juridico: grupo com permissao juridica e pertenca em A ve so o de A', rhA::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.legal_clients WHERE id = %L) = 1 AND (SELECT count(*) FROM public.legal_clients WHERE id = %L) = 0', lcA, lcB), '', ''],
+    ARRAY['juridico: RH sem permissao juridica nao ve (so o grupo juridico)', emA::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.legal_clients WHERE id IN (%L, %L)) = 0', lcA, lcB), '', ''],
     ARRAY['juridico: admin de empresa sem grupo nao ve (so super/admin juridico)', adA::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.legal_clients WHERE id IN (%L, %L)) = 0', lcA, lcB), '', ''],
     ARRAY['financas: RH de A ve so as de A', rhA::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.employee_monthly_finances WHERE id = %L) = 1 AND (SELECT count(*) FROM public.employee_monthly_finances WHERE id = %L) = 0', fnA, fnB), '', ''],
     ARRAY['financas: RH de A nao escreve na empresa B', rhA::text, 'f', 'authenticated', '42501', format('INSERT INTO public.employee_monthly_finances (employee_id, year, month) VALUES (%L, 2090, 2)', eB), '', ''],
@@ -204,6 +208,13 @@ BEGIN
     ARRAY['ficheiros: admin de A ve o ficheiro da ficha de A e nao o de B', adA::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM storage.objects WHERE id = %L) = 1 AND (SELECT count(*) FROM storage.objects WHERE id = %L) = 0', stA, stB), '', ''],
     ARRAY['ficheiros: admin da externa nao ve nenhum', ext::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM storage.objects WHERE id IN (%L, %L)) = 0', stA, stB), '', ''],
     ARRAY['ficheiros: super admin ve os dois', sa::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM storage.objects WHERE id IN (%L, %L)) = 2', stA, stB), '', ''],
+    ARRAY['access_password: admin de A le a palavra-passe da sua empresa', adA::text, 'f', 'authenticated', 'ok', format('SELECT public.access_password(%L)', acA), '', ''],
+    ARRAY['access_password: admin de A nao le a de B', adA::text, 'f', 'authenticated', '42501', format('SELECT public.access_password(%L)', acB), '', ''],
+    ARRAY['access_password: admin da externa nao le', ext::text, 'f', 'authenticated', '42501', format('SELECT public.access_password(%L)', acA), '', ''],
+    ARRAY['phone_codes: admin de A nao ve os codigos de B', adA::text, 'f', 'authenticated', '42501', format('SELECT * FROM public.phone_codes(ARRAY[%L]::uuid[])', phB), '', ''],
+    ARRAY['phone_codes: admin de A ve os da sua empresa', adA::text, 'f', 'authenticated', 'ok', format('SELECT * FROM public.phone_codes(ARRAY[%L]::uuid[])', phA), '', ''],
+    ARRAY['last_sign_in: admin de A so ve colaboradores da sua empresa', adA::text, 'q', 'authenticated', 'true', format('SELECT NOT EXISTS (SELECT 1 FROM public.admin_employee_last_sign_in() WHERE employee_id IN (%L, %L)) = false AND NOT EXISTS (SELECT 1 FROM public.admin_employee_last_sign_in() WHERE employee_id = %L)', eA, eR, eB), '', ''],
+    ARRAY['rever documento: admin de A nao revê o de B', adA::text, 'f', 'authenticated', '42501', format('SELECT public.review_employee_document(%L, ''rejected'', NULL, NULL, NULL, NULL, NULL, ''motivo'')', dcB), '', ''],
     ARRAY['funcoes de ambito: anon sem EXECUTE', '', 'q', '', 'true', format('SELECT NOT has_function_privilege(''anon'', ''public.rz_admin_of_employee(uuid)'', ''EXECUTE'') AND NOT has_function_privilege(''anon'', ''public.rz_is_platform_staff()'', ''EXECUTE'') AND has_function_privilege(''authenticated'', ''public.rz_admin_of_employee(uuid)'', ''EXECUTE'')'), '', ''],
     ARRAY['rz_path_uuid: extrai o id do colaborador (tambem com prefixo)', '', 'q', '', 'true', format('SELECT public.rz_path_uuid(''11111111-1111-1111-1111-111111111111/documents/a.pdf'') = ''11111111-1111-1111-1111-111111111111''::uuid AND public.rz_path_uuid('' (1).11111111-1111-1111-1111-111111111111/documents/a.pdf'') = ''11111111-1111-1111-1111-111111111111''::uuid AND public.rz_path_uuid(''sem-uuid.pdf'') IS NULL'), '', '']
   ];

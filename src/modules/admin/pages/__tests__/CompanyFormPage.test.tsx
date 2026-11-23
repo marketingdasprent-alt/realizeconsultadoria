@@ -5,12 +5,12 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CompanyFormPage from '../CompanyFormPage';
 
 const getById = vi.fn();
-const create = vi.fn();
+const createWithAdmin = vi.fn();
 const update = vi.fn();
 vi.mock('@/modules/admin/services/companyService', () => ({
   companyService: {
     getById: (...args: unknown[]) => getById(...args),
-    create: (...args: unknown[]) => create(...args),
+    createWithAdmin: (...args: unknown[]) => createWithAdmin(...args),
     update: (...args: unknown[]) => update(...args),
   },
 }));
@@ -19,12 +19,18 @@ const toast = vi.fn();
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 
 let canManage = true;
+let isSuperAdmin = true;
 let permissionsLoading = false;
 vi.mock('@/hooks/useAdminPermissions', () => ({
   useAdminPermissions: () => ({
     isLoading: permissionsLoading,
+    isSuperAdmin,
     canExecuteTopic: () => canManage,
   }),
+}));
+
+vi.mock('../../hooks/useSharing', () => ({
+  useAllGroups: () => ({ data: [] }),
 }));
 
 vi.mock('../../components/CompanyAdminsSection', () => ({
@@ -113,7 +119,16 @@ const watchTexts = () => {
 const fill = () => {
   fireEvent.change(screen.getByLabelText(/nome da empresa/i), { target: { value: 'Nova Lda' } });
   fireEvent.change(screen.getByLabelText(/^nif/i), { target: { value: '987654321' } });
-  fireEvent.change(screen.getByLabelText(/^email/i), { target: { value: 'nova@lda.pt' } });
+  fireEvent.change(screen.getByLabelText(/^email \*/i), { target: { value: 'nova@lda.pt' } });
+  fireEvent.change(screen.getByLabelText(/nome do administrador/i), {
+    target: { value: 'Ana Admin' },
+  });
+  fireEvent.change(screen.getByLabelText(/email do administrador/i), {
+    target: { value: 'ana@nova.pt' },
+  });
+  fireEvent.change(screen.getByLabelText(/palavra-passe inicial/i), {
+    target: { value: 'segredo123' },
+  });
 };
 
 const PGRST116 = {
@@ -128,10 +143,11 @@ beforeEach(() => {
   queryClient = new QueryClient({ defaultOptions: { queries: { retry: false } } });
   invalidate = vi.spyOn(queryClient, 'invalidateQueries');
   canManage = true;
+  isSuperAdmin = true;
   permissionsLoading = false;
   getById.mockResolvedValue({ data: COMPANY, error: null });
   update.mockResolvedValue({ data: { ...COMPANY, name: 'Acme Novo' }, error: null });
-  create.mockResolvedValue({ data: { ...COMPANY, id: 'c2' }, error: null });
+  createWithAdmin.mockResolvedValue({ data: { ...COMPANY, id: 'c2' }, error: null });
 });
 
 describe('CompanyFormPage — edição', () => {
@@ -232,12 +248,50 @@ describe('CompanyFormPage — criação', () => {
     expect(screen.getByRole('button', { name: /criar empresa/i })).toBeInTheDocument();
   });
 
+  it('só um super admin cria empresas', async () => {
+    isSuperAdmin = false;
+    renderAt('/admin/empresas/nova');
+    expect(await screen.findByText(/só um super administrador cria empresas/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /criar empresa/i })).not.toBeInTheDocument();
+  });
+
+  it('criar envia a empresa, o primeiro administrador e o grupo (sem insert direto)', async () => {
+    renderAt('/admin/empresas/nova');
+    await screen.findByRole('heading', { name: 'Nova empresa' });
+    fill();
+    fireEvent.click(screen.getByRole('button', { name: /criar empresa/i }));
+    await waitFor(() => expect(createWithAdmin).toHaveBeenCalledTimes(1));
+    expect(createWithAdmin).toHaveBeenCalledWith(
+      expect.objectContaining({
+        name: 'Nova Lda',
+        nif: '987654321',
+        email: 'nova@lda.pt',
+        admin_name: 'Ana Admin',
+        admin_email: 'ana@nova.pt',
+        admin_password: 'segredo123',
+        group_id: '',
+        group_name: '',
+      })
+    );
+  });
+
+  it('sem os dados do administrador não cria', async () => {
+    renderAt('/admin/empresas/nova');
+    await screen.findByRole('heading', { name: 'Nova empresa' });
+    fireEvent.change(screen.getByLabelText(/nome da empresa/i), { target: { value: 'Nova Lda' } });
+    fireEvent.change(screen.getByLabelText(/^nif/i), { target: { value: '987654321' } });
+    fireEvent.change(screen.getByLabelText(/^email \*/i), { target: { value: 'nova@lda.pt' } });
+    fireEvent.click(screen.getByRole('button', { name: /criar empresa/i }));
+    expect(await screen.findByText(/indique o nome do administrador/i)).toBeInTheDocument();
+    expect(createWithAdmin).not.toHaveBeenCalled();
+  });
+
   it('criar com id devolvido navega para a página de edição dessa empresa', async () => {
     renderAt('/admin/empresas/nova');
     await screen.findByRole('heading', { name: 'Nova empresa' });
     fill();
     fireEvent.click(screen.getByRole('button', { name: /criar empresa/i }));
-    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(createWithAdmin).toHaveBeenCalledTimes(1));
     await waitFor(() =>
       expect(toast).toHaveBeenCalledWith({ title: 'Empresa criada com sucesso!' })
     );
@@ -247,7 +301,7 @@ describe('CompanyFormPage — criação', () => {
   });
 
   it('criar sem id devolvido volta à lista', async () => {
-    create.mockResolvedValue({ data: null, error: null });
+    createWithAdmin.mockResolvedValue({ data: null, error: null });
     renderAt('/admin/empresas/nova');
     await screen.findByRole('heading', { name: 'Nova empresa' });
     fill();
@@ -313,7 +367,7 @@ describe('CompanyFormPage — fluxo de guardar e navegar', () => {
   });
 
   it('invalida o seletor depois de criar, e não se a criação falha', async () => {
-    create.mockResolvedValueOnce({ data: null, error: new Error('NIF duplicado') });
+    createWithAdmin.mockResolvedValueOnce({ data: null, error: new Error('NIF duplicado') });
     renderAt('/admin/empresas/nova');
     await screen.findByRole('heading', { name: 'Nova empresa' });
     fill();
@@ -329,16 +383,16 @@ describe('CompanyFormPage — fluxo de guardar e navegar', () => {
 
   it('dois envios seguidos chamam create uma só vez', async () => {
     let finish: (value: unknown) => void = () => {};
-    create.mockReturnValue(new Promise(resolve => (finish = resolve)));
+    createWithAdmin.mockReturnValue(new Promise(resolve => (finish = resolve)));
     renderAt('/admin/empresas/nova');
     await screen.findByRole('heading', { name: 'Nova empresa' });
     fill();
     const form = screen.getByRole('button', { name: /criar empresa/i }).closest('form')!;
     fireEvent.submit(form);
     fireEvent.submit(form);
-    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(createWithAdmin).toHaveBeenCalledTimes(1));
     await act(async () => finish({ data: { ...COMPANY, id: 'c2' }, error: null }));
-    expect(create).toHaveBeenCalledTimes(1);
+    expect(createWithAdmin).toHaveBeenCalledTimes(1);
   });
 
   it('o texto cru do PostgREST (0 linhas) vira mensagem em português', async () => {
@@ -413,12 +467,12 @@ describe('CompanyFormPage — fluxo de guardar e navegar', () => {
 
   it('criar e sair da página a meio: terminada a criação não volta a arrastar o utilizador', async () => {
     let finishCreate: (value: unknown) => void = () => {};
-    create.mockReturnValue(new Promise(resolve => (finishCreate = resolve)));
+    createWithAdmin.mockReturnValue(new Promise(resolve => (finishCreate = resolve)));
     renderAt('/admin/empresas/nova');
     await screen.findByRole('heading', { name: 'Nova empresa' });
     fill();
     fireEvent.click(screen.getByRole('button', { name: /criar empresa/i }));
-    await waitFor(() => expect(create).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(createWithAdmin).toHaveBeenCalledTimes(1));
 
     fireEvent.click(screen.getByRole('button', { name: 'ir para a lista' }));
     expect(screen.getByText('Lista de empresas')).toBeInTheDocument();

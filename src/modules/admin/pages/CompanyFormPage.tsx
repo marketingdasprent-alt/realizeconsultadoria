@@ -7,7 +7,7 @@ import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { ROUTES } from '@/lib/constants';
-import type { CreateCompanyInput } from '@/lib/schemas';
+import type { CreateCompanyWithAdminInput } from '@/lib/schemas';
 import { companyService, type Company } from '@/modules/admin/services/companyService';
 import { COMPANIES_ACTIVE_KEY } from '../context/CompanyScopeContext';
 import { CompanyForm } from '../components/CompanyForm';
@@ -76,7 +76,7 @@ const CompanyFormPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { canExecuteTopic, isLoading: permissionsLoading } = useAdminPermissions();
+  const { canExecuteTopic, isSuperAdmin, isLoading: permissionsLoading } = useAdminPermissions();
   const canManage = canExecuteTopic('companies', 'manage');
 
   const isEditMode = !!id;
@@ -129,7 +129,7 @@ const CompanyFormPage = () => {
     setAttempt(value => value + 1);
   };
 
-  const handleSubmit = async (data: CreateCompanyInput) => {
+  const handleSubmit = async (data: CreateCompanyWithAdminInput) => {
     const key = company?.id ?? 'nova';
     if (savingRef.current === key) return;
     savingRef.current = key;
@@ -148,7 +148,7 @@ const CompanyFormPage = () => {
         void queryClient.invalidateQueries({ queryKey: COMPANIES_ACTIVE_KEY });
         toast({ title: 'Empresa atualizada com sucesso!' });
       } else {
-        const { data: created, error } = await companyService.create(data);
+        const { data: created, error } = await companyService.createWithAdmin(data);
         if (error) throw error;
         void queryClient.invalidateQueries({ queryKey: COMPANIES_ACTIVE_KEY });
         toast({ title: 'Empresa criada com sucesso!' });
@@ -184,6 +184,10 @@ const CompanyFormPage = () => {
     return <Page title="Empresa">Não tem permissão para gerir empresas.</Page>;
   }
 
+  if (!isEditMode && !isSuperAdmin) {
+    return <Page title="Nova empresa">Só um super administrador cria empresas.</Page>;
+  }
+
   if (result?.status === 'not-found') {
     return <Page title="Empresa não encontrada">Esta empresa não existe ou já foi eliminada.</Page>;
   }
@@ -210,7 +214,7 @@ const CompanyFormPage = () => {
           <p className="text-[14px] text-rz-muted">
             {company
               ? 'Dados da empresa e quem a administra.'
-              : 'Depois de criar, pode definir os administradores da empresa.'}
+              : 'A empresa nasce com o seu primeiro administrador.'}
           </p>
         </div>
       </div>

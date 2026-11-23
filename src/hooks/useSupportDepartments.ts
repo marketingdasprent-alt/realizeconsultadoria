@@ -1,4 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { identityIds } from '@/lib/identityIds';
 
@@ -49,20 +50,11 @@ export const useSupportDepartments = (): UseSupportDepartmentsResult => {
       // Conta unificada: os grupos podem estar na conta de admin ligada à ficha
       const userIds = await identityIds(session.user.id);
 
-      // Check if user is in a super admin group
-      const { data: superAdminCheck } = await supabase
-        .from('admin_group_members')
-        .select(
-          `
-          group_id,
-          admin_groups!inner(is_super_admin, is_active)
-        `
-        )
-        .in('user_id', userIds);
-
-      const inSuperAdminGroup = superAdminCheck?.some(
-        (m: any) => m.admin_groups?.is_super_admin && m.admin_groups?.is_active
-      );
+      // Super admin = platform_admins (a BD decide; o campo is_super_admin dos grupos já não conta).
+      const untyped: SupabaseClient = supabase;
+      const { data: superRpc, error: superError } = await untyped.rpc('rz_is_super_admin');
+      if (superError) throw superError;
+      const inSuperAdminGroup = superRpc === true;
 
       if (inSuperAdminGroup) {
         // Super admin has access to all departments

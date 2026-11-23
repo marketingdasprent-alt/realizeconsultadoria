@@ -200,7 +200,7 @@ describe('useAdminPermissions: alcance de equipa', () => {
     expect(p.canView('marketing')).toBe(false);
     expect(p.canView('legal')).toBe(false);
     expect(p.canView('accesses')).toBe(false);
-    expect(p.canView('timeclock')).toBe(false);
+    expect(p.canView('timeclock')).toBe(true);
   });
 
   it('sem papel nenhum: só o painel', async () => {

@@ -19,7 +19,7 @@ DECLARE
   eA uuid; eB uuid; eX uuid; eR uuid;
   abA uuid; abB uuid; pdA uuid; pdB uuid; acA uuid; acB uuid; phA uuid; phB uuid; eqA uuid; eqB uuid;
   asA uuid; asB uuid; tkA uuid; tkB uuid; ntA uuid; ntB uuid; ntG uuid; ntP uuid; dcA uuid; dcB uuid;
-  fnA uuid; fnB uuid; tcA uuid; tcB uuid; lcA uuid; lcB uuid; stA uuid; stB uuid;
+  fnA uuid; fnB uuid; tcA uuid; tcB uuid; lcA uuid; lcB uuid; stA uuid; stB uuid; acN uuid; sdT uuid; tkX uuid;
   v_ids uuid[] := ARRAY[]::uuid[];
   v_k integer;
   v_nif text := 'ZZ' || substr(upper(md5(gen_random_uuid()::text)), 1, 8);
@@ -77,6 +77,10 @@ BEGIN
     INSERT INTO public.absence_periods (absence_id, start_date, end_date) VALUES (abB, current_date + 30, current_date + 30) RETURNING id INTO pdB;
     INSERT INTO public.accesses (company_id, employee_id, title, username, password) VALUES (cA, eA, 'ZZ acesso A', 'u', 'p') RETURNING id INTO acA;
     INSERT INTO public.accesses (company_id, employee_id, title, username, password) VALUES (cB, eB, 'ZZ acesso B', 'u', 'p') RETURNING id INTO acB;
+    INSERT INTO public.accesses (company_id, employee_id, title, username, password) VALUES (NULL, NULL, 'ZZ acesso sem empresa', 'u', 'p') RETURNING id INTO acN;
+    INSERT INTO public.support_departments (name) VALUES ('ZZ P3 suporte') RETURNING id INTO sdT;
+    INSERT INTO public.support_department_teams (support_department_id, department) VALUES (sdT, 'ZZ P3 Equipa');
+    UPDATE public.employees SET department = 'ZZ P3 Equipa' WHERE id IN (eX, eR);
     INSERT INTO public.phones (company_id, phone_number) VALUES (cA, '910000001') RETURNING id INTO phA;
     INSERT INTO public.phones (company_id, phone_number) VALUES (cB, '910000002') RETURNING id INTO phB;
     INSERT INTO public.equipments (company_id, brand) VALUES (cA, 'ZZ marca A') RETURNING id INTO eqA;
@@ -85,6 +89,7 @@ BEGIN
     INSERT INTO public.assignments (employee_id, company_id) VALUES (eB, cB) RETURNING id INTO asB;
     INSERT INTO public.support_tickets (company_id, employee_id, subject, message) VALUES (cA, eA, 'ZZ ticket A', 'm') RETURNING id INTO tkA;
     INSERT INTO public.support_tickets (company_id, employee_id, subject, message) VALUES (cB, eB, 'ZZ ticket B', 'm') RETURNING id INTO tkB;
+    UPDATE public.support_tickets SET department_id = sdT WHERE id IN (tkA, tkB);
     INSERT INTO public.notifications (title, message, created_by, company_id) VALUES ('ZZ aviso A', 'm', sa, cA) RETURNING id INTO ntA;
     INSERT INTO public.notifications (title, message, created_by, company_id) VALUES ('ZZ aviso B', 'm', sa, cB) RETURNING id INTO ntB;
     INSERT INTO public.notifications (title, message, created_by, company_id, employee_id) VALUES ('ZZ aviso pessoal B', 'm', sa, NULL, eB) RETURNING id INTO ntP;
@@ -163,6 +168,15 @@ BEGIN
     ARRAY['time_clock_entries: adB ve a sua e nao a de outra empresa', adB::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.time_clock_entries WHERE id = %L) = 1 AND (SELECT count(*) FROM public.time_clock_entries WHERE id = %L) = 0', tcB, tcA), '', ''],
     ARRAY['time_clock_entries: ext nao ve nada', ext::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.time_clock_entries WHERE id IN (%L,%L)) = 0', tcA, tcB), '', ''],
     ARRAY['time_clock_entries: leg nao ve nada', leg::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.time_clock_entries WHERE id IN (%L,%L)) = 0', tcA, tcB), '', ''],
+    ARRAY['accesses: acesso sem empresa so o super admin ve', sa::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.accesses WHERE id = %L) = 1', acN), '', ''],
+    ARRAY['accesses: acesso sem empresa invisivel ao admin de empresa', adA::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.accesses WHERE id = %L) = 0', acN), '', ''],
+    ARRAY['accesses: acesso sem empresa invisivel ao admin externo', ext::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.accesses WHERE id = %L) = 0', acN), '', ''],
+    ARRAY['accesses: super admin edita acesso sem empresa', sa::text, 'q', 'authenticated', 'true', format('WITH u AS (UPDATE public.accesses SET title = title WHERE id = %L RETURNING 1) SELECT count(*) = 1 FROM u', acN), '', ''],
+    ARRAY['accesses: admin de empresa nao edita acesso sem empresa', adA::text, 'q', 'authenticated', 'true', format('WITH u AS (UPDATE public.accesses SET title = title WHERE id = %L RETURNING 1) SELECT count(*) = 0 FROM u', acN), '', ''],
+    ARRAY['support_desk_tickets: colaborador de empresa externa na equipa nao le tickets de outras empresas', emX::text, 'q', 'authenticated', 'true', 'SELECT jsonb_array_length(public.support_desk_tickets()) = 0', '', ''],
+    ARRAY['support_desk_tickets: equipa de A ve so os tickets de A', rhA::text, 'q', 'authenticated', 'true', format('SELECT jsonb_array_length(public.support_desk_tickets()) = 1 AND (public.support_desk_tickets() -> 0 ->> ''id'') = %L', tkA), '', ''],
+    ARRAY['absences: colaborador de A nao forja a empresa B (fica a de A)', emA::text, 'q', 'authenticated', 'true', format('WITH i AS (INSERT INTO public.absences (employee_id, company_id, absence_type, start_date, end_date) VALUES (%L, %L, ''vacation'', current_date + 60, current_date + 60) RETURNING company_id) SELECT (SELECT company_id FROM i) = %L', eA, cB, cA), '', ''],
+    ARRAY['tickets: colaborador de A nao forja a empresa B (fica a de A)', emA::text, 'q', 'authenticated', 'true', format('WITH i AS (INSERT INTO public.support_tickets (company_id, employee_id, subject, message) VALUES (%L, %L, ''ZZ forjado'', ''m'') RETURNING company_id) SELECT (SELECT company_id FROM i) = %L', cB, eA, cA), '', ''],
     ARRAY['employees: super admin ve as duas empresas', sa::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.employees WHERE id IN (%L, %L)) = 2', eA, eB), '', ''],
     ARRAY['absences: super admin ve as duas empresas', sa::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.absences WHERE id IN (%L, %L)) = 2', abA, abB), '', ''],
     ARRAY['absence_periods: super admin ve as duas empresas', sa::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.absence_periods WHERE id IN (%L, %L)) = 2', pdA, pdB), '', ''],

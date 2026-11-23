@@ -203,7 +203,6 @@ const handler = async (req: Request): Promise<Response> => {
     if (!linkError && new_company && linkedCompanyId) {
       const { error: employeeError } = await supabaseAdmin.from('employees').insert({
         company_id: linkedCompanyId,
-        ...(warning ? { warning } : {}),
         user_id: userId,
         name: displayName,
         email: normalizedEmail,
@@ -344,12 +343,13 @@ const handler = async (req: Request): Promise<Response> => {
         message: 'Novo administrador criado e email enviado',
         userId,
         company_id: linkedCompanyId,
+        ...(warning ? { warning } : {}),
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error: any) {
     console.error('Error in invite-admin function:', error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ error: 'Não foi possível concluir o convite. Tente novamente.' }), {
       status: 200,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });

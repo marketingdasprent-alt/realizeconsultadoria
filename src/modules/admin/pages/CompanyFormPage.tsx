@@ -148,10 +148,13 @@ const CompanyFormPage = () => {
         void queryClient.invalidateQueries({ queryKey: COMPANIES_ACTIVE_KEY });
         toast({ title: 'Empresa atualizada com sucesso!' });
       } else {
-        const { data: created, error } = await companyService.createWithAdmin(data);
+        const { data: created, error, warning } = await companyService.createWithAdmin(data);
         if (error) throw error;
         void queryClient.invalidateQueries({ queryKey: COMPANIES_ACTIVE_KEY });
-        toast({ title: 'Empresa criada com sucesso!' });
+        toast({
+          title: 'Empresa criada com sucesso!',
+          ...(warning ? { description: warning } : {}),
+        });
         // Só segue para a empresa nova se o utilizador ainda estiver em "nova" (não o arrasta de volta)
         if (mountedRef.current && !idRef.current) {
           if (created?.id) navigate(ROUTES.ADMIN.COMPANY_EDIT.replace(':id', created.id));

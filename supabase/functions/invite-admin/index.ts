@@ -196,6 +196,28 @@ const handler = async (req: Request): Promise<Response> => {
       linkError = membershipError;
     }
 
+    // Empresa nova: o primeiro administrador também fica com ficha de colaborador (cargo Administrador, na
+    // Direção). Sem ficha não há área do colaborador (Feed, organograma, chat), e a empresa externa
+    // precisa do seu próprio Feed e organograma desde o primeiro dia. A pertença de admin mantém-se.
+    let warning: string | null = null;
+    if (!linkError && new_company && linkedCompanyId) {
+      const { error: employeeError } = await supabaseAdmin.from('employees').insert({
+        company_id: linkedCompanyId,
+        ...(warning ? { warning } : {}),
+        user_id: userId,
+        name: displayName,
+        email: normalizedEmail,
+        position: 'Administrador',
+        department: 'Direção',
+        is_active: true,
+      });
+      if (employeeError) {
+        console.error('invite-admin: falhou a ficha do primeiro administrador');
+        warning =
+          'Empresa e administrador criados, mas não foi possível criar a ficha de colaborador do administrador. Crie-a em Colaboradores.';
+      }
+    }
+
     if (linkError) {
       console.error('invite-admin: falhou a ligação à empresa');
       // Não deixa uma conta órfã sem empresa: apaga a conta acabada de criar.

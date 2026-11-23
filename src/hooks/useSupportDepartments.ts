@@ -86,9 +86,8 @@ export const useSupportDepartments = (): UseSupportDepartmentsResult => {
         }
       }
     } catch (error) {
+      // Mantém o que já estava carregado: um erro de rede não apaga os departamentos.
       console.error('Error fetching support departments:', error);
-      setDepartments([]);
-      setUserDepartmentIds([]);
     } finally {
       setIsLoading(false);
     }

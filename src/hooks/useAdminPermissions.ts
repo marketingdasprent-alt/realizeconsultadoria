@@ -110,9 +110,11 @@ export const useAdminPermissions = (): AdminPermissions => {
       ]);
       // Uma falha aqui não pode passar por "não é admin": vai para o catch e fica no registo.
       if (superRes.error) throw superRes.error;
-      if (adminRes.error) throw adminRes.error;
+      // Só rz_is_super_admin é fatal. Sem rz_my_admin_company_ids (ex.: frontend novo antes da migração)
+      // conta como "não é admin de empresa", com registo: o super admin e os grupos continuam a funcionar.
+      if (adminRes.error) console.error('Erro ao ler as empresas que administro:', adminRes.error);
       const { data: superRpc } = superRes;
-      const { data: adminCompanies } = adminRes;
+      const adminCompanies = adminRes.error ? null : adminRes.data;
       const superAdmin = superRpc === true;
       const companyAdmin =
         !superAdmin && Array.isArray(adminCompanies) && adminCompanies.length > 0;

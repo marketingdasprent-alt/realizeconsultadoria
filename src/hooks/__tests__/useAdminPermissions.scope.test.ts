@@ -3,7 +3,9 @@ import { renderHook, waitFor } from '@testing-library/react';
 
 // Respostas simuladas por tabela/RPC (cada teste define as suas).
 const db: {
-  superAdmin: unknown[];
+  isSuper: boolean;
+  adminCompanies: string[];
+  superGroupRows: unknown[];
   memberships: unknown[];
   groupPermissions: unknown[];
   team: unknown;
@@ -11,7 +13,9 @@ const db: {
   own: unknown[];
   rpcCalls: string[];
 } = {
-  superAdmin: [],
+  isSuper: false,
+  adminCompanies: [],
+  superGroupRows: [],
   memberships: [],
   groupPermissions: [],
   team: [],
@@ -42,13 +46,15 @@ vi.mock('@/integrations/supabase/client', () => ({
     rpc: vi.fn(async (fn: string) => {
       db.rpcCalls.push(fn);
       if (fn === 'rz_identity_ids') return { data: ['u-chefe'], error: null };
+      if (fn === 'rz_is_super_admin') return { data: db.isSuper, error: null };
+      if (fn === 'rz_my_admin_company_ids') return { data: db.adminCompanies, error: null };
       if (fn === 'rz_my_team_employee_ids') return { data: db.team, error: db.teamError };
       return { data: null, error: null };
     }),
     from: vi.fn((table: string) =>
       query(select => {
         if (table === 'admin_group_members')
-          return select.includes('admin_groups') ? db.superAdmin : db.memberships;
+          return select.includes('admin_groups') ? db.superGroupRows : db.memberships;
         if (table === 'admin_group_permissions') return db.groupPermissions;
         if (table === 'employees') return db.own;
         return [];
@@ -83,7 +89,9 @@ const load = async () => {
 
 describe('useAdminPermissions: alcance de equipa', () => {
   beforeEach(() => {
-    db.superAdmin = [];
+    db.isSuper = false;
+    db.adminCompanies = [];
+    db.superGroupRows = [];
     db.memberships = [{ group_id: 'g1' }, { group_id: 'g2' }];
     db.groupPermissions = [];
     db.team = [];
@@ -156,12 +164,50 @@ describe('useAdminPermissions: alcance de equipa', () => {
     expect(p.canExecuteTopicFor('employees', 'edit', 'emp-rui')).toBe(false);
   });
 
-  it('super admin tem tudo com alcance Todos', async () => {
-    db.superAdmin = [{ group_id: 'g', admin_groups: { is_super_admin: true, is_active: true } }];
+  it('super admin (platform_admins) tem tudo com alcance Todos', async () => {
+    db.isSuper = true;
     db.memberships = [];
     const p = await load();
+    expect(p.isSuperAdmin).toBe(true);
     expect(p.scopeOf('employees', 'edit')).toBe('all');
     expect(p.canExecuteTopicFor('employees', 'delete', 'qualquer')).toBe(true);
+    expect(p.canViewTopic('settings', 'groups')).toBe(true);
+    expect(p.canView('marketing')).toBe(true);
+  });
+
+  it('um grupo is_super_admin já não dá super admin', async () => {
+    db.isSuper = false;
+    db.superGroupRows = [
+      { group_id: 'g', admin_groups: { is_super_admin: true, is_active: true } },
+    ];
+    db.memberships = [];
+    const p = await load();
+    expect(p.isSuperAdmin).toBe(false);
+    expect(p.canView('employees')).toBe(false);
+    expect(p.canViewTopic('settings', 'groups')).toBe(false);
+  });
+
+  it('administrador de empresa: módulos de gestão, sem os da plataforma', async () => {
+    db.adminCompanies = ['c-externa'];
+    db.memberships = [];
+    const p = await load();
+    expect(p.isSuperAdmin).toBe(false);
+    expect(p.canView('employees')).toBe(true);
+    expect(p.canExecuteTopic('employees', 'edit')).toBe(true);
+    expect(p.canViewTopic('settings', 'admins')).toBe(true);
+    expect(p.canViewTopic('settings', 'groups')).toBe(false);
+    expect(p.canViewTopic('settings', 'support_subjects')).toBe(false);
+    expect(p.canView('marketing')).toBe(false);
+    expect(p.canView('legal')).toBe(false);
+    expect(p.canView('accesses')).toBe(false);
+    expect(p.canView('timeclock')).toBe(false);
+  });
+
+  it('sem papel nenhum: só o painel', async () => {
+    db.memberships = [];
+    const p = await load();
+    expect(p.canView('dashboard')).toBe(true);
+    expect(p.canView('employees')).toBe(false);
   });
 
   // Relatório de QA 20/11: o Todos do Ver de um grupo não pode alargar o Executar em equipa de outro.

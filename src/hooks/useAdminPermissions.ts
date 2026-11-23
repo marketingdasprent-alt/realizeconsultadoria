@@ -5,6 +5,8 @@ import {
   PERMISSIONS_CONFIG,
   MODULE_LABELS,
   ALL_MODULE_KEYS,
+  COMPANY_ADMIN_EXCLUDED_MODULES,
+  COMPANY_ADMIN_EXCLUDED_TOPICS,
   getTopicConfig,
   isScopableModule,
   type PermissionScope,
@@ -100,22 +102,24 @@ export const useAdminPermissions = (): AdminPermissions => {
       const userIds: string[] =
         Array.isArray(identity) && identity.length ? (identity as string[]) : [session.user.id];
 
-      // Check if user is in a super admin group
-      const { data: superAdminCheck } = await supabase
-        .from('admin_group_members')
-        .select(
-          `
-          group_id,
-          admin_groups!inner(is_super_admin, is_active)
-        `
-        )
-        .in('user_id', userIds);
+      // Super admin = platform_admins (a BD é a fonte de verdade: o campo is_super_admin dos grupos
+      // de admin já não conta). Administrador de empresa = pertença admin ativa nalguma empresa.
+      const [superRes, adminRes] = await Promise.all([
+        untyped.rpc('rz_is_super_admin'),
+        untyped.rpc('rz_my_admin_company_ids'),
+      ]);
+      // Uma falha aqui não pode passar por "não é admin": vai para o catch e fica no registo.
+      if (superRes.error) throw superRes.error;
+      // Só rz_is_super_admin é fatal. Sem rz_my_admin_company_ids (ex.: frontend novo antes da migração)
+      // conta como "não é admin de empresa", com registo: o super admin e os grupos continuam a funcionar.
+      if (adminRes.error) console.error('Erro ao ler as empresas que administro:', adminRes.error);
+      const { data: superRpc } = superRes;
+      const adminCompanies = adminRes.error ? null : adminRes.data;
+      const superAdmin = superRpc === true;
+      const companyAdmin =
+        !superAdmin && Array.isArray(adminCompanies) && adminCompanies.length > 0;
 
-      const inSuperAdminGroup = superAdminCheck?.some(
-        (m: any) => m.admin_groups?.is_super_admin && m.admin_groups?.is_active
-      );
-
-      setIsSuperAdmin(inSuperAdminGroup || false);
+      setIsSuperAdmin(superAdmin);
 
       // Start with empty permissions
       const permissionMap = new Map<string, TopicPermission>();
@@ -130,10 +134,23 @@ export const useAdminPermissions = (): AdminPermissions => {
         scope: 'all',
       });
 
-      // 2. If Super Admin, add everything except 'legal'
-      if (inSuperAdminGroup) {
+      // 2. Super Admin: tudo menos 'legal'. Administrador de empresa: o mesmo, sem os módulos e
+      // funcionalidades da plataforma (COMPANY_ADMIN_EXCLUDED_*).
+      if (superAdmin || companyAdmin) {
+        const skipModule = (moduleKey: string) =>
+          moduleKey === 'legal' ||
+          moduleKey === 'dashboard' ||
+          (companyAdmin && COMPANY_ADMIN_EXCLUDED_MODULES.includes(moduleKey));
+        const skipTopic = (moduleKey: string, topicKey: string) =>
+          companyAdmin && COMPANY_ADMIN_EXCLUDED_TOPICS.includes(`${moduleKey}:${topicKey}`);
+
+        // Módulo com funcionalidades vedadas ao administrador de empresa: sem linha de módulo
+        // (canViewTopic cairia nela), só as das funcionalidades permitidas.
+        const hasExcludedTopic = (moduleKey: string) =>
+          companyAdmin && COMPANY_ADMIN_EXCLUDED_TOPICS.some(t => t.startsWith(`${moduleKey}:`));
+
         ALL_MODULE_KEYS.forEach(moduleKey => {
-          if (moduleKey === 'legal' || moduleKey === 'dashboard') return;
+          if (skipModule(moduleKey) || hasExcludedTopic(moduleKey)) return;
 
           const key = `${moduleKey}:`;
           permissionMap.set(key, {
@@ -147,9 +164,10 @@ export const useAdminPermissions = (): AdminPermissions => {
         });
 
         PERMISSIONS_CONFIG.forEach(module => {
-          if (module.moduleKey === 'legal' || module.moduleKey === 'dashboard') return;
+          if (skipModule(module.moduleKey)) return;
 
           module.topics.forEach(topic => {
+            if (skipTopic(module.moduleKey, topic.key)) return;
             const key = `${module.moduleKey}:${topic.key}`;
             permissionMap.set(key, {
               module_key: module.moduleKey,
@@ -174,11 +192,12 @@ export const useAdminPermissions = (): AdminPermissions => {
 
         const { data: groupPermissions } = await supabase
           .from('admin_group_permissions')
-          .select('*, admin_groups!inner(is_active)')
+          .select('*, admin_groups!inner(is_active, is_super_admin)')
           .in('group_id', groupIds);
 
         groupPermissions?.forEach((p: any) => {
-          if (p.admin_groups?.is_active) {
+          // is_super_admin já não dá nada (a BD ignora esses grupos): o ecrã também.
+          if (p.admin_groups?.is_active && !p.admin_groups?.is_super_admin) {
             const key = `${p.module_key}:${p.topic_key || ''}`;
             const existing = permissionMap.get(key);
 

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { accessService } from '@/modules/admin/services/accessService';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -190,7 +191,9 @@ const SetPasswordPage = () => {
           .eq('role', 'admin')
           .maybeSingle();
 
-        if (adminRole) {
+        const companyAdmin = adminRole ? null : await accessService.isCompanyAdmin();
+        if (companyAdmin?.transient) throw companyAdmin.error;
+        if (adminRole || companyAdmin?.data) {
           window.location.href = '/admin';
           return;
         }

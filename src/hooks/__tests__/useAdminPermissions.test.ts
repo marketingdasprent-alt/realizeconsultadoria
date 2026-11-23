@@ -9,7 +9,9 @@ vi.mock('@/integrations/supabase/client', () => ({
       getSession: vi.fn(),
     },
     // Conta unificada: por omissão só a própria conta
-    rpc: vi.fn(async (_fn: string, args: { _user_id: string }) => ({ data: [args._user_id] })),
+    rpc: vi.fn(async (fn: string, args?: { _user_id: string }) =>
+      fn === 'rz_identity_ids' ? { data: [args?._user_id] } : { data: null }
+    ),
     from: vi.fn(() => ({
       select: vi.fn().mockReturnThis(),
       eq: vi.fn().mockReturnThis(),
@@ -112,27 +114,17 @@ describe('useAdminPermissions', () => {
     expect(result.current.isSuperAdmin).toBe(false);
   });
 
-  it('should identify super admin users', async () => {
-    const mockSession = { user: { id: 'user-123' } };
-
+  it('should identify super admin users (platform_admins, via RPC)', async () => {
     vi.mocked(supabase.auth.getSession).mockResolvedValue({
-      data: { session: mockSession },
+      data: { session: { user: { id: 'user-123' } } },
       error: null,
     } as any);
-
-    const mockAdminGroupQuery = {
-      select: vi.fn().mockReturnThis(),
-      in: vi.fn().mockResolvedValue({
-        data: [
-          {
-            group_id: 'superadmin-group',
-            admin_groups: { is_super_admin: true, is_active: true },
-          },
-        ],
-      }),
-    };
-
-    vi.mocked(supabase.from).mockReturnValueOnce(mockAdminGroupQuery as any);
+    vi.mocked(supabase.rpc).mockImplementation(((fn: string, args?: { _user_id: string }) =>
+      Promise.resolve(
+        fn === 'rz_identity_ids'
+          ? { data: [args?._user_id] }
+          : { data: fn === 'rz_is_super_admin' ? true : null }
+      )) as any);
 
     const { result } = renderHook(() => useAdminPermissions());
 
@@ -146,11 +138,12 @@ describe('useAdminPermissions', () => {
       data: { session: { user: { id: 'colaborador-1' } } },
       error: null,
     } as any);
-    vi.mocked(supabase.rpc).mockResolvedValueOnce({ data: ['colaborador-1', 'admin-1'] } as any);
-    const inGroups = vi.fn().mockResolvedValue({
-      data: [{ group_id: 'g', admin_groups: { is_super_admin: true, is_active: true } }],
-    });
-    vi.mocked(supabase.from).mockReturnValueOnce({
+    vi.mocked(supabase.rpc).mockImplementation(((fn: string) =>
+      Promise.resolve(
+        fn === 'rz_identity_ids' ? { data: ['colaborador-1', 'admin-1'] } : { data: null }
+      )) as any);
+    const inGroups = vi.fn().mockResolvedValue({ data: [{ group_id: 'g' }] });
+    vi.mocked(supabase.from).mockReturnValue({
       select: vi.fn().mockReturnThis(),
       in: inGroups,
     } as any);
@@ -158,7 +151,7 @@ describe('useAdminPermissions', () => {
     const { result } = renderHook(() => useAdminPermissions());
 
     await waitFor(() => {
-      expect(result.current.isSuperAdmin).toBe(true);
+      expect(result.current.isLoading).toBe(false);
     });
     expect(inGroups).toHaveBeenCalledWith('user_id', ['colaborador-1', 'admin-1']);
   });

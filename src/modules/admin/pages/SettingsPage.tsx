@@ -64,9 +64,11 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { CompanyAdminsSection } from '../components/CompanyAdminsSection';
 import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 
@@ -124,6 +126,8 @@ const SettingsPage = () => {
   const [inviteEmail, setInviteEmail] = useState('');
   const [inviteName, setInviteName] = useState('');
   const [invitePassword, setInvitePassword] = useState('');
+  const [inviteCompanyId, setInviteCompanyId] = useState('');
+  const [adminCompanyIds, setAdminCompanyIds] = useState<string[]>([]);
   const [isInviting, setIsInviting] = useState(false);
   const [removingUserId, setRemovingUserId] = useState<string | null>(null);
   const [changePasswordAdmin, setChangePasswordAdmin] = useState<AdminUser | null>(null);
@@ -133,6 +137,20 @@ const SettingsPage = () => {
   // Separador aberto por ligação (ex.: ?tab=equipa a partir da ficha do colaborador).
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabParam ?? 'profile');
+  // ?tab= só abre o separador a quem o pode ver (os separadores de grupos, acessos e suporte têm permissão).
+  const tabAllowed = (tab: string) =>
+    tab === 'groups'
+      ? canViewTopic('settings', 'groups')
+      : tab === 'access'
+        ? canViewTopic('settings', 'admins')
+        : tab === 'suporte'
+          ? canViewTopic('settings', 'support_subjects')
+          : true;
+  useEffect(() => {
+    if (!isLoadingPermissions && !tabAllowed(activeTab)) setActiveTab('profile');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tabAllowed deriva de canViewTopic
+  }, [isLoadingPermissions, activeTab, canViewTopic]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -168,6 +186,14 @@ const SettingsPage = () => {
 
       setCompanies(companiesRes.data || []);
       setNotifications(notificationsRes.data || []);
+
+      // Empresas de que posso criar administradores (as que administro; o super admin, todas).
+      const untyped: SupabaseClient = supabase;
+      const { data: adminIds, error: adminIdsError } = await untyped.rpc('rz_admin_company_ids');
+      if (adminIdsError) console.error('Erro ao ler as empresas que administro:', adminIdsError);
+      const ids = Array.isArray(adminIds) ? (adminIds as string[]) : [];
+      setAdminCompanyIds(ids);
+      setInviteCompanyId(current => current || (ids.length === 1 ? ids[0] : ''));
     };
     fetchCompaniesAndNotifications();
   }, []);
@@ -485,6 +511,15 @@ const SettingsPage = () => {
       return;
     }
 
+    if (!inviteCompanyId) {
+      toast({
+        title: 'Erro',
+        description: 'Escolha a empresa de que esta conta será administradora.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
     if (!invitePassword || invitePassword.length < 8) {
       toast({
         title: 'Erro',
@@ -506,6 +541,7 @@ const SettingsPage = () => {
           email: inviteEmail.trim(),
           name: inviteName.trim() || undefined,
           password: invitePassword,
+          company_id: inviteCompanyId,
         },
       });
 
@@ -515,6 +551,7 @@ const SettingsPage = () => {
       setInviteEmail('');
       setInviteName('');
       setInvitePassword('');
+      setInviteCompanyId(adminCompanyIds.length === 1 ? adminCompanyIds[0] : '');
       await fetchAdmins();
 
       toast({
@@ -578,7 +615,7 @@ const SettingsPage = () => {
           description="Gerir preferências da conta e do sistema"
         />
 
-        <Tabs defaultValue={tabParam ?? 'profile'} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="flex-wrap">
             <TabsTrigger value="profile" className="gap-2">
               <User className="h-4 w-4" />
@@ -588,14 +625,18 @@ const SettingsPage = () => {
               <Shield className="h-4 w-4" />
               Segurança
             </TabsTrigger>
-            <TabsTrigger value="access" className="gap-2">
-              <Users className="h-4 w-4" />
-              Acessos
-            </TabsTrigger>
-            <TabsTrigger value="groups" className="gap-2">
-              <FolderKey className="h-4 w-4" />
-              Grupos
-            </TabsTrigger>
+            {canViewTopic('settings', 'admins') && (
+              <TabsTrigger value="access" className="gap-2">
+                <Users className="h-4 w-4" />
+                Acessos
+              </TabsTrigger>
+            )}
+            {canViewTopic('settings', 'groups') && (
+              <TabsTrigger value="groups" className="gap-2">
+                <FolderKey className="h-4 w-4" />
+                Grupos
+              </TabsTrigger>
+            )}
             <TabsTrigger value="notifications" className="gap-2">
               <Bell className="h-4 w-4" />
               Notificações
@@ -604,10 +645,12 @@ const SettingsPage = () => {
               <AlertTriangle className="h-4 w-4" />
               Avisos
             </TabsTrigger>
-            <TabsTrigger value="suporte" className="gap-2">
-              <Headset className="h-4 w-4" />
-              Suporte
-            </TabsTrigger>
+            {canViewTopic('settings', 'support_subjects') && (
+              <TabsTrigger value="suporte" className="gap-2">
+                <Headset className="h-4 w-4" />
+                Suporte
+              </TabsTrigger>
+            )}
             <TabsTrigger value="equipa" className="gap-2">
               <Briefcase className="h-4 w-4" />
               Equipa
@@ -739,6 +782,26 @@ const SettingsPage = () => {
                       />
                     </div>
                     <div className="md:col-span-2">
+                      <Label htmlFor="invite-company">Empresa *</Label>
+                      <Select value={inviteCompanyId} onValueChange={setInviteCompanyId}>
+                        <SelectTrigger id="invite-company" className="mt-1">
+                          <SelectValue placeholder="Escolha a empresa" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {companies
+                            .filter(company => adminCompanyIds.includes(company.id))
+                            .map(company => (
+                              <SelectItem key={company.id} value={company.id}>
+                                {company.name}
+                              </SelectItem>
+                            ))}
+                        </SelectContent>
+                      </Select>
+                      <p className="text-xs text-muted-foreground mt-1">
+                        O administrador só gere esta empresa.
+                      </p>
+                    </div>
+                    <div className="md:col-span-2">
                       <Label htmlFor="invite-password">Palavra-passe *</Label>
                       <Input
                         id="invite-password"
@@ -772,138 +835,147 @@ const SettingsPage = () => {
                 </CardContent>
               </Card>
 
-              <Card className="shadow-card">
-                <CardHeader>
-                  <CardTitle className="font-display text-xl">Administradores Atuais</CardTitle>
-                  <CardDescription>Gerir acessos de administração do sistema</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  {isLoadingAdmins ? (
-                    <div className="flex items-center justify-center py-8">
-                      <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
-                    </div>
-                  ) : admins.length === 0 ? (
-                    <p className="text-muted-foreground text-center py-8">
-                      Nenhum administrador encontrado.
-                    </p>
-                  ) : (
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Nome</TableHead>
-                          <TableHead>Email</TableHead>
-                          <TableHead>Data de Criação</TableHead>
-                          <TableHead className="text-right">Ações</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {admins.map(admin => (
-                          <TableRow key={admin.user_id}>
-                            <TableCell className="font-medium">
-                              <div className="flex flex-col gap-1">
-                                <div className="flex items-center gap-2">
-                                  {admin.name}
-                                  {admin.user_id === currentUserId && (
-                                    <Badge variant="secondary">Você</Badge>
+              {companies
+                .filter(company => adminCompanyIds.includes(company.id))
+                .map(company => (
+                  <CompanyAdminsSection key={company.id} company={company} />
+                ))}
+
+              {isSuperAdmin && (
+                <Card className="shadow-card">
+                  <CardHeader>
+                    <CardTitle className="font-display text-xl">Administradores Atuais</CardTitle>
+                    <CardDescription>Gerir acessos de administração do sistema</CardDescription>
+                  </CardHeader>
+                  <CardContent>
+                    {isLoadingAdmins ? (
+                      <div className="flex items-center justify-center py-8">
+                        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+                      </div>
+                    ) : admins.length === 0 ? (
+                      <p className="text-muted-foreground text-center py-8">
+                        Nenhum administrador encontrado.
+                      </p>
+                    ) : (
+                      <Table>
+                        <TableHeader>
+                          <TableRow>
+                            <TableHead>Nome</TableHead>
+                            <TableHead>Email</TableHead>
+                            <TableHead>Data de Criação</TableHead>
+                            <TableHead className="text-right">Ações</TableHead>
+                          </TableRow>
+                        </TableHeader>
+                        <TableBody>
+                          {admins.map(admin => (
+                            <TableRow key={admin.user_id}>
+                              <TableCell className="font-medium">
+                                <div className="flex flex-col gap-1">
+                                  <div className="flex items-center gap-2">
+                                    {admin.name}
+                                    {admin.user_id === currentUserId && (
+                                      <Badge variant="secondary">Você</Badge>
+                                    )}
+                                  </div>
+                                  {admin.has_email_conflict && (
+                                    <div className="flex items-center gap-1 text-xs text-amber-600">
+                                      <AlertTriangle className="h-3 w-3" />
+                                      <span>Conflito de email</span>
+                                    </div>
+                                  )}
+                                  {!authEmailsVerified && (
+                                    <span className="text-xs text-muted-foreground">
+                                      Email de login não verificado
+                                    </span>
                                   )}
                                 </div>
-                                {admin.has_email_conflict && (
-                                  <div className="flex items-center gap-1 text-xs text-amber-600">
-                                    <AlertTriangle className="h-3 w-3" />
-                                    <span>Conflito de email</span>
-                                  </div>
-                                )}
-                                {!authEmailsVerified && (
-                                  <span className="text-xs text-muted-foreground">
-                                    Email de login não verificado
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <div className="flex flex-col gap-0.5">
-                                <span>{admin.email}</span>
-                                {admin.has_email_conflict && admin.auth_email && (
-                                  <span className="text-xs text-muted-foreground">
-                                    Login: {admin.auth_email}
-                                  </span>
-                                )}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              {format(new Date(admin.created_at), "d 'de' MMMM 'de' yyyy", {
-                                locale: pt,
-                              })}
-                            </TableCell>
-                            <TableCell className="text-right">
-                              {admin.user_id !== currentUserId ? (
-                                <div className="flex items-center justify-end gap-1">
-                                  {admin.has_email_conflict && (
-                                    <Button
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => setRepairAdmin(admin)}
-                                      className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
-                                      title="Reparar conta misturada"
-                                    >
-                                      <Wrench className="h-4 w-4" />
-                                    </Button>
+                              </TableCell>
+                              <TableCell>
+                                <div className="flex flex-col gap-0.5">
+                                  <span>{admin.email}</span>
+                                  {admin.has_email_conflict && admin.auth_email && (
+                                    <span className="text-xs text-muted-foreground">
+                                      Login: {admin.auth_email}
+                                    </span>
                                   )}
-                                  <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => setChangePasswordAdmin(admin)}
-                                    title="Alterar Palavra-passe"
-                                  >
-                                    <Key className="h-4 w-4" />
-                                  </Button>
-                                  <AlertDialog>
-                                    <AlertDialogTrigger asChild>
+                                </div>
+                              </TableCell>
+                              <TableCell>
+                                {format(new Date(admin.created_at), "d 'de' MMMM 'de' yyyy", {
+                                  locale: pt,
+                                })}
+                              </TableCell>
+                              <TableCell className="text-right">
+                                {admin.user_id !== currentUserId ? (
+                                  <div className="flex items-center justify-end gap-1">
+                                    {admin.has_email_conflict && (
                                       <Button
                                         variant="ghost"
                                         size="sm"
-                                        className="text-destructive hover:text-destructive"
-                                        disabled={removingUserId === admin.user_id}
+                                        onClick={() => setRepairAdmin(admin)}
+                                        className="text-amber-600 hover:text-amber-700 hover:bg-amber-50"
+                                        title="Reparar conta misturada"
                                       >
-                                        {removingUserId === admin.user_id ? (
-                                          <Loader2 className="h-4 w-4 animate-spin" />
-                                        ) : (
-                                          <Trash2 className="h-4 w-4" />
-                                        )}
+                                        <Wrench className="h-4 w-4" />
                                       </Button>
-                                    </AlertDialogTrigger>
-                                    <AlertDialogContent>
-                                      <AlertDialogHeader>
-                                        <AlertDialogTitle>Remover Administrador</AlertDialogTitle>
-                                        <AlertDialogDescription>
-                                          Tem a certeza que deseja remover o acesso de administrador
-                                          de <strong>{admin.name}</strong>? Esta ação pode ser
-                                          revertida convidando o utilizador novamente.
-                                        </AlertDialogDescription>
-                                      </AlertDialogHeader>
-                                      <AlertDialogFooter>
-                                        <AlertDialogCancel>Cancelar</AlertDialogCancel>
-                                        <AlertDialogAction
-                                          onClick={() => handleRemoveAdmin(admin.user_id)}
-                                          className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    )}
+                                    <Button
+                                      variant="ghost"
+                                      size="sm"
+                                      onClick={() => setChangePasswordAdmin(admin)}
+                                      title="Alterar Palavra-passe"
+                                    >
+                                      <Key className="h-4 w-4" />
+                                    </Button>
+                                    <AlertDialog>
+                                      <AlertDialogTrigger asChild>
+                                        <Button
+                                          variant="ghost"
+                                          size="sm"
+                                          className="text-destructive hover:text-destructive"
+                                          disabled={removingUserId === admin.user_id}
                                         >
-                                          Remover
-                                        </AlertDialogAction>
-                                      </AlertDialogFooter>
-                                    </AlertDialogContent>
-                                  </AlertDialog>
-                                </div>
-                              ) : (
-                                <span className="text-muted-foreground text-sm">—</span>
-                              )}
-                            </TableCell>
-                          </TableRow>
-                        ))}
-                      </TableBody>
-                    </Table>
-                  )}
-                </CardContent>
-              </Card>
+                                          {removingUserId === admin.user_id ? (
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                          ) : (
+                                            <Trash2 className="h-4 w-4" />
+                                          )}
+                                        </Button>
+                                      </AlertDialogTrigger>
+                                      <AlertDialogContent>
+                                        <AlertDialogHeader>
+                                          <AlertDialogTitle>Remover Administrador</AlertDialogTitle>
+                                          <AlertDialogDescription>
+                                            Tem a certeza que deseja remover o acesso de
+                                            administrador de <strong>{admin.name}</strong>? Esta
+                                            ação pode ser revertida convidando o utilizador
+                                            novamente.
+                                          </AlertDialogDescription>
+                                        </AlertDialogHeader>
+                                        <AlertDialogFooter>
+                                          <AlertDialogCancel>Cancelar</AlertDialogCancel>
+                                          <AlertDialogAction
+                                            onClick={() => handleRemoveAdmin(admin.user_id)}
+                                            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                          >
+                                            Remover
+                                          </AlertDialogAction>
+                                        </AlertDialogFooter>
+                                      </AlertDialogContent>
+                                    </AlertDialog>
+                                  </div>
+                                ) : (
+                                  <span className="text-muted-foreground text-sm">—</span>
+                                )}
+                              </TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    )}
+                  </CardContent>
+                </Card>
+              )}
 
               <ChangeAdminPasswordDialog
                 admin={changePasswordAdmin}

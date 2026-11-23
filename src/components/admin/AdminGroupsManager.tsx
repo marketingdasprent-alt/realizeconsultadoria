@@ -137,6 +137,7 @@ const AdminGroupsManager = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [wasSuperAdminGroup, setWasSuperAdminGroup] = useState(false);
   const [permissions, setPermissions] = useState<TopicPermission[]>([]);
   const [selectedDepartments, setSelectedDepartments] = useState<Set<string>>(new Set());
 
@@ -209,6 +210,7 @@ const AdminGroupsManager = () => {
     setName('');
     setDescription('');
     setIsSuperAdmin(false);
+    setWasSuperAdminGroup(false);
     setPermissions(initializePermissions());
     setSelectedDepartments(new Set());
     setEditingGroup(null);
@@ -220,7 +222,9 @@ const AdminGroupsManager = () => {
       setEditingGroup(group);
       setName(group.name);
       setDescription(group.description || '');
-      setIsSuperAdmin(group.is_super_admin);
+      // A marca is_super_admin já não conta: o grupo edita-se como os outros e grava-se sem ela.
+      setIsSuperAdmin(false);
+      setWasSuperAdminGroup(group.is_super_admin);
 
       // Fetch permissions for this group
       const { data: perms } = await supabase
@@ -392,16 +396,19 @@ const AdminGroupsManager = () => {
     try {
       if (editingGroup) {
         // Update group
-        const { error: updateError } = await supabase
+        const { data: updatedRows, error: updateError } = await supabase
           .from('admin_groups')
           .update({
             name: name.trim(),
             description: description.trim() || null,
             is_super_admin: isSuperAdmin,
           })
-          .eq('id', editingGroup.id);
+          .eq('id', editingGroup.id)
+          .select('id');
 
         if (updateError) throw updateError;
+        // A BD (RLS) pode não deixar alterar nenhuma linha sem dar erro: não é sucesso.
+        if (!updatedRows?.length) throw new Error('Sem permissão para alterar este grupo.');
 
         // Delete old permissions and insert new ones (only if not super admin)
         if (!isSuperAdmin) {
@@ -510,12 +517,14 @@ const AdminGroupsManager = () => {
 
   const handleToggleActive = async (group: AdminGroup) => {
     try {
-      const { error } = await supabase
+      const { data: rows, error } = await supabase
         .from('admin_groups')
         .update({ is_active: !group.is_active })
-        .eq('id', group.id);
+        .eq('id', group.id)
+        .select('id');
 
       if (error) throw error;
+      if (!rows?.length) throw new Error('Sem permissão para alterar este grupo.');
 
       setGroups(prev => prev.map(g => (g.id === group.id ? { ...g, is_active: !g.is_active } : g)));
 
@@ -532,9 +541,14 @@ const AdminGroupsManager = () => {
   const handleDelete = async (groupId: string) => {
     setDeletingGroupId(groupId);
     try {
-      const { error } = await supabase.from('admin_groups').delete().eq('id', groupId);
+      const { data: rows, error } = await supabase
+        .from('admin_groups')
+        .delete()
+        .eq('id', groupId)
+        .select('id');
 
       if (error) throw error;
+      if (!rows?.length) throw new Error('Sem permissão para eliminar este grupo.');
 
       setGroups(prev => prev.filter(g => g.id !== groupId));
       toast({ title: 'Grupo eliminado' });
@@ -550,7 +564,7 @@ const AdminGroupsManager = () => {
   };
 
   const getPermissionsSummary = (group: AdminGroup) => {
-    if (group.is_super_admin) return 'Acesso total';
+    if (group.is_super_admin) return 'Sem efeito (legado)';
     return 'Personalizado';
   };
 
@@ -723,16 +737,13 @@ const AdminGroupsManager = () => {
                   className="mt-1"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="is-super-admin"
-                  checked={isSuperAdmin}
-                  onCheckedChange={checked => setIsSuperAdmin(checked === true)}
-                />
-                <Label htmlFor="is-super-admin" className="cursor-pointer">
-                  Super Admin (acesso total a todos os módulos e funcionalidades)
-                </Label>
-              </div>
+              {wasSuperAdminGroup && (
+                <p className="rounded-md border bg-muted p-3 text-sm text-muted-foreground">
+                  Este grupo estava marcado como Super Admin e já não dá acesso total: os super
+                  administradores são definidos pela plataforma. Escolha abaixo as permissões do
+                  grupo.
+                </p>
+              )}
             </div>
 
             {!isSuperAdmin && (

@@ -1,7 +1,23 @@
+import type { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { isTransientQueryError } from '@/lib/retry';
 
 export const accessService = {
+  /**
+   * Administrador de empresa (pertença admin ativa nalguma empresa), com a sessão atual. O administrador
+   * de empresa não tem módulos em get_admin_permissions (ver migração do PR1): reconhece-se por aqui.
+   */
+  isCompanyAdmin: async (): Promise<{ data: boolean; error: unknown; transient: boolean }> => {
+    const untyped: SupabaseClient = supabase;
+    const { data, error, status } = await untyped.rpc('rz_my_admin_company_ids');
+    if (error) {
+      // Falha de rede/serviço (transitória): quem chama tenta de novo em vez de dizer "sem papel".
+      // Outro erro (ex.: função ainda não existe): não é admin de empresa.
+      return { data: false, error, transient: isTransientQueryError(status, error) };
+    }
+    return { data: Array.isArray(data) && data.length > 0, error: null, transient: false };
+  },
+
   /**
    * Verifica se o usuário tem a role de admin
    */
@@ -27,7 +43,10 @@ export const accessService = {
         return { isAdmin: true, error: null };
       }
 
-      return { isAdmin: false, error: null };
+      // 3. Administrador de empresa (pertença admin ativa)
+      const companyAdmin = await accessService.isCompanyAdmin();
+      if (companyAdmin.transient) return { isAdmin: false, error: companyAdmin.error };
+      return { isAdmin: companyAdmin.data, error: null };
     } catch (error) {
       console.error('Erro em checkAdminRole:', error);
       return { isAdmin: false, error };
@@ -103,6 +122,11 @@ export const accessService = {
       if (!permissions.error && permissions.data && permissions.data.length > 0) {
         return { data: 'admin', error: null };
       }
+
+      // 2b. Administrador de empresa (pertença admin ativa; não tem módulos em get_admin_permissions)
+      const companyAdmin = await accessService.isCompanyAdmin();
+      if (companyAdmin.transient) return { data: null, error: companyAdmin.error };
+      if (companyAdmin.data) return { data: 'admin', error: null };
 
       // 3. Fallback: Verificar se é um colaborador (com preferEmployee já se viu)
       if (preferEmployee) return { data: null, error: null };

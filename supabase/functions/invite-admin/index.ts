@@ -268,7 +268,6 @@ const handler = async (req: Request): Promise<Response> => {
         if (!emailResponse.ok) {
           const errorText = await emailResponse.text();
           console.error('Brevo API error:', errorText.slice(0, 200));
-        } else {
         }
       } catch (emailError) {
         console.error('Error sending email:', emailError);

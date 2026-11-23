@@ -331,7 +331,8 @@ BEGIN
     v_who := nullif(v_defs[v_i][2], '')::uuid;
     v_expect := v_defs[v_i][5];
     v_claims := CASE WHEN v_who IS NULL THEN '{}'
-      ELSE '{"sub":"' || v_who::text || '","role":"authenticated"}' END;
+      ELSE '{"sub":"' || v_who::text || '","role":"authenticated","amr":[{"method":"password","timestamp":'
+           || floor(extract(epoch FROM now()))::bigint::text || '}]}' END;
     PERFORM set_config('request.jwt.claim.sub', coalesce(v_who::text, ''), true);
     PERFORM set_config('request.jwt.claims', v_claims, true);
     v_got := NULL;

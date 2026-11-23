@@ -1,6 +1,7 @@
 import { useEffect, useState, useRef } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
+import { accessService } from '@/modules/admin/services/accessService';
 import { Loader2, CheckCircle, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import logoRealize from '@/assets/logo-realize.png';
@@ -142,7 +143,7 @@ const AuthCallbackPage = () => {
           .eq('role', 'admin')
           .maybeSingle();
 
-        if (adminRole) {
+        if (adminRole || (await accessService.isCompanyAdmin()).data) {
           window.location.href = '/admin';
           return;
         }

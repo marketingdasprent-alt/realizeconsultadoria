@@ -1,6 +1,10 @@
 import { serve } from 'https://deno.land/std@0.190.0/http/server.ts';
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { authenticatedCaller, denyUnlessSuperAdmin } from '../_shared/admin-caller.ts';
+import {
+  authenticatedCaller,
+  denyUnlessCompanyAdmin,
+  isSuperAdmin,
+} from '../_shared/admin-caller.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,7 +15,28 @@ interface InviteAdminRequest {
   email: string;
   name?: string;
   password: string;
+  /** Empresa de que a conta passa a ser administradora (e só dessa). */
+  company_id: string;
 }
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+
+const escapeHtml = (value: string): string =>
+  value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+
+const json = (body: Record<string, unknown>) =>
+  new Response(JSON.stringify(body), {
+    status: 200,
+    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+  });
+
+/** Resposta única quando o email já existe: não revela a quem convida se o email é de outra empresa. */
+const EMAIL_TAKEN = 'Não foi possível criar um administrador com este email.';
 
 const handler = async (req: Request): Promise<Response> => {
   if (req.method === 'OPTIONS') {
@@ -27,20 +52,34 @@ const handler = async (req: Request): Promise<Response> => {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Cria uma conta de administrador global: só super admin. Mantém o contrato (200 com error).
+    // Cria uma conta de administrador LIGADA a uma empresa (nunca global): só o administrador dessa
+    // empresa ou o super admin. Mantém o contrato (200 com error).
     const caller = await authenticatedCaller(req, corsHeaders);
-    const denied =
-      caller instanceof Response ? caller : await denyUnlessSuperAdmin(caller, corsHeaders);
+    if (caller instanceof Response) {
+      return new Response(await caller.text(), {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    const { email, name, password, company_id }: InviteAdminRequest = await req.json();
+    const denied = await denyUnlessCompanyAdmin(caller, corsHeaders, company_id);
     if (denied) {
       return new Response(await denied.text(), {
         status: 200,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const requesterEmail = (caller as { email: string | null }).email;
-
-    const { email, name, password }: InviteAdminRequest = await req.json();
+    if (typeof email !== 'string' || typeof password !== 'string') {
+      return json({ error: 'Dados inválidos.' });
+    }
     const normalizedEmail = email.toLowerCase().trim();
+    if (normalizedEmail.length > 254 || !EMAIL_RE.test(normalizedEmail)) {
+      return json({ error: 'Indique um email válido.' });
+    }
+    const cleanName = typeof name === 'string' ? name.trim().slice(0, 100) : '';
+    // O super admin vê o motivo exato; um admin de empresa recebe sempre a mesma resposta.
+    const callerIsSuper = await isSuperAdmin(caller);
+    const taken = (detail: string) => json({ error: callerIsSuper ? detail : EMAIL_TAKEN });
 
     // Validate password
     if (!password || password.length < 8) {
@@ -50,61 +89,38 @@ const handler = async (req: Request): Promise<Response> => {
       );
     }
 
-    console.log(`Admin ${requesterEmail} is creating new admin: ${normalizedEmail}`);
-
-    // Check if email already exists in employees table - BLOCK if exists
-    const { data: existingEmployee } = await supabaseAdmin
+    // Email já associado a um colaborador (de qualquer empresa): igualdade exata, sem curingas, e a
+    // falhar fechado (um erro aqui não deixa passar). O gatilho de registo ligaria a conta nova às
+    // fichas com este email, e dava acesso cruzado entre empresas.
+    const { count: employeeCount, error: employeeError } = await supabaseAdmin
       .from('employees')
-      .select('id')
-      .ilike('email', normalizedEmail)
-      .maybeSingle();
-
-    if (existingEmployee) {
-      console.log(`Email already in use by employee: ${normalizedEmail}`);
-      return new Response(
-        JSON.stringify({
-          error:
-            'Este email já está associado a um colaborador. Por favor utilize um email diferente para o administrador.',
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      .select('id', { count: 'exact', head: true })
+      .ilike(
+        'email',
+        normalizedEmail.replace(/[\\%_]/g, ch => `\\${ch}`)
+      );
+    if (employeeError) {
+      console.error('invite-admin: erro ao verificar colaboradores');
+      return json({ error: 'Não foi possível verificar o email. Tente novamente.' });
+    }
+    if ((employeeCount ?? 0) > 0) {
+      return taken(
+        'Este email já está associado a um colaborador. Por favor utilize um email diferente para o administrador.'
       );
     }
 
-    // Check if user already exists in auth
+    const displayName = cleanName || normalizedEmail.split('@')[0];
+
+    // Se o email já tem conta (listUsers só devolve a primeira página; o createUser abaixo falha em duplicados)
     const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
     const existingUser = existingUsers?.users?.find(
       u => u.email?.toLowerCase() === normalizedEmail
     );
+    if (existingUser) {
+      return taken('Este email já está em uso no sistema. Por favor utilize um email diferente.');
+    }
 
     let userId: string;
-    const displayName = name || normalizedEmail.split('@')[0];
-
-    if (existingUser) {
-      // Check if already admin
-      const { data: existingRole } = await supabaseAdmin
-        .from('user_roles')
-        .select('role')
-        .eq('user_id', existingUser.id)
-        .eq('role', 'admin')
-        .maybeSingle();
-
-      if (existingRole) {
-        return new Response(JSON.stringify({ error: 'Este utilizador já é administrador' }), {
-          status: 200,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-
-      // Email exists in auth but not in employees and not admin - this means it's an orphan account
-      // Block anyway to ensure clean separation
-      console.log(`Email exists in auth but not employees, blocking: ${normalizedEmail}`);
-      return new Response(
-        JSON.stringify({
-          error: 'Este email já está em uso no sistema. Por favor utilize um email diferente.',
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
 
     // Create new user with password directly (always a fresh account)
     const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
@@ -125,22 +141,32 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     userId = newUser.user.id;
-    console.log(`Created new user with ID: ${userId}`);
 
-    // Add admin role
-    const { error: roleError } = await supabaseAdmin
-      .from('user_roles')
-      .insert({ user_id: userId, role: 'admin' });
+    // Liga a conta à empresa como administradora (pertença ativa). Não há papel admin global em
+    // user_roles: o poder é só sobre esta empresa (a BD limita os dados por pertença).
+    const { error: membershipError } = await supabaseAdmin.from('company_memberships').insert({
+      company_id,
+      user_id: userId,
+      role: 'admin',
+      origin: 'convite',
+      status: 'ativo',
+      created_by: caller.userId,
+    });
 
-    if (roleError) {
-      console.error('Error adding admin role:', roleError);
+    if (membershipError) {
+      console.error('Error adding company admin membership:', membershipError);
+      // Não deixa uma conta órfã sem empresa: apaga a conta acabada de criar.
+      const { error: cleanupError } = await supabaseAdmin.auth.admin.deleteUser(userId);
+      if (cleanupError) {
+        console.error('invite-admin: falhou a limpeza da conta criada', userId);
+      }
       return new Response(
-        JSON.stringify({ error: `Erro ao adicionar role admin: ${roleError.message}` }),
+        JSON.stringify({
+          error: `Erro ao ligar o administrador à empresa: ${membershipError.message}`,
+        }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
-
-    console.log(`Added admin role to user ${userId}`);
 
     // Create profile
     const { error: profileError } = await supabaseAdmin.from('profiles').insert({
@@ -179,7 +205,7 @@ const handler = async (req: Request): Promise<Response> => {
     </tr>
     <tr>
       <td style="background-color: #ffffff; padding: 40px 30px;">
-        <h2 style="color: #333333; margin: 0 0 20px 0; font-size: 22px;">Olá ${displayName},</h2>
+        <h2 style="color: #333333; margin: 0 0 20px 0; font-size: 22px;">Olá ${escapeHtml(displayName)},</h2>
         <p style="color: #666666; font-size: 16px; line-height: 1.6; margin: 0 0 25px 0;">
           A sua conta de <strong>administrador(a)</strong> foi criada no Portal Realize Consultadoria.
         </p>
@@ -187,8 +213,8 @@ const handler = async (req: Request): Promise<Response> => {
         <div style="background-color: #f9f9f9; border-radius: 8px; padding: 20px; margin: 0 0 25px 0;">
           <h3 style="color: #333333; margin: 0 0 15px 0; font-size: 16px;">Os seus dados de acesso:</h3>
           <p style="color: #666666; font-size: 14px; line-height: 1.8; margin: 0;">
-            <strong>Email:</strong> ${normalizedEmail}<br>
-            <strong>Palavra-passe:</strong> ${password}
+            <strong>Email:</strong> ${escapeHtml(normalizedEmail)}<br>
+            <strong>Palavra-passe:</strong> ${escapeHtml(password)}
           </p>
         </div>
         
@@ -241,9 +267,7 @@ const handler = async (req: Request): Promise<Response> => {
 
         if (!emailResponse.ok) {
           const errorText = await emailResponse.text();
-          console.error('Brevo API error:', errorText);
-        } else {
-          console.log(`Welcome email sent to ${normalizedEmail}`);
+          console.error('Brevo API error:', errorText.slice(0, 200));
         }
       } catch (emailError) {
         console.error('Error sending email:', emailError);

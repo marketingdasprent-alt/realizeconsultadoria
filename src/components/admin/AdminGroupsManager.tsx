@@ -137,6 +137,7 @@ const AdminGroupsManager = () => {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [isSuperAdmin, setIsSuperAdmin] = useState(false);
+  const [wasSuperAdminGroup, setWasSuperAdminGroup] = useState(false);
   const [permissions, setPermissions] = useState<TopicPermission[]>([]);
   const [selectedDepartments, setSelectedDepartments] = useState<Set<string>>(new Set());
 
@@ -209,6 +210,7 @@ const AdminGroupsManager = () => {
     setName('');
     setDescription('');
     setIsSuperAdmin(false);
+    setWasSuperAdminGroup(false);
     setPermissions(initializePermissions());
     setSelectedDepartments(new Set());
     setEditingGroup(null);
@@ -220,7 +222,9 @@ const AdminGroupsManager = () => {
       setEditingGroup(group);
       setName(group.name);
       setDescription(group.description || '');
-      setIsSuperAdmin(group.is_super_admin);
+      // A marca is_super_admin já não conta: o grupo edita-se como os outros e grava-se sem ela.
+      setIsSuperAdmin(false);
+      setWasSuperAdminGroup(group.is_super_admin);
 
       // Fetch permissions for this group
       const { data: perms } = await supabase
@@ -550,7 +554,7 @@ const AdminGroupsManager = () => {
   };
 
   const getPermissionsSummary = (group: AdminGroup) => {
-    if (group.is_super_admin) return 'Acesso total';
+    if (group.is_super_admin) return 'Sem efeito (legado)';
     return 'Personalizado';
   };
 
@@ -723,16 +727,13 @@ const AdminGroupsManager = () => {
                   className="mt-1"
                 />
               </div>
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="is-super-admin"
-                  checked={isSuperAdmin}
-                  onCheckedChange={checked => setIsSuperAdmin(checked === true)}
-                />
-                <Label htmlFor="is-super-admin" className="cursor-pointer">
-                  Super Admin (acesso total a todos os módulos e funcionalidades)
-                </Label>
-              </div>
+              {wasSuperAdminGroup && (
+                <p className="rounded-md border bg-muted p-3 text-sm text-muted-foreground">
+                  Este grupo estava marcado como Super Admin e já não dá acesso total: os super
+                  administradores são definidos pela plataforma. Escolha abaixo as permissões do
+                  grupo.
+                </p>
+              )}
             </div>
 
             {!isSuperAdmin && (

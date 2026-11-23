@@ -339,6 +339,25 @@ export const MODULE_LABELS: Record<string, string> = Object.fromEntries(
 export const ALL_MODULE_KEYS = getAllModuleKeys();
 
 /**
+ * Administrador de empresa (pertença admin ativa): tem os módulos de gestão da sua empresa, mas não
+ * os da plataforma nem os que ainda não têm âmbito por empresa na BD. Só o super admin (platform_admins)
+ * os tem. 'legal' vem só por grupo de admin.
+ */
+export const COMPANY_ADMIN_EXCLUDED_MODULES: readonly string[] = [
+  'legal',
+  'marketing',
+  'accesses',
+  'timeclock',
+  'support',
+];
+
+/** Funcionalidades (módulo:tópico) que um administrador de empresa não tem: os grupos de admin são da plataforma. */
+export const COMPANY_ADMIN_EXCLUDED_TOPICS: readonly string[] = [
+  'settings:groups',
+  'settings:support_subjects',
+];
+
+/**
  * Alcance de uma permissão: toda a empresa ou só a equipa de quem a tem (os colaboradores
  * abaixo dela na cadeia de responsável direto). Ver docs/chefe-de-equipa.md.
  */

@@ -396,16 +396,19 @@ const AdminGroupsManager = () => {
     try {
       if (editingGroup) {
         // Update group
-        const { error: updateError } = await supabase
+        const { data: updatedRows, error: updateError } = await supabase
           .from('admin_groups')
           .update({
             name: name.trim(),
             description: description.trim() || null,
             is_super_admin: isSuperAdmin,
           })
-          .eq('id', editingGroup.id);
+          .eq('id', editingGroup.id)
+          .select('id');
 
         if (updateError) throw updateError;
+        // A BD (RLS) pode não deixar alterar nenhuma linha sem dar erro: não é sucesso.
+        if (!updatedRows?.length) throw new Error('Sem permissão para alterar este grupo.');
 
         // Delete old permissions and insert new ones (only if not super admin)
         if (!isSuperAdmin) {
@@ -514,12 +517,14 @@ const AdminGroupsManager = () => {
 
   const handleToggleActive = async (group: AdminGroup) => {
     try {
-      const { error } = await supabase
+      const { data: rows, error } = await supabase
         .from('admin_groups')
         .update({ is_active: !group.is_active })
-        .eq('id', group.id);
+        .eq('id', group.id)
+        .select('id');
 
       if (error) throw error;
+      if (!rows?.length) throw new Error('Sem permissão para alterar este grupo.');
 
       setGroups(prev => prev.map(g => (g.id === group.id ? { ...g, is_active: !g.is_active } : g)));
 
@@ -536,9 +541,14 @@ const AdminGroupsManager = () => {
   const handleDelete = async (groupId: string) => {
     setDeletingGroupId(groupId);
     try {
-      const { error } = await supabase.from('admin_groups').delete().eq('id', groupId);
+      const { data: rows, error } = await supabase
+        .from('admin_groups')
+        .delete()
+        .eq('id', groupId)
+        .select('id');
 
       if (error) throw error;
+      if (!rows?.length) throw new Error('Sem permissão para eliminar este grupo.');
 
       setGroups(prev => prev.filter(g => g.id !== groupId));
       toast({ title: 'Grupo eliminado' });

@@ -8,6 +8,10 @@ DROP POLICY IF EXISTS "Documentos de ausência: o admin da empresa gere" ON stor
 DROP POLICY IF EXISTS "Ficheiros da ficha: o admin da empresa gere" ON storage.objects;
 DROP POLICY IF EXISTS "Tickets: enviar anexos" ON storage.objects;
 DROP POLICY IF EXISTS "Tickets: ler anexos" ON storage.objects;
+DROP POLICY IF EXISTS "Documentos jurídicos: só o jurídico apaga" ON storage.objects;
+DROP POLICY IF EXISTS "Documentos jurídicos: só o jurídico envia" ON storage.objects;
+DROP POLICY IF EXISTS "Documentos jurídicos: só o jurídico vê" ON storage.objects;
+DROP POLICY IF EXISTS "Faturas de equipamento: só a equipa da plataforma" ON storage.objects;
 CREATE POLICY "Admins can manage all absence documents in storage" ON storage.objects
   AS PERMISSIVE FOR ALL TO authenticated
   USING (((bucket_id = 'absence-documents'::text) AND has_role(auth.uid(), 'admin'::app_role)));
@@ -24,6 +28,19 @@ CREATE POLICY "Tickets: enviar anexos" ON storage.objects
 CREATE POLICY "Tickets: ler anexos" ON storage.objects
   AS PERMISSIVE FOR SELECT TO authenticated,mail_client
   USING (((bucket_id = 'ticket-attachments'::text) AND (rz_is_admin() OR ticket_is_mine(ticket_path_ticket(name)))));
+CREATE POLICY "Documentos jurídicos: administradores apagam" ON storage.objects
+  AS PERMISSIVE FOR DELETE TO authenticated
+  USING (((bucket_id = 'legal_documents'::text) AND rz_is_admin()));
+CREATE POLICY "Documentos jurídicos: administradores enviam" ON storage.objects
+  AS PERMISSIVE FOR INSERT TO authenticated
+  WITH CHECK (((bucket_id = 'legal_documents'::text) AND rz_is_admin()));
+CREATE POLICY "Documentos jurídicos: administradores veem" ON storage.objects
+  AS PERMISSIVE FOR SELECT TO authenticated
+  USING (((bucket_id = 'legal_documents'::text) AND rz_is_admin()));
+CREATE POLICY "Faturas de equipamento: só administradores" ON storage.objects
+  AS PERMISSIVE FOR ALL TO authenticated
+  USING (((bucket_id = 'equipment_invoices'::text) AND rz_is_admin()))
+  WITH CHECK (((bucket_id = 'equipment_invoices'::text) AND rz_is_admin()));
 
 -- ---- employees
 DROP POLICY IF EXISTS "Fichas: o admin da empresa gere" ON public.employees;
@@ -185,6 +202,13 @@ CREATE POLICY "Jurídico: só administradores" ON public.legal_clients
   USING (rz_is_admin())
   WITH CHECK (rz_is_admin());
 
+-- ---- legal_agenda_events
+DROP POLICY IF EXISTS "Jurídico: agenda só do jurídico" ON public.legal_agenda_events;
+CREATE POLICY "Jurídico: só administradores" ON public.legal_agenda_events
+  AS PERMISSIVE FOR ALL TO authenticated
+  USING (rz_is_admin())
+  WITH CHECK (rz_is_admin());
+
 -- ---- legal_installments
 DROP POLICY IF EXISTS "Jurídico: prestações só do admin jurídico da empresa" ON public.legal_installments;
 CREATE POLICY "Jurídico: só administradores" ON public.legal_installments
@@ -210,6 +234,12 @@ DROP POLICY IF EXISTS "Marketing: super admin ou admin da empresa" ON public.mar
 CREATE POLICY "Admins can manage marketing emails" ON public.marketing_emails
   AS PERMISSIVE FOR ALL TO public
   USING ((EXISTS ( SELECT 1 FROM admin_group_members WHERE (admin_group_members.user_id = auth.uid()))));
+CREATE POLICY "Admins with marketing access can insert emails" ON public.marketing_emails
+  AS PERMISSIVE FOR INSERT TO authenticated
+  WITH CHECK (has_module_permission(auth.uid(), 'marketing'::text, 'execute'::text, 'email'::text));
+CREATE POLICY "Admins with marketing access can view emails" ON public.marketing_emails
+  AS PERMISSIVE FOR SELECT TO authenticated
+  USING ((has_module_permission(auth.uid(), 'marketing'::text, 'view'::text, 'email'::text) OR has_module_permission(auth.uid(), 'marketing'::text, 'execute'::text, 'email'::text)));
 
 -- ---- notice_reactions
 DROP POLICY IF EXISTS "Comunicados: ver reações" ON public.notice_reactions;
@@ -397,6 +427,37 @@ AS $function$
   );
 $function$;
 
+DO $fx$
+DECLARE v_def text;
+BEGIN
+  SELECT pg_get_functiondef('public.access_password(uuid)'::regprocedure) INTO v_def;
+  EXECUTE replace(v_def, 'NOT COALESCE((SELECT public.rz_is_company_admin(a0.company_id) FROM public.accesses a0 WHERE a0.id = _access_id), false) THEN', 'NOT has_role(auth.uid(), ''admin'') THEN');
+  SELECT pg_get_functiondef('public.phone_codes(uuid[])'::regprocedure) INTO v_def;
+  EXECUTE replace(v_def, 'IF NOT (SELECT public.rz_is_super_admin()) AND EXISTS (SELECT 1 FROM public.phones p0 WHERE p0.id = ANY(_phone_ids) AND NOT public.rz_is_company_admin(p0.company_id)) THEN', 'IF NOT has_role(auth.uid(), ''admin'') THEN');
+  SELECT pg_get_functiondef('public.reschedule_vacation(uuid,jsonb,text)'::regprocedure) INTO v_def;
+  EXECUTE replace(v_def, 'v_is_admin := public.rz_admin_of_employee(v_absence.employee_id);', 'v_is_admin := public.has_role(auth.uid(), ''admin''::public.app_role);');
+  SELECT pg_get_functiondef('public.review_employee_document(uuid,text,text,text,date,date,date,text)'::regprocedure) INTO v_def;
+  EXECUTE replace(v_def, 'IF NOT COALESCE((SELECT public.rz_admin_of_employee(d0.employee_id) FROM public.employee_documents d0 WHERE d0.id = _document_id), false) THEN', 'IF NOT public.has_role(auth.uid(), ''admin''::app_role) THEN');
+  SELECT pg_get_functiondef('public.mail_access_status()'::regprocedure) INTO v_def;
+  EXECUTE replace(v_def, 'AND public.rz_is_company_admin(m.company_id)', 'AND has_role(auth.uid(), ''admin'')');
+END
+$fx$;
+CREATE OR REPLACE FUNCTION public.admin_employee_last_sign_in()
+ RETURNS TABLE(employee_id uuid, last_sign_in_at timestamp with time zone)
+ LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+AS $function$
+  SELECT e.id, u.last_sign_in_at
+  FROM employees e
+  LEFT JOIN auth.users u ON u.id = e.user_id
+  WHERE has_role(auth.uid(), 'admin')
+     OR EXISTS (
+       SELECT 1 FROM admin_group_members m
+       JOIN admin_groups g ON g.id = m.group_id AND g.is_active
+       WHERE m.user_id = auth.uid()
+     );
+$function$;
+
+DROP FUNCTION IF EXISTS public.rz_legal_global();
 DROP FUNCTION IF EXISTS public.rz_feed_peer_companies();
 DROP FUNCTION IF EXISTS public.rz_admin_of_employee_path(text);
 DROP FUNCTION IF EXISTS public.rz_path_uuid(text);

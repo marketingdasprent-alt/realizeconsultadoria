@@ -159,6 +159,7 @@ CREATE POLICY "Admins gerem as pastas atribuídas" ON public.folder_assignments
   WITH CHECK (has_role(auth.uid(), 'admin'::app_role));
 
 -- ---- employee_monthly_finances
+DROP POLICY IF EXISTS "Finanças: o admin da empresa vê" ON public.employee_monthly_finances;
 DROP POLICY IF EXISTS "Finanças: RH da empresa ou super admin apaga" ON public.employee_monthly_finances;
 DROP POLICY IF EXISTS "Finanças: RH da empresa ou super admin insere" ON public.employee_monthly_finances;
 DROP POLICY IF EXISTS "Finanças: RH da empresa ou super admin altera" ON public.employee_monthly_finances;
@@ -428,7 +429,7 @@ AS $function$
 $function$;
 
 DO $fx$
-DECLARE v_def text;
+DECLARE v_def text; v_fn text;
 BEGIN
   SELECT pg_get_functiondef('public.access_password(uuid)'::regprocedure) INTO v_def;
   EXECUTE replace(v_def, 'NOT COALESCE((SELECT public.rz_is_company_admin(a0.company_id) FROM public.accesses a0 WHERE a0.id = _access_id), false) THEN', 'NOT has_role(auth.uid(), ''admin'') THEN');
@@ -440,6 +441,21 @@ BEGIN
   EXECUTE replace(v_def, 'IF NOT COALESCE((SELECT public.rz_admin_of_employee(d0.employee_id) FROM public.employee_documents d0 WHERE d0.id = _document_id), false) THEN', 'IF NOT public.has_role(auth.uid(), ''admin''::app_role) THEN');
   SELECT pg_get_functiondef('public.mail_access_status()'::regprocedure) INTO v_def;
   EXECUTE replace(v_def, 'AND public.rz_is_company_admin(m.company_id)', 'AND has_role(auth.uid(), ''admin'')');
+  SELECT pg_get_functiondef('public.time_clock_admin_create_entry(uuid,text,timestamptz,text,uuid,text,text)'::regprocedure) INTO v_def;
+  EXECUTE replace(v_def, 'IF NOT (public.rz_admin_of_employee(_employee_id) OR (public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') AND public.rz_member_of_employee_company(_employee_id))) THEN', 'IF NOT public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') THEN');
+  FOREACH v_fn IN ARRAY ARRAY['time_clock_admin_set_status(uuid,text,text)', 'time_clock_admin_update_entry(uuid,text,timestamptz,text,text,text)'] LOOP
+    SELECT pg_get_functiondef(v_fn::regprocedure) INTO v_def;
+    EXECUTE replace(v_def, 'IF NOT COALESCE((SELECT public.rz_admin_of_employee(t0.employee_id) OR (public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') AND public.rz_member_of_employee_company(t0.employee_id)) FROM public.time_clock_entries t0 WHERE t0.id = _entry_id), false) THEN', 'IF NOT public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') THEN');
+  END LOOP;
+  SELECT pg_get_functiondef('public.time_clock_admin_review(uuid[],text,text)'::regprocedure) INTO v_def;
+  EXECUTE replace(v_def, 'IF EXISTS (SELECT 1 FROM public.time_clock_entries t0 WHERE t0.id = ANY(_entry_ids) AND NOT (public.rz_admin_of_employee(t0.employee_id) OR (public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') AND public.rz_member_of_employee_company(t0.employee_id)))) THEN', 'IF NOT public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') THEN');
+  SELECT pg_get_functiondef('public.time_clock_recent_punchers(integer)'::regprocedure) INTO v_def;
+  EXECUTE replace(v_def, 'WHERE (public.rz_admin_of_employee(e.employee_id) OR (public.has_timeclock_permission(auth.uid(), ''view'') AND public.rz_member_of_employee_company(e.employee_id)))', 'WHERE public.has_timeclock_permission(auth.uid(), ''view'')');
+  SELECT pg_get_functiondef('public.admin_task_people(uuid)'::regprocedure) INTO v_def;
+  EXECUTE replace(v_def, 'IF NOT public.rz_is_company_admin(_company_id) THEN', 'IF NOT public.rz_is_admin() THEN');
+  SELECT p.oid::regprocedure::text INTO v_fn FROM pg_proc p WHERE p.proname = 'admin_create_task' AND p.pronamespace = 'public'::regnamespace;
+  SELECT pg_get_functiondef(v_fn::regprocedure) INTO v_def;
+  EXECUTE replace(v_def, 'IF NOT public.rz_is_company_admin(_company_id) THEN', 'IF NOT public.rz_is_admin() THEN');
 END
 $fx$;
 CREATE OR REPLACE FUNCTION public.admin_employee_last_sign_in()

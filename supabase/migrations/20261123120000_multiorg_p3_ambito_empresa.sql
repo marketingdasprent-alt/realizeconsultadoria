@@ -109,11 +109,12 @@ AS $function$
                     AND (e.company_id = ANY (public.rz_my_company_ids()) OR public.rz_is_super_admin()));
 $function$;
 
--- Finanças: super admin, ou membro do grupo RH com pertença na empresa do colaborador.
+-- Finanças: super admin, administrador da empresa do colaborador, ou membro do grupo RH com pertença nela.
 CREATE OR REPLACE FUNCTION public.rz_hr_of_employee(p_employee uuid)
  RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $function$
   SELECT public.rz_is_super_admin()
+      OR public.rz_admin_of_employee(p_employee)
       OR (public.is_rh_member(auth.uid()) AND public.rz_member_of_employee_company(p_employee));
 $function$;
 
@@ -151,17 +152,23 @@ CREATE OR REPLACE FUNCTION public.rz_admin_of_employee_path(p_name text)
  RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $function$
   SELECT public.rz_is_super_admin()
+      -- envio em massa: company/<empresa>/bulk/...
+      OR (split_part(p_name, '/', 1) = 'company'
+          AND split_part(p_name, '/', 2) ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+          AND public.rz_is_company_admin(split_part(p_name, '/', 2)::uuid))
+      -- <ficha>/... (employee-files)
       OR public.rz_admin_of_employee(public.rz_path_uuid(p_name))
+      -- <conta do colaborador>/<ausência>/... (absence-documents)
       OR public.rz_admin_of_user(public.rz_path_uuid(p_name));
 $function$;
 
 -- Equipa de suporte: o administrador da empresa do ticket, ou quem está no departamento da equipa mas
 -- só nos tickets das empresas onde tem pertença.
 CREATE OR REPLACE FUNCTION public.rz_can_handle_ticket(p_ticket uuid)
- RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public'
+ RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $function$
   SELECT public.rz_admin_of_ticket(p_ticket) OR EXISTS (
-    SELECT 1 FROM support_tickets st
+    SELECT 1 FROM public.support_tickets st
     WHERE st.id = p_ticket
       AND st.department_id IN (SELECT public.rz_support_desk_departments())
       AND NOT public.ticket_is_mine(st.id)
@@ -190,21 +197,30 @@ BEGIN
 END
 $g$;
 
+-- O papel mail_client (cliente de email) usa estas funções nas suas policies: sem EXECUTE daria erro em vez de false.
+DO $mc$
+BEGIN
+  IF EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'mail_client') THEN
+    GRANT EXECUTE ON FUNCTION public.rz_admin_of_ticket(uuid), public.rz_admin_of_mail_account(uuid) TO mail_client;
+  END IF;
+END
+$mc$;
+
 -- ------------------------------------------------------------------ policies das tabelas
 
 -- ---- employees
 DROP POLICY IF EXISTS "Admins can manage all employees" ON public.employees;
 CREATE POLICY "Fichas: o admin da empresa gere" ON public.employees
   FOR ALL TO authenticated
-  USING (public.rz_is_company_admin(company_id))
-  WITH CHECK (public.rz_is_company_admin(company_id));
+  USING (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]))
+  WITH CHECK (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]));
 
 -- ---- absences
 DROP POLICY IF EXISTS "Admins can manage all absences" ON public.absences;
 CREATE POLICY "Ausências: o admin da empresa gere" ON public.absences
   FOR ALL TO authenticated
-  USING (public.rz_is_company_admin(company_id))
-  WITH CHECK (public.rz_is_company_admin(company_id));
+  USING (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]))
+  WITH CHECK (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]));
 
 -- ---- absence_periods
 DROP POLICY IF EXISTS "Admins can manage all absence periods" ON public.absence_periods;
@@ -225,8 +241,8 @@ CREATE POLICY "Documentos de ausência: o admin da empresa gere" ON public.absen
 DROP POLICY IF EXISTS "Admins can manage all accesses" ON public.accesses;
 CREATE POLICY "Acessos: o admin da empresa gere" ON public.accesses
   FOR ALL TO authenticated
-  USING (public.rz_is_company_admin(company_id))
-  WITH CHECK (public.rz_is_company_admin(company_id));
+  USING (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]))
+  WITH CHECK (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]));
 
 -- ---- access_categories
 DROP POLICY IF EXISTS "Admins can manage all access categories" ON public.access_categories;
@@ -253,8 +269,8 @@ CREATE POLICY "Itens de atribuição: o admin da empresa gere" ON public.assignm
 DROP POLICY IF EXISTS "Admins can manage all assignments" ON public.assignments;
 CREATE POLICY "Atribuições: o admin da empresa gere" ON public.assignments
   FOR ALL TO authenticated
-  USING (public.rz_is_company_admin(company_id))
-  WITH CHECK (public.rz_is_company_admin(company_id));
+  USING (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]))
+  WITH CHECK (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]));
 
 -- ---- calendar_attendee_history
 DROP POLICY IF EXISTS "Calendário: histórico (admin e organizador)" ON public.calendar_attendee_history;
@@ -324,6 +340,9 @@ DROP POLICY IF EXISTS "RH or super admin can insert employee finances" ON public
 DROP POLICY IF EXISTS "RH or super admin can update employee finances" ON public.employee_monthly_finances;
 DROP POLICY IF EXISTS "Admins with employees access can view finances" ON public.employee_monthly_finances;
 DROP POLICY IF EXISTS "RH can view employee finances" ON public.employee_monthly_finances;
+CREATE POLICY "Finanças: o admin da empresa vê" ON public.employee_monthly_finances
+  FOR SELECT TO authenticated
+  USING (public.rz_admin_of_employee(employee_id));
 CREATE POLICY "Finanças: RH da empresa ou super admin apaga" ON public.employee_monthly_finances
   FOR DELETE TO authenticated
   USING (public.rz_hr_of_employee(employee_id));
@@ -352,8 +371,8 @@ CREATE POLICY "Categorias de equipamento: só a equipa da plataforma" ON public.
 DROP POLICY IF EXISTS "Admins can manage equipments" ON public.equipments;
 CREATE POLICY "Equipamentos: o admin da empresa gere" ON public.equipments
   FOR ALL TO authenticated
-  USING (public.rz_is_company_admin(company_id))
-  WITH CHECK (public.rz_is_company_admin(company_id));
+  USING (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]))
+  WITH CHECK (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]));
 
 -- ---- legal_clients
 DROP POLICY IF EXISTS "Jurídico: só administradores" ON public.legal_clients;
@@ -386,7 +405,7 @@ CREATE POLICY "Jurídico: documentos só do admin jurídico da empresa" ON publi
 -- ---- mail_account_members
 DROP POLICY IF EXISTS "Mail: ver as próprias partilhas" ON public.mail_account_members;
 CREATE POLICY "Mail: ver as próprias partilhas (ou admin da empresa da caixa)" ON public.mail_account_members
-  FOR SELECT TO authenticated
+  FOR SELECT TO authenticated,mail_client
   USING (user_id = (SELECT auth.uid()) OR public.rz_admin_of_mail_account(account_id));
 
 -- ---- marketing_emails
@@ -446,8 +465,8 @@ CREATE POLICY "Avisos: o admin da empresa gere" ON public.notifications
 DROP POLICY IF EXISTS "Admins can manage all phones" ON public.phones;
 CREATE POLICY "Telefones: o admin da empresa gere" ON public.phones
   FOR ALL TO authenticated
-  USING (public.rz_is_company_admin(company_id))
-  WITH CHECK (public.rz_is_company_admin(company_id));
+  USING (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]))
+  WITH CHECK (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]));
 
 -- ---- profiles
 DROP POLICY IF EXISTS "Admins can view all profiles" ON public.profiles;
@@ -459,8 +478,8 @@ CREATE POLICY "Perfis: o admin da empresa vê" ON public.profiles
 DROP POLICY IF EXISTS "Admins can manage recurring_services" ON public.recurring_services;
 CREATE POLICY "Serviços recorrentes: o admin da empresa gere" ON public.recurring_services
   FOR ALL TO authenticated
-  USING (public.rz_is_company_admin(company_id))
-  WITH CHECK (public.rz_is_company_admin(company_id));
+  USING (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]))
+  WITH CHECK (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]));
 
 -- ---- site_domains
 DROP POLICY IF EXISTS "Admins can manage site_domains" ON public.site_domains;
@@ -494,8 +513,8 @@ CREATE POLICY "Assuntos de suporte: só a equipa da plataforma" ON public.suppor
 DROP POLICY IF EXISTS "Admins can manage all tickets" ON public.support_tickets;
 CREATE POLICY "Tickets: o admin da empresa gere" ON public.support_tickets
   FOR ALL TO authenticated
-  USING (public.rz_is_company_admin(company_id))
-  WITH CHECK (public.rz_is_company_admin(company_id));
+  USING (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]))
+  WITH CHECK (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]));
 
 -- ---- support_ticket_replies
 DROP POLICY IF EXISTS "Admins can reply to tickets" ON public.support_ticket_replies;
@@ -542,19 +561,19 @@ CREATE POLICY "Banco de horas: só a equipa da plataforma muda as regras" ON pub
 DROP POLICY IF EXISTS "Timeclock admins view time entries" ON public.time_clock_entries;
 CREATE POLICY "Ponto: quem tem permissão vê, só na sua empresa" ON public.time_clock_entries
   FOR SELECT TO authenticated
-  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR (has_timeclock_permission(auth.uid(), 'view'::text) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
+  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'view'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
 
 -- ---- time_clock_attempts
 DROP POLICY IF EXISTS "Timeclock admins view attempts" ON public.time_clock_attempts;
 CREATE POLICY "Ponto: tentativas, só na sua empresa" ON public.time_clock_attempts
   FOR SELECT TO authenticated
-  USING ((SELECT public.rz_is_super_admin()) OR public.rz_admin_of_employee(employee_id) OR (has_timeclock_permission(auth.uid(), 'view'::text) AND public.rz_member_of_employee_company(employee_id)));
+  USING ((SELECT public.rz_is_super_admin()) OR public.rz_admin_of_employee(employee_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'view'::text)) AND public.rz_member_of_employee_company(employee_id)));
 
 -- ---- time_clock_entry_history
 DROP POLICY IF EXISTS "Timeclock admins view history" ON public.time_clock_entry_history;
 CREATE POLICY "Ponto: histórico, só na sua empresa" ON public.time_clock_entry_history
   FOR SELECT TO authenticated
-  USING ((SELECT public.rz_is_super_admin()) OR public.rz_admin_of_employee(employee_id) OR (has_timeclock_permission(auth.uid(), 'view'::text) AND public.rz_member_of_employee_company(employee_id)));
+  USING ((SELECT public.rz_is_super_admin()) OR public.rz_admin_of_employee(employee_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'view'::text)) AND public.rz_member_of_employee_company(employee_id)));
 
 -- ---- time_clock_locations
 DROP POLICY IF EXISTS "Timeclock admins view locations" ON public.time_clock_locations;
@@ -563,17 +582,17 @@ DROP POLICY IF EXISTS "Timeclock managers insert locations" ON public.time_clock
 DROP POLICY IF EXISTS "Timeclock managers update locations" ON public.time_clock_locations;
 CREATE POLICY "Ponto: locais, quem tem permissão vê, só na sua empresa" ON public.time_clock_locations
   FOR SELECT TO authenticated
-  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR (has_timeclock_permission(auth.uid(), 'view'::text) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
+  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'view'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
 CREATE POLICY "Ponto: locais, quem gere apaga, só na sua empresa" ON public.time_clock_locations
   FOR DELETE TO authenticated
-  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR (has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
+  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
 CREATE POLICY "Ponto: locais, quem gere cria, só na sua empresa" ON public.time_clock_locations
   FOR INSERT TO authenticated
-  WITH CHECK ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR (has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
+  WITH CHECK ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
 CREATE POLICY "Ponto: locais, quem gere altera, só na sua empresa" ON public.time_clock_locations
   FOR UPDATE TO authenticated
-  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR (has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])))
-  WITH CHECK ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR (has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
+  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])))
+  WITH CHECK ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
 
 -- ------------------------------------------------------------------ ficheiros (storage)
 DROP POLICY IF EXISTS "Admins can manage all absence documents in storage" ON storage.objects;
@@ -621,6 +640,7 @@ CREATE POLICY "Faturas de equipamento: só a equipa da plataforma" ON storage.ob
 DO $fx$
 DECLARE
   v_def text;
+  v_fn text;
 BEGIN
   -- Palavras-passe dos acessos: só o admin da empresa do acesso (ou o serviço).
   SELECT pg_get_functiondef('public.access_password(uuid)'::regprocedure) INTO v_def;
@@ -650,6 +670,31 @@ BEGIN
   SELECT pg_get_functiondef('public.mail_access_status()'::regprocedure) INTO v_def;
   IF position('AND has_role(auth.uid(), ''admin'')' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: mail_access_status mudou'; END IF;
   EXECUTE replace(v_def, 'AND has_role(auth.uid(), ''admin'')', 'AND public.rz_is_company_admin(m.company_id)');
+
+  -- Ponto (RPC de admin): a permissão de grupo só vale nas empresas onde há pertença; o admin da empresa gere a sua.
+  SELECT pg_get_functiondef('public.time_clock_admin_create_entry(uuid,text,timestamptz,text,uuid,text,text)'::regprocedure) INTO v_def;
+  IF position('IF NOT public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') THEN' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: time_clock_admin_create_entry mudou'; END IF;
+  EXECUTE replace(v_def, 'IF NOT public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') THEN', 'IF NOT (public.rz_admin_of_employee(_employee_id) OR (public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') AND public.rz_member_of_employee_company(_employee_id))) THEN');
+  FOREACH v_fn IN ARRAY ARRAY['time_clock_admin_set_status(uuid,text,text)', 'time_clock_admin_update_entry(uuid,text,timestamptz,text,text,text)'] LOOP
+    SELECT pg_get_functiondef(v_fn::regprocedure) INTO v_def;
+    IF position('IF NOT public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') THEN' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: % mudou', v_fn; END IF;
+    EXECUTE replace(v_def, 'IF NOT public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') THEN', 'IF NOT COALESCE((SELECT public.rz_admin_of_employee(t0.employee_id) OR (public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') AND public.rz_member_of_employee_company(t0.employee_id)) FROM public.time_clock_entries t0 WHERE t0.id = _entry_id), false) THEN');
+  END LOOP;
+  SELECT pg_get_functiondef('public.time_clock_admin_review(uuid[],text,text)'::regprocedure) INTO v_def;
+  IF position('IF NOT public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') THEN' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: time_clock_admin_review mudou'; END IF;
+  EXECUTE replace(v_def, 'IF NOT public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') THEN', 'IF EXISTS (SELECT 1 FROM public.time_clock_entries t0 WHERE t0.id = ANY(_entry_ids) AND NOT (public.rz_admin_of_employee(t0.employee_id) OR (public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') AND public.rz_member_of_employee_company(t0.employee_id)))) THEN');
+  SELECT pg_get_functiondef('public.time_clock_recent_punchers(integer)'::regprocedure) INTO v_def;
+  IF position('WHERE public.has_timeclock_permission(auth.uid(), ''view'')' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: time_clock_recent_punchers mudou'; END IF;
+  EXECUTE replace(v_def, 'WHERE public.has_timeclock_permission(auth.uid(), ''view'')', 'WHERE (public.rz_admin_of_employee(e.employee_id) OR (public.has_timeclock_permission(auth.uid(), ''view'') AND public.rz_member_of_employee_company(e.employee_id)))');
+
+  -- Tarefas criadas por admin: só para a empresa que o admin gere.
+  SELECT pg_get_functiondef('public.admin_task_people(uuid)'::regprocedure) INTO v_def;
+  IF position('IF NOT public.rz_is_admin() THEN' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: admin_task_people mudou'; END IF;
+  EXECUTE replace(v_def, 'IF NOT public.rz_is_admin() THEN', 'IF NOT public.rz_is_company_admin(_company_id) THEN');
+  SELECT p.oid::regprocedure::text INTO v_fn FROM pg_proc p WHERE p.proname = 'admin_create_task' AND p.pronamespace = 'public'::regnamespace;
+  SELECT pg_get_functiondef(v_fn::regprocedure) INTO v_def;
+  IF position('IF NOT public.rz_is_admin() THEN' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: admin_create_task mudou'; END IF;
+  EXECUTE replace(v_def, 'IF NOT public.rz_is_admin() THEN', 'IF NOT public.rz_is_company_admin(_company_id) THEN');
 END
 $fx$;
 

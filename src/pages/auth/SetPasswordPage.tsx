@@ -191,7 +191,9 @@ const SetPasswordPage = () => {
           .eq('role', 'admin')
           .maybeSingle();
 
-        if (adminRole || (await accessService.isCompanyAdmin()).data) {
+        const companyAdmin = adminRole ? null : await accessService.isCompanyAdmin();
+        if (companyAdmin?.transient) throw companyAdmin.error;
+        if (adminRole || companyAdmin?.data) {
           window.location.href = '/admin';
           return;
         }

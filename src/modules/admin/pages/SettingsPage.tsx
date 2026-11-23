@@ -137,6 +137,20 @@ const SettingsPage = () => {
   // Separador aberto por ligação (ex.: ?tab=equipa a partir da ficha do colaborador).
   const [searchParams] = useSearchParams();
   const tabParam = searchParams.get('tab');
+  const [activeTab, setActiveTab] = useState(tabParam ?? 'profile');
+  // ?tab= só abre o separador a quem o pode ver (os separadores de grupos, acessos e suporte têm permissão).
+  const tabAllowed = (tab: string) =>
+    tab === 'groups'
+      ? canViewTopic('settings', 'groups')
+      : tab === 'access'
+        ? canViewTopic('settings', 'admins')
+        : tab === 'suporte'
+          ? canViewTopic('settings', 'support_subjects')
+          : true;
+  useEffect(() => {
+    if (!isLoadingPermissions && !tabAllowed(activeTab)) setActiveTab('profile');
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- tabAllowed deriva de canViewTopic
+  }, [isLoadingPermissions, activeTab, canViewTopic]);
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -601,7 +615,7 @@ const SettingsPage = () => {
           description="Gerir preferências da conta e do sistema"
         />
 
-        <Tabs defaultValue={tabParam ?? 'profile'} className="space-y-6">
+        <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
           <TabsList className="flex-wrap">
             <TabsTrigger value="profile" className="gap-2">
               <User className="h-4 w-4" />

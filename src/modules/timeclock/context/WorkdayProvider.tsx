@@ -2,7 +2,12 @@
 // tag): registos recentes do colaborador e a ação em curso.
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { addDays, startOfDay } from 'date-fns';
-import { readDeviceCache, sessionUserId, writeDeviceCacheIfSession } from '@/lib/device-cache';
+import {
+  readDeviceCache,
+  sessionChangedSince,
+  sessionUserId,
+  writeDeviceCacheIfSession,
+} from '@/lib/device-cache';
 import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
 import { ACTION_ENTRY, deriveWorkday, type WorkdayAction } from '@/lib/workday';
 import { useCurrentEmployee } from '../hooks/useCurrentEmployee';
@@ -69,7 +74,7 @@ export const WorkdayProvider: React.FC<{ children: React.ReactNode }> = ({ child
       addDays(today, -1).toISOString(),
       addDays(today, 2).toISOString()
     );
-    if (!error) {
+    if (!error && !sessionChangedSince(requester)) {
       setEntries(data);
       loadedAt.current = Date.now();
       writeDeviceCacheIfSession(ENTRIES_CACHE, requester, data);

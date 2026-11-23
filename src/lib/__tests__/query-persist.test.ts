@@ -19,6 +19,7 @@ import {
   clearAllDeviceData,
   clearDeviceCache,
   readDeviceCache,
+  sessionChangedSince,
   sessionUserId,
   writeDeviceCache,
   writeDeviceCacheIfSession,
@@ -296,6 +297,50 @@ describe('limpar tudo o que é do utilizador no aparelho', () => {
     expect(keysOf('u2')).toHaveLength(4);
   });
 
+  it('apaga também separadores, rascunhos e recentes que ficavam para a conta seguinte', () => {
+    localStorage.setItem('rz-tabs:u1', '[]');
+    localStorage.setItem('rz.admin.broadcast.draft', '{"texto":"rascunho"}');
+    localStorage.setItem('rz.people.recent', '["x"]');
+    localStorage.setItem('rz.mail.supportCompany', 'empresa');
+    localStorage.setItem('rz-last-punch-at', '1');
+    localStorage.setItem('rz.mail.contacts.backfilled', '1');
+    localStorage.setItem('rz.admin.company-scope', 'c:abc');
+
+    clearAllDeviceData('u2');
+
+    expect(localStorage.length).toBe(0);
+  });
+
+  it('as chaves globais saem sempre, mesmo a poupar a conta nova; as da conta nova ficam', () => {
+    localStorage.setItem('rz.people.recent', '["x"]');
+    localStorage.setItem('rz-tabs:u2', '[]');
+
+    clearAllDeviceData('u2');
+
+    expect(localStorage.getItem('rz.people.recent')).toBeNull();
+    expect(localStorage.getItem('rz-tabs:u2')).toBe('[]');
+  });
+
+  it('poupa só as chaves exatas da conta nova (um id parecido não a protege)', () => {
+    localStorage.setItem('rz.role.u2', 'admin');
+    localStorage.setItem('rz-ai-chat:xu2', '[]');
+    localStorage.setItem('rz-mail-cache:u22:inbox', '{}');
+
+    clearAllDeviceData('u2');
+
+    expect(localStorage.getItem('rz.role.u2')).toBe('admin');
+    expect(localStorage.getItem('rz-ai-chat:xu2')).toBeNull();
+    expect(localStorage.getItem('rz-mail-cache:u22:inbox')).toBeNull();
+  });
+
+  it('sessionChangedSince: só diz que mudou se havia dono e a sessão já é outra', () => {
+    session('u1');
+    expect(sessionChangedSince('u1')).toBe(false);
+    expect(sessionChangedSince(null)).toBe(false);
+    session('u2');
+    expect(sessionChangedSince('u1')).toBe(true);
+  });
+
   it('só grava se a sessão ainda for a de quem pediu', () => {
     session('u1');
     writeDeviceCacheIfSession('x', 'u1', { a: 1 });
@@ -329,6 +374,46 @@ describe('sessão: limpeza completa e observadores montados', () => {
     expect(localStorage.getItem('rz-mail-cache:u1:inbox')).toBeNull();
     expect(localStorage.getItem('rz-ai-chat:u1')).toBeNull();
     expect(localStorage.getItem('rz.role.u1')).toBeNull();
+  });
+
+  it('conta nova sem dono anterior (sessão que desapareceu sem SIGNED_OUT) apaga o que ficou no aparelho', () => {
+    localStorage.setItem('rz-mail-cache:u1:inbox', '{}');
+    localStorage.setItem('rz.role.u2', 'colaborador');
+    stop = persistQueries(new QueryClient());
+
+    auth.listener?.('SIGNED_IN', { user: { id: 'u2' } });
+
+    expect(localStorage.getItem('rz-mail-cache:u1:inbox')).toBeNull();
+    expect(localStorage.getItem('rz.role.u2')).toBe('colaborador');
+  });
+
+  it('outra conta a entrar também limpa as mutações em memória', () => {
+    session('u1');
+    const client = new QueryClient();
+    stop = persistQueries(client);
+    const clearMutations = vi.spyOn(client.getMutationCache(), 'clear');
+
+    auth.listener?.('SIGNED_IN', { user: { id: 'u2' } });
+
+    expect(clearMutations).toHaveBeenCalled();
+  });
+
+  it('terminar a sessão cancela os pedidos em curso antes de limpar a memória', () => {
+    session('u1');
+    const client = new QueryClient();
+    const order: string[] = [];
+    vi.spyOn(client, 'cancelQueries').mockImplementation(() => {
+      order.push('cancel');
+      return Promise.resolve();
+    });
+    vi.spyOn(client, 'clear').mockImplementation(() => {
+      order.push('clear');
+    });
+    stop = persistQueries(client);
+
+    auth.listener?.('SIGNED_OUT', null);
+
+    expect(order).toEqual(['cancel', 'clear']);
   });
 
   it('outra conta a entrar apaga o que ficou no aparelho da anterior e mantém o da nova', () => {

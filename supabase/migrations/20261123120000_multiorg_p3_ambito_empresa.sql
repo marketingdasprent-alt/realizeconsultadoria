@@ -85,7 +85,9 @@ CREATE OR REPLACE FUNCTION public.rz_admin_of_mail_account(p_account uuid)
  RETURNS boolean LANGUAGE sql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $function$
   SELECT EXISTS (SELECT 1 FROM public.mail_accounts a
-                  WHERE a.id = p_account AND public.rz_is_company_admin(a.company_id));
+                  WHERE a.id = p_account
+                    AND (public.rz_is_company_admin(a.company_id)
+                         OR (a.company_id IS NULL AND public.rz_is_super_admin())));
 $function$;
 
 -- A conta (colaborador ou administrador) pertence a uma empresa que o admin gere.
@@ -161,6 +163,30 @@ AS $function$
       -- <conta do colaborador>/<ausência>/... (absence-documents)
       OR public.rz_admin_of_user(public.rz_path_uuid(p_name));
 $function$;
+
+-- A fila da equipa de suporte (RPC definer): só tickets das empresas onde a pessoa tem pertença. A pertença à
+-- equipa vem do texto livre employees.department (de qualquer empresa), por isso sem este filtro um admin de
+-- empresa externa lia os tickets de todas as empresas ao editar o departamento de uma ficha sua.
+CREATE OR REPLACE FUNCTION public.support_desk_tickets()
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT coalesce(jsonb_agg(
+    to_jsonb(st)
+      || jsonb_build_object(
+        'employees', jsonb_build_object('name', e.name, 'email', e.email),
+        'companies', jsonb_build_object('name', c.name)
+      )
+    ORDER BY st.created_at DESC), '[]'::jsonb)
+  FROM support_tickets st
+  JOIN employees e ON e.id = st.employee_id
+  LEFT JOIN companies c ON c.id = st.company_id
+  WHERE st.department_id IN (SELECT public.rz_support_desk_departments())
+    AND st.company_id = ANY (public.rz_my_company_ids())
+    AND coalesce(e.user_id, '00000000-0000-0000-0000-000000000000'::uuid) <> auth.uid();
+$$;
+REVOKE ALL ON FUNCTION public.support_desk_tickets() FROM anon, public;
+GRANT EXECUTE ON FUNCTION public.support_desk_tickets() TO authenticated;
 
 -- Equipa de suporte: o administrador da empresa do ticket, ou quem está no departamento da equipa mas
 -- só nos tickets das empresas onde tem pertença.
@@ -241,8 +267,10 @@ CREATE POLICY "Documentos de ausência: o admin da empresa gere" ON public.absen
 DROP POLICY IF EXISTS "Admins can manage all accesses" ON public.accesses;
 CREATE POLICY "Acessos: o admin da empresa gere" ON public.accesses
   FOR ALL TO authenticated
-  USING (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]))
-  WITH CHECK (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]));
+  USING (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[])
+         OR (company_id IS NULL AND (SELECT public.rz_is_super_admin())))
+  WITH CHECK (company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[])
+              OR (company_id IS NULL AND (SELECT public.rz_is_super_admin())));
 
 -- ---- access_categories
 DROP POLICY IF EXISTS "Admins can manage all access categories" ON public.access_categories;
@@ -561,7 +589,7 @@ CREATE POLICY "Banco de horas: só a equipa da plataforma muda as regras" ON pub
 DROP POLICY IF EXISTS "Timeclock admins view time entries" ON public.time_clock_entries;
 CREATE POLICY "Ponto: quem tem permissão vê, só na sua empresa" ON public.time_clock_entries
   FOR SELECT TO authenticated
-  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'view'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
+  USING ((SELECT public.rz_is_super_admin()) OR company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]) OR ((SELECT has_timeclock_permission(auth.uid(), 'view'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
 
 -- ---- time_clock_attempts
 DROP POLICY IF EXISTS "Timeclock admins view attempts" ON public.time_clock_attempts;
@@ -582,17 +610,17 @@ DROP POLICY IF EXISTS "Timeclock managers insert locations" ON public.time_clock
 DROP POLICY IF EXISTS "Timeclock managers update locations" ON public.time_clock_locations;
 CREATE POLICY "Ponto: locais, quem tem permissão vê, só na sua empresa" ON public.time_clock_locations
   FOR SELECT TO authenticated
-  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'view'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
+  USING ((SELECT public.rz_is_super_admin()) OR company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]) OR ((SELECT has_timeclock_permission(auth.uid(), 'view'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
 CREATE POLICY "Ponto: locais, quem gere apaga, só na sua empresa" ON public.time_clock_locations
   FOR DELETE TO authenticated
-  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
+  USING ((SELECT public.rz_is_super_admin()) OR company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
 CREATE POLICY "Ponto: locais, quem gere cria, só na sua empresa" ON public.time_clock_locations
   FOR INSERT TO authenticated
-  WITH CHECK ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
+  WITH CHECK ((SELECT public.rz_is_super_admin()) OR company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
 CREATE POLICY "Ponto: locais, quem gere altera, só na sua empresa" ON public.time_clock_locations
   FOR UPDATE TO authenticated
-  USING ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])))
-  WITH CHECK ((SELECT public.rz_is_super_admin()) OR public.rz_is_company_admin(company_id) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
+  USING ((SELECT public.rz_is_super_admin()) OR company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])))
+  WITH CHECK ((SELECT public.rz_is_super_admin()) OR company_id = ANY ((SELECT public.rz_admin_company_ids())::uuid[]) OR ((SELECT has_timeclock_permission(auth.uid(), 'execute'::text, 'locations'::text)) AND company_id = ANY ((SELECT public.rz_my_company_ids())::uuid[])));
 
 -- ------------------------------------------------------------------ ficheiros (storage)
 DROP POLICY IF EXISTS "Admins can manage all absence documents in storage" ON storage.objects;
@@ -646,7 +674,7 @@ BEGIN
   SELECT pg_get_functiondef('public.access_password(uuid)'::regprocedure) INTO v_def;
   IF position('NOT has_role(auth.uid(), ''admin'') THEN' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: access_password mudou'; END IF;
   EXECUTE replace(v_def, 'NOT has_role(auth.uid(), ''admin'') THEN',
-    'NOT COALESCE((SELECT public.rz_is_company_admin(a0.company_id) FROM public.accesses a0 WHERE a0.id = _access_id), false) THEN');
+    'NOT COALESCE((SELECT public.rz_is_company_admin(a0.company_id) OR (a0.company_id IS NULL AND public.rz_is_super_admin()) FROM public.accesses a0 WHERE a0.id = _access_id), false) THEN');
 
   -- PIN/PUK dos cartões: só se todos os telefones pedidos são de empresas que o admin gere.
   SELECT pg_get_functiondef('public.phone_codes(uuid[])'::regprocedure) INTO v_def;
@@ -669,7 +697,7 @@ BEGIN
   -- Estado das caixas de email: só as da empresa que o admin gere.
   SELECT pg_get_functiondef('public.mail_access_status()'::regprocedure) INTO v_def;
   IF position('AND has_role(auth.uid(), ''admin'')' IN v_def) = 0 THEN RAISE EXCEPTION 'p3: mail_access_status mudou'; END IF;
-  EXECUTE replace(v_def, 'AND has_role(auth.uid(), ''admin'')', 'AND public.rz_is_company_admin(m.company_id)');
+  EXECUTE replace(v_def, 'AND has_role(auth.uid(), ''admin'')', 'AND (public.rz_is_company_admin(m.company_id) OR (m.company_id IS NULL AND public.rz_is_super_admin()))');
 
   -- Ponto (RPC de admin): a permissão de grupo só vale nas empresas onde há pertença; o admin da empresa gere a sua.
   SELECT pg_get_functiondef('public.time_clock_admin_create_entry(uuid,text,timestamptz,text,uuid,text,text)'::regprocedure) INTO v_def;
@@ -709,6 +737,34 @@ AS $function$
   WHERE public.rz_is_company_admin(e.company_id)
      OR (public.rz_is_admin() AND e.company_id = ANY (public.rz_my_company_ids()));
 $function$;
+
+-- ------------------------------------------------------------------ empresa forjada nos pedidos do colaborador
+-- Os INSERT "Employees can create own absences/tickets" só validam o employee_id. Sem isto, um colaborador de A
+-- podia pôr company_id = B e meter pedidos na fila do admin de B. Nos pedidos feitos pelo próprio colaborador a
+-- empresa passa a ser sempre a da sua ficha.
+CREATE OR REPLACE FUNCTION public.rz_force_own_company()
+ RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_company uuid;
+BEGIN
+  SELECT e.company_id INTO v_company
+  FROM public.employees e
+  WHERE e.id = NEW.employee_id AND e.user_id = auth.uid() AND e.company_id IS NOT NULL;
+  IF FOUND THEN
+    NEW.company_id := v_company;
+  END IF;
+  RETURN NEW;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.rz_force_own_company() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS tr_rz_force_own_company ON public.absences;
+CREATE TRIGGER tr_rz_force_own_company BEFORE INSERT ON public.absences
+  FOR EACH ROW EXECUTE FUNCTION public.rz_force_own_company();
+DROP TRIGGER IF EXISTS tr_rz_force_own_company ON public.support_tickets;
+CREATE TRIGGER tr_rz_force_own_company BEFORE INSERT ON public.support_tickets
+  FOR EACH ROW EXECUTE FUNCTION public.rz_force_own_company();
 
 -- ------------------------------------------------------------------ dados
 DO $d$

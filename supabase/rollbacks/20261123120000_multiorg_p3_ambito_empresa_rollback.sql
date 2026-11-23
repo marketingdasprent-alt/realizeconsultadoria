@@ -428,11 +428,34 @@ AS $function$
   );
 $function$;
 
+DROP TRIGGER IF EXISTS tr_rz_force_own_company ON public.absences;
+DROP TRIGGER IF EXISTS tr_rz_force_own_company ON public.support_tickets;
+DROP FUNCTION IF EXISTS public.rz_force_own_company();
+
+-- support_desk_tickets: definição anterior (sem filtro por empresa).
+CREATE OR REPLACE FUNCTION public.support_desk_tickets()
+RETURNS jsonb
+LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
+AS $$
+  SELECT coalesce(jsonb_agg(
+    to_jsonb(st)
+      || jsonb_build_object(
+        'employees', jsonb_build_object('name', e.name, 'email', e.email),
+        'companies', jsonb_build_object('name', c.name)
+      )
+    ORDER BY st.created_at DESC), '[]'::jsonb)
+  FROM support_tickets st
+  JOIN employees e ON e.id = st.employee_id
+  LEFT JOIN companies c ON c.id = st.company_id
+  WHERE st.department_id IN (SELECT public.rz_support_desk_departments())
+    AND coalesce(e.user_id, '00000000-0000-0000-0000-000000000000'::uuid) <> auth.uid();
+$$;
+
 DO $fx$
 DECLARE v_def text; v_fn text;
 BEGIN
   SELECT pg_get_functiondef('public.access_password(uuid)'::regprocedure) INTO v_def;
-  EXECUTE replace(v_def, 'NOT COALESCE((SELECT public.rz_is_company_admin(a0.company_id) FROM public.accesses a0 WHERE a0.id = _access_id), false) THEN', 'NOT has_role(auth.uid(), ''admin'') THEN');
+  EXECUTE replace(v_def, 'NOT COALESCE((SELECT public.rz_is_company_admin(a0.company_id) OR (a0.company_id IS NULL AND public.rz_is_super_admin()) FROM public.accesses a0 WHERE a0.id = _access_id), false) THEN', 'NOT has_role(auth.uid(), ''admin'') THEN');
   SELECT pg_get_functiondef('public.phone_codes(uuid[])'::regprocedure) INTO v_def;
   EXECUTE replace(v_def, 'IF NOT (SELECT public.rz_is_super_admin()) AND EXISTS (SELECT 1 FROM public.phones p0 WHERE p0.id = ANY(_phone_ids) AND NOT public.rz_is_company_admin(p0.company_id)) THEN', 'IF NOT has_role(auth.uid(), ''admin'') THEN');
   SELECT pg_get_functiondef('public.reschedule_vacation(uuid,jsonb,text)'::regprocedure) INTO v_def;
@@ -440,7 +463,7 @@ BEGIN
   SELECT pg_get_functiondef('public.review_employee_document(uuid,text,text,text,date,date,date,text)'::regprocedure) INTO v_def;
   EXECUTE replace(v_def, 'IF NOT COALESCE((SELECT public.rz_admin_of_employee(d0.employee_id) FROM public.employee_documents d0 WHERE d0.id = _document_id), false) THEN', 'IF NOT public.has_role(auth.uid(), ''admin''::app_role) THEN');
   SELECT pg_get_functiondef('public.mail_access_status()'::regprocedure) INTO v_def;
-  EXECUTE replace(v_def, 'AND public.rz_is_company_admin(m.company_id)', 'AND has_role(auth.uid(), ''admin'')');
+  EXECUTE replace(v_def, 'AND (public.rz_is_company_admin(m.company_id) OR (m.company_id IS NULL AND public.rz_is_super_admin()))', 'AND has_role(auth.uid(), ''admin'')');
   SELECT pg_get_functiondef('public.time_clock_admin_create_entry(uuid,text,timestamptz,text,uuid,text,text)'::regprocedure) INTO v_def;
   EXECUTE replace(v_def, 'IF NOT (public.rz_admin_of_employee(_employee_id) OR (public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') AND public.rz_member_of_employee_company(_employee_id))) THEN', 'IF NOT public.has_timeclock_permission(auth.uid(), ''execute'', ''edit'') THEN');
   FOREACH v_fn IN ARRAY ARRAY['time_clock_admin_set_status(uuid,text,text)', 'time_clock_admin_update_entry(uuid,text,timestamptz,text,text,text)'] LOOP

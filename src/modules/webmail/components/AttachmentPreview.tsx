@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Copy, Download, Loader2, MailPlus, RefreshCw } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
+import { formatBytes } from '@/modules/messenger/lib/files';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { attachmentClipboard } from '../lib/attachmentClipboard';
 import {
@@ -36,6 +37,7 @@ export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
   onNewEmail,
 }) => {
   const [loaded, setLoaded] = useState<LoadedAttachment | null>(null);
+  const [copying, setCopying] = useState(false);
   const [url, setUrl] = useState<string | null>(null);
   const [text, setText] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -80,6 +82,10 @@ export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
   const { attachment } = target;
 
   const copy = async () => {
+    // Um anexo copiado antes não pode ficar pronto a colar no lugar deste (se este falhar,
+    // colava-se o ficheiro errado sem ninguém dar por isso).
+    attachmentClipboard.clear();
+    setCopying(true);
     try {
       const file = await attachmentFile(
         target.accountId,
@@ -87,13 +93,28 @@ export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
         attachment.id,
         attachment.filename
       );
+      if (!file.size) {
+        const empty: MailError = { code: 'empty_file', message: 'O ficheiro veio vazio.' };
+        throw empty;
+      }
       attachmentClipboard.copy([file]);
       toast({
-        title: 'Anexo copiado',
+        title: `Anexo copiado: ${file.name} (${formatBytes(file.size)})`,
         description: 'Num email que esteja a escrever, carregue em "Colar" ou Ctrl+V.',
       });
-    } catch {
-      toast({ title: 'Não foi possível copiar o anexo', variant: 'destructive' });
+    } catch (error) {
+      toast({
+        title: 'Não foi possível copiar o anexo',
+        // Só os erros do email (com código) têm texto para mostrar; os outros (rede, browser)
+        // ficam com a frase de recurso, em vez de mensagens internas ou em inglês.
+        description:
+          (error && typeof error === 'object' && 'code' in error
+            ? mailErrorText(error as MailError)
+            : '') || 'Tente outra vez, ou use "Novo email com anexo".',
+        variant: 'destructive',
+      });
+    } finally {
+      setCopying(false);
     }
   };
   const secondary =
@@ -106,8 +127,15 @@ export const AttachmentPreview: React.FC<AttachmentPreviewProps> = ({
           <DialogTitle className="min-w-0 flex-1 truncate text-[16px] font-extrabold">
             {attachment.filename}
           </DialogTitle>
-          <button type="button" onClick={() => void copy()} className={secondary}>
-            <Copy className="h-4 w-4" /> Copiar
+          <button
+            type="button"
+            onClick={() => void copy()}
+            disabled={copying}
+            aria-busy={copying}
+            className={secondary}
+          >
+            {copying ? <Loader2 className="h-4 w-4 animate-spin" /> : <Copy className="h-4 w-4" />}
+            {copying ? 'A copiar…' : 'Copiar'}
           </button>
           <button type="button" onClick={() => onNewEmail(target)} className={secondary}>
             <MailPlus className="h-4 w-4" /> Novo email com anexo

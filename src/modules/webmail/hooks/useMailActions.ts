@@ -10,6 +10,7 @@ import { composeWithSignature } from '../lib/signature';
 import { contactService } from '../services/contactService';
 import { mailErrorText, mailService, type MailError } from '../services/mailService';
 import type { ComposeInput, MailFolder, MailSummary } from '../types';
+import { detachInlineImages } from '../lib/inlineImages';
 import { useMailChanges, type MailChange } from './useMailChanges';
 
 const fail = (error: MailError | null, fallback: string): void => {
@@ -114,7 +115,9 @@ export const useMailActions = (folder?: MailFolder) => {
       // Conta tudo o que vai no pedido (anexos, HTML e o texto, que repete a conversa citada)
       // com folga para o JSON; antes ficava de fora o texto e o servidor recusava a fila.
       const bytes = input.attachments.reduce((total, a) => total + a.base64.length, 0);
-      let queued = (bytes + composed.html.length + composed.text.length) * 1.05 < QUEUE_MAX_BYTES;
+      // As imagens da conversa não contam: vão por referência e o servidor junta-as (cid:).
+      const htmlBytes = detachInlineImages(composed.html).html.length;
+      let queued = (bytes + htmlBytes + composed.text.length) * 1.05 < QUEUE_MAX_BYTES;
       let { data, error } = await mailService.send(outgoing, composed.html, queued);
       // A fila não o aceitou por ser grande: vai direto, como os pesados
       if (queued && error?.code === 'too_large') {

@@ -18,6 +18,7 @@ import {
   type GmailMessagePart,
 } from '../../_shared/mail/gmail-parse.ts';
 import { referencedContentIds, replaceCidLinks } from '../../_shared/mail/html.ts';
+import { partMarkedDataUrl } from '../../_shared/mail/inline-token.ts';
 import {
   base64UrlEncode,
   base64UrlToBase64,
@@ -271,7 +272,9 @@ export const createGmailDriver = (
           const data =
             p.data ?? (p.attachmentId ? await attachmentData(messageId, p.attachmentId) : null);
           if (!data) return;
-          urls[p.contentId] = `data:${p.mime};base64,${base64UrlToBase64(data)}`;
+          // Com a marca da parte (o id do anexo no Gmail é o partId): ao citar, o envio volta a
+          // buscá-la à caixa (inline-token.ts)
+          urls[p.contentId] = partMarkedDataUrl(p.mime, base64UrlToBase64(data), p.partId);
           embedded.add(p.partId);
         });
         html = replaceCidLinks(html, urls);

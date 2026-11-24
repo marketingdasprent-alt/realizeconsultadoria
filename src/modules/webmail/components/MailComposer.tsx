@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { toast } from '@/hooks/use-toast';
+import { formatBytes } from '@/modules/messenger/lib/files';
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog';
 import { useDirectory } from '@/modules/social/hooks/useDirectory';
 import { attachmentClipboard, useCopiedAttachments } from '../lib/attachmentClipboard';
@@ -139,8 +140,13 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   // Anexo copiado noutro email ("Copiar" no visualizador): oferece-se para colar aqui.
   const copied = useCopiedAttachments();
   const pasteCopied = () => {
-    addFiles(attachmentClipboard.get());
+    const pasted = attachmentClipboard.get();
+    addFiles(pasted);
     attachmentClipboard.clear();
+    // Confirma o que entrou (nome e tamanho), para não seguir um ficheiro trocado.
+    toast({
+      title: `Anexo colado: ${pasted.map(file => `${file.name} (${formatBytes(file.size)})`).join(', ')}`,
+    });
   };
   const { isDragging, dropProps } = useFileDrop(addFiles);
   const [busy, setBusy] = useState(false);
@@ -476,6 +482,11 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     }
     event.preventDefault();
     addFiles(pasted);
+    // Ficheiros da área de transferência do computador: diz quais, para não se trocarem com
+    // o anexo copiado no Realize.
+    toast({
+      title: `Anexo colado: ${pasted.map(file => `${file.name} (${formatBytes(file.size)})`).join(', ')}`,
+    });
   };
 
   const openPopout = (at?: { left: number; top: number }) => {
@@ -717,7 +728,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
       {copied.length > 0 && (
         <div className="mx-5 mb-2 flex items-center gap-2 rounded-2xl bg-rz-primary-soft px-3 py-2 text-[12.5px]">
           <span className="min-w-0 flex-1 truncate">
-            📎 <b>{copied.map(file => file.name).join(', ')}</b> copiado
+            📎 <b>{copied.map(file => `${file.name} (${formatBytes(file.size)})`).join(', ')}</b>{' '}
+            copiado
           </span>
           <button
             type="button"

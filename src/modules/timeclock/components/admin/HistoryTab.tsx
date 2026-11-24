@@ -26,18 +26,23 @@ export const HistoryTab: React.FC = () => {
   const [onlyManual, setOnlyManual] = useState(true);
   const [scope, setScope] = useState<'entries' | 'config'>('entries');
   const [search, setSearch] = useState('');
-  const entriesHistory = useTimeClockHistory(days);
   const configHistory = useTimeClockConfigHistory(days, scope === 'config');
+  const { employees } = useEmployees();
+  // Só as alterações de quem é das empresas escolhidas no menu (sem escolha: todas). O âmbito
+  // entra na consulta, para o limite de 500 não cortar as da escolha.
+  const { ids: scopeIds } = useCompanyScope();
+  const scopedEmployeeIds = useMemo(
+    () => (scopeIds ? employees.filter(e => inScope(scopeIds, e.company_id)).map(e => e.id) : null),
+    [employees, scopeIds]
+  );
+  const entriesHistory = useTimeClockHistory(days, scopedEmployeeIds);
   const { items } = entriesHistory;
   const { isLoading, error } = scope === 'config' ? configHistory : entriesHistory;
-  const { employees } = useEmployees();
 
   const employeeNames = useMemo(
     () => Object.fromEntries(employees.map(e => [e.id, e.name])),
     [employees]
   );
-  // Só as alterações de quem é das empresas escolhidas no menu (sem escolha: todas).
-  const { ids: scopeIds } = useCompanyScope();
   const companyOfEmployee = useMemo(
     () => Object.fromEntries(employees.map(e => [e.id, e.company_id])),
     [employees]

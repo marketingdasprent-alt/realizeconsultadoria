@@ -40,6 +40,8 @@ export const useTimeClockReview = (enabled = true): UseTimeClockReviewResult => 
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Chave estável das empresas da escolha (para a consulta de tentativas).
+  const idsKey = scopeIds ? [...scopeIds].sort().join(',') : null;
   const fetchAll = useCallback(async () => {
     if (!enabled) return;
     setIsLoading(true);
@@ -50,7 +52,11 @@ export const useTimeClockReview = (enabled = true): UseTimeClockReviewResult => 
     const [pendingRes, flaggedRes, attemptsRes] = await Promise.all([
       timeClockService.getEntries({ fromIso: from, toIso: tomorrow, status: 'pending' }),
       timeClockService.getEntries({ fromIso: from, toIso: tomorrow, status: 'flagged' }),
-      timeClockService.getAttempts(addDays(now, -30).toISOString(), tomorrow),
+      timeClockService.getAttempts(
+        addDays(now, -30).toISOString(),
+        tomorrow,
+        idsKey === null ? null : idsKey.split(',').filter(Boolean)
+      ),
     ]);
     if (pendingRes.error || flaggedRes.error || attemptsRes.error) {
       setError('Erro ao carregar registos para revisão');
@@ -59,7 +65,7 @@ export const useTimeClockReview = (enabled = true): UseTimeClockReviewResult => 
     setFlagged([...flaggedRes.data].reverse());
     setAttempts(attemptsRes.data);
     setIsLoading(false);
-  }, [enabled]);
+  }, [enabled, idsKey]);
 
   useEffect(() => {
     fetchAll();

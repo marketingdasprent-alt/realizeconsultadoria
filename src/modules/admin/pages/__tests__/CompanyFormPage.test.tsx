@@ -178,6 +178,7 @@ beforeEach(() => {
   myCompanies.isLoading = false;
   myCompanies.error = null;
   myCompanies.isFetching = false;
+  refetchMine.mockReset();
 });
 
 describe('CompanyFormPage — edição', () => {
@@ -286,12 +287,19 @@ describe('CompanyFormPage — edição', () => {
       expect(screen.queryByRole('button', { name: /tentar de novo/i })).not.toBeInTheDocument();
     });
 
-    it('durante o novo pedido o aviso fica montado, com o botão desativado', async () => {
+    it('ao clicar "Tentar de novo" o aviso fica montado (o React Query repõe isLoading e apaga o erro)', async () => {
       myCompanies.data = undefined;
       myCompanies.error = new Error('rede');
-      myCompanies.isFetching = true;
+      // Como o React Query real: sem dados, o novo pedido volta a "pending" e o erro desaparece
+      refetchMine.mockImplementation(() => {
+        myCompanies.error = null;
+        myCompanies.isLoading = true;
+        myCompanies.isFetching = true;
+        return new Promise(() => {});
+      });
       renderAt('/admin/empresas/c1?tab=partilha');
-      expect(await screen.findByRole('alert')).toBeInTheDocument();
+      await userEvent.click(await screen.findByRole('button', { name: /tentar de novo/i }));
+      expect(screen.getByRole('alert')).toBeInTheDocument();
       expect(screen.getByRole('button', { name: /a tentar/i })).toBeDisabled();
     });
 

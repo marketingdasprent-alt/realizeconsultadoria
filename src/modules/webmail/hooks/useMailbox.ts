@@ -217,6 +217,7 @@ const messageKey = (mail: Pick<MailSummary, 'accountId' | 'id'> | null) =>
 const fetchMessage = async (mail: MailSummary) => {
   const { data, error } = await mailService.get(mail.accountId, mail.id);
   if (error) throw error;
+  if (!data) throw new Error('O servidor não devolveu o email.');
   return data;
 };
 
@@ -241,6 +242,7 @@ export const usePrefetchMessage = () => {
             queryKey: messageKey(mail),
             queryFn: () => fetchMessage(mail),
             staleTime: 5 * 60_000,
+            retry: false,
           })
           .finally(() => {
             busy.current = false;
@@ -260,9 +262,8 @@ export const useMailMessage = (summary: MailSummary | null) => {
     queryFn: () => fetchMessage(summary!),
     enabled: !isPreview && !!summary,
     staleTime: 5 * 60_000,
-    // Uma repetição no máximo (o pedido já tenta duas vezes): depois mostra o erro e o
-    // "Tentar outra vez", em vez de ficar minutos em "A abrir o email…".
-    retry: 1,
+    // O pedido já tem limite de 30 s. Sem repetições automáticas que prolonguem a espera.
+    retry: false,
   });
   if (isPreview)
     return {
@@ -301,6 +302,7 @@ export const usePrefetchTop = (messages: MailSummary[], count = 4) => {
             queryKey: messageKey(mail),
             queryFn: () => fetchMessage(mail),
             staleTime: 5 * 60_000,
+            retry: false,
           })
           .catch(() => undefined);
       }

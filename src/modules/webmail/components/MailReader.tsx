@@ -134,7 +134,7 @@ export const MailReader: React.FC<MailReaderProps> = ({
           )}
           <div className="flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-[13px] text-amber-900 ring-1 ring-amber-200">
             <span className="flex-1">
-              Não foi possível abrir este email (o servidor de email está lento a responder).
+              Não foi possível carregar o email completo. Tente outra vez.
             </span>
             {onRetry && (
               <button

@@ -106,6 +106,28 @@ const toMessage = (accountId: string, row: Row): MailMessage => ({
 
 const READ_ACTIONS = new Set(['list', 'get', 'unread-counts', 'attachment', 'discover', 'folders']);
 
+/** Limite total da abertura, incluindo espera pela sessão e pelo corpo da resposta. */
+const invokeMessage = async (body: Row) => {
+  const controller = new AbortController();
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const deadline = new Promise<{ data: null; error: Error }>(resolve => {
+    timer = setTimeout(() => {
+      resolve({ data: null, error: new Error('Tempo de abertura esgotado.') });
+      controller.abort();
+    }, 30_000);
+  });
+  try {
+    return await Promise.race([
+      supabase.functions.invoke('mail-api', { body, signal: controller.signal }),
+      deadline,
+    ]);
+  } catch {
+    return { data: null, error: new Error('Não foi possível abrir o email.') };
+  } finally {
+    clearTimeout(timer);
+  }
+};
+
 /**
  * Chama uma edge function; respostas de negócio vêm como { ok, code, message, data }. Sem resposta
  * (rede, ou a BD lenta a dar 500/503) tenta mais uma vez antes de mostrar o erro — só nas leituras:
@@ -115,8 +137,12 @@ const call = async <T>(
   fn: 'mail-api' | 'mail-oauth',
   body: Row
 ): Promise<{ data: T | null; error: MailError | null }> => {
-  let { data, error } = await supabase.functions.invoke(fn, { body });
-  if ((error || !data) && READ_ACTIONS.has(String(body.action))) {
+  const isMessage = fn === 'mail-api' && body.action === 'get';
+  let { data, error } = isMessage
+    ? await invokeMessage(body)
+    : await supabase.functions.invoke(fn, { body });
+  // A abertura tem um só pedido limitado a 30 s; a pessoa decide quando repetir.
+  if (!isMessage && (error || !data) && READ_ACTIONS.has(String(body.action))) {
     await new Promise(resolve => setTimeout(resolve, 1500));
     ({ data, error } = await supabase.functions.invoke(fn, { body }));
   }

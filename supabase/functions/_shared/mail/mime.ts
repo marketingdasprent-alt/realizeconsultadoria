@@ -38,11 +38,12 @@ export const decodeBytes = (bytes: Uint8Array, charset?: string | null): string 
 
 /** Cada byte → um carácter (ISO-8859-1), para texto 7/8 bits como quoted-printable. */
 export const bytesToLatin1 = (bytes: Uint8Array): string => {
-  let out = '';
+  // Pedaços num array e um só join: com `out +=` um corpo de vários MB gastava o CPU da função
+  const parts: string[] = [];
   for (let i = 0; i < bytes.length; i += 8192) {
-    out += String.fromCharCode(...bytes.subarray(i, i + 8192));
+    parts.push(String.fromCharCode(...bytes.subarray(i, i + 8192)));
   }
-  return out;
+  return parts.join('');
 };
 
 export const bytesToBase64 = (bytes: Uint8Array): string => {
@@ -135,9 +136,79 @@ export const decodeQuotedPrintable = (input: string): Uint8Array => {
 /** Desfaz o Content-Transfer-Encoding de uma parte (base64 / quoted-printable). */
 export const decodeTransferEncoding = (bytes: Uint8Array, encoding?: string | null): Uint8Array => {
   const enc = (encoding ?? '').toLowerCase();
-  if (enc === 'base64') return base64ToBytes(bytesToLatin1(bytes), { lenient: true });
-  if (enc === 'quoted-printable') return decodeQuotedPrintable(bytesToLatin1(bytes));
+  if (enc === 'base64') return base64BytesToBytes(bytes);
+  if (enc === 'quoted-printable') return quotedPrintableBytesToBytes(bytes);
   return bytes;
+};
+
+/**
+ * Base64 (bytes do servidor) → bytes, sem passar por texto: o mesmo que
+ * base64ToBytes(bytesToLatin1(bytes), { lenient: true }), mas sem cópias. Um rascunho com
+ * imagens dentro do HTML (vários MB) passava o limite de CPU da função ao abrir.
+ */
+export const base64BytesToBytes = (bytes: Uint8Array): Uint8Array => {
+  let valid = 0;
+  for (let i = 0; i < bytes.length; i++) if (B64_LOOKUP[bytes[i]] >= 0) valid++;
+  // Como no modo lenient: um resto de 1 carácter (leitura truncada) sai
+  const usable = valid % 4 === 1 ? valid - 1 : valid;
+  const out = new Uint8Array(Math.floor((usable * 3) / 4));
+  let o = 0;
+  let buffer = 0;
+  let bits = 0;
+  let seen = 0;
+  for (let i = 0; i < bytes.length && seen < usable; i++) {
+    const value = B64_LOOKUP[bytes[i]];
+    if (value < 0) continue;
+    seen++;
+    buffer = ((buffer << 6) | value) & 0xffffff;
+    bits += 6;
+    if (bits >= 8) {
+      bits -= 8;
+      out[o++] = (buffer >> bits) & 0xff;
+    }
+  }
+  return out.subarray(0, o);
+};
+
+const hexValue = (code: number): number =>
+  code >= 48 && code <= 57
+    ? code - 48
+    : code >= 65 && code <= 70
+      ? code - 55
+      : code >= 97 && code <= 102
+        ? code - 87
+        : -1;
+
+/**
+ * Quoted-printable (bytes do servidor) → bytes, sem passar por texto nem por um array de
+ * números: o mesmo resultado que decodeQuotedPrintable(bytesToLatin1(bytes)).
+ */
+export const quotedPrintableBytesToBytes = (bytes: Uint8Array): Uint8Array => {
+  const out = new Uint8Array(bytes.length);
+  let o = 0;
+  for (let i = 0; i < bytes.length; i++) {
+    const b = bytes[i];
+    if (b === 61) {
+      // Quebra suave: "=\r\n" ou "=\n"
+      if (bytes[i + 1] === 13 && bytes[i + 2] === 10) {
+        i += 2;
+        continue;
+      }
+      if (bytes[i + 1] === 10) {
+        i += 1;
+        continue;
+      }
+      const hi = i + 2 < bytes.length ? hexValue(bytes[i + 1]) : -1;
+      const lo = hi >= 0 ? hexValue(bytes[i + 2]) : -1;
+      if (lo >= 0) {
+        out[o++] = (hi << 4) | lo;
+        i += 2;
+        continue;
+      }
+    }
+    out[o++] = b;
+  }
+  return out.subarray(0, o);
 };
 
 const needsEncoding = (value: string): boolean => /[^\x20-\x7e\t]/.test(value);

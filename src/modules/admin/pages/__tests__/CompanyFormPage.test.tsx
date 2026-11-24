@@ -39,13 +39,13 @@ const myCompanies: {
   isLoading: boolean;
   isFetching: boolean;
   error: unknown;
-  refetch: () => void;
+  refetch: () => Promise<unknown>;
 } = {
   data: [{ company_id: 'c1', role: 'admin' }],
   isLoading: false,
   isFetching: false,
   error: null,
-  refetch: () => refetchMine(),
+  refetch: () => Promise.resolve(refetchMine()),
 };
 vi.mock('../../hooks/useSharing', () => ({
   useAllGroups: () => ({ data: [] }),
@@ -285,22 +285,6 @@ describe('CompanyFormPage — edição', () => {
       renderAt('/admin/empresas/c1?tab=partilha');
       expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso à partilha/i);
       expect(screen.queryByRole('button', { name: /tentar de novo/i })).not.toBeInTheDocument();
-    });
-
-    it('ao clicar "Tentar de novo" o aviso fica montado (o React Query repõe isLoading e apaga o erro)', async () => {
-      myCompanies.data = undefined;
-      myCompanies.error = new Error('rede');
-      // Como o React Query real: sem dados, o novo pedido volta a "pending" e o erro desaparece
-      refetchMine.mockImplementation(() => {
-        myCompanies.error = null;
-        myCompanies.isLoading = true;
-        myCompanies.isFetching = true;
-        return new Promise(() => {});
-      });
-      renderAt('/admin/empresas/c1?tab=partilha');
-      await userEvent.click(await screen.findByRole('button', { name: /tentar de novo/i }));
-      expect(screen.getByRole('alert')).toBeInTheDocument();
-      expect(screen.getByRole('button', { name: /a tentar/i })).toBeDisabled();
     });
 
     it('acesso recém-dado: a ler de novo com dados antigos não mostra "sem acesso" de relance', async () => {

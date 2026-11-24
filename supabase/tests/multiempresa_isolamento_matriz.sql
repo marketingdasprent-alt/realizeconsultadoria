@@ -2,12 +2,12 @@
 -- corre a matriz como utilizador "authenticated" e termina SEMPRE com RAISE EXCEPTION (anula a transação).
 -- O relatório vem na mensagem do erro, entre FP_BEGIN e FP_END. A mensagem vermelha é o relatório.
 --
--- COMO LER: cada teste descreve o comportamento CORRETO (depois dos PRs multi-empresa). Hoje falham os
--- que provam as falhas conhecidas (admin da empresa A mexe na B em companies, employees, absences,
+-- COMO LER: cada teste descreve o comportamento CORRETO (depois dos PRs multi-empresa). Antes dos PRs multi-empresa falhavam
+-- os que provam as falhas conhecidas (admin da empresa A mexe na B em companies, employees, absences,
 -- user_roles, admin_groups*; qualquer admin cria empresas/grupos). Prefixos: [CTRL] controlo positivo
 -- (tem de passar sempre: prova que a matriz não passa só por bloquear tudo), [ISOL] isolamento,
 -- [ESC] escalada de privilégios, [SUPER] super admin, [GRUPO] partilha do feed, [EXT] empresa externa,
--- [FORMA] estado das policies.
+-- [FORMA] estado das policies, [ANA] gatilho rz_force_own_company (empresa forjada, pessoa com pertença em 2 empresas).
 --
 -- Cenário: A e B no mesmo grupo (feed.read); C externa, sem grupo; D vazia (para criar grupos).
 -- Cada empresa tem dados em employees, absences, absence_periods, employee_monthly_finances,
@@ -16,7 +16,11 @@
 --   adM = admin de A só com pertença (sem user_roles)     adN = admin de A sem ficha (feed)
 --   cA / cB / cC = colaboradores
 -- Cada teste corre isolado (o efeito é desfeito no fim). Esperado DEPOIS dos PRs: 0 falhas.
--- Pré-requisitos: migrações até 20261120160000. 'ERR' como esperado = qualquer erro SQL é o resultado certo.
+-- Pré-requisitos: as 5 migrações multiorg aplicadas, de 20261123100000 (p1_escalada) a 20261123140000
+-- (p4_feed_empresa_externa); o gatilho rz_force_own_company vem de 20261123120000 (p3_ambito_empresa).
+-- Sem elas falham os testes [ESC], [SUPER] e [ANA].
+-- Esperado: SQLSTATE exato (42501 = recusado por permissão) com alvos válidos, para que remover a verificação
+-- de permissão seja detetado. 'ERR' (qualquer erro) só onde o erro é de regra de negócio e não de permissão.
 
 DO $t$
 DECLARE
@@ -234,32 +238,32 @@ BEGIN
       format('INSERT INTO public.company_memberships (company_id, user_id, role, origin, status) VALUES (%L, %L, ''admin'', ''convite'', ''ativo'')', kC, adA)],
     ARRAY['[ESC] adA nao altera pertencas de C (0 linhas ou 42501)', adA::text, 'f', 'authenticated', 'ok',
       format('DO $x$ DECLARE n integer; BEGIN BEGIN UPDATE public.company_memberships SET role = ''colaborador'' WHERE company_id = %L; GET DIAGNOSTICS n = ROW_COUNT; IF n > 0 THEN RAISE EXCEPTION ''escalou: %% linhas'', n; END IF; EXCEPTION WHEN insufficient_privilege THEN NULL; END; END $x$', kC)],
-    ARRAY['[ESC] adA nao faz admin de C via rz_add_company_admin', adA::text, 'f', 'authenticated', 'ERR',
-      format('SELECT public.rz_add_company_admin(%L, %L, ''admin'')', kC, cA)],
-    ARRAY['[ESC] adA nao faz admin do par B via rz_add_company_admin', adA::text, 'f', 'authenticated', 'ERR',
-      format('SELECT public.rz_add_company_admin(%L, %L, ''admin'')', kB, cA)],
-    ARRAY['[ESC] adA nao remove admin de C via rz_remove_company_admin', adA::text, 'f', 'authenticated', 'ERR',
+    ARRAY['[ESC] adA nao faz admin de C via rz_add_company_admin (alvo valido: ficha ativa em C)', adA::text, 'f', 'authenticated', '42501',
+      format('SELECT public.rz_add_company_admin(%L, %L, ''admin'')', kC, cC)],
+    ARRAY['[ESC] adA nao faz admin do par B via rz_add_company_admin (alvo valido: ficha ativa em B)', adA::text, 'f', 'authenticated', '42501',
+      format('SELECT public.rz_add_company_admin(%L, %L, ''admin'')', kB, cB)],
+    ARRAY['[ESC] adA nao remove admin de C via rz_remove_company_admin (alvo valido; sem a verificacao daria last_admin 55000)', adA::text, 'f', 'authenticated', '42501',
       format('SELECT public.rz_remove_company_admin(%L, %L)', kC, adC)],
     ARRAY['[ESC] adA nao cria empresa (insert direto)', adA::text, 'f', 'authenticated', '42501',
       'INSERT INTO public.companies (name, nif, email) VALUES (''ZZ ISO hack'', ''ZZHACK0001'', ''h@invalid.example'')'],
-    ARRAY['[ESC] adA nao cria empresa (rz_create_company)', adA::text, 'f', 'authenticated', 'ERR',
-      format('SELECT public.rz_create_company(''ZZ ISO X'', %L, ''x@invalid.example'', NULL, NULL, %L)', v_nif || 'X1', adA)],
-    ARRAY['[ESC] adA nao cria grupo de empresas', adA::text, 'f', 'authenticated', 'ERR',
+    ARRAY['[ESC] adA nao cria empresa (rz_create_company, NIF de 9 digitos e admin validos)', adA::text, 'f', 'authenticated', '42501',
+      format('SELECT public.rz_create_company(''ZZ ISO X'', %L, ''x@invalid.example'', NULL, NULL, %L)', v_nif9, cA)],
+    ARRAY['[ESC] adA nao cria grupo de empresas (C e D livres, validas)', adA::text, 'f', 'authenticated', '42501',
       format('SELECT public.rz_create_group(''ZZ ISO GX'', ARRAY[%L,%L]::uuid[], ARRAY[''feed.read'']::text[])', kC, kD)],
-    ARRAY['[ESC] adA nao muda membros de grupos (rz_set_group_members)', adA::text, 'f', 'authenticated', 'ERR',
+    ARRAY['[ESC] adA nao muda membros de grupos (rz_set_group_members, grupo e empresas validos)', adA::text, 'f', 'authenticated', '42501',
       format('SELECT public.rz_set_group_members(%L, ARRAY[%L,%L,%L]::uuid[])', gShare, kA, kB, kC)],
-    ARRAY['[ESC] adA nao dissolve grupos (rz_dissolve_group)', adA::text, 'f', 'authenticated', 'ERR',
+    ARRAY['[ESC] adA nao dissolve grupos (rz_dissolve_group, grupo valido)', adA::text, 'f', 'authenticated', '42501',
       format('SELECT public.rz_dissolve_group(%L)', gShare)],
     ARRAY['[ESC] adA nao altera company_groups (0 linhas ou 42501)', adA::text, 'f', 'authenticated', 'ok',
       format('DO $x$ DECLARE n integer; BEGIN BEGIN UPDATE public.company_groups SET default_capabilities = ARRAY[''feed.read'',''employees.read''] WHERE id = %L; GET DIAGNOSTICS n = ROW_COUNT; IF n > 0 THEN RAISE EXCEPTION ''escalou: %% linhas'', n; END IF; EXCEPTION WHEN insufficient_privilege THEN NULL; END; END $x$', gShare)],
-    ARRAY['[ESC] colaborador cA nao cria empresa', cA::text, 'f', 'authenticated', 'ERR',
-      format('SELECT public.rz_create_company(''ZZ ISO Y'', %L, ''y@invalid.example'', NULL, NULL, %L)', v_nif || 'Y1', cA)],
+    ARRAY['[ESC] colaborador cA nao cria empresa (NIF de 9 digitos e admin validos)', cA::text, 'f', 'authenticated', '42501',
+      format('SELECT public.rz_create_company(''ZZ ISO Y'', %L, ''y@invalid.example'', NULL, NULL, %L)', v_nif9, cA)],
     ARRAY['[ESC] colaborador cA nao se da admin (user_roles)', cA::text, 'f', 'authenticated', '42501',
       format('INSERT INTO public.user_roles (user_id, role) VALUES (%L, ''admin'')', cA)],
     ARRAY['[ESC] colaborador cA nao se faz admin (company_memberships, 0 linhas ou 42501)', cA::text, 'f', 'authenticated', 'ok',
       format('DO $x$ DECLARE n integer; BEGIN BEGIN UPDATE public.company_memberships SET role = ''admin'' WHERE company_id = %L AND user_id = %L; GET DIAGNOSTICS n = ROW_COUNT; IF n > 0 THEN RAISE EXCEPTION ''escalou: %% linhas'', n; END IF; EXCEPTION WHEN insufficient_privilege THEN NULL; END; END $x$', kA, cA)],
-    ARRAY['[ESC] adC (externa) nao faz admin de A', adC::text, 'f', 'authenticated', 'ERR',
-      format('SELECT public.rz_add_company_admin(%L, %L, ''admin'')', kA, cC)],
+    ARRAY['[ESC] adC (externa) nao faz admin de A (alvo valido: ficha ativa em A)', adC::text, 'f', 'authenticated', '42501',
+      format('SELECT public.rz_add_company_admin(%L, %L, ''admin'')', kA, cA)],
 
     -- ===== [ANA] gatilho rz_force_own_company (20261123120000): quem tem pertenca em 2 empresas pede na 2.a; forjar sem pertenca fica a da ficha
     ARRAY['[ANA] Ana (ficha A, pertenca B) pede ausencia em B: fica em B', ana::text, 'f', 'authenticated', 'ok',
@@ -292,6 +296,14 @@ BEGIN
       format('SELECT public.rz_create_group(''ZZ ISO G2'', ARRAY[%L,%L]::uuid[], ARRAY[''feed.read'']::text[])', kC, kD)],
     ARRAY['[SUPER] sa nomeia admin de empresa (rz_add_company_admin)', sa::text, 'f', 'authenticated', 'ok',
       format('SELECT public.rz_add_company_admin(%L, %L, ''admin'')', kB, cB)],
+    ARRAY['[SUPER] sa muda membros de grupo (rz_set_group_members)', sa::text, 'f', 'authenticated', 'ok',
+      format('SELECT public.rz_set_group_members(%L, ARRAY[%L,%L,%L]::uuid[])', gShare, kA, kB, kD)],
+    ARRAY['[SUPER] sa dissolve grupo (rz_dissolve_group)', sa::text, 'f', 'authenticated', 'ok',
+      format('SELECT public.rz_dissolve_group(%L)', gShare)],
+    ARRAY['[SUPER] sa remove admin de empresa (rz_remove_company_admin, A tem outros admins)', sa::text, 'f', 'authenticated', 'ok',
+      format('SELECT public.rz_remove_company_admin(%L, %L)', kA, adM)],
+    ARRAY['[CTRL] adA (admin de A) remove outro admin de A (rz_remove_company_admin)', adA::text, 'f', 'authenticated', 'ok',
+      format('SELECT public.rz_remove_company_admin(%L, %L)', kA, adM)],
     ARRAY['[SUPER] sa edita grupos de admin', sa::text, 'q', 'authenticated', 'true',
       format('WITH u AS (UPDATE public.admin_groups SET description = ''x'' WHERE id = %L RETURNING 1) SELECT count(*) = 1 FROM u', gSuper)],
 

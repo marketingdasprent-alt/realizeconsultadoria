@@ -19,7 +19,7 @@ DECLARE
   eA uuid; eB uuid; eX uuid; eR uuid;
   abA uuid; abB uuid; pdA uuid; pdB uuid; acA uuid; acB uuid; phA uuid; phB uuid; eqA uuid; eqB uuid;
   asA uuid; asB uuid; tkA uuid; tkB uuid; ntA uuid; ntB uuid; ntG uuid; ntP uuid; dcA uuid; dcB uuid;
-  fnA uuid; fnB uuid; tcA uuid; tcB uuid; lcA uuid; lcB uuid; stA uuid; stB uuid; acN uuid; sdT uuid; tkX uuid;
+  fnA uuid; fnB uuid; tcA uuid; tcB uuid; lcA uuid; lcB uuid; stA uuid; stB uuid; acN uuid; sdT uuid; tkX uuid; tkM uuid;
   v_ids uuid[] := ARRAY[]::uuid[];
   v_k integer;
   v_nif text := 'ZZ' || substr(upper(md5(gen_random_uuid()::text)), 1, 8);
@@ -89,7 +89,9 @@ BEGIN
     INSERT INTO public.assignments (employee_id, company_id) VALUES (eB, cB) RETURNING id INTO asB;
     INSERT INTO public.support_tickets (company_id, employee_id, subject, message) VALUES (cA, eA, 'ZZ ticket A', 'm') RETURNING id INTO tkA;
     INSERT INTO public.support_tickets (company_id, employee_id, subject, message) VALUES (cB, eB, 'ZZ ticket B', 'm') RETURNING id INTO tkB;
+    INSERT INTO public.support_tickets (company_id, employee_id, subject, message, requester_name, requester_email, requester_user_id, department_id) VALUES (cA, NULL, 'ZZ ticket mail', 'm', 'ZZ Cliente Mail', 'zz-cliente@invalid.example', emB, NULL) RETURNING id INTO tkM;
     UPDATE public.support_tickets SET department_id = sdT WHERE id IN (tkA, tkB);
+    UPDATE public.support_tickets SET department_id = sdT WHERE id = tkM;
     INSERT INTO public.notifications (title, message, created_by, company_id) VALUES ('ZZ aviso A', 'm', sa, cA) RETURNING id INTO ntA;
     INSERT INTO public.notifications (title, message, created_by, company_id) VALUES ('ZZ aviso B', 'm', sa, cB) RETURNING id INTO ntB;
     INSERT INTO public.notifications (title, message, created_by, company_id, employee_id) VALUES ('ZZ aviso pessoal B', 'm', sa, NULL, eB) RETURNING id INTO ntP;
@@ -174,7 +176,8 @@ BEGIN
     ARRAY['accesses: super admin edita acesso sem empresa', sa::text, 'q', 'authenticated', 'true', format('WITH u AS (UPDATE public.accesses SET title = title WHERE id = %L RETURNING 1) SELECT count(*) = 1 FROM u', acN), '', ''],
     ARRAY['accesses: admin de empresa nao edita acesso sem empresa', adA::text, 'q', 'authenticated', 'true', format('WITH u AS (UPDATE public.accesses SET title = title WHERE id = %L RETURNING 1) SELECT count(*) = 0 FROM u', acN), '', ''],
     ARRAY['support_desk_tickets: colaborador de empresa externa na equipa nao le tickets de outras empresas', emX::text, 'q', 'authenticated', 'true', 'SELECT jsonb_array_length(public.support_desk_tickets()) = 0', '', ''],
-    ARRAY['support_desk_tickets: equipa de A ve so os tickets de A', rhA::text, 'q', 'authenticated', 'true', format('SELECT jsonb_array_length(public.support_desk_tickets()) = 1 AND (public.support_desk_tickets() -> 0 ->> ''id'') = %L', tkA), '', ''],
+    ARRAY['support_desk_tickets: ticket de cliente sem ficha (employee_id NULL, requester_*) continua na fila com nome e email', rhA::text, 'q', 'authenticated', 'true', format('SELECT EXISTS (SELECT 1 FROM jsonb_array_elements(public.support_desk_tickets()) t WHERE t ->> ''id'' = %L AND t -> ''employees'' ->> ''email'' = ''zz-cliente@invalid.example'' AND t -> ''employees'' ->> ''name'' = ''ZZ Cliente Mail'')', tkM), '', ''],
+    ARRAY['support_desk_tickets: equipa de A ve so os tickets de A', rhA::text, 'q', 'authenticated', 'true', format('SELECT jsonb_array_length(public.support_desk_tickets()) = 2 AND EXISTS (SELECT 1 FROM jsonb_array_elements(public.support_desk_tickets()) t WHERE t ->> ''id'' = %L) AND NOT EXISTS (SELECT 1 FROM jsonb_array_elements(public.support_desk_tickets()) t WHERE t ->> ''id'' = %L)', tkA, tkB), '', ''],
     ARRAY['absences: colaborador de A nao forja a empresa B (fica a de A)', emA::text, 'q', 'authenticated', 'true', format('WITH i AS (INSERT INTO public.absences (employee_id, company_id, absence_type, start_date, end_date) VALUES (%L, %L, ''vacation'', current_date + 60, current_date + 60) RETURNING company_id) SELECT (SELECT company_id FROM i) = %L', eA, cB, cA), '', ''],
     ARRAY['tickets: colaborador de A nao forja a empresa B (fica a de A)', emA::text, 'q', 'authenticated', 'true', format('WITH i AS (INSERT INTO public.support_tickets (company_id, employee_id, subject, message) VALUES (%L, %L, ''ZZ forjado'', ''m'') RETURNING company_id) SELECT (SELECT company_id FROM i) = %L', cB, eA, cA), '', ''],
     ARRAY['employees: super admin ve as duas empresas', sa::text, 'q', 'authenticated', 'true', format('SELECT (SELECT count(*) FROM public.employees WHERE id IN (%L, %L)) = 2', eA, eB), '', ''],

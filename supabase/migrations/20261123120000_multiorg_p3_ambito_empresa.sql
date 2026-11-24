@@ -168,23 +168,28 @@ $function$;
 -- equipa vem do texto livre employees.department (de qualquer empresa), por isso sem este filtro um admin de
 -- empresa externa lia os tickets de todas as empresas ao editar o departamento de uma ficha sua.
 CREATE OR REPLACE FUNCTION public.support_desk_tickets()
-RETURNS jsonb
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-AS $$
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
   SELECT coalesce(jsonb_agg(
     to_jsonb(st)
       || jsonb_build_object(
-        'employees', jsonb_build_object('name', e.name, 'email', e.email),
+        'employees', jsonb_build_object(
+          'name', coalesce(e.name, st.requester_name),
+          'email', coalesce(e.email, st.requester_email)),
         'companies', jsonb_build_object('name', c.name)
       )
     ORDER BY st.created_at DESC), '[]'::jsonb)
   FROM support_tickets st
-  JOIN employees e ON e.id = st.employee_id
+  LEFT JOIN employees e ON e.id = st.employee_id
   LEFT JOIN companies c ON c.id = st.company_id
   WHERE st.department_id IN (SELECT public.rz_support_desk_departments())
     AND st.company_id = ANY (public.rz_my_company_ids())
-    AND coalesce(e.user_id, '00000000-0000-0000-0000-000000000000'::uuid) <> auth.uid();
-$$;
+    AND coalesce(e.user_id, st.requester_user_id, '00000000-0000-0000-0000-000000000000'::uuid)
+        <> auth.uid();
+$function$;
 REVOKE ALL ON FUNCTION public.support_desk_tickets() FROM anon, public;
 GRANT EXECUTE ON FUNCTION public.support_desk_tickets() TO authenticated;
 
@@ -741,7 +746,7 @@ $function$;
 -- ------------------------------------------------------------------ empresa forjada nos pedidos do colaborador
 -- Os INSERT "Employees can create own absences/tickets" só validam o employee_id. Sem isto, um colaborador de A
 -- podia pôr company_id = B e meter pedidos na fila do admin de B. Nos pedidos feitos pelo próprio colaborador a
--- empresa passa a ser sempre a da sua ficha.
+-- empresa tem de ser uma onde a pessoa tem pertença (senão fica a da sua ficha).
 CREATE OR REPLACE FUNCTION public.rz_force_own_company()
  RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $function$
@@ -751,7 +756,8 @@ BEGIN
   SELECT e.company_id INTO v_company
   FROM public.employees e
   WHERE e.id = NEW.employee_id AND e.user_id = auth.uid() AND e.company_id IS NOT NULL;
-  IF FOUND THEN
+  -- Quem tem pertença em várias empresas pode pedir em qualquer uma delas; fora disso fica a da ficha.
+  IF FOUND AND NOT (NEW.company_id IS NOT NULL AND NEW.company_id = ANY (public.rz_my_company_ids())) THEN
     NEW.company_id := v_company;
   END IF;
   RETURN NEW;

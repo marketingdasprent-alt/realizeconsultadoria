@@ -3,6 +3,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import {
   authenticatedCaller,
   denyUnlessCompanyAdmin,
+  denyUnlessSuperAdmin,
   isSuperAdmin,
 } from '../_shared/admin-caller.ts';
 
@@ -16,7 +17,18 @@ interface InviteAdminRequest {
   name?: string;
   password: string;
   /** Empresa de que a conta passa a ser administradora (e só dessa). */
-  company_id: string;
+  company_id?: string;
+  /**
+   * Criar uma empresa nova (só super admin) e esta conta como o seu primeiro administrador, através de
+   * rz_create_company (empresa, administrador e grupo opcional nascem juntos, ou nada fica).
+   */
+  new_company?: {
+    name: string;
+    nif: string;
+    email: string;
+    group_id?: string | null;
+    group_name?: string | null;
+  };
 }
 
 const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
@@ -61,8 +73,11 @@ const handler = async (req: Request): Promise<Response> => {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
-    const { email, name, password, company_id }: InviteAdminRequest = await req.json();
-    const denied = await denyUnlessCompanyAdmin(caller, corsHeaders, company_id);
+    const { email, name, password, company_id, new_company }: InviteAdminRequest = await req.json();
+    // Empresa nova: só o super admin. Empresa existente: o administrador dessa empresa ou o super admin.
+    const denied = new_company
+      ? await denyUnlessSuperAdmin(caller, corsHeaders)
+      : await denyUnlessCompanyAdmin(caller, corsHeaders, company_id);
     if (denied) {
       return new Response(await denied.text(), {
         status: 200,
@@ -75,6 +90,12 @@ const handler = async (req: Request): Promise<Response> => {
     const normalizedEmail = email.toLowerCase().trim();
     if (normalizedEmail.length > 254 || !EMAIL_RE.test(normalizedEmail)) {
       return json({ error: 'Indique um email válido.' });
+    }
+    if (new_company && (!new_company.name?.trim() || !/^\d{9}$/.test(new_company.nif ?? ''))) {
+      return json({ error: 'Indique o nome e um NIF com 9 dígitos.' });
+    }
+    if (!new_company && typeof company_id !== 'string') {
+      return json({ error: 'Indique a empresa.' });
     }
     const cleanName = typeof name === 'string' ? name.trim().slice(0, 100) : '';
     // O super admin vê o motivo exato; um admin de empresa recebe sempre a mesma resposta.
@@ -111,13 +132,14 @@ const handler = async (req: Request): Promise<Response> => {
 
     const displayName = cleanName || normalizedEmail.split('@')[0];
 
-    // Se o email já tem conta (listUsers só devolve a primeira página; o createUser abaixo falha em duplicados)
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(
-      u => u.email?.toLowerCase() === normalizedEmail
-    );
-    if (existingUser) {
-      return taken('Este email já está em uso no sistema. Por favor utilize um email diferente.');
+    // NIF repetido: verifica antes de criar a conta (evita criar e apagar uma conta à toa).
+    if (new_company) {
+      const { count: nifCount, error: nifError } = await supabaseAdmin
+        .from('companies')
+        .select('id', { count: 'exact', head: true })
+        .eq('nif', new_company.nif);
+      if (nifError) return json({ error: 'Não foi possível verificar o NIF. Tente novamente.' });
+      if ((nifCount ?? 0) > 0) return json({ error: 'Já existe uma empresa com este NIF.' });
     }
 
     let userId: string;
@@ -133,39 +155,57 @@ const handler = async (req: Request): Promise<Response> => {
     });
 
     if (createError) {
-      console.error('Error creating user:', createError);
-      return new Response(
-        JSON.stringify({ error: `Erro ao criar utilizador: ${createError.message}` }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      console.error('invite-admin: falhou a criação da conta');
+      // Email já registado (ou outro erro do Auth): a mesma resposta para quem não é super admin.
+      const duplicate =
+        createError.status === 422 || /already|registered|exists/i.test(createError.message ?? '');
+      return duplicate
+        ? taken('Este email já está em uso no sistema. Por favor utilize um email diferente.')
+        : json({ error: 'Não foi possível criar a conta. Tente novamente.' });
     }
 
     userId = newUser.user.id;
 
-    // Liga a conta à empresa como administradora (pertença ativa). Não há papel admin global em
-    // user_roles: o poder é só sobre esta empresa (a BD limita os dados por pertença).
-    const { error: membershipError } = await supabaseAdmin.from('company_memberships').insert({
-      company_id,
-      user_id: userId,
-      role: 'admin',
-      origin: 'convite',
-      status: 'ativo',
-      created_by: caller.userId,
-    });
+    let linkedCompanyId: string | null = company_id ?? null;
+    let linkError: { message: string } | null = null;
 
-    if (membershipError) {
-      console.error('Error adding company admin membership:', membershipError);
+    if (new_company) {
+      // Empresa + primeiro administrador + grupo, numa só transação da BD (rz_create_company confirma
+      // que quem chama é super admin).
+      const created = await caller.userClient.rpc('rz_create_company', {
+        p_name: new_company.name,
+        p_nif: new_company.nif,
+        p_email: new_company.email,
+        p_group: new_company.group_id || null,
+        p_group_name: new_company.group_name || null,
+        p_admin_user: userId,
+      });
+      linkError = created.error;
+      linkedCompanyId = (created.data as { company_id?: string } | null)?.company_id ?? null;
+    } else {
+      // Liga a conta à empresa como administradora (pertença ativa). Não há papel admin global em
+      // user_roles: o poder é só sobre esta empresa (a BD limita os dados por pertença).
+      const { error: membershipError } = await supabaseAdmin.from('company_memberships').insert({
+        company_id,
+        user_id: userId,
+        role: 'admin',
+        origin: 'convite',
+        status: 'ativo',
+        created_by: caller.userId,
+      });
+      linkError = membershipError;
+    }
+
+    if (linkError) {
+      console.error('invite-admin: falhou a ligação à empresa');
       // Não deixa uma conta órfã sem empresa: apaga a conta acabada de criar.
       const { error: cleanupError } = await supabaseAdmin.auth.admin.deleteUser(userId);
       if (cleanupError) {
         console.error('invite-admin: falhou a limpeza da conta criada', userId);
       }
-      return new Response(
-        JSON.stringify({
-          error: `Erro ao ligar o administrador à empresa: ${membershipError.message}`,
-        }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+      // As funções da BD põem o texto em português em `details` (message é só o código).
+      const reason = (linkError as { details?: string }).details || linkError.message;
+      return json({ error: `Erro ao ligar o administrador à empresa: ${reason}` });
     }
 
     // Create profile
@@ -281,6 +321,7 @@ const handler = async (req: Request): Promise<Response> => {
         success: true,
         message: 'Novo administrador criado e email enviado',
         userId,
+        company_id: linkedCompanyId,
       }),
       { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );

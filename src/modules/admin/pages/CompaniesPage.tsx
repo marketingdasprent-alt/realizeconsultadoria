@@ -30,8 +30,10 @@ import { ROUTES } from '@/lib/constants';
 const CompaniesPage = () => {
   const { toast } = useToast();
   const navigate = useNavigate();
-  const { canExecuteTopic } = useAdminPermissions();
+  const { canExecuteTopic, isSuperAdmin } = useAdminPermissions();
   const canManage = canExecuteTopic('companies', 'manage');
+  // Criar, eliminar e ativar/desativar empresas é da plataforma: o admin de empresa só edita a sua.
+  const canAdministerPlatform = canManage && isSuperAdmin;
 
   const { companies, isLoading, deleteCompany, toggleStatus } = useCompanies();
 
@@ -103,7 +105,7 @@ const CompaniesPage = () => {
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <AdminPageTitle title="Empresas" description="Gerir empresas clientes" />
 
-          {canManage && (
+          {canAdministerPlatform && (
             <Button variant="gold" onClick={() => navigate(ROUTES.ADMIN.COMPANY_NEW)}>
               <Plus className="h-4 w-4 mr-2" />
               Nova Empresa
@@ -167,7 +169,7 @@ const CompaniesPage = () => {
                       <TableCell
                         className="py-1 px-2"
                         onClick={e => {
-                          if (canManage) {
+                          if (canAdministerPlatform) {
                             e.stopPropagation();
                             handleToggleStatus(company);
                           }
@@ -175,7 +177,7 @@ const CompaniesPage = () => {
                       >
                         <Badge
                           variant={company.is_active ? 'default' : 'secondary'}
-                          className={`text-xs py-0 ${canManage ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                          className={`text-xs py-0 ${canAdministerPlatform ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
                         >
                           {company.is_active ? 'Ativa' : 'Desativada'}
                         </Badge>
@@ -194,7 +196,7 @@ const CompaniesPage = () => {
                                 Editar
                               </DropdownMenuItem>
                             )}
-                            {canManage && (
+                            {canAdministerPlatform && (
                               <DropdownMenuItem
                                 onClick={() => openDeleteDialog(company)}
                                 className="text-destructive"

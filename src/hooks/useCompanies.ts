@@ -11,7 +11,6 @@ interface UseCompaniesResult {
   isLoading: boolean;
   error: string | null;
   refetch: () => Promise<void>;
-  createCompany: (company: CompanyInsert) => Promise<{ data: Company | null; error: any }>;
   updateCompany: (
     id: string,
     company: CompanyUpdate
@@ -44,12 +43,6 @@ export const useCompanies = (): UseCompaniesResult => {
     fetchCompanies();
   }, [fetchCompanies]);
 
-  const createCompany = async (company: CompanyInsert) => {
-    const result = await companyService.create(company);
-    if (!result.error) await fetchCompanies();
-    return result;
-  };
-
   const updateCompany = async (id: string, company: CompanyUpdate) => {
     const result = await companyService.update(id, company);
     if (!result.error) {
@@ -79,7 +72,6 @@ export const useCompanies = (): UseCompaniesResult => {
     isLoading,
     error,
     refetch: fetchCompanies,
-    createCompany,
     updateCompany,
     deleteCompany,
     toggleStatus,

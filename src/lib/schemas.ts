@@ -25,7 +25,7 @@ export const resetPasswordSchema = z
 
 // ─── Empresa ─────────────────────────────────────────────────────────────────
 
-export const createCompanySchema = z.object({
+const companyShape = {
   name: z.string().min(2, 'Nome deve ter pelo menos 2 caracteres'),
   nif: z
     .string()
@@ -41,9 +41,38 @@ export const createCompanySchema = z.object({
   domain: z.string().optional().nullable(),
   notes: z.string().optional().nullable(),
   is_active: z.boolean().default(true),
-});
+};
+
+export const createCompanySchema = z.object(companyShape);
 
 export const updateCompanySchema = createCompanySchema.partial();
+
+/** Primeiro administrador (e grupo opcional) de uma empresa nova: só na criação, só super admin. */
+export const newCompanyAdminSchema = z.object({
+  admin_name: z.string().trim().min(2, 'Indique o nome do administrador'),
+  admin_email: z.string().min(1, 'Email do administrador é obrigatório').email('Email inválido'),
+  admin_password: z.string().min(8, 'A palavra-passe deve ter pelo menos 8 caracteres'),
+  group_id: z.string().optional().nullable(),
+  group_name: z.string().optional().nullable(),
+});
+
+/** Valor do select de grupo que significa "criar um grupo novo" (o nome vai em group_name). */
+export const NEW_GROUP_VALUE = '__novo__';
+
+export const createCompanyWithAdminSchema = z
+  .object({
+    ...companyShape,
+    ...newCompanyAdminSchema.shape,
+  })
+  .superRefine((data, ctx) => {
+    if (data.group_id === NEW_GROUP_VALUE && (data.group_name ?? '').trim().length < 2) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['group_name'],
+        message: 'Indique o nome do grupo novo',
+      });
+    }
+  });
 
 // ─── Colaborador ─────────────────────────────────────────────────────────────
 
@@ -172,6 +201,8 @@ export const timeClockLocationSchema = z.object({
 export type LoginInput = z.infer<typeof loginSchema>;
 export type ResetPasswordInput = z.infer<typeof resetPasswordSchema>;
 export type CreateCompanyInput = z.infer<typeof createCompanySchema>;
+export type NewCompanyAdminInput = z.infer<typeof newCompanyAdminSchema>;
+export type CreateCompanyWithAdminInput = z.infer<typeof createCompanyWithAdminSchema>;
 export type UpdateCompanyInput = z.infer<typeof updateCompanySchema>;
 export type CreateEmployeeInput = z.infer<typeof createEmployeeSchema>;
 export type UpdateEmployeeInput = z.infer<typeof updateEmployeeSchema>;

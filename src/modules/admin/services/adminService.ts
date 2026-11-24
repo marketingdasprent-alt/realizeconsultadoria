@@ -32,17 +32,6 @@ export const adminService = {
     }
   },
 
-  createCompany: async (company: Omit<Company, 'id' | 'created_at'>) => {
-    try {
-      const { data, error } = await supabase.from('companies').insert(company).select().single();
-
-      if (error) throw error;
-      return { data, error: null };
-    } catch (error) {
-      return { data: null, error };
-    }
-  },
-
   // Colaboradores
   getEmployees: async (page = 1, pageSize = 20) => {
     try {

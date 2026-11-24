@@ -25,7 +25,6 @@ vi.mock('@/hooks/useCompanies', () => ({
   useCompanies: () => ({
     companies: COMPANIES,
     isLoading: false,
-    createCompany: vi.fn(),
     updateCompany: vi.fn(),
     deleteCompany: (...args: unknown[]) => deleteCompany(...args),
     toggleStatus: (...args: unknown[]) => toggleStatus(...args),
@@ -34,8 +33,9 @@ vi.mock('@/hooks/useCompanies', () => ({
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
 
 let canManage = true;
+let isSuperAdmin = true;
 vi.mock('@/hooks/useAdminPermissions', () => ({
-  useAdminPermissions: () => ({ canExecuteTopic: () => canManage }),
+  useAdminPermissions: () => ({ canExecuteTopic: () => canManage, isSuperAdmin }),
 }));
 
 const Where = () => <div data-testid="where">{useLocation().pathname}</div>;
@@ -60,6 +60,7 @@ const openRowMenu = async (user: ReturnType<typeof userEvent.setup>) => {
 beforeEach(() => {
   vi.clearAllMocks();
   canManage = true;
+  isSuperAdmin = true;
   deleteCompany.mockResolvedValue({ success: true, error: null });
   toggleStatus.mockResolvedValue({ data: null, error: null });
 });
@@ -112,5 +113,17 @@ describe('CompaniesPage', () => {
     renderPage();
     await user.click(screen.getByText('Ativa'));
     await waitFor(() => expect(toggleStatus).toHaveBeenCalledWith('c1', false));
+  });
+
+  it('administrador de empresa (não super admin) edita mas não cria, elimina nem ativa/desativa', async () => {
+    isSuperAdmin = false;
+    const user = userEvent.setup();
+    renderPage();
+    expect(screen.queryByRole('button', { name: /nova empresa/i })).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText('Ativa'));
+    expect(toggleStatus).not.toHaveBeenCalled();
+    await openRowMenu(user);
+    expect(await screen.findByRole('menuitem', { name: /editar/i })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /eliminar/i })).not.toBeInTheDocument();
   });
 });

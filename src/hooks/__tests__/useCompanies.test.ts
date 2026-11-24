@@ -94,64 +94,6 @@ describe('useCompanies', () => {
     expect(companyService.getAll).toHaveBeenCalledTimes(2);
   });
 
-  it('should create a new company', async () => {
-    const newCompany = { name: 'New Company' };
-    const createdCompany = { id: '3', ...newCompany } as any;
-
-    vi.mocked(companyService.getAll).mockResolvedValue({
-      data: [{ id: '1', name: 'Company A' }],
-      error: null,
-    });
-
-    vi.mocked(companyService.create).mockResolvedValue({
-      data: createdCompany,
-      error: null,
-    });
-
-    const { result } = renderHook(() => useCompanies());
-
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
-
-    let createResult;
-    await act(async () => {
-      createResult = await result.current.createCompany(newCompany as any);
-    });
-
-    expect(createResult.data).toEqual(createdCompany);
-    expect(createResult.error).toBeNull();
-    expect(companyService.create).toHaveBeenCalledWith(newCompany);
-  });
-
-  it('should handle create company error', async () => {
-    const mockError = new Error('Create error');
-
-    vi.mocked(companyService.getAll).mockResolvedValue({
-      data: [],
-      error: null,
-    });
-
-    vi.mocked(companyService.create).mockResolvedValue({
-      data: null,
-      error: mockError,
-    });
-
-    const { result } = renderHook(() => useCompanies());
-
-    await waitFor(() => {
-      expect(result.current.isLoading).toBe(false);
-    });
-
-    let createResult;
-    await act(async () => {
-      createResult = await result.current.createCompany({ name: 'Test' } as any);
-    });
-
-    expect(createResult.error).toBeDefined();
-    expect(createResult.data).toBeNull();
-  });
-
   it('should update a company', async () => {
     const updatedCompany = { id: '1', name: 'Updated Company' } as any;
     const updateData = { name: 'Updated Company' };
@@ -253,7 +195,7 @@ describe('useCompanies', () => {
     expect(result.current).toHaveProperty('isLoading');
     expect(result.current).toHaveProperty('error');
     expect(result.current).toHaveProperty('refetch');
-    expect(result.current).toHaveProperty('createCompany');
+    expect(result.current).not.toHaveProperty('createCompany');
     expect(result.current).toHaveProperty('updateCompany');
     expect(result.current).toHaveProperty('deleteCompany');
     expect(result.current).toHaveProperty('toggleStatus');

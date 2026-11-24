@@ -94,45 +94,6 @@ describe('adminService', () => {
     });
   });
 
-  describe('createCompany', () => {
-    it('should create a new company', async () => {
-      const newCompany = { name: 'New Company' };
-      const createdCompany = { id: '3', ...newCompany, created_at: '2026-05-11T00:00:00Z' };
-
-      const mockQuery = {
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockResolvedValue({ data: createdCompany, error: null }),
-      };
-
-      vi.mocked(supabase.from).mockReturnValue(mockQuery as any);
-
-      const result = await adminService.createCompany(newCompany as any);
-
-      expect(result.data).toEqual(createdCompany);
-      expect(result.error).toBeNull();
-      expect(mockQuery.insert).toHaveBeenCalledWith(newCompany);
-    });
-
-    it('should return error when creation fails', async () => {
-      const newCompany = { name: 'New Company' };
-      const mockError = new Error('Insert error');
-
-      const mockQuery = {
-        insert: vi.fn().mockReturnThis(),
-        select: vi.fn().mockReturnThis(),
-        single: vi.fn().mockRejectedValue(mockError),
-      };
-
-      vi.mocked(supabase.from).mockReturnValue(mockQuery as any);
-
-      const result = await adminService.createCompany(newCompany as any);
-
-      expect(result.data).toBeNull();
-      expect(result.error).toBeDefined();
-    });
-  });
-
   describe('getEmployees', () => {
     it('should fetch employees with pagination', async () => {
       const mockEmployees = [

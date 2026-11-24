@@ -94,6 +94,8 @@ describe('QA multi-org PR1: useAdminPermissions por papel', () => {
     for (const m of ['marketing', 'legal', 'accesses', 'support']) {
       expect(p.canView(m)).toBe(false);
     }
+    // PR3: o ponto passou a ter âmbito por empresa na BD, por isso o admin de empresa tem o módulo.
+    expect(p.canView('timeclock')).toBe(true);
     expect(p.canViewTopic('settings', 'groups')).toBe(false);
     expect(p.canViewTopic('settings', 'support_subjects')).toBe(false);
   });

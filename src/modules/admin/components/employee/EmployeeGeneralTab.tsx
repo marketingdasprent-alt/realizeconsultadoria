@@ -213,6 +213,9 @@ const EmployeeGeneralTab = ({
       const details = buildEmployeeDetails(
         {
           ...data,
+          // O formulário tem Date; buildEmployeeDetails só lê as versões *_iso (texto).
+          safety_checkup_date: isoDate(data.safety_checkup_date),
+          birth_date: isoDate(data.birth_date),
           safety_checkup_date_iso: isoDate(data.safety_checkup_date),
           birth_date_iso: isoDate(data.birth_date),
         },

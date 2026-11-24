@@ -17,7 +17,7 @@
     "lint:fix": "eslint . --ext .ts,.tsx --fix",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "type-check": "tsc --noEmit",
+    "type-check": "tsc --noEmit -p tsconfig.app.json && tsc --noEmit -p tsconfig.node.json",
     "validate": "pnpm lint && pnpm format:check && pnpm type-check && pnpm test",
     "setup:admin": "node scripts/setup-admin.mjs",
     "sync": "git add . && git commit -m 'Update' && git push origin main",

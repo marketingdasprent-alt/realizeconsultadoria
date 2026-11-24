@@ -17,6 +17,7 @@ const INPUT = {
   name: ' Externa Lda ',
   nif: '123456789',
   email: 'geral@externa.pt',
+  country: 'Portugal',
   is_active: true,
   admin_name: ' Ana ',
   admin_email: ' ana@externa.pt ',

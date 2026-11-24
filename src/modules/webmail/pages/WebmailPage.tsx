@@ -47,7 +47,7 @@ import {
 import { FOLDERS, draftFrom, mailKey } from '../lib/mailFormat';
 import { draftFromSaved } from '../lib/savedDraft';
 import { composeSession } from '../lib/composeSession';
-import { mailService } from '../services/mailService';
+import { mailErrorText, mailService } from '../services/mailService';
 import {
   NO_FILTER,
   applyListFilter,
@@ -309,7 +309,13 @@ const WebmailPage: React.FC = () => {
     ]);
     loading.dismiss();
     if (error || !data)
-      return void toast({ title: 'O rascunho não abriu', variant: 'destructive' });
+      return void toast({
+        title: 'O rascunho não abriu',
+        // O motivo do servidor (ex.: o rascunho já não está na pasta), em vez de só "não abriu".
+        description:
+          mailErrorText(error) || 'O servidor de email não devolveu o rascunho. Tente outra vez.',
+        variant: 'destructive',
+      });
     // Volta com o que o servidor de email não guarda: Bcc, conversa, citação e anexos remotos
     const base = draftFromSaved(data);
     setDraft(

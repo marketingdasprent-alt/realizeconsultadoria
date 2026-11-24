@@ -65,10 +65,13 @@ export const loadAttachment = (
   cache.set(key, pending);
   void pending.then(
     () => {
-      if (epoch !== sessionEpoch()) cache.delete(key);
+      // Só apaga a própria entrada: a conta nova pode já ter pedido o mesmo anexo.
+      if (epoch !== sessionEpoch() && cache.get(key) === pending) cache.delete(key);
     },
     // Falhou: não fica em cache (a próxima tentativa volta a pedir).
-    () => cache.delete(key)
+    () => {
+      if (cache.get(key) === pending) cache.delete(key);
+    }
   );
   while (cache.size > MAX_CACHED) cache.delete(cache.keys().next().value as string);
   return pending;

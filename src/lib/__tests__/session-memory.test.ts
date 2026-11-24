@@ -145,6 +145,27 @@ describe('memória da sessão (módulos com estado fora do React)', () => {
     expect(mail.attachment).toHaveBeenCalledTimes(2);
   });
 
+  it('o pedido de anexo da conta anterior que termina tarde não apaga o da conta nova', async () => {
+    let answerOld!: (value: unknown) => void;
+    mail.attachment.mockClear();
+    mail.attachment.mockImplementationOnce(
+      () =>
+        new Promise(resolve => {
+          answerOld = resolve;
+        }) as never
+    );
+    const old = loadAttachment('caixa', 'm2', 'a2', 'a.txt');
+    resetSessionMemory(); // outra conta entrou
+    await loadAttachment('caixa', 'm2', 'a2', 'a.txt'); // a conta nova pede o mesmo anexo
+    expect(mail.attachment).toHaveBeenCalledTimes(2);
+
+    answerOld({ data: { filename: 'a.txt', mime: 'text/plain', base64: 'eA==' }, error: null });
+    await old;
+    // o da conta nova continua em cache: não volta a pedir
+    await loadAttachment('caixa', 'm2', 'a2', 'a.txt');
+    expect(mail.attachment).toHaveBeenCalledTimes(2);
+  });
+
   it('os avisos (toasts) da conta anterior desaparecem', () => {
     act(() => {
       toast({ title: 'Nova mensagem de um cliente da conta 1' });

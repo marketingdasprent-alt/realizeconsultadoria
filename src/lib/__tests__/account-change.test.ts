@@ -10,6 +10,16 @@ describe('createAccountWatcher', () => {
     expect(onChange).not.toHaveBeenCalled();
   });
 
+  it('diz qual é a conta nova (para poupar o que já é dela) ou null ao terminar a sessão', () => {
+    const onChange = vi.fn();
+    const seen = createAccountWatcher(onChange);
+    seen('u1');
+    seen('u2');
+    expect(onChange).toHaveBeenLastCalledWith('u2');
+    seen(null);
+    expect(onChange).toHaveBeenLastCalledWith(null);
+  });
+
   it('outra conta a entrar limpa uma vez', () => {
     const onChange = vi.fn();
     const seen = createAccountWatcher(onChange);

@@ -10,6 +10,7 @@ import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
 import { createAccountWatcher } from '@/lib/account-change';
+import { clearAllDeviceData } from '@/lib/device-cache';
 import { resetSessionMemory } from '@/lib/session-memory';
 import { supabase } from '@/integrations/supabase/client';
 import { NewMailPopup } from '@/modules/webmail/components/NewMailPopup';
@@ -175,9 +176,11 @@ const MailAppContent: React.FC = () => {
         variant: 'destructive',
       });
     // Outra conta neste separador (ou a sessão a terminar): a cache e a memória da anterior saem.
-    const watchAccount = createAccountWatcher(() => {
+    const watchAccount = createAccountWatcher(newUserId => {
       void queryClient.cancelQueries();
       queryClient.clear();
+      // Também o que a conta anterior guardou no aparelho (caixas, chat IA…), poupando a nova.
+      clearAllDeviceData(newUserId);
       resetSessionMemory();
     });
     void (async () => {

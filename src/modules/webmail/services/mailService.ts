@@ -2,6 +2,7 @@
 // mail-oauth (ligar Google/Microsoft) e mail-api (ler, enviar, organizar).
 import { supabase } from '@/integrations/supabase/client';
 import { applyAccountOrder } from '../lib/accountOrder';
+import { detachInlineImages } from '../lib/inlineImages';
 import type { Discovery } from '../lib/autodiscover';
 import type { MailProviderKey } from '../lib/providers';
 import type {
@@ -34,12 +35,16 @@ export const MAIL_ERRORS: Record<string, string> = {
   reauth: 'A autorização desta caixa expirou. Volte a ligá-la.',
   imap_login_failed: 'Não foi possível entrar com estes dados. Confirme o email e a palavra-passe.',
   smtp_port_blocked: 'O envio só funciona por SMTP com SSL na porta 465.',
-  too_large: 'Os anexos ultrapassam 14 MB.',
+  too_large: 'O email passa de 14 MB (texto, imagens e anexos).',
   not_found: 'Esta caixa de correio já não existe.',
 };
 
-export const mailErrorText = (error: MailError | null) =>
-  error ? (MAIL_ERRORS[error.code] ?? error.message) : '';
+export const mailErrorText = (error: MailError | null) => {
+  if (!error) return '';
+  // O servidor diz o que passou do limite (pedido de 14 MB, ou 18 MB com imagens e anexos).
+  if (error.code === 'too_large' && error.message) return error.message;
+  return MAIL_ERRORS[error.code] ?? error.message;
+};
 
 type Row = Record<string, unknown>;
 const str = (value: unknown) => (typeof value === 'string' ? value : '');
@@ -604,8 +609,10 @@ export const mailService = {
    * `queued`: vai para a caixa de saída (o servidor envia num pedido próprio, repete se não
    * conseguir ligar e apaga o rascunho) e devolve o id na fila.
    */
-  send: (input: ComposeInput, html: string, queued = false) =>
-    call<{ id: string | null }>('mail-api', {
+  send: (input: ComposeInput, rawHtml: string, queued = false) => {
+    // As imagens da conversa vão como partes do email (cid:), buscadas pelo servidor.
+    const { html, images } = detachInlineImages(rawHtml);
+    return call<{ id: string | null }>('mail-api', {
       action: queued ? 'queue-send' : 'send',
       delete_draft_id:
         queued && input.draft?.accountId === input.accountId ? input.draft.id : undefined,
@@ -631,11 +638,14 @@ export const mailService = {
       forward_of_key: input.forwardOf
         ? input.forwardOf.messageKey || `id:${input.forwardOf.messageId}`
         : undefined,
-    }),
+      inline_images: images.length ? images : undefined,
+    });
+  },
 
   /** Guarda (ou substitui `draftId`) o rascunho na pasta Rascunhos; devolve o id novo. */
-  saveDraft: (input: ComposeInput, html: string, draftId: string | null) =>
-    call<{ id: string }>('mail-api', {
+  saveDraft: (input: ComposeInput, rawHtml: string, draftId: string | null) => {
+    const { html, images } = detachInlineImages(rawHtml);
+    return call<{ id: string }>('mail-api', {
       action: 'save-draft',
       account_id: input.accountId,
       draft_id: draftId ?? undefined,
@@ -647,7 +657,9 @@ export const mailService = {
       html,
       in_reply_to: input.inReplyTo,
       attachments: input.attachments,
-    }),
+      inline_images: images.length ? images : undefined,
+    });
+  },
 
   deleteDraft: (accountId: string, draftId: string) =>
     call('mail-api', { action: 'delete-draft', account_id: accountId, message_id: draftId }),

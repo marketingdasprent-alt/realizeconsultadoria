@@ -79,6 +79,8 @@ import {
 } from './labels.ts';
 import { dropFolderRefs, renameFolderRefs } from './folderRefs.ts';
 import { fetchRemoteAttachments, parseRemoteAttachments } from './remoteAttachments.ts';
+import { markInlineImages, parseInlineImages } from '../_shared/mail/inline-token.ts';
+import { resolveQuotedImages } from './quotedImages.ts';
 import { bundleIfTooMany } from './bundleAttachments.ts';
 import { logSend, sendDailyReport } from './sendLog.ts';
 import { backfillCache } from './backfill.ts';
@@ -108,12 +110,12 @@ type Body = Record<string, unknown>;
 const ok = (data: unknown = null) => json({ ok: true, data });
 const badRequest = () => json({ ok: false, code: 'bad_request' }, 400);
 
-const reauthError = async (db: SupabaseClient, accountId: string) => {
+const reauthError = async (db: SupabaseClient, accountId: string, message?: string) => {
   await updateAccountStatus(db, accountId, {
     status: 'reauth',
-    last_error: 'Credenciais inválidas ou autorização revogada.',
+    last_error: message ?? 'Credenciais inválidas ou autorização revogada.',
   });
-  return mailError('reauth');
+  return mailError('reauth', message);
 };
 
 const imapConfig = (
@@ -159,7 +161,13 @@ const createDriver = async (
     const secret = parseImapSecret(raw);
     const config = secret ? imapConfig(account, secret) : null;
     if (!config) throw await reauthError(db, account.id);
-    return createImapDriver(config, () => reauthError(db, account.id));
+    return createImapDriver(config, () =>
+      reauthError(
+        db,
+        account.id,
+        'O servidor recusou o acesso à caixa. A ligação será verificada novamente de forma automática; se o problema persistir, confirme as credenciais.'
+      )
+    );
   }
   const oauth = oauthProviderOfMethod(account.auth_method);
   const secret = parseOAuthSecret(raw);
@@ -341,6 +349,19 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
   ];
   const messageId = optionalString(body.message_id, 2000) ?? '';
   if (needsMessage.includes(action) && !messageId) return badRequest();
+
+  /**
+   * Caixa de origem de uma imagem citada: a própria ou outra conta desta pessoa (a mesma
+   * verificação dos anexos do original); conta de outra pessoa → erro (a imagem não entra).
+   */
+  const sourceDriver = async (sourceId: string, own: MailDriver): Promise<MailDriver> =>
+    sourceId === account.id
+      ? own
+      : createDriver(
+          db,
+          await requireAccount(db, userId, { account_id: sourceId }),
+          readSecret(db, sourceId)
+        );
 
   switch (action) {
     case 'list': {
@@ -666,7 +687,11 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const imap = account.auth_method === 'imap';
       const cached = imap ? await readCached(db, account.id, messageId) : null;
       if (cached) return ok((await attachLabels(db, account.id, [cached]))[0]);
-      const message = await (await createDriver(db, account, pendingSecret)).get(messageId);
+      const opened = await (await createDriver(db, account, pendingSecret)).get(messageId);
+      // Imagens com a origem (conta, email, parte): ao citar, o envio vai buscá-las à caixa
+      const message = opened.html
+        ? { ...opened, html: markInlineImages(opened.html, account.id, messageId) }
+        : opened;
       if (imap) inBackground(writeCached(db, account.id, message));
       return ok((await attachLabels(db, account.id, [message]))[0]);
     }
@@ -692,6 +717,8 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
           ? badRequest()
           : json({ ok: false, code: parsed.code, message: MAIL_ERROR_MESSAGES[parsed.code] });
       }
+      const quotedRefs = parseInlineImages(body.inline_images);
+      if (!quotedRefs) return invalidInlineImages();
       const driver = await createDriver(db, account, pendingSecret);
       // Reencaminhar: os anexos do original vêm da caixa dele (sem passar pelo browser)
       const remote = parseRemoteAttachments(body.remote_attachments);
@@ -740,9 +767,20 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
       const bundled = bundleIfTooMany(parsed.value.attachments, parsed.value.attachmentBytes);
       parsed.value.attachments = bundled.attachments;
       parsed.value.attachmentBytes = bundled.attachmentBytes;
+      // Imagens da conversa citada: vêm da caixa de origem, uma vez cada (como no Outlook)
+      const quoted = await resolveQuotedImages({
+        refs: quotedRefs,
+        html: parsed.value.html,
+        alreadyBytes: outgoingBytes(parsed.value),
+        driverFor: id => sourceDriver(id, driver),
+      });
       // Imagens da assinatura dentro do email (o Outlook bloqueia as que vêm por link)
-      const embedded = await embedSignatureImages(parsed.value.html);
-      const sent = await driver.send({ ...parsed.value, ...embedded });
+      const embedded = await embedSignatureImages(quoted.html);
+      const sent = await driver.send({
+        ...parsed.value,
+        html: embedded.html,
+        inline: [...embedded.inline, ...quoted.inline],
+      });
       // Reencaminhar: o email original fica com a marca "reencaminhado"
       const forwardKey = optionalString(body.forward_of_key, 1000);
       if (forwardKey && !/[\r\n\0]/.test(forwardKey))
@@ -773,6 +811,8 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
         return check.code === 'bad_request'
           ? badRequest()
           : json({ ok: false, code: check.code, message: MAIL_ERROR_MESSAGES[check.code] });
+      // As imagens citadas ficam como referências (pequenas) e resolvem-se no envio
+      if (!parseInlineImages(body.inline_images)) return invalidInlineImages();
       if (JSON.stringify(body).length > MAX_QUEUE_BYTES)
         return json({ ok: false, code: 'too_large', message: 'Email grande demais para a fila.' });
       const id = await queueSend(db, userId, account.id, body);
@@ -786,9 +826,21 @@ const handle = async (db: SupabaseClient, userId: string, body: Body): Promise<R
           ? badRequest()
           : json({ ok: false, code: parsed.code, message: MAIL_ERROR_MESSAGES[parsed.code] });
       }
+      const quotedRefs = parseInlineImages(body.inline_images);
+      if (!quotedRefs) return invalidInlineImages();
       const draftId = optionalString(body.draft_id, 2000) ?? null;
       const driver = await createDriver(db, account, pendingSecret);
-      const savedDraft = await driver.saveDraft(parsed.value, draftId);
+      // O rascunho guarda as imagens da conversa citada como partes inline (como o envio)
+      const quoted = await resolveQuotedImages({
+        refs: quotedRefs,
+        html: parsed.value.html,
+        alreadyBytes: outgoingBytes(parsed.value),
+        driverFor: id => sourceDriver(id, driver),
+      });
+      const savedDraft = await driver.saveDraft(
+        { ...parsed.value, html: quoted.html, inline: quoted.inline },
+        draftId
+      );
       if (account.auth_method === 'imap')
         await clearCachedLists(db, account.id).catch(() => undefined);
       return ok(savedDraft);
@@ -910,6 +962,23 @@ const runAction = async (db: SupabaseClient, userId: string, body: Body): Promis
     logIfSlow(String(body.action), String(body.account_id ?? '-'), started);
   }
 };
+
+/** O que o email já leva (texto e anexos, pelo base64), para o total das imagens citadas. */
+const outgoingBytes = (value: {
+  html: string;
+  text: string;
+  attachments: { base64: string }[];
+}): number =>
+  value.html.length +
+  value.text.length +
+  value.attachments.reduce((total, a) => total + Math.floor((a.base64.length * 3) / 4), 0);
+
+const invalidInlineImages = () =>
+  json({
+    ok: false,
+    code: 'bad_request',
+    message: 'Não foi possível juntar as imagens da conversa citada (pedido inválido).',
+  });
 
 /** Anexos e destinatários de um pedido de envio (para o registo). */
 const sendCounts = (body: Record<string, unknown>) => {

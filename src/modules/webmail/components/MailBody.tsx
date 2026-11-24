@@ -1,5 +1,15 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useWorkspace } from '@/modules/workspace/context/workspaceContext';
 import { readerDocument } from '../lib/mailFormat';
+import {
+  conversationCandidates,
+  insertAttachmentBar,
+  loadMessage,
+  matchHeader,
+  visibleAttachments,
+} from '../lib/quotedAttachments';
+import { findQuotedHeaders } from '../lib/quotedHeaders';
 import type { MailAttachmentInfo, MailMessage } from '../types';
 import { AttachmentThumb } from './AttachmentThumb';
 
@@ -13,6 +23,10 @@ interface MailBodyProps {
 export const MailBody: React.FC<MailBodyProps> = ({ message, onDownload, onOpenAttachment }) => {
   const frame = useRef<HTMLIFrameElement>(null);
   const [height, setHeight] = useState(320);
+  const qc = useQueryClient();
+  const { isPreview } = useWorkspace();
+  // Cada abertura do email tem o seu número: o que chega tarde de uma abertura antiga não entra.
+  const loadRun = useRef(0);
   // A altura acompanha o conteúdo (imagens que chegam depois, coluna mais estreita) e os emails
   // mais largos do que a coluna (ex.: tabelas de 600 px) encolhem para caber, sem barras.
   const fit = () => {
@@ -26,10 +40,35 @@ export const MailBody: React.FC<MailBodyProps> = ({ message, onDownload, onOpenA
     body.style.zoom = String(wide > available + 2 ? Math.max(0.45, available / wide) : 1);
     setHeight(Math.max(120, Math.ceil(doc.documentElement.scrollHeight) + 8));
   };
+  /**
+   * Histórico citado: no início de cada email citado, os anexos que esse email trouxe (procura-o
+   * na caixa pelo assunto, remetente e data). Sem correspondência certa, não mostra nada.
+   */
+  const showQuotedAttachments = async (doc: Document) => {
+    const run = ++loadRun.current;
+    const headers = findQuotedHeaders(doc);
+    if (!headers.length || isPreview) return;
+    try {
+      const candidates = await conversationCandidates(qc, message);
+      for (const header of headers) {
+        const match = matchHeader(header, candidates, message.id);
+        if (!match?.hasAttachments) continue;
+        const full = await loadMessage(qc, match).catch(() => null);
+        if (!full || run !== loadRun.current || frame.current?.contentDocument !== doc) return;
+        insertAttachmentBar(header, full, visibleAttachments(full), attachment =>
+          onOpenAttachment(full, attachment)
+        );
+        fit();
+      }
+    } catch {
+      // Sem pesquisa (servidor ocupado, sem rede): o email lê-se na mesma, só sem as faixas.
+    }
+  };
   const onFrameLoad = () => {
     fit();
     const doc = frame.current?.contentDocument;
     doc?.querySelectorAll('img').forEach(img => img.addEventListener('load', fit, { once: true }));
+    if (doc) void showQuotedAttachments(doc);
   };
   useEffect(() => {
     const iframe = frame.current;

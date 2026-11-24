@@ -61,6 +61,7 @@ import {
   planLightMessage,
 } from '../../_shared/mail/imap-light.ts';
 import { errorMessage } from '../../_shared/mail-server/http.ts';
+import { isImapAuthFailure } from '../../_shared/mail/imap-auth.ts';
 
 // ---------------------------------------------------------------- tipos mínimos dos pacotes
 
@@ -160,14 +161,6 @@ const SNIPPET_PART_MAX = 200_000;
 const AUTO_SAVES_SENT =
   /(^|\.)(gmail\.com|googlemail\.com|office365\.com|outlook\.com|hotmail\.com)$/i;
 
-const isAuthFailure = (error: unknown): boolean => {
-  if (typeof error !== 'object' || error === null) return false;
-  const e = error as { authenticationFailed?: unknown; responseText?: unknown; message?: unknown };
-  if (e.authenticationFailed === true) return true;
-  const text = `${String(e.responseText ?? '')} ${String(e.message ?? '')}`;
-  return /AUTHENTICATIONFAILED|invalid credentials|authentication failed|LOGIN failed/i.test(text);
-};
-
 /** A causa curta de uma falha de ligação (código, resposta do servidor), para o aviso e o registo. */
 const connectCause = (error: unknown): string => {
   const e = (error ?? {}) as { code?: unknown; responseText?: unknown; message?: unknown };
@@ -228,7 +221,7 @@ const openClientPaced = (cfg: ImapAccountConfig): Promise<ImapClient> =>
     try {
       return await openClient(cfg);
     } catch (error) {
-      if (isAuthFailure(error)) throw error;
+      if (isImapAuthFailure(error)) throw error;
       await new Promise(resolve => setTimeout(resolve, 800));
       return await openClient(cfg);
     }
@@ -317,7 +310,7 @@ export const testImapLogin = async (cfg: ImapAccountConfig): Promise<void> => {
     console.warn('mail-api imap: login falhou', errorMessage(error));
     throw mailError(
       'imap_login_failed',
-      isAuthFailure(error)
+      isImapAuthFailure(error)
         ? undefined
         : `Não foi possível ligar a ${cfg.imapHost}:${cfg.imapPort}. Confirme o servidor e a porta.`
     );
@@ -377,7 +370,7 @@ export const createImapDriver = (
     try {
       client = await openClientPaced(cfg);
     } catch (error) {
-      if (isAuthFailure(error)) throw await onAuthFailure();
+      if (isImapAuthFailure(error)) throw await onAuthFailure();
       console.error(`mail-api imap: sem ligação ${cfg.imapHost}:`, errorMessage(error));
       throw mailError(
         'provider_error',
@@ -1020,6 +1013,8 @@ export const createImapDriver = (
         subject: params.subject,
         text: params.text,
         html: params.html,
+        // Imagens da assinatura e da conversa citada (o html refere-as por cid:)
+        inline: params.inline,
         // Já em base64 (do pedido ou da caixa de origem): não se volta a codificar
         attachments: params.attachments.map(a => ({
           filename: a.filename,

@@ -125,6 +125,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       void resolveRole(session, generation);
       return { role: cached, unavailable: false };
     }
+
+    // Outra conta no mesmo separador (por exemplo, entrou noutro separador): a anterior sai de
+    // vista já, em vez de ficar à frente da sessão nova até o papel chegar. Com isto o ecrã
+    // passa por "a carregar" e a estrutura monta-se de novo para a conta nova.
+    if (resolvedUserIdRef.current && resolvedUserIdRef.current !== session.user.id) {
+      resolvedUserIdRef.current = null;
+      setUser(null);
+      setRole(null);
+      setIsLoading(true);
+      try {
+        return await resolveRole(session, generation);
+      } finally {
+        if (generation === lookupGenerationRef.current) setIsLoading(false);
+      }
+    }
     return resolveRole(session, generation);
   };
 

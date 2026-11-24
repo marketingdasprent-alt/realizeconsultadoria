@@ -1,6 +1,7 @@
 // Anexos do Webmail: o servidor lê a mensagem inteira a cada anexo (demora), por isso o que já
 // foi buscado fica em memória nesta sessão — abrir, pré-visualizar, descarregar e reencaminhar
 // o mesmo anexo só pede uma vez.
+import { onSessionReset } from '@/lib/session-memory';
 import { mailService, type MailError } from '../services/mailService';
 
 export interface LoadedAttachment {
@@ -11,6 +12,9 @@ export interface LoadedAttachment {
 
 const MAX_CACHED = 12;
 const cache = new Map<string, Promise<LoadedAttachment>>();
+
+// Os anexos já buscados são de emails da conta que os abriu.
+onSessionReset(() => cache.clear());
 
 // Tipo genérico ("octet-stream"): deduz pela extensão, para pré-visualizar e abrir bem.
 const BY_EXTENSION: Record<string, string> = {

@@ -1,6 +1,7 @@
 // Feed no Supabase: publicações (feed_posts), comentários, reações e ficheiros (feed-files).
 // As regras da BD decidem quem vê o quê (empresa / departamento).
 import { supabase } from '@/integrations/supabase/client';
+import { onSessionReset } from '@/lib/session-memory';
 import type { Database, Json } from '@/integrations/supabase/types';
 import type { FeedAttachment } from '../types';
 
@@ -17,6 +18,8 @@ const safeFileName = (name: string): string =>
     .slice(-80) || 'ficheiro';
 
 const signedUrls = new Map<string, { url: string; expires: number }>();
+// Um URL assinado vale para quem o pediu: outra conta no mesmo separador pede o seu.
+onSessionReset(() => signedUrls.clear());
 
 export const feedService = {
   /** Publicações visíveis, mais recentes primeiro (`before` carrega as anteriores). */

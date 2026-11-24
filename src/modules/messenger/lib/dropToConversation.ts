@@ -1,8 +1,15 @@
 // Largar ficheiros em cima de uma conversa da lista: abrem nessa conversa, prontos a enviar.
 // A conversa pode ainda não estar aberta, por isso ficam guardados até ela os ir buscar.
 
+import { onSessionReset } from '@/lib/session-memory';
+
 const EVENT = 'rz-chat-drop';
 let pending: { conversationId: string; files: File[] } | null = null;
+
+// Ficheiros largados e ainda por abrir não passam para a conta seguinte.
+onSessionReset(() => {
+  pending = null;
+});
 
 export const dropToConversation = (conversationId: string, files: File[]) => {
   if (!files.length) return;

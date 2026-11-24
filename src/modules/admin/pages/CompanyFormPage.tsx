@@ -122,7 +122,13 @@ const CompanyFormPage = () => {
       item => item.company_id === company.id && managesCompany(item.role)
     );
   const requestedTab = parseCompanyTab(params.get('tab'));
-  const sharingPending = requestedTab === 'partilha' && myCompanies.isLoading;
+  // A ler as empresas da conta (1.ª vez, ou a confirmar uma lista que ainda não inclui esta
+  // empresa, p.ex. acesso acabado de dar): não decide nem mostra "sem acesso" de relance.
+  // Com erro mantém o aviso montado (o botão "Tentar de novo" não desaparece ao clicar).
+  const sharingPending =
+    requestedTab === 'partilha' &&
+    !myCompanies.error &&
+    (myCompanies.isLoading || (myCompanies.isFetching && !canSeeSharing));
   // Sem direito à Partilha, o endereço com ?tab=partilha abre em Dados (nada de página vazia).
   const sharingBlocked = requestedTab === 'partilha' && !sharingPending && !canSeeSharing;
   const tab: CompanyTab = sharingBlocked ? 'dados' : requestedTab;
@@ -289,16 +295,17 @@ const CompanyFormPage = () => {
               role="alert"
               className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
             >
-              {myCompanies.error ? (
+              {canView('sharing') && myCompanies.data === undefined ? (
                 <>
                   <span>Não foi possível carregar a Partilha desta empresa.</span>
                   <Button
                     type="button"
                     size="sm"
                     variant="outline"
+                    disabled={myCompanies.isFetching}
                     onClick={() => void myCompanies.refetch()}
                   >
-                    Tentar de novo
+                    {myCompanies.isFetching ? 'A tentar…' : 'Tentar de novo'}
                   </Button>
                 </>
               ) : (

@@ -35,11 +35,18 @@ vi.mock('@/hooks/useAdminPermissions', () => ({
 // As empresas que a conta administra (a Partilha só aparece para estas).
 const refetchMine = vi.fn();
 const myCompanies: {
-  data: { company_id: string; role: string }[];
+  data: { company_id: string; role: string }[] | undefined;
   isLoading: boolean;
+  isFetching: boolean;
   error: unknown;
   refetch: () => void;
-} = { data: [{ company_id: 'c1', role: 'admin' }], isLoading: false, error: null, refetch: () => refetchMine() };
+} = {
+  data: [{ company_id: 'c1', role: 'admin' }],
+  isLoading: false,
+  isFetching: false,
+  error: null,
+  refetch: () => refetchMine(),
+};
 vi.mock('../../hooks/useSharing', () => ({
   useAllGroups: () => ({ data: [] }),
   useMyCompanies: () => myCompanies,
@@ -170,6 +177,7 @@ beforeEach(() => {
   myCompanies.data = [{ company_id: 'c1', role: 'admin' }];
   myCompanies.isLoading = false;
   myCompanies.error = null;
+  myCompanies.isFetching = false;
 });
 
 describe('CompanyFormPage — edição', () => {
@@ -245,13 +253,55 @@ describe('CompanyFormPage — edição', () => {
     });
 
     it('?tab=partilha com erro a ler as empresas da conta: aviso com "Tentar de novo"', async () => {
-      myCompanies.data = [];
+      myCompanies.data = undefined;
       myCompanies.error = new Error('rede');
       renderAt('/admin/empresas/c1?tab=partilha');
       const alert = await screen.findByRole('alert');
       expect(alert).toHaveTextContent(/não foi possível carregar a partilha/i);
       await userEvent.click(screen.getByRole('button', { name: /tentar de novo/i }));
       expect(refetchMine).toHaveBeenCalledTimes(1);
+    });
+
+    it('sem dados e sem erro (pedido em pausa, offline): também "Tentar de novo", nunca "sem acesso"', async () => {
+      myCompanies.data = undefined;
+      renderAt('/admin/empresas/c1?tab=partilha');
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(/não foi possível carregar a partilha/i);
+      expect(alert).not.toHaveTextContent(/não tem acesso/i);
+    });
+
+    it('um erro de fundo com dados já lidos que dizem "não administra" continua a ser "sem acesso"', async () => {
+      myCompanies.data = [{ company_id: 'c1', role: 'colaborador' }];
+      myCompanies.error = new Error('rede');
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso à partilha/i);
+    });
+
+    it('sem a permissão "sharing" o aviso é "sem acesso", sem "Tentar de novo"', async () => {
+      canViewSharing = false;
+      myCompanies.data = undefined;
+      myCompanies.error = new Error('rede');
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso à partilha/i);
+      expect(screen.queryByRole('button', { name: /tentar de novo/i })).not.toBeInTheDocument();
+    });
+
+    it('durante o novo pedido o aviso fica montado, com o botão desativado', async () => {
+      myCompanies.data = undefined;
+      myCompanies.error = new Error('rede');
+      myCompanies.isFetching = true;
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByRole('alert')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /a tentar/i })).toBeDisabled();
+    });
+
+    it('acesso recém-dado: a ler de novo com dados antigos não mostra "sem acesso" de relance', async () => {
+      myCompanies.data = [];
+      myCompanies.isFetching = true;
+      renderAt('/admin/empresas/c1?tab=partilha');
+      await screen.findByRole('heading', { name: 'Acme Lda' });
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByRole('status')).toBeInTheDocument();
     });
 
     it('sem ?tab=partilha não há aviso', async () => {

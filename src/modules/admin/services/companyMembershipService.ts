@@ -32,11 +32,22 @@ interface LooseTable {
         column: string,
         value: string
       ) => {
-        eq: (column: string, value: string) => PromiseLike<RpcResult>;
+        eq: (
+          column: string,
+          value: string
+        ) => {
+          order: (column: string) => {
+            order: (column: string) => {
+              range: (from: number, to: number) => PromiseLike<RpcResult>;
+            };
+          };
+        };
       };
     };
   };
 }
+
+const MEMBERSHIP_PAGE = 1000;
 
 export const companyMembershipService = {
   /**
@@ -44,13 +55,23 @@ export const companyMembershipService = {
    * empresa só as das suas empresas): uma só consulta para a lista de Empresas.
    */
   adminMemberships: async (): Promise<{ company_id: string; user_id: string }[]> => {
-    const { data, error } = await (supabase as unknown as LooseTable)
-      .from('company_memberships')
-      .select('company_id, user_id')
-      .eq('role', 'admin')
-      .eq('status', 'ativo');
-    if (error) throw toSharingError(error);
-    return (data ?? []) as { company_id: string; user_id: string }[];
+    const rows: { company_id: string; user_id: string }[] = [];
+    // O PostgREST devolve no máximo ~1000 linhas por pedido: lê por páginas, em ordem estável,
+    // para a contagem de administradores nunca ficar curta sem aviso.
+    for (let from = 0; ; from += MEMBERSHIP_PAGE) {
+      const { data, error } = await (supabase as unknown as LooseTable)
+        .from('company_memberships')
+        .select('company_id, user_id')
+        .eq('role', 'admin')
+        .eq('status', 'ativo')
+        .order('company_id')
+        .order('user_id')
+        .range(from, from + MEMBERSHIP_PAGE - 1);
+      if (error) throw toSharingError(error);
+      const page = (data ?? []) as { company_id: string; user_id: string }[];
+      rows.push(...page);
+      if (page.length < MEMBERSHIP_PAGE) return rows;
+    }
   },
 
   /** Move um colaborador para outra empresa (atómica; devolve o que fica por tratar). */

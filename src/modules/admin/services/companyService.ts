@@ -118,9 +118,13 @@ export const companyService = {
           };
         }
       }
-      return { data: { id }, error: null };
+      return {
+        data: { id },
+        error: null,
+        warning: typeof data?.warning === 'string' ? data.warning : undefined,
+      };
     } catch (error) {
-      return { data: null, error };
+      return { data: null, error, warning: undefined };
     }
   },
 

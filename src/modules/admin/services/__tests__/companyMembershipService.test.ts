@@ -250,3 +250,62 @@ describe('companyMembershipService', () => {
     });
   });
 });
+
+describe('companyMembershipService.adminMemberships', () => {
+  const from = vi.mocked(supabase.from) as unknown as ReturnType<typeof vi.fn>;
+  const row = (n: number) => ({ company_id: `c${n % 7}`, user_id: `u${n}` });
+
+  /** Simula o PostgREST: devolve a fatia pedida por `.range(de, até)`. */
+  const serve = (total: number) => {
+    const ranges: [number, number][] = [];
+    from.mockImplementation(() => {
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        order: () => chain,
+        range: (a: number, b: number) => {
+          ranges.push([a, b]);
+          const rows = Array.from({ length: Math.max(0, Math.min(b + 1, total) - a) }, (_, i) =>
+            row(a + i)
+          );
+          return Promise.resolve({ data: rows, error: null });
+        },
+      };
+      return chain;
+    });
+    return ranges;
+  };
+
+  it('lê todas as páginas (não fica pelas primeiras 1000 linhas)', async () => {
+    const ranges = serve(2300);
+    const rows = await companyMembershipService.adminMemberships();
+    expect(rows).toHaveLength(2300);
+    expect(ranges).toEqual([
+      [0, 999],
+      [1000, 1999],
+      [2000, 2999],
+    ]);
+  });
+
+  it('uma página cheia e exata ainda pede a seguinte (e pára na vazia)', async () => {
+    const ranges = serve(1000);
+    expect(await companyMembershipService.adminMemberships()).toHaveLength(1000);
+    expect(ranges).toEqual([
+      [0, 999],
+      [1000, 1999],
+    ]);
+  });
+
+  it('um erro da base falha (não devolve só parte)', async () => {
+    from.mockImplementation(() => {
+      const chain = {
+        select: () => chain,
+        eq: () => chain,
+        order: () => chain,
+        range: () => Promise.resolve({ data: null, error: { message: 'boom' } }),
+      };
+      return chain;
+    });
+    await expect(companyMembershipService.adminMemberships()).rejects.toBeInstanceOf(SharingError);
+  });
+});

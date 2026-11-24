@@ -1,5 +1,6 @@
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import CompanyFormPage from '../CompanyFormPage';
@@ -21,16 +22,40 @@ vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast }) }));
 let canManage = true;
 let isSuperAdmin = true;
 let permissionsLoading = false;
+let canViewSharing = true;
 vi.mock('@/hooks/useAdminPermissions', () => ({
   useAdminPermissions: () => ({
     isLoading: permissionsLoading,
     isSuperAdmin,
     canExecuteTopic: () => canManage,
+    canView: (module: string) => (module === 'sharing' ? canViewSharing : true),
   }),
 }));
 
+// As empresas que a conta administra (a Partilha só aparece para estas).
+const refetchMine = vi.fn();
+const myCompanies: {
+  data: { company_id: string; role: string }[] | undefined;
+  isLoading: boolean;
+  isFetching: boolean;
+  error: unknown;
+  refetch: () => void;
+} = {
+  data: [{ company_id: 'c1', role: 'admin' }],
+  isLoading: false,
+  isFetching: false,
+  error: null,
+  refetch: () => refetchMine(),
+};
 vi.mock('../../hooks/useSharing', () => ({
   useAllGroups: () => ({ data: [] }),
+  useMyCompanies: () => myCompanies,
+}));
+
+vi.mock('../../components/company/CompanySharing', () => ({
+  CompanySharing: ({ company }: { company: { id: string; name: string } }) => (
+    <div data-testid="sharing-section">Partilha de {company.name}</div>
+  ),
 }));
 
 vi.mock('../../components/CompanyAdminsSection', () => ({
@@ -148,27 +173,152 @@ beforeEach(() => {
   getById.mockResolvedValue({ data: COMPANY, error: null });
   update.mockResolvedValue({ data: { ...COMPANY, name: 'Acme Novo' }, error: null });
   createWithAdmin.mockResolvedValue({ data: { ...COMPANY, id: 'c2' }, error: null });
+  canViewSharing = true;
+  myCompanies.data = [{ company_id: 'c1', role: 'admin' }];
+  myCompanies.isLoading = false;
+  myCompanies.error = null;
+  myCompanies.isFetching = false;
 });
 
 describe('CompanyFormPage — edição', () => {
-  it('carrega a empresa por id e mostra o formulário e os administradores', async () => {
+  it('carrega a empresa por id e abre nos Dados, com os separadores da ficha', async () => {
     renderAt('/admin/empresas/c1');
     expect(await screen.findByDisplayValue('Acme Lda')).toBeInTheDocument();
     expect(getById).toHaveBeenCalledWith('c1');
     expect(screen.getByRole('heading', { name: 'Acme Lda' })).toBeInTheDocument();
     expect(screen.getByText('Dados da empresa')).toBeInTheDocument();
-    expect(screen.getByTestId('admins-section')).toHaveTextContent('Acme Lda');
+    for (const name of ['Dados', 'Administradores', 'Colaboradores', 'Partilha']) {
+      expect(screen.getByRole('tab', { name })).toBeInTheDocument();
+    }
+    expect(screen.getByRole('tab', { name: 'Dados' })).toHaveAttribute('data-state', 'active');
+    expect(screen.queryByTestId('admins-section')).not.toBeInTheDocument();
   });
 
-  it('mostra a secção Colaboradores, por baixo dos administradores, com o estado da empresa', async () => {
+  it('?tab=administradores abre os administradores desta empresa', async () => {
+    renderAt('/admin/empresas/c1?tab=administradores');
+    expect(await screen.findByTestId('admins-section')).toHaveTextContent('Acme Lda');
+  });
+
+  it('mostra a secção Colaboradores com o estado da empresa', async () => {
     getById.mockResolvedValue({ data: { ...COMPANY, is_active: false }, error: null });
-    renderAt('/admin/empresas/c1');
+    renderAt('/admin/empresas/c1?tab=colaboradores');
     const employees = await screen.findByTestId('employees-section');
     expect(employees).toHaveTextContent('Colaboradores de Acme Lda (c1, inativa)');
-    const admins = screen.getByTestId('admins-section');
-    expect(
-      admins.compareDocumentPosition(employees) & Node.DOCUMENT_POSITION_FOLLOWING
-    ).toBeTruthy();
+  });
+
+  it('mudar de separador não apaga o que ainda não foi guardado em Dados', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/empresas/c1');
+    const name = await screen.findByDisplayValue('Acme Lda');
+    fireEvent.change(name, { target: { value: 'Acme Editada' } });
+    await user.click(screen.getByRole('tab', { name: 'Administradores' }));
+    expect(await screen.findByTestId('admins-section')).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Dados' }));
+    expect(screen.getByDisplayValue('Acme Editada')).toBeInTheDocument();
+  });
+
+  describe('separador Partilha (era a página "Partilha entre empresas")', () => {
+    it('?tab=partilha abre a Partilha com a empresa fixada (sem escolher empresa)', async () => {
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByTestId('sharing-section')).toHaveTextContent('Acme Lda');
+    });
+
+    it('sem a permissão "sharing" não há separador Partilha e o endereço cai em Dados', async () => {
+      canViewSharing = false;
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByDisplayValue('Acme Lda')).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: 'Partilha' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('sharing-section')).not.toBeInTheDocument();
+    });
+
+    it('quem não administra esta empresa não vê a Partilha dela', async () => {
+      myCompanies.data = [{ company_id: 'c1', role: 'colaborador' }];
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByDisplayValue('Acme Lda')).toBeInTheDocument();
+      expect(screen.queryByRole('tab', { name: 'Partilha' })).not.toBeInTheDocument();
+      expect(screen.queryByTestId('sharing-section')).not.toBeInTheDocument();
+    });
+
+    it('um super admin (papel super_admin) vê a Partilha de qualquer empresa', async () => {
+      myCompanies.data = [{ company_id: 'c1', role: 'super_admin' }];
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByTestId('sharing-section')).toBeInTheDocument();
+    });
+
+    it('?tab=partilha sem direito: aviso claro em vez de cair em Dados calado', async () => {
+      myCompanies.data = [{ company_id: 'c1', role: 'colaborador' }];
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso à partilha/i);
+      expect(screen.queryByTestId('sharing-section')).not.toBeInTheDocument();
+    });
+
+    it('?tab=partilha com erro a ler as empresas da conta: aviso com "Tentar de novo"', async () => {
+      myCompanies.data = undefined;
+      myCompanies.error = new Error('rede');
+      renderAt('/admin/empresas/c1?tab=partilha');
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(/não foi possível carregar a partilha/i);
+      await userEvent.click(screen.getByRole('button', { name: /tentar de novo/i }));
+      expect(refetchMine).toHaveBeenCalledTimes(1);
+    });
+
+    it('sem dados e sem erro (pedido em pausa, offline): também "Tentar de novo", nunca "sem acesso"', async () => {
+      myCompanies.data = undefined;
+      renderAt('/admin/empresas/c1?tab=partilha');
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(/não foi possível carregar a partilha/i);
+      expect(alert).not.toHaveTextContent(/não tem acesso/i);
+    });
+
+    it('um erro de fundo com dados já lidos que dizem "não administra" continua a ser "sem acesso"', async () => {
+      myCompanies.data = [{ company_id: 'c1', role: 'colaborador' }];
+      myCompanies.error = new Error('rede');
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso à partilha/i);
+    });
+
+    it('sem a permissão "sharing" o aviso é "sem acesso", sem "Tentar de novo"', async () => {
+      canViewSharing = false;
+      myCompanies.data = undefined;
+      myCompanies.error = new Error('rede');
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso à partilha/i);
+      expect(screen.queryByRole('button', { name: /tentar de novo/i })).not.toBeInTheDocument();
+    });
+
+    it('durante o novo pedido o aviso fica montado, com o botão desativado', async () => {
+      myCompanies.data = undefined;
+      myCompanies.error = new Error('rede');
+      myCompanies.isFetching = true;
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByRole('alert')).toBeInTheDocument();
+      expect(screen.getByRole('button', { name: /a tentar/i })).toBeDisabled();
+    });
+
+    it('acesso recém-dado: a ler de novo com dados antigos não mostra "sem acesso" de relance', async () => {
+      myCompanies.data = [];
+      myCompanies.isFetching = true;
+      renderAt('/admin/empresas/c1?tab=partilha');
+      await screen.findByRole('heading', { name: 'Acme Lda' });
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+      expect(screen.getByRole('status')).toBeInTheDocument();
+    });
+
+    it('sem ?tab=partilha não há aviso', async () => {
+      myCompanies.data = [{ company_id: 'c1', role: 'colaborador' }];
+      renderAt('/admin/empresas/c1');
+      await screen.findByDisplayValue('Acme Lda');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+
+    it('enquanto as empresas da conta carregam não cai em Dados nem decide', async () => {
+      myCompanies.data = [];
+      myCompanies.isLoading = true;
+      renderAt('/admin/empresas/c1?tab=partilha');
+      await screen.findByRole('heading', { name: 'Acme Lda' });
+      expect(screen.getByRole('status')).toBeInTheDocument();
+      expect(screen.queryByTestId('sharing-section')).not.toBeInTheDocument();
+    });
   });
 
   it('empresa não encontrada: mensagem e voltar à lista', async () => {
@@ -193,7 +343,7 @@ describe('CompanyFormPage — edição', () => {
       expect(toast).toHaveBeenCalledWith({ title: 'Empresa atualizada com sucesso!' })
     );
     expect(screen.getByTestId('where')).toHaveTextContent('/admin/empresas/c1');
-    expect(screen.getByTestId('admins-section')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Dados' })).toHaveAttribute('data-state', 'active');
   });
 
   it('erro ao guardar mostra o erro e não sai da página', async () => {

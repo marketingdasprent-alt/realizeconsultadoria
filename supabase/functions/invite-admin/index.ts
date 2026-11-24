@@ -349,10 +349,13 @@ const handler = async (req: Request): Promise<Response> => {
     );
   } catch (error: any) {
     console.error('Error in invite-admin function:', error);
-    return new Response(JSON.stringify({ error: 'Não foi possível concluir o convite. Tente novamente.' }), {
-      status: 200,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
+    return new Response(
+      JSON.stringify({ error: 'Não foi possível concluir o convite. Tente novamente.' }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      }
+    );
   }
 };
 

@@ -85,7 +85,8 @@ describe('buildLightMessage', () => {
     });
     expect(message.subject).toBe('Matricula BL-54-FR');
     expect(message.text).toBe('Boa tarde, envio em anexo.');
-    expect(message.html).toContain('src="data:image/png;base64,UE5H"');
+    // A imagem leva a marca da parte (p:1.2), para o envio a voltar a buscar (imagens citadas)
+    expect(message.html).toContain('src="data:image/png;rz-part=cDoxLjI;base64,UE5H"');
     expect(message.unread).toBe(false);
     expect(message.has_attachments).toBe(true);
     expect(message.attachments[0].id).toBe('p:2');

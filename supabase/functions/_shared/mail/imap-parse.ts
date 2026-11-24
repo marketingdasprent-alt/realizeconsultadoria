@@ -2,7 +2,8 @@
 // os testes não dependerem dos pacotes npm.
 
 import { htmlToText, makeSnippet } from './html.ts';
-import { decodeBytes, decodeTransferEncoding } from './mime.ts';
+import { partMarkedDataUrl } from './inline-token.ts';
+import { bytesToBase64, decodeBytes, decodeTransferEncoding } from './mime.ts';
 import type { MailAddress, MailAttachmentInfo, MailMessage, MailSummary } from './types.ts';
 
 export interface ImapAddressLike {
@@ -150,7 +151,27 @@ export interface ParsedAttachmentLike {
   size?: number;
   /** mailparser: imagem de multipart/related já embebida no HTML como data: URL. */
   related?: boolean;
+  /** Content-ID (sem < >), quando o anexo é uma imagem referida por cid:. */
+  cid?: string;
+  content?: Uint8Array;
 }
+
+/**
+ * O mailparser troca cid: por `data:<contentType>;base64,<conteúdo>` (simple-parser.js). Aqui essa
+ * data URL ganha a marca da parte (id = índice do anexo, o que driver.attachment aceita), para o
+ * envio a voltar a buscar à caixa ao citar. Se o texto não bater certo, a imagem fica sem marca.
+ */
+const markParsedImages = (html: string, attachments: ParsedAttachmentLike[]): string => {
+  let out = html;
+  attachments.forEach((a, index) => {
+    if (!a.cid || !a.content || !/^image\/[\w]+$/i.test(a.contentType ?? '')) return;
+    const base64 = bytesToBase64(a.content);
+    const plain = `data:${a.contentType};base64,${base64}`;
+    if (!out.includes(plain)) return;
+    out = out.split(plain).join(partMarkedDataUrl(a.contentType as string, base64, String(index)));
+  });
+  return out;
+};
 
 export interface ParsedMailLike {
   subject?: string;
@@ -188,7 +209,10 @@ export const parsedMailToMessage = (
   parsed: ParsedMailLike,
   meta: { id: string; flags?: Iterable<string>; internalDate?: Date | string }
 ): MailMessage => {
-  const html = typeof parsed.html === 'string' && parsed.html ? parsed.html : null;
+  const html =
+    typeof parsed.html === 'string' && parsed.html
+      ? markParsedImages(parsed.html, parsed.attachments ?? [])
+      : null;
   const text = parsed.text ?? null;
   const attachments = parsedAttachments(parsed);
   const references = Array.isArray(parsed.references)

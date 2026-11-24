@@ -13,6 +13,7 @@ import { activeRulesByAccount, applyRules, type MailRule } from './rules.ts';
 import { inBackground, pruneCached, writeCached } from './messageCache.ts';
 import { bounceNotice, explainBounce, isBounce } from '../_shared/mail/bounce.ts';
 import { pickFresh } from './pollFresh.ts';
+import { IMAP_REAUTH_GAP_MS, isImapRecovery } from '../_shared/mail/imap-auth.ts';
 
 const PER_ACCOUNT = 10;
 /** Intervalo mínimo entre leituras da mesma caixa (as IMAP limitam logins: 2 em 2 minutos). */
@@ -174,20 +175,64 @@ const precache = async (
  * Reserva a caixa para esta passagem (atómico): duas passagens seguidas nunca leem a mesma caixa
  * ao mesmo tempo (o que avisaria duas vezes do mesmo email) e as IMAP só a cada 2 minutos.
  */
-const claim = async (db: SupabaseClient, account: PollAccount): Promise<boolean> => {
-  const gap = account.auth_method === 'imap' ? IMAP_GAP_MS : GAP_MS;
+interface PollClaim {
+  polledAt: string;
+  updatedAt: string | null;
+}
+
+const claim = async (db: SupabaseClient, account: PollAccount): Promise<PollClaim | null> => {
+  const gap = isImapRecovery(account)
+    ? IMAP_REAUTH_GAP_MS
+    : account.auth_method === 'imap'
+      ? IMAP_GAP_MS
+      : GAP_MS;
   const before = new Date(Date.now() - gap).toISOString();
+  const polledAt = new Date().toISOString();
   const { data, error } = await db
     .from('mail_accounts')
-    .update({ polled_at: new Date().toISOString() })
+    .update({ polled_at: polledAt })
     .eq('id', account.id)
+    .eq('status', account.status)
     .or(`polled_at.is.null,polled_at.lt.${before}`)
-    .select('id');
+    .select('id, updated_at');
   if (error) console.error('mail-api poll: reserva falhou', error.message);
-  return !error && (data ?? []).length > 0;
+  if (error || !data?.length) return null;
+  return { polledAt, updatedAt: data[0].updated_at ?? null };
 };
 
-/** Passa por todas as contas ativas; os erros de uma conta não param as outras. */
+/** Só recupera depois de ler a Entrada, sem aplicar regras nem gerar avisos. */
+const recoverImapAccount = async (
+  db: SupabaseClient,
+  account: PollAccount,
+  driver: MailDriver,
+  reservation: PollClaim,
+  deadline: number
+): Promise<number> => {
+  if (!reservation.updatedAt) throw new Error('Reserva de recuperação sem versão.');
+  if (Date.now() >= deadline) return 0;
+  await driver.list({
+    folder: 'inbox',
+    query: null,
+    pageToken: null,
+    limit: 1,
+    withoutSnippets: true,
+  });
+  // O limite externo não cancela o trabalho já iniciado: uma resposta tardia não reativa a conta.
+  if (Date.now() >= deadline) return 0;
+  const { data, error } = await db
+    .from('mail_accounts')
+    .update({ status: 'active', last_error: null })
+    .eq('id', account.id)
+    .eq('status', 'reauth')
+    .eq('polled_at', reservation.polledAt)
+    .eq('updated_at', reservation.updatedAt)
+    .select('id');
+  if (error) throw error;
+  if (data?.length) console.info(`mail-api poll: conta IMAP recuperada ${account.id}`);
+  return 0;
+};
+
+/** Contas ativas e recuperação lenta de IMAP em reauth; um erro não para as outras. */
 export const pollNewMail = async (
   db: SupabaseClient,
   createDriver: (db: SupabaseClient, account: MailAccountRow) => Promise<MailDriver>
@@ -195,7 +240,7 @@ export const pollNewMail = async (
   const { data, error } = await db
     .from('mail_accounts')
     .select(`${ACCOUNT_COLUMNS}, notified_until, notify`)
-    .eq('status', 'active');
+    .or('status.eq.active,and(status.eq.reauth,auth_method.eq.imap)');
   if (error) throw error;
   const accounts = (data ?? []) as PollAccount[];
   // Uma falha a ler as regras não pára os avisos
@@ -210,16 +255,19 @@ export const pollNewMail = async (
     2,
     async account => {
       try {
-        if (!(await claim(db, account))) return 0;
+        // A verificação local também impede recuperar OAuth/contas desativadas por engano.
+        if (account.status !== 'active' && !isImapRecovery(account)) return 0;
+        const reservation = await claim(db, account);
+        if (!reservation) return 0;
+        const deadline = Date.now() + ACCOUNT_TIMEOUT_MS;
         // Uma caixa lenta (ex.: servidor IMAP pendurado) não atrasa as outras.
         return await withTimeout(
-          (async () =>
-            pollAccount(
-              db,
-              account,
-              await createDriver(db, account),
-              rules.get(account.id) ?? []
-            ))(),
+          (async () => {
+            const driver = await createDriver(db, account);
+            if (isImapRecovery(account))
+              return recoverImapAccount(db, account, driver, reservation, deadline);
+            return pollAccount(db, account, driver, rules.get(account.id) ?? []);
+          })(),
           ACCOUNT_TIMEOUT_MS
         );
       } catch (err) {

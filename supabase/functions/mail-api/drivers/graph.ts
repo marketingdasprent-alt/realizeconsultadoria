@@ -32,6 +32,7 @@ import {
   referencedContentIds,
   replaceCidLinks,
 } from '../../_shared/mail/html.ts';
+import { partMarkedDataUrl } from '../../_shared/mail/inline-token.ts';
 import { bytesToBase64 } from '../../_shared/mail/mime.ts';
 import {
   graphRecipientTerms,
@@ -127,12 +128,16 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
     return draft.id;
   };
 
-  /** Anexo grande num rascunho: sessão de upload em pedaços de 320 KiB × 9. */
+  /**
+   * Anexo grande num rascunho: sessão de upload em pedaços de 320 KiB × 9. Com `contentId`, é uma
+   * imagem inline (o html refere-a por cid:).
+   */
   const uploadLargeAttachment = async (
     draftId: string,
     name: string,
     mime: string,
-    bytes: Uint8Array
+    bytes: Uint8Array,
+    contentId?: string
   ) => {
     const upload = await session.json<{ uploadUrl?: string }>(
       `${messageUrl(draftId)}/attachments/createUploadSession`,
@@ -140,7 +145,13 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
         method: 'POST',
         headers: JSON_HEADERS,
         body: JSON.stringify({
-          AttachmentItem: { attachmentType: 'file', name, size: bytes.length, contentType: mime },
+          AttachmentItem: {
+            attachmentType: 'file',
+            name,
+            size: bytes.length,
+            contentType: mime,
+            ...(contentId ? { isInline: true, contentId } : {}),
+          },
         }),
       }
     );
@@ -196,14 +207,20 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
         await uploadLargeAttachment(draftId, attachment.filename, attachment.mime, bytes);
       }
     }
-    // Imagens da assinatura (o html refere-as por cid:)
+    // Imagens da assinatura e da conversa citada (o html refere-as por cid:). As grandes (ex.: do
+    // IMAP pelo mailparser, até 10 MB) vão por sessão de upload: o POST JSON tem limite de ~4 MB.
     for (const [index, image] of (params.inline ?? []).entries()) {
+      const name = `imagem-${index + 1}.${image.mime.split('/')[1] || 'png'}`;
+      if (image.content.length >= GRAPH_SMALL_ATTACHMENT_BYTES) {
+        await uploadLargeAttachment(draftId, name, image.mime, image.content, image.cid);
+        continue;
+      }
       await session.json(`${messageUrl(draftId)}/attachments`, {
         method: 'POST',
         headers: JSON_HEADERS,
         body: JSON.stringify({
           '@odata.type': '#microsoft.graph.fileAttachment',
-          name: `assinatura-${index + 1}.${image.mime.split('/')[1] || 'png'}`,
+          name,
           contentType: image.mime,
           contentBytes: bytesToBase64(image.content),
           contentId: image.cid,
@@ -355,8 +372,12 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
             );
             const cid = full.contentId ? normalizeContentId(full.contentId) : null;
             if (!cid || !used.has(cid) || !full.contentBytes) return;
-            urls[cid] =
-              `data:${(full.contentType ?? 'image/png').toLowerCase()};base64,${full.contentBytes}`;
+            // Com a marca da parte: ao citar, o envio volta a buscá-la à caixa (inline-token.ts)
+            urls[cid] = partMarkedDataUrl(
+              (full.contentType ?? 'image/png').toLowerCase(),
+              full.contentBytes,
+              a.id
+            );
             embedded.add(a.id);
           });
           html = replaceCidLinks(html, urls);
@@ -407,7 +428,7 @@ export const createGraphDriver = (session: OAuthSession, ME = `${GRAPH_BASE}/me`
       // chegavam partidas a quem recebe. Contam para o limite do pedido (em base64).
       const inline = (params.inline ?? []).map((image, index) => ({
         '@odata.type': '#microsoft.graph.fileAttachment',
-        name: `assinatura-${index + 1}.${image.mime.split('/')[1] || 'png'}`,
+        name: `imagem-${index + 1}.${image.mime.split('/')[1] || 'png'}`,
         contentType: image.mime,
         contentBytes: bytesToBase64(image.content),
         contentId: image.cid,

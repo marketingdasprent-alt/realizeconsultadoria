@@ -4,6 +4,7 @@
 
 import { htmlToText, makeSnippet } from './html.ts';
 import { imapAddresses, type ImapAddressLike, type ImapBodyNode } from './imap-parse.ts';
+import { partMarkedDataUrl } from './inline-token.ts';
 import { messageKey } from './labels.ts';
 import { bytesToBase64, decodeBytes, decodeTransferEncoding } from './mime.ts';
 import type { MailAttachmentInfo, MailMessage } from './types.ts';
@@ -172,7 +173,13 @@ export const buildLightMessage = (input: {
     for (const image of plan.inline) {
       const bytes = input.read(image.part);
       if (!bytes) continue;
-      const data = `data:${image.mime};base64,${bytesToBase64(decodeTransferEncoding(bytes, image.encoding))}`;
+      // Com a marca da parte (p:<parte>, o id que driver.attachment aceita): ao citar, o envio
+      // volta a buscá-la à caixa (inline-token.ts)
+      const data = partMarkedDataUrl(
+        image.mime,
+        bytesToBase64(decodeTransferEncoding(bytes, image.encoding)),
+        `${PART_ATTACHMENT_PREFIX}${image.part}`
+      );
       html = html.split(`cid:${image.cid}`).join(data);
     }
   }

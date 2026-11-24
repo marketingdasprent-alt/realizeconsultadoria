@@ -581,7 +581,12 @@ export const createImapDriver = (
     withMailbox(client, path, false, async () => {
       const draftsPath = resolveImapFolder('drafts', await client.list());
       const msg = await client.fetchOne(String(uid), { uid: true, flags: true }, { uid: true });
-      if (!msg) return;
+      // Já não existe: normalmente outra gravação já o substituiu (o rascunho mais novo pode ter
+      // ficado). Fica no registo, para se ver quando um envio não apaga o rascunho certo.
+      if (!msg) {
+        console.warn('mail-api imap: rascunho a apagar já não existe', path, uid);
+        return;
+      }
       const isDraft =
         [...(msg.flags ?? [])].some(flag => flag.toLowerCase() === '\\draft') ||
         (!!draftsPath && draftsPath === path);

@@ -168,23 +168,28 @@ $function$;
 -- equipa vem do texto livre employees.department (de qualquer empresa), por isso sem este filtro um admin de
 -- empresa externa lia os tickets de todas as empresas ao editar o departamento de uma ficha sua.
 CREATE OR REPLACE FUNCTION public.support_desk_tickets()
-RETURNS jsonb
-LANGUAGE sql STABLE SECURITY DEFINER SET search_path = public
-AS $$
+ RETURNS jsonb
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public'
+AS $function$
   SELECT coalesce(jsonb_agg(
     to_jsonb(st)
       || jsonb_build_object(
-        'employees', jsonb_build_object('name', e.name, 'email', e.email),
+        'employees', jsonb_build_object(
+          'name', coalesce(e.name, st.requester_name),
+          'email', coalesce(e.email, st.requester_email)),
         'companies', jsonb_build_object('name', c.name)
       )
     ORDER BY st.created_at DESC), '[]'::jsonb)
   FROM support_tickets st
-  JOIN employees e ON e.id = st.employee_id
+  LEFT JOIN employees e ON e.id = st.employee_id
   LEFT JOIN companies c ON c.id = st.company_id
   WHERE st.department_id IN (SELECT public.rz_support_desk_departments())
     AND st.company_id = ANY (public.rz_my_company_ids())
-    AND coalesce(e.user_id, '00000000-0000-0000-0000-000000000000'::uuid) <> auth.uid();
-$$;
+    AND coalesce(e.user_id, st.requester_user_id, '00000000-0000-0000-0000-000000000000'::uuid)
+        <> auth.uid();
+$function$;
 REVOKE ALL ON FUNCTION public.support_desk_tickets() FROM anon, public;
 GRANT EXECUTE ON FUNCTION public.support_desk_tickets() TO authenticated;
 

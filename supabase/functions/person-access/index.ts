@@ -122,11 +122,14 @@ serve(async (req: Request) => {
           .maybeSingle();
         if (!linked) return fail('Esta caixa ainda não está ligada ao Webmail.');
         // A caixa tem de ser da mesma empresa da pessoa.
-        if (
-          (linked as { company_id: string | null }).company_id !==
-          (employee as { company_id: string }).company_id
-        )
+        // Caixas antigas sem empresa só as liga o super admin.
+        const linkedCompany = (linked as { company_id: string | null }).company_id;
+        if (linkedCompany === null) {
+          const { data: isSuper } = await db.rpc('is_super_admin_member', { _user_id: userId });
+          if (isSuper !== true) return fail('Esta caixa é de outra empresa.');
+        } else if (linkedCompany !== (employee as { company_id: string }).company_id) {
           return fail('Esta caixa é de outra empresa.');
+        }
         if (body.on === true) {
           const { error } = await db
             .from('employee_department_emails')

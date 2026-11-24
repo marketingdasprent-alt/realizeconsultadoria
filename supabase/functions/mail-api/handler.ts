@@ -951,6 +951,17 @@ const runAction = async (db: SupabaseClient, userId: string, body: Body): Promis
           error.code,
           error.message
         );
+      // Abrir um email que falha (ex.: «O rascunho não abriu»): o código, a conta e o id pedido
+      // ficam no registo, sem nada do conteúdo do email
+      if (body.action === 'get')
+        console.warn(
+          `mail-api get falhou: conta=${String(body.account_id)}`,
+          `id=${String(body.message_id ?? '')
+            .replace(/[\r\n\0]/g, ' ')
+            .slice(0, 300)}`,
+          error.code,
+          error.message
+        );
       return json({ ok: false, code: error.code, message: error.message });
     }
     console.error(`mail-api ${String(body.action)}:`, errorMessage(error));

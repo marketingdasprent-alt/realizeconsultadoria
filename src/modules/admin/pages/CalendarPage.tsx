@@ -1,4 +1,5 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
+import { lazyRetry as lazy } from '@/lib/lazy-retry';
 import { useSearchParams } from 'react-router-dom';
 import { CalendarDays, ClipboardList } from 'lucide-react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';

@@ -1,6 +1,7 @@
 import { useCallback, useState } from 'react';
 import { endOfMonth, format, startOfMonth } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
+import { retryImport } from '@/lib/lazy-retry';
 import { getLogoBase64 } from '@/lib/logo-utils';
 import { getErrorMessage, type TimeClockEntry } from '@/lib/timeclock';
 import {
@@ -77,7 +78,7 @@ const buildReport = async ({
 
 const savePdf = async (report: TimesheetPrintOptions) => {
   // Carregado só quando é preciso (a biblioteca de PDF é pesada).
-  const { generateTimesheetPdf } = await import('@/lib/timesheet-pdf');
+  const { generateTimesheetPdf } = await retryImport(() => import('@/lib/timesheet-pdf'));
   const suffix = report.sheets.length === 1 ? `-${report.sheets[0].employeeName}` : '';
   generateTimesheetPdf(report).save(
     `folha-de-ponto-${format(report.month, 'yyyy-MM')}${suffix}.pdf`.replace(/\s+/g, '-')

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { useCallback, useMemo, useState } from 'react';
+import { retryImport } from '@/lib/lazy-retry';
 import { useSearchParams } from 'react-router-dom';
 import {
   Briefcase,
@@ -799,7 +800,7 @@ const EmployeeFinancialTab = ({
 
     setIsExporting(true);
     try {
-      const ExcelJSmod = await import('exceljs');
+      const ExcelJSmod = await retryImport(() => import('exceljs'));
       const ExcelJS = ExcelJSmod.default ?? ExcelJSmod;
       const monthLabel = MONTH_LABELS[month - 1];
 

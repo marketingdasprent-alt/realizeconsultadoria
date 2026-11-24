@@ -1,4 +1,5 @@
 // Ajudas do editor de assinaturas: largar imagens no sítio certo e reduzir as que são grandes.
+import { retryImport } from '@/lib/lazy-retry';
 
 type CaretDocument = Document & {
   caretRangeFromPoint?: (x: number, y: number) => Range | null;
@@ -85,7 +86,7 @@ export const prepareSignatureImage = async (file: File): Promise<File> => {
   if (file.type === 'image/gif') {
     if (!isHeavyGif(file)) return file;
     // Só se carrega o compressor quando é preciso (não pesa no resto da app).
-    const { compressGif } = await import('./gifCompress');
+    const { compressGif } = await retryImport(() => import('./gifCompress'));
     const compressed = await compressGif(file, MAX_SIDE);
     return compressed && compressed.size < file.size ? compressed : file;
   }

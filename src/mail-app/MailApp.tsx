@@ -1,4 +1,5 @@
-import React, { Suspense, lazy, useEffect, useMemo, useState } from 'react';
+import React, { Suspense, useEffect, useMemo, useState } from 'react';
+import { lazyRetry as lazy } from '@/lib/lazy-retry';
 import { isReaderWindow } from '@/modules/webmail/lib/readerWindow';
 import type { Session } from '@supabase/supabase-js';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';

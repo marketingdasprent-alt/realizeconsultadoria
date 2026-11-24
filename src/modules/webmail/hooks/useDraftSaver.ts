@@ -66,6 +66,10 @@ export const useDraftSaver = ({
   const savedSnapshot = useRef(snapshot);
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const running = useRef<Promise<boolean> | null>(null);
+  // Enviado ou descartado: nenhuma gravação (nem uma que esteja à espera da vez) arranca depois.
+  // Antes, uma gravação à espera corria já depois do Enviar e criava um rascunho que ninguém
+  // apagava (ficavam rascunhos de emails já enviados).
+  const stopped = useRef(false);
   // Sempre a versão atual (sem refazer o temporizador a cada render).
   const buildRef = useRef(build);
   buildRef.current = build;
@@ -78,6 +82,9 @@ export const useDraftSaver = ({
     saved.current = initial;
     savedSnapshot.current = snapshot;
     measuring.current = true;
+    // A trava do Enviar só sai quando o compositor abre outra mensagem: ao fechar depois de
+    // enviar (open passa a false) tem de continuar, senão a gravação à espera arrancava.
+    if (open) stopped.current = false;
     setStatus('idle');
     setSavedAt(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- só ao abrir outro rascunho
@@ -97,12 +104,13 @@ export const useDraftSaver = ({
   const save = useCallback(
     async (force = false): Promise<boolean> => {
       cancel();
-      if (isPreview || !hasContent) return true;
+      if (stopped.current || isPreview || !hasContent) return true;
       // Sem alterações desde que abriu (ou desde a última gravação): nada a guardar.
       if (!force && snapshot === savedSnapshot.current) return true;
       // Um de cada vez: espera pela que está a correr (e por outra que tenha começado entretanto)
       // — antes duas gravações à espera arrancavam juntas e ficava um rascunho a mais.
       while (running.current) await running.current.catch(() => false);
+      if (stopped.current) return true;
       if (!force && snapshot === savedSnapshot.current) return true;
       const job = (async () => {
         setStatus('saving');
@@ -168,11 +176,17 @@ export const useDraftSaver = ({
     save: () => save(true),
     /** Há alterações por guardar. */
     isDirty: () => snapshot !== savedSnapshot.current,
-    /** Deixa de guardar (enviado ou descartado). */
-    stop: cancel,
-    /** Espera que acabe a gravação em curso (para saber o id do rascunho a apagar). */
+    /** Deixa de guardar (enviado ou descartado): nenhuma gravação nova arranca depois disto. */
+    stop: () => {
+      stopped.current = true;
+      cancel();
+    },
+    /**
+     * Espera que acabem todas as gravações (a que corre e alguma que já estivesse à espera),
+     * para o id do rascunho a apagar ser mesmo o último.
+     */
     settled: async () => {
-      if (running.current) await running.current.catch(() => false);
+      while (running.current) await running.current.catch(() => false);
     },
     /** Descarta: apaga o rascunho guardado. */
     discard: async () => {

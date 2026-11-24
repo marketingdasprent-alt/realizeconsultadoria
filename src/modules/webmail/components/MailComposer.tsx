@@ -439,7 +439,9 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     const pending = saver.settled();
     await Promise.race([pending, new Promise(resolve => setTimeout(resolve, 2000))]);
     const saved = saver.current();
-    // Se a gravação acabar depois do envio, o rascunho que ela criou é apagado (não fica lixo)
+    // Se a gravação acabar depois do envio, o rascunho que ela criou é apagado (não fica lixo).
+    // `pending` só termina quando não há nenhuma gravação (o stop impede que arranquem novas),
+    // por isso `late` é sempre o último rascunho gravado.
     void pending.then(() => {
       const late = saver.current();
       if (late && late.id !== saved?.id) void mailService.deleteDraft(late.accountId, late.id);

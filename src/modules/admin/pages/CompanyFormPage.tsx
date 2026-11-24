@@ -94,9 +94,10 @@ const CompanyFormPage = () => {
   const myCompanies = useMyCompanies();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [attempt, setAttempt] = useState(0);
-  // "Tentar de novo" na Partilha: o React Query apaga o erro e volta a "a carregar" (sem dados),
-  // o que desmontava o aviso e o botão; assim ficam até o pedido acabar.
-  const [retryingSharing, setRetryingSharing] = useState(false);
+  // Falhou a leitura das empresas da conta: sem dados, ao repetir (botão, rede que volta, outro
+  // consumidor da mesma query) o React Query apaga o erro e volta a "a carregar". Fica registado
+  // até chegarem dados, para o aviso e o botão não se desmontarem pelo caminho.
+  const [sharingLoadFailed, setSharingLoadFailed] = useState(false);
   // Quem está a guardar: "nova" ou o id da empresa (o formulário de outra empresa não fica preso)
   const [savingFor, setSavingFor] = useState<string | null>(null);
   // O estado "a guardar" só chega depois da validação do formulário: este impede o duplo envio
@@ -125,13 +126,19 @@ const CompanyFormPage = () => {
       item => item.company_id === company.id && managesCompany(item.role)
     );
   const requestedTab = parseCompanyTab(params.get('tab'));
+  const mineHasData = myCompanies.data !== undefined;
+  const mineFailed = !!myCompanies.error;
+  useEffect(() => {
+    if (mineHasData) setSharingLoadFailed(false);
+    else if (mineFailed) setSharingLoadFailed(true);
+  }, [mineHasData, mineFailed]);
   // A ler as empresas da conta (1.ª vez, ou a confirmar uma lista que ainda não inclui esta
   // empresa, p.ex. acesso acabado de dar): não decide nem mostra "sem acesso" de relance.
   // Com erro mantém o aviso montado (o botão "Tentar de novo" não desaparece ao clicar).
   const sharingPending =
     requestedTab === 'partilha' &&
     !myCompanies.error &&
-    !retryingSharing &&
+    !sharingLoadFailed &&
     (myCompanies.isLoading || (myCompanies.isFetching && !canSeeSharing));
   // Sem direito à Partilha, o endereço com ?tab=partilha abre em Dados (nada de página vazia).
   const sharingBlocked = requestedTab === 'partilha' && !sharingPending && !canSeeSharing;
@@ -306,15 +313,13 @@ const CompanyFormPage = () => {
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={myCompanies.isFetching || retryingSharing}
+                    // aria-disabled (e não disabled) para o foco do teclado não se perder
+                    aria-disabled={myCompanies.isFetching}
                     onClick={() => {
-                      setRetryingSharing(true);
-                      void Promise.resolve(myCompanies.refetch()).finally(() =>
-                        setRetryingSharing(false)
-                      );
+                      if (!myCompanies.isFetching) void myCompanies.refetch();
                     }}
                   >
-                    {myCompanies.isFetching || retryingSharing ? 'A tentar…' : 'Tentar de novo'}
+                    {myCompanies.isFetching ? 'A tentar…' : 'Tentar de novo'}
                   </Button>
                 </>
               ) : (

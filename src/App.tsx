@@ -31,7 +31,7 @@ const TermsPage = lazy(() => import('./pages/TermsPage'));
 const AdminDashboard = lazy(() => import('./modules/admin/pages/AdminDashboard'));
 const CompaniesPage = lazy(() => import('./modules/admin/pages/CompaniesPage'));
 const CompanyFormPage = lazy(() => import('./modules/admin/pages/CompanyFormPage'));
-const SharingPage = lazy(() => import('./modules/admin/pages/SharingPage'));
+const LegacySharingRedirect = lazy(() => import('./modules/admin/pages/LegacySharingRedirect'));
 const EmployeesPage = lazy(() => import('./modules/admin/pages/EmployeesPage'));
 const EmployeeFormPage = lazy(() => import('./modules/admin/pages/EmployeeFormPage'));
 const CalendarPage = lazy(() => import('./modules/admin/pages/CalendarPage'));
@@ -140,7 +140,8 @@ const App = () => (
                         <Route path="/admin/empresas" element={<CompaniesPage />} />
                         <Route path="/admin/empresas/nova" element={<CompanyFormPage />} />
                         <Route path="/admin/empresas/:id" element={<CompanyFormPage />} />
-                        <Route path="/admin/partilha" element={<SharingPage />} />
+                        {/* A Partilha entre empresas passou para a ficha de cada empresa (links antigos) */}
+                        <Route path="/admin/partilha" element={<LegacySharingRedirect />} />
                         <Route path="/admin/colaboradores" element={<EmployeesPage />} />
                         <Route path="/admin/colaboradores/novo" element={<EmployeeFormPage />} />
                         <Route path="/admin/colaboradores/:id" element={<EmployeeFormPage />} />

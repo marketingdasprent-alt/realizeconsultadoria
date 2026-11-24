@@ -25,7 +25,34 @@ const unwrap = ({ data, error }: RpcResult): unknown => {
   return data;
 };
 
+interface LooseTable {
+  from: (table: string) => {
+    select: (columns: string) => {
+      eq: (
+        column: string,
+        value: string
+      ) => {
+        eq: (column: string, value: string) => PromiseLike<RpcResult>;
+      };
+    };
+  };
+}
+
 export const companyMembershipService = {
+  /**
+   * Pertenças de administrador ativas que a conta pode ler (o super admin lê todas; um admin de
+   * empresa só as das suas empresas): uma só consulta para a lista de Empresas.
+   */
+  adminMemberships: async (): Promise<{ company_id: string; user_id: string }[]> => {
+    const { data, error } = await (supabase as unknown as LooseTable)
+      .from('company_memberships')
+      .select('company_id, user_id')
+      .eq('role', 'admin')
+      .eq('status', 'ativo');
+    if (error) throw toSharingError(error);
+    return (data ?? []) as { company_id: string; user_id: string }[];
+  },
+
   /** Move um colaborador para outra empresa (atómica; devolve o que fica por tratar). */
   transferEmployee: async (
     employeeId: string,

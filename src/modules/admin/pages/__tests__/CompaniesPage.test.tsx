@@ -31,6 +31,8 @@ vi.mock('@/hooks/useCompanies', () => ({
   }),
 }));
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: vi.fn() }) }));
+vi.mock('../../hooks/useCompanyListFacts', () => ({ useCompanyListFacts: () => new Map() }));
+vi.mock('../../components/sharing/AllGroupsPanel', () => ({ AllGroupsPanel: () => null }));
 
 let canManage = true;
 let isSuperAdmin = true;

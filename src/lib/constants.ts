@@ -50,6 +50,7 @@ export const ROUTES = {
     COMPANY_NEW: '/admin/empresas/nova',
     COMPANY_EDIT: '/admin/empresas/:id',
     /** Partilha entre empresas: código, pedidos de ligação, quem tem acesso e grupo. */
+    /** Só redireciona: a Partilha vive na ficha de cada empresa (Empresas). */
     SHARING: '/admin/partilha',
     EMPLOYEES: '/admin/colaboradores',
     EMPLOYEE_NEW: '/admin/colaboradores/novo',

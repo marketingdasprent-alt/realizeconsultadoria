@@ -1,9 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useNavigate, useParams } from 'react-router-dom';
+import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { ROUTES } from '@/lib/constants';
@@ -13,6 +14,10 @@ import { COMPANIES_ACTIVE_KEY } from '../context/CompanyScopeContext';
 import { CompanyForm } from '../components/CompanyForm';
 import { CompanyAdminsSection } from '../components/CompanyAdminsSection';
 import { CompanyEmployeesSection } from '../components/CompanyEmployeesSection';
+import { CompanySharing } from '../components/company/CompanySharing';
+import { useMyCompanies } from '../hooks/useSharing';
+import { parseCompanyTab, type CompanyTab } from '../lib/companyTabs';
+import { managesCompany } from '../lib/sharing';
 
 const BackButton = ({ onClick }: { onClick: () => void }) => (
   <button
@@ -76,10 +81,17 @@ const CompanyFormPage = () => {
   const navigate = useNavigate();
   const queryClient = useQueryClient();
   const { toast } = useToast();
-  const { canExecuteTopic, isSuperAdmin, isLoading: permissionsLoading } = useAdminPermissions();
+  const {
+    canExecuteTopic,
+    canView,
+    isSuperAdmin,
+    isLoading: permissionsLoading,
+  } = useAdminPermissions();
   const canManage = canExecuteTopic('companies', 'manage');
 
   const isEditMode = !!id;
+  const [params, setParams] = useSearchParams();
+  const myCompanies = useMyCompanies();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [attempt, setAttempt] = useState(0);
   // Quem está a guardar: "nova" ou o id da empresa (o formulário de outra empresa não fica preso)
@@ -101,6 +113,30 @@ const CompanyFormPage = () => {
   // a empresa acabada de criar) nada da empresa anterior aparece, nem "não encontrada".
   const result = isEditMode && loaded?.id === id ? loaded : null;
   const company = result?.status === 'ok' ? result.company : null;
+
+  // A Partilha só aparece a quem hoje a veria (permissão "sharing") e administra esta empresa.
+  const canSeeSharing =
+    !!company &&
+    canView('sharing') &&
+    (myCompanies.data ?? []).some(
+      item => item.company_id === company.id && managesCompany(item.role)
+    );
+  const requestedTab = parseCompanyTab(params.get('tab'));
+  const sharingPending = requestedTab === 'partilha' && myCompanies.isLoading;
+  // Sem direito à Partilha, o endereço com ?tab=partilha abre em Dados (nada de página vazia).
+  const tab: CompanyTab =
+    requestedTab === 'partilha' && !sharingPending && !canSeeSharing ? 'dados' : requestedTab;
+  const changeTab = (next: string) =>
+    setParams(
+      previous => {
+        const query = new URLSearchParams(previous);
+        if (next === 'dados') query.delete('tab');
+        else query.set('tab', next);
+        if (next !== 'partilha') query.delete('sub');
+        return query;
+      },
+      { replace: true }
+    );
 
   const goToList = useCallback(() => navigate(ROUTES.ADMIN.COMPANIES), [navigate]);
 
@@ -206,6 +242,24 @@ const CompanyFormPage = () => {
     );
   }
 
+  const dataCard = (
+    <Card className="max-w-4xl shadow-card">
+      <CardHeader>
+        <h2 className="text-lg font-semibold leading-none tracking-tight">Dados da empresa</h2>
+      </CardHeader>
+      <CardContent className="pt-0">
+        {/* A chave faz o formulário nascer de novo por empresa (e vazio em "nova") */}
+        <CompanyForm
+          key={company?.id ?? 'nova'}
+          initialData={company}
+          onSubmit={handleSubmit}
+          onCancel={goToList}
+          isLoading={savingFor === (company?.id ?? 'nova')}
+        />
+      </CardContent>
+    </Card>
+  );
+
   return (
     <div className="space-y-4">
       <div className="flex items-center gap-3">
@@ -222,40 +276,54 @@ const CompanyFormPage = () => {
         </div>
       </div>
 
-      <Card className="max-w-4xl shadow-card">
-        <CardHeader>
-          <h2 className="text-lg font-semibold leading-none tracking-tight">Dados da empresa</h2>
-        </CardHeader>
-        <CardContent className="pt-0">
-          {/* A chave faz o formulário nascer de novo por empresa (e vazio em "nova") */}
-          <CompanyForm
-            key={company?.id ?? 'nova'}
-            initialData={company}
-            onSubmit={handleSubmit}
-            onCancel={goToList}
-            isLoading={savingFor === (company?.id ?? 'nova')}
-          />
-        </CardContent>
-      </Card>
-
-      {company && (
-        <Card className="max-w-4xl shadow-card">
-          {/* A secção traz o seu próprio título "Administradores" */}
-          <CardContent className="pt-6">
-            <CompanyAdminsSection company={{ id: company.id, name: company.name }} />
-          </CardContent>
-        </Card>
-      )}
-
-      {company && (
-        <Card className="max-w-4xl shadow-card">
-          {/* A secção traz o seu próprio título "Colaboradores" */}
-          <CardContent className="pt-6">
-            <CompanyEmployeesSection
-              company={{ id: company.id, name: company.name, isActive: company.is_active }}
-            />
-          </CardContent>
-        </Card>
+      {company ? (
+        <Tabs value={tab} onValueChange={changeTab} className="max-w-4xl">
+          <TabsList className="h-auto flex-wrap">
+            <TabsTrigger value="dados">Dados</TabsTrigger>
+            <TabsTrigger value="administradores">Administradores</TabsTrigger>
+            <TabsTrigger value="colaboradores">Colaboradores</TabsTrigger>
+            {canSeeSharing && <TabsTrigger value="partilha">Partilha</TabsTrigger>}
+          </TabsList>
+          {/* Dados fica montado: mudar de separador não apaga o que ainda não foi guardado */}
+          <TabsContent value="dados" forceMount className="mt-4 data-[state=inactive]:hidden">
+            {dataCard}
+          </TabsContent>
+          <TabsContent value="administradores" className="mt-4">
+            <Card className="shadow-card">
+              {/* A secção traz o seu próprio título "Administradores" */}
+              <CardContent className="pt-6">
+                <CompanyAdminsSection company={{ id: company.id, name: company.name }} />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          <TabsContent value="colaboradores" className="mt-4">
+            <Card className="shadow-card">
+              {/* A secção traz o seu próprio título "Colaboradores" */}
+              <CardContent className="pt-6">
+                <CompanyEmployeesSection
+                  company={{ id: company.id, name: company.name, isActive: company.is_active }}
+                />
+              </CardContent>
+            </Card>
+          </TabsContent>
+          {canSeeSharing && (
+            <TabsContent value="partilha" className="mt-4">
+              <Card className="shadow-card">
+                <CardContent className="pt-6">
+                  <CompanySharing company={{ id: company.id, name: company.name }} />
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+          {sharingPending && (
+            <div role="status" className="flex justify-center py-10">
+              <Loader2 className="h-6 w-6 animate-spin text-rz-primary" aria-hidden="true" />
+              <span className="sr-only">A carregar…</span>
+            </div>
+          )}
+        </Tabs>
+      ) : (
+        dataCard
       )}
     </div>
   );

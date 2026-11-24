@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Plus, Search, Edit, Trash2, MoreHorizontal, Loader2 } from 'lucide-react';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
@@ -27,7 +27,10 @@ import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useCompanies } from '@/hooks/useCompanies';
 import type { Company } from '@/modules/admin/services/companyService';
 import { ROUTES } from '@/lib/constants';
+import { AllGroupsPanel } from '../components/sharing/AllGroupsPanel';
 import { useCompanyScope } from '../context/CompanyScopeContext';
+import { useCompanyListFacts } from '../hooks/useCompanyListFacts';
+import { parseListTab } from '../lib/companyTabs';
 import { inScope } from '../lib/companyScope';
 
 const CompaniesPage = () => {
@@ -40,6 +43,15 @@ const CompaniesPage = () => {
 
   const { companies, isLoading, deleteCompany, toggleStatus } = useCompanies();
   const { ids: scopeIds } = useCompanyScope();
+  const [params, setParams] = useSearchParams();
+  // "Grupos" (criar grupos, pôr e tirar empresas) é só do super admin.
+  const listTab = parseListTab(params.get('tab'), isSuperAdmin);
+  const changeListTab = (tab: 'empresas' | 'grupos') =>
+    setParams(tab === 'grupos' ? { tab: 'grupos' } : {}, { replace: true });
+  const facts = useCompanyListFacts(
+    companies.map(company => company.id),
+    isSuperAdmin
+  );
 
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -120,110 +132,162 @@ const CompaniesPage = () => {
           )}
         </div>
 
-        <CompanyScopeNotice />
+        {isSuperAdmin && (
+          <nav className="flex gap-1" aria-label="Empresas">
+            {(
+              [
+                ['empresas', 'Empresas'],
+                ['grupos', 'Grupos'],
+              ] as const
+            ).map(([key, label]) => (
+              <button
+                key={key}
+                type="button"
+                onClick={() => changeListTab(key)}
+                aria-current={listTab === key ? 'page' : undefined}
+                className={`h-9 rounded-full px-4 text-[13.5px] font-semibold transition-colors ${
+                  listTab === key
+                    ? 'bg-rz-ink text-white'
+                    : 'text-rz-muted hover:bg-white hover:text-rz-ink'
+                }`}
+              >
+                {label}
+              </button>
+            ))}
+          </nav>
+        )}
 
-        {/* Search */}
-        <Card className="shadow-card">
-          <CardContent className="pt-6">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="search"
-                autoComplete="off"
-                placeholder="Pesquisar por nome, NIF ou email..."
-                value={searchTerm}
-                onChange={e => setSearchTerm(e.target.value)}
-                className="pl-10"
-              />
-            </div>
-          </CardContent>
-        </Card>
+        {listTab === 'grupos' ? (
+          <AllGroupsPanel />
+        ) : (
+          <>
+            <CompanyScopeNotice />
 
-        {/* Table */}
-        <Card className="shadow-card">
-          <CardContent className="p-0">
-            <Table>
-              <TableHeader>
-                <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>NIF</TableHead>
-                  <TableHead className="hidden md:table-cell">Email</TableHead>
-                  <TableHead className="hidden md:table-cell">Cidade</TableHead>
-                  <TableHead>Estado</TableHead>
-                  <TableHead className="w-[50px]"></TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {isLoading ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8">
-                      <div className="flex justify-center items-center">
-                        <Loader2 className="w-6 h-6 animate-spin text-primary" />
-                      </div>
-                    </TableCell>
-                  </TableRow>
-                ) : filteredCompanies.length === 0 ? (
-                  <TableRow>
-                    <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                      Nenhuma empresa encontrada
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredCompanies.map(company => (
-                    <TableRow key={company.id}>
-                      <TableCell className="font-medium">{company.name}</TableCell>
-                      <TableCell>{company.nif}</TableCell>
-                      <TableCell className="hidden md:table-cell">{company.email}</TableCell>
-                      <TableCell className="hidden md:table-cell">{company.city || '-'}</TableCell>
-                      <TableCell
-                        className="py-1 px-2"
-                        onClick={e => {
-                          if (canAdministerPlatform) {
-                            e.stopPropagation();
-                            handleToggleStatus(company);
-                          }
-                        }}
-                      >
-                        <Badge
-                          variant={company.is_active ? 'default' : 'secondary'}
-                          className={`text-xs py-0 ${canAdministerPlatform ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                        >
-                          {company.is_active ? 'Ativa' : 'Desativada'}
-                        </Badge>
-                      </TableCell>
-                      <TableCell>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button variant="ghost" size="icon">
-                              <MoreHorizontal className="h-4 w-4" />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            {canManage && (
-                              <DropdownMenuItem onClick={() => handleEdit(company)}>
-                                <Edit className="h-4 w-4 mr-2" />
-                                Editar
-                              </DropdownMenuItem>
-                            )}
-                            {canAdministerPlatform && (
-                              <DropdownMenuItem
-                                onClick={() => openDeleteDialog(company)}
-                                className="text-destructive"
-                              >
-                                <Trash2 className="h-4 w-4 mr-2" />
-                                Eliminar
-                              </DropdownMenuItem>
-                            )}
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </TableCell>
+            {/* Search */}
+            <Card className="shadow-card">
+              <CardContent className="pt-6">
+                <div className="relative">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                  <Input
+                    type="search"
+                    autoComplete="off"
+                    placeholder="Pesquisar por nome, NIF ou email..."
+                    value={searchTerm}
+                    onChange={e => setSearchTerm(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </CardContent>
+            </Card>
+
+            {/* Table */}
+            <Card className="shadow-card">
+              <CardContent className="p-0">
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Nome</TableHead>
+                      <TableHead>NIF</TableHead>
+                      <TableHead className="hidden md:table-cell">Email</TableHead>
+                      <TableHead className="hidden md:table-cell">Cidade</TableHead>
+                      <TableHead className="hidden lg:table-cell">Grupo</TableHead>
+                      <TableHead className="hidden lg:table-cell">Administradores</TableHead>
+                      <TableHead>Estado</TableHead>
+                      <TableHead className="w-[50px]"></TableHead>
                     </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
-          </CardContent>
-        </Card>
+                  </TableHeader>
+                  <TableBody>
+                    {isLoading ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8">
+                          <div className="flex justify-center items-center">
+                            <Loader2 className="w-6 h-6 animate-spin text-primary" />
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ) : filteredCompanies.length === 0 ? (
+                      <TableRow>
+                        <TableCell colSpan={8} className="text-center py-8 text-muted-foreground">
+                          Nenhuma empresa encontrada
+                        </TableCell>
+                      </TableRow>
+                    ) : (
+                      filteredCompanies.map(company => (
+                        <TableRow key={company.id}>
+                          <TableCell className="font-medium">
+                            {canManage ? (
+                              <Link
+                                to={ROUTES.ADMIN.COMPANY_EDIT.replace(':id', company.id)}
+                                className="hover:underline"
+                              >
+                                {company.name}
+                              </Link>
+                            ) : (
+                              company.name
+                            )}
+                          </TableCell>
+                          <TableCell>{company.nif}</TableCell>
+                          <TableCell className="hidden md:table-cell">{company.email}</TableCell>
+                          <TableCell className="hidden md:table-cell">
+                            {company.city || '-'}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {facts.get(company.id)?.group ?? '—'}
+                          </TableCell>
+                          <TableCell className="hidden lg:table-cell">
+                            {facts.get(company.id)?.admins ?? '—'}
+                          </TableCell>
+                          <TableCell
+                            className="py-1 px-2"
+                            onClick={e => {
+                              if (canAdministerPlatform) {
+                                e.stopPropagation();
+                                handleToggleStatus(company);
+                              }
+                            }}
+                          >
+                            <Badge
+                              variant={company.is_active ? 'default' : 'secondary'}
+                              className={`text-xs py-0 ${canAdministerPlatform ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
+                            >
+                              {company.is_active ? 'Ativa' : 'Desativada'}
+                            </Badge>
+                          </TableCell>
+                          <TableCell>
+                            <DropdownMenu>
+                              <DropdownMenuTrigger asChild>
+                                <Button variant="ghost" size="icon">
+                                  <MoreHorizontal className="h-4 w-4" />
+                                </Button>
+                              </DropdownMenuTrigger>
+                              <DropdownMenuContent align="end">
+                                {canManage && (
+                                  <DropdownMenuItem onClick={() => handleEdit(company)}>
+                                    <Edit className="h-4 w-4 mr-2" />
+                                    Editar
+                                  </DropdownMenuItem>
+                                )}
+                                {canAdministerPlatform && (
+                                  <DropdownMenuItem
+                                    onClick={() => openDeleteDialog(company)}
+                                    className="text-destructive"
+                                  >
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Eliminar
+                                  </DropdownMenuItem>
+                                )}
+                              </DropdownMenuContent>
+                            </DropdownMenu>
+                          </TableCell>
+                        </TableRow>
+                      ))
+                    )}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </>
+        )}
 
         {/* Delete Confirmation Dialog */}
         <DeleteConfirmDialog

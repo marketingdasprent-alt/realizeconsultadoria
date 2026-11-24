@@ -55,7 +55,7 @@ export const PERMISSIONS_CONFIG: ModuleTopicsConfig[] = [
     topics: [
       {
         key: 'view',
-        label: 'Ver a partilha entre empresas',
+        label: 'Ver a partilha entre empresas (na ficha da empresa)',
         description:
           'Ver o código da empresa, os pedidos, quem tem acesso, o grupo e quem pode ver a empresa',
         hasView: true,

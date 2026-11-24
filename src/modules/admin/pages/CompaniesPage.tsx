@@ -47,7 +47,15 @@ const CompaniesPage = () => {
   // "Grupos" (criar grupos, pôr e tirar empresas) é só do super admin.
   const listTab = parseListTab(params.get('tab'), isSuperAdmin);
   const changeListTab = (tab: 'empresas' | 'grupos') =>
-    setParams(tab === 'grupos' ? { tab: 'grupos' } : {}, { replace: true });
+    setParams(
+      previous => {
+        const next = new URLSearchParams(previous);
+        if (tab === 'grupos') next.set('tab', 'grupos');
+        else next.delete('tab');
+        return next;
+      },
+      { replace: true }
+    );
   const facts = useCompanyListFacts(
     companies.map(company => company.id),
     isSuperAdmin

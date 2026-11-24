@@ -17,7 +17,7 @@ const mine = vi.hoisted(() => ({
 }));
 vi.mock('../../hooks/useSharing', () => ({ useMyCompanies: () => mine.value }));
 
-const scope = vi.hoisted(() => ({ ids: null as Set<string> | null }));
+const scope = vi.hoisted(() => ({ ids: null as Set<string> | null, isLoading: false }));
 vi.mock('../../context/CompanyScopeContext', () => ({ useCompanyScope: () => scope }));
 
 const Where = () => {
@@ -43,6 +43,7 @@ describe('/admin/partilha redireciona para Empresas (links e notificações anti
       error: null,
     };
     scope.ids = null;
+    scope.isLoading = false;
   });
 
   it('sem separador abre o Código da primeira empresa que se administra', () => {
@@ -82,6 +83,18 @@ describe('/admin/partilha redireciona para Empresas (links e notificações anti
 
   it('enquanto carrega as empresas não decide nada', () => {
     mine.value = { data: [], isLoading: true, error: null };
+    renderAt('/admin/partilha');
+    expect(screen.queryByTestId('where')).not.toBeInTheDocument();
+  });
+
+  it('enquanto o menu Empresa carrega não escolhe a primeira empresa (esperaria pela escolhida)', () => {
+    scope.isLoading = true;
+    renderAt('/admin/partilha');
+    expect(screen.queryByTestId('where')).not.toBeInTheDocument();
+  });
+
+  it('com dados antigos ainda a atualizar (cache sem dados novos) não decide', () => {
+    mine.value = { data: [], isLoading: false, isFetching: true, error: null } as never;
     renderAt('/admin/partilha');
     expect(screen.queryByTestId('where')).not.toBeInTheDocument();
   });

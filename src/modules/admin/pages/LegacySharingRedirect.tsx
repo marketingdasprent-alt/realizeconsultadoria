@@ -14,10 +14,14 @@ import { managesCompany, sortCompanies } from '../lib/sharing';
 const LegacySharingRedirect = () => {
   const { search } = useLocation();
   const companies = useMyCompanies();
-  const { ids: scopeIds } = useCompanyScope();
+  const { ids: scopeIds, isLoading: scopeLoading } = useCompanyScope();
   const wantsGroups = new URLSearchParams(search).get('tab') === 'grupos';
 
-  if (!wantsGroups && companies.isLoading) {
+  // Sem esperar pelo menu Empresa (a escolha) nem por uma lista vazia que ainda se está a atualizar,
+  // abria-se a primeira empresa em vez da certa, ou a lista em vez da empresa.
+  const waiting =
+    companies.isLoading || scopeLoading || (companies.isFetching && !companies.data?.length);
+  if (!wantsGroups && waiting) {
     return (
       <div role="status" className="flex min-h-[300px] items-center justify-center">
         <Loader2 className="h-8 w-8 animate-spin text-rz-primary" aria-hidden="true" />

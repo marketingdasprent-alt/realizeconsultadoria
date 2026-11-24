@@ -21,7 +21,8 @@ export const useCompanyListFacts = (companyIds: readonly string[], isSuperAdmin:
   const mine = useMyCompanies();
   const groups = useAllGroups(isSuperAdmin);
   const memberships = useQuery({
-    queryKey: ['admin', 'companies', 'admin-memberships'],
+    // Sob 'sharing': adicionar ou retirar um administrador já invalida esta chave.
+    queryKey: ['admin', 'sharing', 'admin-memberships'],
     queryFn: companyMembershipService.adminMemberships,
     staleTime: 60_000,
     retry: false,

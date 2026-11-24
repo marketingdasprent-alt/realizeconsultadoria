@@ -59,7 +59,7 @@ export const CompanySharing: React.FC<CompanySharingProps> = ({ company }) => {
                 value={value}
                 className="flex items-center gap-1.5 px-3 text-xs sm:px-4 sm:text-sm"
               >
-                <Icon className="hidden h-4 w-4 sm:inline" />
+                <Icon className="hidden h-4 w-4 sm:inline" aria-hidden="true" />
                 {label}
               </TabsTrigger>
             ))}

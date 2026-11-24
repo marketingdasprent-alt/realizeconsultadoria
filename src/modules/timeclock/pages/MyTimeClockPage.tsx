@@ -1,4 +1,5 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
+import { lazyRetry as lazy } from '@/lib/lazy-retry';
 import { Loader2 } from 'lucide-react';
 import { useSearchParams } from 'react-router-dom';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';

@@ -1,4 +1,5 @@
-import React, { Suspense, lazy } from 'react';
+import React, { Suspense } from 'react';
+import { lazyRetry as lazy } from '@/lib/lazy-retry';
 import { WorkspaceContext, type WorkspaceContextValue } from '../../context/workspaceContext';
 import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { useRzTheme } from '../../hooks/useRzTheme';

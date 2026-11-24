@@ -26,7 +26,7 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
 }) => {
   const [open, setOpen] = useState(false);
   // Só carrega o corpo quando se abre.
-  const { message, isLoading } = useMailMessage(open ? mail : null);
+  const { message, isLoading, isError, retry } = useMailMessage(open ? mail : null);
 
   return (
     <section className="rounded-2xl ring-1 ring-rz-line">
@@ -63,7 +63,23 @@ export const ThreadItem: React.FC<ThreadItemProps> = ({
           <div className="text-[12.5px]">
             <MailRecipients to={message?.to ?? mail.to} cc={message?.cc ?? []} onWrite={onWrite} />
           </div>
-          {isLoading || !message ? (
+          {isError && !message ? (
+            <div
+              role="alert"
+              className="mt-3 flex flex-wrap items-center gap-3 rounded-2xl bg-amber-50 px-4 py-3 text-[13px] text-amber-900 ring-1 ring-amber-200"
+            >
+              <span className="flex-1">
+                Não foi possível carregar o email completo. Tente outra vez.
+              </span>
+              <button
+                type="button"
+                onClick={retry}
+                className="h-9 rounded-full bg-rz-primary px-4 text-[13px] font-bold text-white"
+              >
+                Tentar outra vez
+              </button>
+            </div>
+          ) : isLoading || !message ? (
             <p className="mt-3 flex items-center gap-2 text-[12.5px] text-rz-muted">
               <Loader2 className="h-4 w-4 animate-spin text-rz-primary" /> A abrir…
             </p>

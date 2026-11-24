@@ -154,6 +154,23 @@ const toIso = (...values: (Date | string | undefined | null)[]): string => {
 const decodePart = (bytes: Uint8Array | undefined, part: LightPart) =>
   bytes ? decodeBytes(decodeTransferEncoding(bytes, part.encoding), part.charset) : '';
 
+/** HTML acima disto (com as imagens já embutidas) perde as imagens grandes escritas no texto. */
+const HUGE_HTML = 4 * 1024 * 1024;
+/** Uma imagem escrita no HTML (data: URL) com mais do que isto conta como grande. */
+const BIG_DATA_URL = 100 * 1024;
+const BIG_IMAGE = new RegExp(
+  `<img\\b[^>]*?\\bsrc\\s*=\\s*(["'])data:[^"']{${BIG_DATA_URL},}\\1[^>]*>`,
+  'gi'
+);
+
+/**
+ * Emails e rascunhos enormes por terem as imagens escritas dentro do HTML (ex.: respostas
+ * guardadas antes de as imagens citadas irem à parte): as imagens grandes passam a «[imagem]»
+ * para o email abrir sempre e o texto aparecer. Abaixo de HUGE_HTML fica tudo igual.
+ */
+export const shrinkHugeHtml = (html: string): string =>
+  html.length > HUGE_HTML ? html.replace(BIG_IMAGE, '<span>[imagem]</span>') : html;
+
 /** Monta o email a partir das partes descarregadas (as imagens cid: passam a data: URLs). */
 export const buildLightMessage = (input: {
   id: string;
@@ -182,6 +199,7 @@ export const buildLightMessage = (input: {
       );
       html = html.split(`cid:${image.cid}`).join(data);
     }
+    html = shrinkHugeHtml(html);
   }
   const env = input.envelope;
   return {

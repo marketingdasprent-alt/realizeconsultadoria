@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { FileUp, Search } from 'lucide-react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
 import { Button } from '@/components/ui/button';
 import {
   Select,
@@ -15,6 +16,8 @@ import { useEmployees } from '@/hooks/useEmployees';
 import { matchesSearch } from '@/lib/utils';
 import EmployeeFinancialTab from '../components/employee/EmployeeFinancialTab';
 import { ImportPayslipsDialog } from '../components/employees/ImportPayslipsDialog';
+import { useCompanyScope } from '../context/CompanyScopeContext';
+import { inScope } from '../lib/companyScope';
 import { companiesOf, companyName } from '../lib/employeeView';
 
 /**
@@ -26,8 +29,9 @@ const FinancePage = () => {
   const { employees, isLoading } = useEmployees();
   const [params, setParams] = useSearchParams();
   const [importOpen, setImportOpen] = useState(false);
+  const scope = useCompanyScope();
   const search = params.get('q') || '';
-  const companyId = params.get('empresa') || 'all';
+  const urlCompanyId = params.get('empresa') || 'all';
 
   const setParam = (key: string, value: string, fallback: string) =>
     setParams(
@@ -40,8 +44,16 @@ const FinancePage = () => {
       { replace: true }
     );
 
-  const active = useMemo(() => employees.filter(e => e.is_active), [employees]);
+  // O menu pode limitar a uma empresa ou grupo: só as pessoas e empresas dessa escolha.
+  const active = useMemo(
+    () => employees.filter(e => e.is_active && inScope(scope.ids, e.company_id)),
+    [employees, scope.ids]
+  );
   const companies = useMemo(() => companiesOf(active), [active]);
+  // Uma empresa só no menu manda; senão vale o filtro do endereço, se ainda estiver na escolha.
+  const companyId =
+    scope.singleCompanyId ??
+    (urlCompanyId !== 'all' && companies.some(c => c.id === urlCompanyId) ? urlCompanyId : 'all');
   const visible = useMemo(() => {
     const iban = search.replace(/\s/g, '').toLowerCase();
     return active
@@ -62,6 +74,8 @@ const FinancePage = () => {
         description="Vencimentos, subsídios, ajudas de custo e descontos do mês"
       />
 
+      <CompanyScopeNotice />
+
       <div className="flex flex-wrap items-center gap-2">
         <label className="flex h-10 min-w-[220px] flex-1 items-center gap-2 rounded-full bg-white px-4 text-rz-muted ring-1 ring-rz-line focus-within:ring-rz-primary/40">
           <Search className="h-4 w-4 shrink-0" />
@@ -74,19 +88,21 @@ const FinancePage = () => {
             className="w-full bg-transparent text-[14px] text-rz-ink outline-none placeholder:text-rz-muted"
           />
         </label>
-        <Select value={companyId} onValueChange={value => setParam('empresa', value, 'all')}>
-          <SelectTrigger className="h-10 w-full rounded-full bg-white sm:w-[230px]">
-            <SelectValue placeholder="Empresa" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="all">Todas as empresas</SelectItem>
-            {companies.map(company => (
-              <SelectItem key={company.id} value={company.id}>
-                {company.name}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
+        {!scope.singleCompanyId && (
+          <Select value={companyId} onValueChange={value => setParam('empresa', value, 'all')}>
+            <SelectTrigger className="h-10 w-full rounded-full bg-white sm:w-[230px]">
+              <SelectValue placeholder="Empresa" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as empresas</SelectItem>
+              {companies.map(company => (
+                <SelectItem key={company.id} value={company.id}>
+                  {company.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
       </div>
 
       <EmployeeFinancialTab

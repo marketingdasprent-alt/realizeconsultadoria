@@ -11,6 +11,8 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { matchesNameSearch } from '@/lib/timeclock';
 import { useEmployees } from '@/hooks/useEmployees';
+import { useCompanyScope } from '@/modules/admin/context/CompanyScopeContext';
+import { inScope } from '@/modules/admin/lib/companyScope';
 import { useTimeClockConfigHistory } from '../../hooks/useTimeClockConfigHistory';
 import { useTimeClockHistory } from '../../hooks/useTimeClockHistory';
 import { ConfigHistoryList } from './ConfigHistoryList';
@@ -24,14 +26,25 @@ export const HistoryTab: React.FC = () => {
   const [onlyManual, setOnlyManual] = useState(true);
   const [scope, setScope] = useState<'entries' | 'config'>('entries');
   const [search, setSearch] = useState('');
-  const entriesHistory = useTimeClockHistory(days);
   const configHistory = useTimeClockConfigHistory(days, scope === 'config');
+  const { employees } = useEmployees();
+  // Só as alterações de quem é das empresas escolhidas no menu (sem escolha: todas). O âmbito
+  // entra na consulta, para o limite de 500 não cortar as da escolha.
+  const { ids: scopeIds } = useCompanyScope();
+  const scopedEmployeeIds = useMemo(
+    () => (scopeIds ? employees.filter(e => inScope(scopeIds, e.company_id)).map(e => e.id) : null),
+    [employees, scopeIds]
+  );
+  const entriesHistory = useTimeClockHistory(days, scopedEmployeeIds);
   const { items } = entriesHistory;
   const { isLoading, error } = scope === 'config' ? configHistory : entriesHistory;
-  const { employees } = useEmployees();
 
   const employeeNames = useMemo(
     () => Object.fromEntries(employees.map(e => [e.id, e.name])),
+    [employees]
+  );
+  const companyOfEmployee = useMemo(
+    () => Object.fromEntries(employees.map(e => [e.id, e.company_id])),
     [employees]
   );
 
@@ -39,12 +52,13 @@ export const HistoryTab: React.FC = () => {
   const visible = useMemo(
     () =>
       items.filter(item => {
+        if (!inScope(scopeIds, companyOfEmployee[item.employee_id])) return false;
         if (!matchesNameSearch(employeeNames[item.employee_id], search)) return false;
         if (!onlyManual || item.action !== 'create') return true;
         const source = (item.new_data as Record<string, unknown> | null)?.source;
         return source === 'admin';
       }),
-    [items, onlyManual, search, employeeNames]
+    [items, onlyManual, search, employeeNames, scopeIds, companyOfEmployee]
   );
 
   return (

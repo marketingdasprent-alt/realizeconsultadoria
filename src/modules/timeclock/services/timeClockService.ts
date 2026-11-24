@@ -164,21 +164,41 @@ export const timeClockService = {
   /**
    * Tentativas rejeitadas (fora do raio, tag inválida, VPN bloqueada, ...).
    */
-  getAttempts: async (fromIso: string, toIso: string) => {
-    const { data, error } = await supabase
+  getAttempts: async (fromIso: string, toIso: string, companyIds: string[] | null = null) => {
+    if (companyIds && companyIds.length === 0) {
+      return { data: [] as TimeClockAttemptWithRelations[], error: null };
+    }
+    // O âmbito entra na consulta (e não depois): o limite de 500 não corta as da escolha.
+    const query = supabase
       .from('time_clock_attempts')
-      .select('*, employee:employees(name, company_id), location:time_clock_locations(name)')
+      .select(
+        companyIds
+          ? '*, employee:employees!inner(name, company_id), location:time_clock_locations(name)'
+          : '*, employee:employees(name, company_id), location:time_clock_locations(name)'
+      )
       .gte('created_at', fromIso)
       .lt('created_at', toIso)
       .order('created_at', { ascending: false })
       .limit(500);
-    return { data: (data ?? []) as TimeClockAttemptWithRelations[], error };
+    const { data, error } = await (companyIds
+      ? query.in('employee.company_id', companyIds)
+      : query);
+    return { data: (data ?? []) as unknown as TimeClockAttemptWithRelations[], error };
   },
 
   /**
-   * Histórico de um registo, ou de todos os registos num período.
+   * Histórico de um registo, ou de todos os registos num período. `employeeIds` limita aos
+   * colaboradores da escolha do menu Empresa (lista vazia: nada, sem consultar).
    */
-  getHistory: async (params: { entryId?: string; fromIso?: string; toIso?: string }) => {
+  getHistory: async (params: {
+    entryId?: string;
+    fromIso?: string;
+    toIso?: string;
+    employeeIds?: string[] | null;
+  }) => {
+    if (params.employeeIds && params.employeeIds.length === 0) {
+      return { data: [] as TimeClockHistory[], error: null };
+    }
     let query = supabase
       .from('time_clock_entry_history')
       .select('*')
@@ -187,6 +207,7 @@ export const timeClockService = {
     if (params.entryId) query = query.eq('entry_id', params.entryId);
     if (params.fromIso) query = query.gte('changed_at', params.fromIso);
     if (params.toIso) query = query.lt('changed_at', params.toIso);
+    if (params.employeeIds) query = query.in('employee_id', params.employeeIds);
     const { data, error } = await query;
     return { data: (data ?? []) as TimeClockHistory[], error };
   },

@@ -3,12 +3,15 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useSearchParams } from 'react-router-dom';
 import { Loader2, Search } from 'lucide-react';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
 import { ConfirmDialog } from '@/modules/workspace/components/ConfirmDialog';
 import { MailClientRow } from '../components/mailClients/MailClientRow';
 import { MailClientSignaturesDialog } from '../components/mailClients/MailClientSignaturesDialog';
 import { MailPostosPanel } from '../components/mailClients/MailPostosPanel';
+import { useCompanyScope } from '../context/CompanyScopeContext';
+import { inScope } from '../lib/companyScope';
 import { mailClientsService, type MailClient } from '../services/mailClientsService';
 
 const KEY = ['admin', 'mail-clients'] as const;
@@ -37,16 +40,19 @@ const MailClientsPage: React.FC = () => {
     queryKey: ['admin', 'companies', 'names'],
     queryFn: mailClientsService.companies,
   });
+  const { ids: scopeIds } = useCompanyScope();
   const visible = useMemo(() => {
     const term = search.trim().toLowerCase();
+    // O menu pode limitar a uma empresa ou grupo: só os clientes dessa escolha.
     return (clients.data ?? []).filter(
       c =>
-        !term ||
-        [c.name, c.mailbox, c.companyName ?? '', ...c.accounts.map(a => a.email)].some(v =>
-          v.toLowerCase().includes(term)
-        )
+        inScope(scopeIds, c.companyId) &&
+        (!term ||
+          [c.name, c.mailbox, c.companyName ?? '', ...c.accounts.map(a => a.email)].some(v =>
+            v.toLowerCase().includes(term)
+          ))
     );
-  }, [clients.data, search]);
+  }, [clients.data, search, scopeIds]);
   const refresh = () => qc.invalidateQueries({ queryKey: KEY });
 
   const setCompany = async (client: MailClient, companyId: string | null) => {
@@ -77,6 +83,7 @@ const MailClientsPage: React.FC = () => {
         title="Realize Mail"
         description="Clientes e postos da app de email (email.realizeconsultadoria.pt)"
       />
+      <CompanyScopeNotice />
       <nav className="flex gap-1" aria-label="Realize Mail">
         {(
           [

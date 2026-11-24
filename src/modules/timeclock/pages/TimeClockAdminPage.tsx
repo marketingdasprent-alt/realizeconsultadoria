@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
+import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useToast } from '@/hooks/use-toast';
@@ -60,6 +61,8 @@ const TimeClockAdminPage: React.FC = () => {
         title="Controlo de Ponto"
         description="Folha de ponto dos colaboradores, aprovações, locais e tags NFC."
       />
+
+      <CompanyScopeNotice />
 
       <Tabs value={tab} onValueChange={changeTab}>
         <TabsList className="flex-wrap h-auto">

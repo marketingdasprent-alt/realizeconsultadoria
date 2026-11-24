@@ -1,4 +1,6 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCompanyScope } from '@/modules/admin/context/CompanyScopeContext';
+import { filterByScope } from '@/modules/admin/lib/companyScope';
 import {
   timeClockLocationService,
   type TimeClockLocationWithTags,
@@ -15,7 +17,13 @@ interface UseTimeClockLocationsResult {
  * Locais de ponto com as respetivas tags NFC.
  */
 export const useTimeClockLocations = (): UseTimeClockLocationsResult => {
-  const [locations, setLocations] = useState<TimeClockLocationWithTags[]>([]);
+  const [allLocations, setLocations] = useState<TimeClockLocationWithTags[]>([]);
+  // Só os locais das empresas escolhidas no menu (sem escolha: todos os que a conta vê).
+  const { ids: scopeIds } = useCompanyScope();
+  const locations = useMemo(
+    () => filterByScope(allLocations, scopeIds, l => l.company_id),
+    [allLocations, scopeIds]
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

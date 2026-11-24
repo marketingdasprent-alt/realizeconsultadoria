@@ -103,10 +103,19 @@ const EmployeesPage = () => {
     () =>
       documentAlerts.pending.filter(
         doc =>
+          // O cartão e a fila seguem a empresa ou o grupo escolhido no menu, como a lista.
+          inScope(scopeCtx.ids, doc.employee?.company_id) &&
           (!teamOnly || teamEmployeeIds.has(doc.employee_id)) &&
           (!canEditAny || canExecuteTopicFor('employees', 'edit', doc.employee_id))
       ),
-    [documentAlerts.pending, teamOnly, teamEmployeeIds, canEditAny, canExecuteTopicFor]
+    [
+      documentAlerts.pending,
+      scopeCtx.ids,
+      teamOnly,
+      teamEmployeeIds,
+      canEditAny,
+      canExecuteTopicFor,
+    ]
   );
 
   // O menu pode limitar a uma empresa ou grupo: só as pessoas e empresas dessa escolha.

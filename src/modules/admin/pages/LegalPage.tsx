@@ -18,6 +18,9 @@ import { Badge } from '@/components/ui/badge';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
+import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
+import { useCompanyScope } from '../context/CompanyScopeContext';
+import { filterByScope } from '../lib/companyScope';
 import LegalAgenda from '@/components/admin/legal/LegalAgenda';
 import LegalClientModal, { LegalClient } from '@/components/admin/legal/LegalClientModal';
 
@@ -37,7 +40,13 @@ const LegalPage = () => {
     }
   }, [canView, isLoadingPermissions, navigate, toast]);
 
-  const [clients, setClients] = useState<LegalClient[]>([]);
+  const [allClients, setClients] = useState<LegalClient[]>([]);
+  // O menu pode limitar a uma empresa ou grupo: a lista, os totais e a agenda só a incluem.
+  const { ids: scopeIds } = useCompanyScope();
+  const clients = useMemo(
+    () => filterByScope(allClients, scopeIds, client => client.company_id),
+    [allClients, scopeIds]
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -364,6 +373,8 @@ const LegalPage = () => {
             Adicionar Cliente
           </Button>
         </div>
+
+        <CompanyScopeNotice />
 
         {/* Dashboard Resumo Financeiro */}
         <div className="grid gap-4 md:grid-cols-3">

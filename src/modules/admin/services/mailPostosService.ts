@@ -10,6 +10,8 @@ export interface PostoBox {
   title: string;
   email: string;
   accountId: string | null;
+  /** Empresa da caixa (o seletor de empresa filtra por ela). */
+  companyId: string | null;
   /** 'pending' = a caixa ainda não foi ligada ao Webmail. */
   status: PostoBoxStatus;
   lastError: string | null;
@@ -32,6 +34,7 @@ export interface PostoAccess {
   accessId: string;
   title: string;
   email: string;
+  companyId: string | null;
   companyName: string | null;
   connected: boolean;
 }

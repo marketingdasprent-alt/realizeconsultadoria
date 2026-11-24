@@ -3,6 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { Loader2, Plus } from 'lucide-react';
 import { toast } from '@/hooks/use-toast';
 import { ConfirmDialog } from '@/modules/workspace/components/ConfirmDialog';
+import { useCompanyScope } from '../../context/CompanyScopeContext';
+import { inScope } from '../../lib/companyScope';
+import { postoInScope } from '../../lib/mailPostos';
 import { mailClientsService } from '../../services/mailClientsService';
 import {
   mailPostosService,
@@ -33,6 +36,7 @@ export const MailPostosPanel: React.FC = () => {
   const [toggling, setToggling] = useState<MailPosto | null>(null);
   const [deleting, setDeleting] = useState<MailPosto | null>(null);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const { ids: scopeIds } = useCompanyScope();
 
   const postos = useQuery({
     queryKey: KEY,
@@ -111,7 +115,9 @@ export const MailPostosPanel: React.FC = () => {
     await refresh();
   };
 
-  const list = postos.data ?? [];
+  // O menu pode limitar a uma empresa ou grupo: só os postos (e as caixas a escolher) dessa escolha.
+  const list = (postos.data ?? []).filter(posto => postoInScope(posto, scopeIds));
+  const accessList = (accesses.data ?? []).filter(access => inScope(scopeIds, access.companyId));
   return (
     <section className="overflow-hidden rounded-[28px] bg-white shadow-rz-soft ring-1 ring-rz-line">
       <div className="flex flex-wrap items-center gap-3 border-b border-rz-line px-4 py-3">
@@ -160,7 +166,7 @@ export const MailPostosPanel: React.FC = () => {
       <MailPostoDialog
         open={!!dialog}
         posto={dialog?.posto ?? null}
-        accesses={accesses.data ?? []}
+        accesses={accessList}
         accessesLoading={accesses.isLoading}
         onClose={() => setDialog(null)}
         onSave={save}

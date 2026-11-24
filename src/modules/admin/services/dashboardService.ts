@@ -53,36 +53,79 @@ export const absentToday = (rows: AbsenceRow[], today: string): AbsentToday[] =>
   return [...absent.values()].sort((a, b) => a.name.localeCompare(b.name, 'pt'));
 };
 
+const ABSENCE_COLUMNS =
+  'employee_id, status, absence_type, end_date, employees(name), absence_periods(start_date, end_date, status)';
+
+/** Ausências aprovadas que incluem hoje (só das empresas escolhidas, se houver escolha). */
+const absencesToday = (today: string, companyIds: string[] | null) => {
+  const query = supabase
+    .from('absences')
+    .select(ABSENCE_COLUMNS)
+    .in('status', ['approved', 'partially_approved'])
+    .lte('start_date', today)
+    .gte('end_date', today);
+  return companyIds ? query.in('company_id', companyIds) : query;
+};
+
+const EMPTY_OVERVIEW: DashboardOverview = {
+  totalCompanies: 0,
+  totalEmployees: 0,
+  pendingAbsences: 0,
+  openTickets: 0,
+  absentToday: [],
+};
+
 export const dashboardService = {
   /**
    * Números do Dashboard (empresas, colaboradores ativos, pedidos por aprovar, tickets em
-   * aberto) e a lista de quem está ausente hoje.
+   * aberto) e a lista de quem está ausente hoje. `companyIds` é a escolha do seletor Empresa
+   * (uma empresa ou as de um grupo); null é "Todas as empresas" (a base já só devolve as que a
+   * conta pode ver).
    */
-  getOverview: async (): Promise<{ data: DashboardOverview | null; error: unknown }> => {
+  getOverview: async (
+    companyIds: string[] | null = null
+  ): Promise<{ data: DashboardOverview | null; error: unknown }> => {
+    if (companyIds && companyIds.length === 0) return { data: EMPTY_OVERVIEW, error: null };
     try {
       const today = isoToday();
       const [companies, employees, pending, absences, tickets] = await Promise.all([
-        supabase.from('companies').select('id', { count: 'exact', head: true }),
-        supabase
-          .from('employees')
-          .select('id', { count: 'exact', head: true })
-          .eq('is_active', true),
-        supabase
-          .from('absences')
-          .select('id', { count: 'exact', head: true })
-          .eq('status', 'pending'),
-        supabase
-          .from('absences')
-          .select(
-            'employee_id, status, absence_type, end_date, employees(name), absence_periods(start_date, end_date, status)'
-          )
-          .in('status', ['approved', 'partially_approved'])
-          .lte('start_date', today)
-          .gte('end_date', today),
-        supabase
-          .from('support_tickets')
-          .select('id', { count: 'exact', head: true })
-          .in('status', ['open', 'in_progress']),
+        companyIds
+          ? supabase
+              .from('companies')
+              .select('id', { count: 'exact', head: true })
+              .in('id', companyIds)
+          : supabase.from('companies').select('id', { count: 'exact', head: true }),
+        companyIds
+          ? supabase
+              .from('employees')
+              .select('id', { count: 'exact', head: true })
+              .eq('is_active', true)
+              .in('company_id', companyIds)
+          : supabase
+              .from('employees')
+              .select('id', { count: 'exact', head: true })
+              .eq('is_active', true),
+        companyIds
+          ? supabase
+              .from('absences')
+              .select('id', { count: 'exact', head: true })
+              .eq('status', 'pending')
+              .in('company_id', companyIds)
+          : supabase
+              .from('absences')
+              .select('id', { count: 'exact', head: true })
+              .eq('status', 'pending'),
+        absencesToday(today, companyIds),
+        companyIds
+          ? supabase
+              .from('support_tickets')
+              .select('id', { count: 'exact', head: true })
+              .in('status', ['open', 'in_progress'])
+              .in('company_id', companyIds)
+          : supabase
+              .from('support_tickets')
+              .select('id', { count: 'exact', head: true })
+              .in('status', ['open', 'in_progress']),
       ]);
       const failed = [companies, employees, pending, absences, tickets].find(r => r.error);
       if (failed?.error) throw failed.error;

@@ -21,13 +21,23 @@ vi.mock('../../components/employees/EmployeesTable', () => ({
     return <div data-testid="tabela" />;
   },
 }));
-vi.mock('../../components/employees/EmployeesStats', () => ({ EmployeesStats: () => null }));
+const stats = vi.hoisted(() => ({ props: null as null | Record<string, unknown> }));
+vi.mock('../../components/employees/EmployeesStats', () => ({
+  EmployeesStats: (props: Record<string, unknown>) => {
+    stats.props = props;
+    return null;
+  },
+}));
 vi.mock('../../components/employees/EmployeesToolbar', () => ({ EmployeesToolbar: () => null }));
 vi.mock('../../components/employees/MissingBirthdatesNotice', () => ({
   MissingBirthdatesNotice: () => null,
 }));
+const dialog = vi.hoisted(() => ({ props: null as null | Record<string, unknown> }));
 vi.mock('../../components/employees/PendingDocumentsDialog', () => ({
-  PendingDocumentsDialog: () => null,
+  PendingDocumentsDialog: (props: Record<string, unknown>) => {
+    dialog.props = props;
+    return null;
+  },
 }));
 vi.mock('../../components/employees/MoveEmployeesDialog', () => ({
   MoveEmployeesDialog: () => null,
@@ -49,15 +59,27 @@ vi.mock('@/hooks/useAdminPermissions', () => ({
     isLoading: false,
   }),
 }));
-vi.mock('../../context/CompanyScopeContext', () => ({
-  useCompanyScope: () => ({ ids: null, singleCompanyId: null }),
+const scope = vi.hoisted(() => ({
+  value: { ids: null as Set<string> | null, singleCompanyId: null as string | null },
 }));
+vi.mock('../../context/CompanyScopeContext', () => ({ useCompanyScope: () => scope.value }));
 vi.mock('../../hooks/useCompanyMembership', () => ({
   useMoveAccess: () => ({ canOfferMove: () => canOfferMove }),
 }));
+// Documentos por aprovar de duas empresas: a do ANA (c1) e outra (c2).
+const DOC_C1 = {
+  id: 'd1',
+  employee_id: 'e1',
+  employee: { id: 'e1', name: 'Ana', company_id: 'c1' },
+};
+const DOC_C2 = {
+  id: 'd2',
+  employee_id: 'e9',
+  employee: { id: 'e9', name: 'Zé', company_id: 'c2' },
+};
 vi.mock('../../hooks/useDocumentAlerts', () => ({
   useDocumentAlerts: () => ({
-    pending: [],
+    pending: [DOC_C1, DOC_C2],
     expiringOf: () => [],
     pendingOf: () => [],
     refetch: vi.fn(),
@@ -104,6 +126,9 @@ const canMoveProp = () => table.props?.canMove as CanMove;
 describe('EmployeesPage: lista de Colaboradores', () => {
   beforeEach(() => {
     table.props = null;
+    stats.props = null;
+    dialog.props = null;
+    scope.value = { ids: null, singleCompanyId: null };
     canEdit = true;
     canOfferMove = true;
   });
@@ -133,5 +158,25 @@ describe('EmployeesPage: lista de Colaboradores', () => {
     canOfferMove = false;
     renderPage();
     expect(canMoveProp()(ANA)).toBe(false);
+  });
+
+  describe('cartões do topo seguem o seletor de empresa', () => {
+    it('"Todas as empresas": os documentos por aprovar são todos', () => {
+      renderPage();
+      expect(stats.props?.pendingDocuments).toBe(2);
+    });
+
+    it('com uma empresa escolhida, só contam os documentos dela', () => {
+      scope.value = { ids: new Set(['c1']), singleCompanyId: 'c1' };
+      renderPage();
+      expect(stats.props?.pendingDocuments).toBe(1);
+      expect((dialog.props?.pending as { id: string }[]).map(d => d.id)).toEqual(['d1']);
+    });
+
+    it('com um grupo sem documentos por aprovar o cartão fica a zero', () => {
+      scope.value = { ids: new Set(['c3']), singleCompanyId: null };
+      renderPage();
+      expect(stats.props?.pendingDocuments).toBe(0);
+    });
   });
 });

@@ -1,5 +1,6 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { AdminPageHeader } from '@/components/admin/AdminPageHeader';
+import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
 import { DashboardStats } from '../components/DashboardStats';
 import { AbsentTodayCard } from '../components/AbsentTodayCard';
 import { useDashboardOverview } from '../hooks/useDashboardOverview';
@@ -28,6 +29,8 @@ const AdminDashboard = () => {
         title={`${greeting(new Date().getHours())}${name ? `, ${name}` : ''}`}
         description={<span className="first-letter:uppercase">{today}</span>}
       />
+
+      <CompanyScopeNotice />
 
       <DashboardStats data={data} />
 

@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { addDays } from 'date-fns';
 import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
+import { useCompanyScope } from '@/modules/admin/context/CompanyScopeContext';
+import { filterByScope } from '@/modules/admin/lib/companyScope';
 import { timeClockService, type TimeClockAttemptWithRelations } from '../services/timeClockService';
 
 export interface UseTimeClockReviewResult {
@@ -18,12 +20,28 @@ export interface UseTimeClockReviewResult {
  * Registos a aprovar / em revisão (últimos 90 dias) e tentativas rejeitadas (últimos 30 dias).
  */
 export const useTimeClockReview = (enabled = true): UseTimeClockReviewResult => {
-  const [pending, setPending] = useState<TimeClockEntryWithRelations[]>([]);
-  const [flagged, setFlagged] = useState<TimeClockEntryWithRelations[]>([]);
-  const [attempts, setAttempts] = useState<TimeClockAttemptWithRelations[]>([]);
+  const [allPending, setPending] = useState<TimeClockEntryWithRelations[]>([]);
+  const [allFlagged, setFlagged] = useState<TimeClockEntryWithRelations[]>([]);
+  const [allAttempts, setAttempts] = useState<TimeClockAttemptWithRelations[]>([]);
+  // Só o que é das empresas escolhidas no menu (sem escolha: tudo o que a conta vê).
+  const { ids: scopeIds } = useCompanyScope();
+  const pending = useMemo(
+    () => filterByScope(allPending, scopeIds, e => e.employee?.company_id ?? e.company_id),
+    [allPending, scopeIds]
+  );
+  const flagged = useMemo(
+    () => filterByScope(allFlagged, scopeIds, e => e.employee?.company_id ?? e.company_id),
+    [allFlagged, scopeIds]
+  );
+  const attempts = useMemo(
+    () => filterByScope(allAttempts, scopeIds, a => a.employee?.company_id),
+    [allAttempts, scopeIds]
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  // Chave estável das empresas da escolha (para a consulta de tentativas).
+  const idsKey = scopeIds ? [...scopeIds].sort().join(',') : null;
   const fetchAll = useCallback(async () => {
     if (!enabled) return;
     setIsLoading(true);
@@ -34,7 +52,11 @@ export const useTimeClockReview = (enabled = true): UseTimeClockReviewResult => 
     const [pendingRes, flaggedRes, attemptsRes] = await Promise.all([
       timeClockService.getEntries({ fromIso: from, toIso: tomorrow, status: 'pending' }),
       timeClockService.getEntries({ fromIso: from, toIso: tomorrow, status: 'flagged' }),
-      timeClockService.getAttempts(addDays(now, -30).toISOString(), tomorrow),
+      timeClockService.getAttempts(
+        addDays(now, -30).toISOString(),
+        tomorrow,
+        idsKey === null ? null : idsKey.split(',').filter(Boolean)
+      ),
     ]);
     if (pendingRes.error || flaggedRes.error || attemptsRes.error) {
       setError('Erro ao carregar registos para revisão');
@@ -43,7 +65,7 @@ export const useTimeClockReview = (enabled = true): UseTimeClockReviewResult => 
     setFlagged([...flaggedRes.data].reverse());
     setAttempts(attemptsRes.data);
     setIsLoading(false);
-  }, [enabled]);
+  }, [enabled, idsKey]);
 
   useEffect(() => {
     fetchAll();

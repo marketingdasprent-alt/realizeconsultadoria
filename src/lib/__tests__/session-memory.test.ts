@@ -33,7 +33,8 @@ vi.mock('@/integrations/supabase/client', () => ({
 
 import { loadAttachment } from '@/modules/webmail/lib/attachments';
 import { openPrintPreview, usePrintPreview } from '../print-preview';
-import { renderHook } from '@testing-library/react';
+import { act, renderHook } from '@testing-library/react';
+import { toast, useToast } from '@/hooks/use-toast';
 import { persistQueries } from '../query-persist';
 import { onSessionReset, resetSessionMemory, sessionEpoch } from '../session-memory';
 import { feedService } from '@/modules/social/services/feedService';
@@ -142,6 +143,18 @@ describe('memória da sessão (módulos com estado fora do React)', () => {
     resetSessionMemory();
     await loadAttachment('caixa', 'm1', 'a1', 'a.txt');
     expect(mail.attachment).toHaveBeenCalledTimes(2);
+  });
+
+  it('os avisos (toasts) da conta anterior desaparecem', () => {
+    act(() => {
+      toast({ title: 'Nova mensagem de um cliente da conta 1' });
+    });
+    const { result } = renderHook(() => useToast());
+    expect(result.current.toasts.some(t => t.open)).toBe(true);
+
+    act(() => resetSessionMemory());
+
+    expect(result.current.toasts.every(t => !t.open)).toBe(true);
   });
 
   it('a época da sessão muda a cada reset', () => {

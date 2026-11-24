@@ -1,4 +1,5 @@
 // Primeira vez: aprende os contactos com a pasta Enviados de cada caixa (a 1.ª página de cada).
+import { sessionEpoch } from '@/lib/session-memory';
 import { contactService } from '../services/contactService';
 import { cleanContactName } from './recipients';
 import { mailService } from '../services/mailService';
@@ -29,11 +30,15 @@ const markDone = () => {
 export const backfillContacts = async (accountIds: string[]): Promise<boolean> => {
   if (running || done() || !accountIds.length) return false;
   running = true;
+  // Se a conta mudar a meio, os destinatários lidos são da anterior: não se registam nos
+  // contactos da nova nem se marca o backfill como feito (a nova faz o seu).
+  const epoch = sessionEpoch();
   try {
     const counts = new Map<string, { email: string; name: string | null; uses: number }>();
     let failed = false;
     for (const accountId of accountIds) {
       const { data, error } = await mailService.list(accountId, 'sent', '', null);
+      if (epoch !== sessionEpoch()) return false;
       if (error || !data) {
         failed = true;
         continue;
@@ -55,6 +60,7 @@ export const backfillContacts = async (accountIds: string[]): Promise<boolean> =
       const { error } = await contactService.remember([...counts.values()]);
       if (error) return false;
     }
+    if (epoch !== sessionEpoch()) return false;
     if (!failed) markDone();
     return counts.size > 0;
   } finally {

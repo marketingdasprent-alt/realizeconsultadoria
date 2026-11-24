@@ -1,6 +1,6 @@
 // @vitest-environment node
 // Registo dos erros do get na mail-api (diagnóstico do «O rascunho não abriu»). Tudo simulado.
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const ACCOUNT = '1f1302c2-0000-4000-8000-000000000001';
 const { driverGet } = vi.hoisted(() => ({ driverGet: vi.fn() }));
@@ -58,7 +58,13 @@ vi.mock('../../../supabase/functions/mail-api/sendLog.ts', () => ({
 (globalThis as { Deno?: unknown }).Deno = { env: { get: () => undefined } };
 
 import { mailError } from '../../../supabase/functions/_shared/mail/errors';
-import { mailApiHandler } from '../../../supabase/functions/mail-api/handler';
+// O handler (código Deno) carrega-se só ao correr: com um import normal, o tsc do browser
+// (pnpm type-check no CI) passava a verificar a mail-api inteira, que não é para ele.
+const HANDLER_PATH = '../../../supabase/functions/mail-api/handler';
+let mailApiHandler: (request: Request) => Promise<Response>;
+beforeAll(async () => {
+  ({ mailApiHandler } = await import(/* @vite-ignore */ HANDLER_PATH));
+});
 
 const call = (body: Record<string, unknown>) =>
   mailApiHandler(

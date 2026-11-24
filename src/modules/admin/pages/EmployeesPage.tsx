@@ -176,7 +176,7 @@ const EmployeesPage = () => {
   const open = (employee: Employee) => navigate(`${ROUTES.ADMIN.EMPLOYEES}/${employee.id}`);
 
   const canMove = (employee: Employee) =>
-    permissions.canEdit && employee.is_active && moveAccess.canOfferMove(employee);
+    permissionsOf(employee).canEdit && employee.is_active && moveAccess.canOfferMove(employee);
   const subjectOf = (employee: Employee): MoveSubject => ({
     id: employee.id,
     name: employee.name,

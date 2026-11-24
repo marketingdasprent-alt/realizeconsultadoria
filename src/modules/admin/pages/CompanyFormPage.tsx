@@ -124,8 +124,8 @@ const CompanyFormPage = () => {
   const requestedTab = parseCompanyTab(params.get('tab'));
   const sharingPending = requestedTab === 'partilha' && myCompanies.isLoading;
   // Sem direito à Partilha, o endereço com ?tab=partilha abre em Dados (nada de página vazia).
-  const tab: CompanyTab =
-    requestedTab === 'partilha' && !sharingPending && !canSeeSharing ? 'dados' : requestedTab;
+  const sharingBlocked = requestedTab === 'partilha' && !sharingPending && !canSeeSharing;
+  const tab: CompanyTab = sharingBlocked ? 'dados' : requestedTab;
   const changeTab = (next: string) =>
     setParams(
       previous => {
@@ -284,6 +284,28 @@ const CompanyFormPage = () => {
             <TabsTrigger value="colaboradores">Colaboradores</TabsTrigger>
             {canSeeSharing && <TabsTrigger value="partilha">Partilha</TabsTrigger>}
           </TabsList>
+          {sharingBlocked && (
+            <div
+              role="alert"
+              className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+            >
+              {myCompanies.error ? (
+                <>
+                  <span>Não foi possível carregar a Partilha desta empresa.</span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="outline"
+                    onClick={() => void myCompanies.refetch()}
+                  >
+                    Tentar de novo
+                  </Button>
+                </>
+              ) : (
+                <span>Não tem acesso à Partilha desta empresa.</span>
+              )}
+            </div>
+          )}
           {/* Dados fica montado: mudar de separador não apaga o que ainda não foi guardado */}
           <TabsContent value="dados" forceMount className="mt-4 data-[state=inactive]:hidden">
             {dataCard}

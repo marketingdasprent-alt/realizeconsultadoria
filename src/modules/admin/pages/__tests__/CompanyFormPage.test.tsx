@@ -33,7 +33,13 @@ vi.mock('@/hooks/useAdminPermissions', () => ({
 }));
 
 // As empresas que a conta administra (a Partilha só aparece para estas).
-const myCompanies = { data: [{ company_id: 'c1', role: 'admin' }], isLoading: false };
+const refetchMine = vi.fn();
+const myCompanies: {
+  data: { company_id: string; role: string }[];
+  isLoading: boolean;
+  error: unknown;
+  refetch: () => void;
+} = { data: [{ company_id: 'c1', role: 'admin' }], isLoading: false, error: null, refetch: () => refetchMine() };
 vi.mock('../../hooks/useSharing', () => ({
   useAllGroups: () => ({ data: [] }),
   useMyCompanies: () => myCompanies,
@@ -163,6 +169,7 @@ beforeEach(() => {
   canViewSharing = true;
   myCompanies.data = [{ company_id: 'c1', role: 'admin' }];
   myCompanies.isLoading = false;
+  myCompanies.error = null;
 });
 
 describe('CompanyFormPage — edição', () => {
@@ -228,6 +235,30 @@ describe('CompanyFormPage — edição', () => {
       myCompanies.data = [{ company_id: 'c1', role: 'super_admin' }];
       renderAt('/admin/empresas/c1?tab=partilha');
       expect(await screen.findByTestId('sharing-section')).toBeInTheDocument();
+    });
+
+    it('?tab=partilha sem direito: aviso claro em vez de cair em Dados calado', async () => {
+      myCompanies.data = [{ company_id: 'c1', role: 'colaborador' }];
+      renderAt('/admin/empresas/c1?tab=partilha');
+      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso à partilha/i);
+      expect(screen.queryByTestId('sharing-section')).not.toBeInTheDocument();
+    });
+
+    it('?tab=partilha com erro a ler as empresas da conta: aviso com "Tentar de novo"', async () => {
+      myCompanies.data = [];
+      myCompanies.error = new Error('rede');
+      renderAt('/admin/empresas/c1?tab=partilha');
+      const alert = await screen.findByRole('alert');
+      expect(alert).toHaveTextContent(/não foi possível carregar a partilha/i);
+      await userEvent.click(screen.getByRole('button', { name: /tentar de novo/i }));
+      expect(refetchMine).toHaveBeenCalledTimes(1);
+    });
+
+    it('sem ?tab=partilha não há aviso', async () => {
+      myCompanies.data = [{ company_id: 'c1', role: 'colaborador' }];
+      renderAt('/admin/empresas/c1');
+      await screen.findByDisplayValue('Acme Lda');
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     });
 
     it('enquanto as empresas da conta carregam não cai em Dados nem decide', async () => {

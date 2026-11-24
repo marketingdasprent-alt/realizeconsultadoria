@@ -11,6 +11,8 @@ import {
 import { Switch } from '@/components/ui/switch';
 import { matchesNameSearch } from '@/lib/timeclock';
 import { useEmployees } from '@/hooks/useEmployees';
+import { useCompanyScope } from '@/modules/admin/context/CompanyScopeContext';
+import { inScope } from '@/modules/admin/lib/companyScope';
 import { useTimeClockConfigHistory } from '../../hooks/useTimeClockConfigHistory';
 import { useTimeClockHistory } from '../../hooks/useTimeClockHistory';
 import { ConfigHistoryList } from './ConfigHistoryList';
@@ -34,17 +36,24 @@ export const HistoryTab: React.FC = () => {
     () => Object.fromEntries(employees.map(e => [e.id, e.name])),
     [employees]
   );
+  // Só as alterações de quem é das empresas escolhidas no menu (sem escolha: todas).
+  const { ids: scopeIds } = useCompanyScope();
+  const companyOfEmployee = useMemo(
+    () => Object.fromEntries(employees.map(e => [e.id, e.company_id])),
+    [employees]
+  );
 
   // Por defeito esconde os registos criados pelo próprio colaborador (picagens normais).
   const visible = useMemo(
     () =>
       items.filter(item => {
+        if (!inScope(scopeIds, companyOfEmployee[item.employee_id])) return false;
         if (!matchesNameSearch(employeeNames[item.employee_id], search)) return false;
         if (!onlyManual || item.action !== 'create') return true;
         const source = (item.new_data as Record<string, unknown> | null)?.source;
         return source === 'admin';
       }),
-    [items, onlyManual, search, employeeNames]
+    [items, onlyManual, search, employeeNames, scopeIds, companyOfEmployee]
   );
 
   return (

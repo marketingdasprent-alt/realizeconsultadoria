@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Plus, Search, Edit, Trash2, MoreHorizontal, Loader2 } from 'lucide-react';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
+import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
@@ -26,6 +27,8 @@ import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { useCompanies } from '@/hooks/useCompanies';
 import type { Company } from '@/modules/admin/services/companyService';
 import { ROUTES } from '@/lib/constants';
+import { useCompanyScope } from '../context/CompanyScopeContext';
+import { inScope } from '../lib/companyScope';
 
 const CompaniesPage = () => {
   const { toast } = useToast();
@@ -36,6 +39,7 @@ const CompaniesPage = () => {
   const canAdministerPlatform = canManage && isSuperAdmin;
 
   const { companies, isLoading, deleteCompany, toggleStatus } = useCompanies();
+  const { ids: scopeIds } = useCompanyScope();
 
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -91,12 +95,15 @@ const CompaniesPage = () => {
     }
   };
 
-  const filteredCompanies = companies.filter(
-    company =>
-      company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      company.nif.includes(searchTerm) ||
-      company.email.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  // O menu pode limitar a uma empresa ou grupo: só as empresas dessa escolha.
+  const filteredCompanies = companies
+    .filter(company => inScope(scopeIds, company.id))
+    .filter(
+      company =>
+        company.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        company.nif.includes(searchTerm) ||
+        company.email.toLowerCase().includes(searchTerm.toLowerCase())
+    );
 
   return (
     <>
@@ -112,6 +119,8 @@ const CompaniesPage = () => {
             </Button>
           )}
         </div>
+
+        <CompanyScopeNotice />
 
         {/* Search */}
         <Card className="shadow-card">

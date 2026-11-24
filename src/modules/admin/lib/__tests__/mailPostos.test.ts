@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { MailPosto, PostoBox } from '../../services/mailPostosService';
-import { boxState, postoState } from '../mailPostos';
+import { boxState, postoInScope, postoState } from '../mailPostos';
 
 const posto = (over: Partial<MailPosto> = {}): MailPosto => ({
   id: 'p1',
@@ -19,6 +19,7 @@ const box = (over: Partial<PostoBox> = {}): PostoBox => ({
   title: 'Geral',
   email: 'geral@empresa.pt',
   accountId: 'm1',
+  companyId: 'c1',
   status: 'active',
   lastError: null,
   ...over,
@@ -50,5 +51,28 @@ describe('boxState', () => {
     });
     expect(boxState(box({ status: 'reauth' })).tone).toBe('error');
     expect(boxState(box({ status: 'error' })).label).toBe('Com erro');
+  });
+});
+
+describe('postoInScope: os postos seguem o seletor de empresa', () => {
+  const doisSitios = posto({
+    boxes: [box({ companyId: 'c1' }), box({ accessId: 'a2', companyId: 'c2' })],
+  });
+
+  it('sem escolha (Todas as empresas) todos os postos contam', () => {
+    expect(postoInScope(doisSitios, null)).toBe(true);
+  });
+
+  it('com uma empresa escolhida, conta se alguma caixa for dela', () => {
+    expect(postoInScope(doisSitios, new Set(['c2']))).toBe(true);
+  });
+
+  it('com uma empresa escolhida, não conta se nenhuma caixa for dela', () => {
+    expect(postoInScope(doisSitios, new Set(['c9']))).toBe(false);
+  });
+
+  it('um posto sem caixas só aparece sem escolha', () => {
+    expect(postoInScope(posto({ boxes: [] }), null)).toBe(true);
+    expect(postoInScope(posto({ boxes: [] }), new Set(['c1']))).toBe(false);
   });
 });

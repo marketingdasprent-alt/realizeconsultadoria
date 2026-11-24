@@ -1,5 +1,7 @@
 import { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useCompanyScope } from '@/modules/admin/context/CompanyScopeContext';
+import { inScope } from '@/modules/admin/lib/companyScope';
 import { buildBoard, type BoardPerson } from '../lib/todayBoard';
 import { todayBoardService } from '../services/todayBoardService';
 import { useNow } from './useNow';
@@ -22,10 +24,19 @@ export const useTodayBoard = (enabled = true) => {
     refetchOnWindowFocus: true,
   });
   const now = useNow(30_000);
+  // Só as pessoas das empresas escolhidas no menu (sem escolha: todas as que a conta vê).
+  const { ids: scopeIds } = useCompanyScope();
 
   const people: BoardPerson[] = useMemo(
-    () => (query.data ? buildBoard({ ...query.data, now }) : []),
-    [query.data, now]
+    () =>
+      query.data
+        ? buildBoard({
+            ...query.data,
+            employees: query.data.employees.filter(e => inScope(scopeIds, e.companyId)),
+            now,
+          })
+        : [],
+    [query.data, scopeIds, now]
   );
 
   return {

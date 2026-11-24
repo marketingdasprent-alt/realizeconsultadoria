@@ -20,3 +20,10 @@ export const boxState = (box: PostoBox): { label: string; tone: BoxTone } => {
   if (box.status === 'reauth') return { label: 'Palavra-passe a rever', tone: 'error' };
   return { label: 'Com erro', tone: 'error' };
 };
+
+/**
+ * O posto conta para a escolha do menu Empresa se alguma das suas caixas for de uma empresa da
+ * escolha. Sem escolha (null, "Todas as empresas") contam todos, também os sem caixas.
+ */
+export const postoInScope = (posto: MailPosto, ids: Set<string> | null): boolean =>
+  ids === null || posto.boxes.some(box => !!box.companyId && ids.has(box.companyId));

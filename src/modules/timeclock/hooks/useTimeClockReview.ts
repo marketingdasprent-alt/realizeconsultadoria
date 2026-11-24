@@ -1,6 +1,8 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { addDays } from 'date-fns';
 import type { TimeClockEntryWithRelations } from '@/lib/timeclock';
+import { useCompanyScope } from '@/modules/admin/context/CompanyScopeContext';
+import { filterByScope } from '@/modules/admin/lib/companyScope';
 import { timeClockService, type TimeClockAttemptWithRelations } from '../services/timeClockService';
 
 export interface UseTimeClockReviewResult {
@@ -18,9 +20,23 @@ export interface UseTimeClockReviewResult {
  * Registos a aprovar / em revisão (últimos 90 dias) e tentativas rejeitadas (últimos 30 dias).
  */
 export const useTimeClockReview = (enabled = true): UseTimeClockReviewResult => {
-  const [pending, setPending] = useState<TimeClockEntryWithRelations[]>([]);
-  const [flagged, setFlagged] = useState<TimeClockEntryWithRelations[]>([]);
-  const [attempts, setAttempts] = useState<TimeClockAttemptWithRelations[]>([]);
+  const [allPending, setPending] = useState<TimeClockEntryWithRelations[]>([]);
+  const [allFlagged, setFlagged] = useState<TimeClockEntryWithRelations[]>([]);
+  const [allAttempts, setAttempts] = useState<TimeClockAttemptWithRelations[]>([]);
+  // Só o que é das empresas escolhidas no menu (sem escolha: tudo o que a conta vê).
+  const { ids: scopeIds } = useCompanyScope();
+  const pending = useMemo(
+    () => filterByScope(allPending, scopeIds, e => e.employee?.company_id ?? e.company_id),
+    [allPending, scopeIds]
+  );
+  const flagged = useMemo(
+    () => filterByScope(allFlagged, scopeIds, e => e.employee?.company_id ?? e.company_id),
+    [allFlagged, scopeIds]
+  );
+  const attempts = useMemo(
+    () => filterByScope(allAttempts, scopeIds, a => a.employee?.company_id),
+    [allAttempts, scopeIds]
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 

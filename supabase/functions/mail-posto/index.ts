@@ -144,12 +144,35 @@ const loadPosto = async (db: Db, postoId: unknown) => {
   return (data as { id: string; name: string; user_id: string } | null) ?? null;
 };
 
+/**
+ * A conta administra a empresa de cada uma destas caixas (o super admin, todas). A função corre com a
+ * chave de serviço, por isso a regra por empresa tem de ser verificada aqui, na base de dados.
+ */
+const canUseBoxes = async (db: Db, userId: string, accessIds: string[]) => {
+  const checks = await Promise.all(
+    accessIds.map(id => db.rpc('rz_mail_access_ok_for', { p_user: userId, p_access: id }))
+  );
+  return checks.every(check => !check.error && check.data === true);
+};
+
+/** O posto só tem caixas das empresas que a conta administra (ou é dela, se ainda não tem caixas). */
+const canManagePosto = async (db: Db, userId: string, postoId: string) => {
+  const { data, error } = await db.rpc('rz_mail_posto_ok_for', {
+    p_user: userId,
+    p_posto: postoId,
+  });
+  return !error && data === true;
+};
+
+const BOXES_OUT_OF_SCOPE = 'Só pode usar caixas das empresas que administra.';
+
 const create = async (db: Db, adminId: string, body: Record<string, unknown>) => {
   const name = parsePostoName(body.name);
   if (!name) return fail('Dê um nome ao posto (até 80 caracteres).');
   const boxes = parsePostoBoxes(body.access_ids);
   if (!boxes) return fail('Escolha as caixas do posto (no máximo 20).');
   if (boxes.length === 0) return fail('Escolha pelo menos uma caixa para o posto.');
+  if (!(await canUseBoxes(db, adminId, boxes))) return fail(BOXES_OUT_OF_SCOPE);
 
   const postoId = crypto.randomUUID();
   const userId = await mailAppUser(db, `posto:${postoId}`, name);
@@ -170,15 +193,17 @@ const create = async (db: Db, adminId: string, body: Record<string, unknown>) =>
   return ok({ id: postoId, problems });
 };
 
-const update = async (db: Db, body: Record<string, unknown>) => {
+const update = async (db: Db, adminId: string, body: Record<string, unknown>) => {
   const posto = await loadPosto(db, body.posto_id);
-  if (!posto) return fail('Posto não encontrado.');
+  if (!posto || !(await canManagePosto(db, adminId, posto.id)))
+    return fail('Posto não encontrado.');
   const name = parsePostoName(body.name);
   if (!name) return fail('Dê um nome ao posto (até 80 caracteres).');
   const boxes = parsePostoBoxes(body.access_ids);
   if (!boxes) return fail('Escolha as caixas do posto (no máximo 20).');
   if (boxes.length === 0)
     return fail('O posto precisa de pelo menos uma caixa. Para o tirar, apague-o.');
+  if (!(await canUseBoxes(db, adminId, boxes))) return fail(BOXES_OUT_OF_SCOPE);
 
   if (name !== posto.name) {
     const { error } = await db.from('mail_postos').update({ name }).eq('id', posto.id);
@@ -190,7 +215,8 @@ const update = async (db: Db, body: Record<string, unknown>) => {
 
 const invite = async (db: Db, adminId: string, body: Record<string, unknown>) => {
   const posto = await loadPosto(db, body.posto_id);
-  if (!posto) return fail('Posto não encontrado.');
+  if (!posto || !(await canManagePosto(db, adminId, posto.id)))
+    return fail('Posto não encontrado.');
   const { data: access } = await db
     .from('mail_app_users')
     .select('disabled_at')
@@ -223,9 +249,10 @@ const invite = async (db: Db, adminId: string, body: Record<string, unknown>) =>
   return ok({ link: inviteLink(MAIL_APP_ORIGIN, token), expiresAt });
 };
 
-const remove = async (db: Db, body: Record<string, unknown>) => {
+const remove = async (db: Db, adminId: string, body: Record<string, unknown>) => {
   const posto = await loadPosto(db, body.posto_id);
-  if (!posto) return fail('Posto não encontrado.');
+  if (!posto || !(await canManagePosto(db, adminId, posto.id)))
+    return fail('Posto não encontrado.');
   // Apagar a conta apaga as sessões, os membros das caixas, o posto, as caixas e os convites
   const { error } = await db.auth.admin.deleteUser(posto.user_id);
   if (error) throw error;
@@ -247,11 +274,11 @@ serve(async req => {
       case 'create':
         return await create(db, userId, body);
       case 'update':
-        return await update(db, body);
+        return await update(db, userId, body);
       case 'invite':
         return await invite(db, userId, body);
       case 'delete':
-        return await remove(db, body);
+        return await remove(db, userId, body);
       default:
         return fail('Pedido inválido.');
     }

@@ -1,6 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { addDays, endOfMonth, startOfMonth } from 'date-fns';
 import { summarizeDays, type DaySummary, type TimeClockEntryWithRelations } from '@/lib/timeclock';
+import { useCompanyScope } from '@/modules/admin/context/CompanyScopeContext';
+import { filterByScope } from '@/modules/admin/lib/companyScope';
 import { timeClockService } from '../services/timeClockService';
 import type { MonthBank } from '../lib/hourBank';
 import { useHourBank } from './useHourBank';
@@ -40,7 +42,13 @@ export const useTimesheet = ({
   employeeId,
   onlyFlagged,
 }: TimesheetFilters): UseTimesheetResult => {
-  const [entries, setEntries] = useState<TimeClockEntryWithRelations[]>([]);
+  const [allEntries, setEntries] = useState<TimeClockEntryWithRelations[]>([]);
+  // Só os registos das empresas escolhidas no menu (sem escolha: tudo o que a conta vê).
+  const { ids: scopeIds } = useCompanyScope();
+  const entries = useMemo(
+    () => filterByScope(allEntries, scopeIds, e => e.employee?.company_id ?? e.company_id),
+    [allEntries, scopeIds]
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const monthKey = month.toISOString();

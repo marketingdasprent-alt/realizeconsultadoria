@@ -14,7 +14,9 @@ import { ShareCodeCard } from '../components/sharing/ShareCodeCard';
 import { SharesPanel } from '../components/sharing/SharesPanel';
 import { CompanyPicker } from '../components/sharing/CompanyPicker';
 import { ViewersPanel } from '../components/sharing/ViewersPanel';
+import { useCompanyScope } from '../context/CompanyScopeContext';
 import { useMyCompanies } from '../hooks/useSharing';
+import { inScope } from '../lib/companyScope';
 import { companyLabel, isSuperAdminAccount, managesCompany, sortCompanies } from '../lib/sharing';
 
 const PAGE_TABS = [
@@ -34,8 +36,13 @@ const SharingPage: React.FC = () => {
   const companies = useMyCompanies();
   // Só quem é administrador da empresa gere a partilha (rz_my_companies já só devolve pertenças ativas).
   const adminOf = sortCompanies((companies.data ?? []).filter(item => managesCompany(item.role)));
+  // O menu Empresa manda: com uma empresa ou grupo escolhido só se escolhe entre elas (se a conta
+  // não administra nenhuma, ficam todas, para a página não abrir vazia).
+  const { ids: scopeIds } = useCompanyScope();
+  const scoped = adminOf.filter(item => inScope(scopeIds, item.company_id));
+  const options = scoped.length ? scoped : adminOf;
   const [chosen, setChosen] = useState<string | null>(null);
-  const company = adminOf.find(item => item.company_id === chosen) ?? adminOf[0];
+  const company = options.find(item => item.company_id === chosen) ?? options[0];
 
   const superAdmin = isSuperAdminAccount(companies.data ?? []);
   const tabs = PAGE_TABS.filter(t => t.value !== 'grupos' || superAdmin);
@@ -65,12 +72,12 @@ const SharingPage: React.FC = () => {
       >
         {company && (
           <>
-            {adminOf.length > 1 && (
+            {options.length > 1 && (
               <div className="max-w-sm space-y-2">
                 <Label htmlFor="sharing-company">Empresa</Label>
                 <CompanyPicker
                   id="sharing-company"
-                  companies={adminOf}
+                  companies={options}
                   value={company.company_id}
                   onChange={setChosen}
                 />

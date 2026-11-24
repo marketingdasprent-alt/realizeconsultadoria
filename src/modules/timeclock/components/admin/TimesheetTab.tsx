@@ -4,6 +4,8 @@ import { Loader2 } from 'lucide-react';
 import { matchesNameSearch } from '@/lib/timeclock';
 import { useCompanies } from '@/hooks/useCompanies';
 import { useEmployees } from '@/hooks/useEmployees';
+import { useCompanyScope } from '@/modules/admin/context/CompanyScopeContext';
+import { inScope } from '@/modules/admin/lib/companyScope';
 import { useTimesheet, type TimesheetFilters as Filters } from '../../hooks/useTimesheet';
 import { useTimesheetPrint, type ReportAction } from '../../hooks/useTimesheetPrint';
 import { EmployeeTimesheetCard } from './EmployeeTimesheetCard';
@@ -16,7 +18,7 @@ interface TimesheetTabProps {
 }
 
 export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
-  const [filters, setFilters] = useState<Filters>({
+  const [picked, setFilters] = useState<Filters>({
     month: startOfMonth(new Date()),
     companyId: null,
     employeeId: null,
@@ -24,8 +26,33 @@ export const TimesheetTab: React.FC<TimesheetTabProps> = ({ canEdit }) => {
   });
   const [dialog, setDialog] = useState<EntryDialogState | null>(null);
   const [search, setSearch] = useState('');
-  const { companies } = useCompanies();
-  const { employees } = useEmployees();
+  // O menu pode limitar a uma empresa ou grupo: só as empresas e pessoas dessa escolha.
+  const { ids: scopeIds } = useCompanyScope();
+  const allCompanies = useCompanies().companies;
+  const allEmployees = useEmployees().employees;
+  const companies = useMemo(
+    () => allCompanies.filter(c => inScope(scopeIds, c.id)),
+    [allCompanies, scopeIds]
+  );
+  const employees = useMemo(
+    () => allEmployees.filter(e => inScope(scopeIds, e.company_id)),
+    [allEmployees, scopeIds]
+  );
+  // Uma empresa ou pessoa escolhida aqui que deixou de estar na escolha do menu volta a "todas".
+  const filters = useMemo<Filters>(
+    () => ({
+      ...picked,
+      companyId:
+        picked.companyId && companies.some(c => c.id === picked.companyId)
+          ? picked.companyId
+          : null,
+      employeeId:
+        picked.employeeId && employees.some(e => e.id === picked.employeeId)
+          ? picked.employeeId
+          : null,
+    }),
+    [picked, companies, employees]
+  );
   const { sheets, entries, isLoading, error, refetch } = useTimesheet(filters);
   const { view, downloadPdf, busyAction } = useTimesheetPrint();
   const visibleSheets = useMemo(

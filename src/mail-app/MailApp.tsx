@@ -9,6 +9,9 @@ import { cn } from '@/lib/utils';
 import { Toaster } from '@/components/ui/toaster';
 import { TooltipProvider } from '@/components/ui/tooltip';
 import { toast } from '@/hooks/use-toast';
+import { createAccountWatcher } from '@/lib/account-change';
+import { clearAllDeviceData } from '@/lib/device-cache';
+import { resetSessionMemory } from '@/lib/session-memory';
 import { supabase } from '@/integrations/supabase/client';
 import { NewMailPopup } from '@/modules/webmail/components/NewMailPopup';
 import { mailAppExchange, mailAppLoginPosto } from '@/modules/webmail/services/mailAppLogin';
@@ -172,6 +175,14 @@ const MailAppContent: React.FC = () => {
               : 'Tente outra vez.',
         variant: 'destructive',
       });
+    // Outra conta neste separador (ou a sessão a terminar): a cache e a memória da anterior saem.
+    const watchAccount = createAccountWatcher(newUserId => {
+      void queryClient.cancelQueries();
+      queryClient.clear();
+      // Também o que a conta anterior guardou no aparelho (caixas, chat IA…), poupando a nova.
+      clearAllDeviceData(newUserId);
+      resetSessionMemory();
+    });
     void (async () => {
       if (code) {
         const error = await mailAppExchange(code);
@@ -186,11 +197,15 @@ const MailAppContent: React.FC = () => {
       const { data } = await supabase.auth.getSession();
       // Uma sessão da Realize neste browser não serve aqui
       if (data.session && !isMailOnly(data.session)) await supabase.auth.signOut();
-      setSession(isMailOnly(data.session) ? data.session : null);
+      const mine = isMailOnly(data.session) ? data.session : null;
+      watchAccount(mine?.user.id ?? null);
+      setSession(mine);
     })();
-    const { data: listener } = supabase.auth.onAuthStateChange((_event, next) =>
-      setSession(isMailOnly(next) ? next : null)
-    );
+    const { data: listener } = supabase.auth.onAuthStateChange((_event, next) => {
+      const mine = isMailOnly(next) ? next : null;
+      watchAccount(mine?.user.id ?? null);
+      setSession(mine);
+    });
     return () => listener.subscription.unsubscribe();
   }, []);
 

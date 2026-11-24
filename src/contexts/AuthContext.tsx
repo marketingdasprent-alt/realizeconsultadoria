@@ -102,11 +102,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     retryingUserIdRef.current = null;
   };
 
+  // Troca de conta em curso: isLoading ficou a true à espera do papel da conta nova. Quem
+  // chega ao fim com a geração atual (qualquer resultado, ou uma sessão nova/terminada que
+  // substitui esta) repõe-no; assim nenhum evento seguinte o deixa preso.
+  const switchingRef = useRef(false);
+  const endSwitch = () => {
+    if (!switchingRef.current) return;
+    switchingRef.current = false;
+    setIsLoading(false);
+  };
+
   const applySession = async (session: Session | null): Promise<RoleLookup> => {
     const generation = ++lookupGenerationRef.current;
     cancelRetry();
 
     if (!session?.user) {
+      endSwitch();
       resolvedUserIdRef.current = null;
       setUser(null);
       setRole(null);
@@ -118,12 +129,35 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     const stored = readCachedRole(session.user.id);
     const cached = stored === 'admin' && isWorkspaceArea() ? null : stored;
     if (cached) {
+      endSwitch();
       resolvedUserIdRef.current = session.user.id;
       setUser({ ...session.user, role: cached } as AuthUser);
       setRole(cached);
       setError(null);
       void resolveRole(session, generation);
       return { role: cached, unavailable: false };
+    }
+
+    // Outra conta no mesmo separador (por exemplo, entrou noutro separador): a anterior sai de
+    // vista já, em vez de ficar à frente da sessão nova até o papel chegar. Com isto o ecrã
+    // passa por "a carregar" e a estrutura monta-se de novo para a conta nova.
+    if (resolvedUserIdRef.current && resolvedUserIdRef.current !== session.user.id) {
+      resolvedUserIdRef.current = null;
+      switchingRef.current = true;
+      setUser(null);
+      setRole(null);
+      setError(null);
+      setIsLoading(true);
+      try {
+        return await resolveRole(session, generation);
+      } catch (err) {
+        console.error('Error switching account:', err);
+        if (generation === lookupGenerationRef.current) {
+          endSwitch();
+          setError('Erro ao verificar autenticação');
+        }
+        return { role: null, unavailable: true };
+      }
     }
     return resolveRole(session, generation);
   };
@@ -139,6 +173,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     });
     const lookup: RoleLookup = { role: normalizeRole(rawRole), unavailable: !!lookupError };
     if (generation !== lookupGenerationRef.current) return lookup;
+    // Daqui até ao fim todos os caminhos deixam o estado final (conta, aviso ou erro).
+    endSwitch();
 
     if (lookupError) {
       // A BD não respondeu: não se sabe o papel, o que é diferente de "conta sem papel".
@@ -213,6 +249,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     try {
       setError(null);
       ++lookupGenerationRef.current;
+      endSwitch();
       cancelRetry();
       setIsServiceUnavailable(false);
       await authService.logout();

@@ -8,6 +8,7 @@ import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { LoginAlias } from '@/components/LoginAlias';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { RemountOnUserChange } from '@/components/RemountOnUserChange';
 import { AppManifestSync } from '@/components/AppManifestSync';
 import { ROUTES } from '@/lib/constants';
 import { persistQueries, restoreQueries } from '@/lib/query-persist';
@@ -224,9 +225,11 @@ const App = () => (
                     path="/ponto/nfc"
                     element={
                       <ProtectedRoute>
-                        <WorkdayProvider>
-                          <TimeClockNfcPage />
-                        </WorkdayProvider>
+                        <RemountOnUserChange>
+                          <WorkdayProvider>
+                            <TimeClockNfcPage />
+                          </WorkdayProvider>
+                        </RemountOnUserChange>
                       </ProtectedRoute>
                     }
                   />

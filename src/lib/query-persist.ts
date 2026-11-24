@@ -10,6 +10,7 @@ import {
   sessionUserId,
   writeDeviceCache,
 } from './device-cache';
+import { resetSessionMemory } from './session-memory';
 
 const NAME = 'queries';
 const VERSION = 1;
@@ -154,6 +155,7 @@ export const persistQueries = (client: QueryClient) => {
       stopTimer();
       clearAllDeviceData();
       client.clear();
+      resetSessionMemory();
       owner = null;
       return;
     }
@@ -164,6 +166,10 @@ export const persistQueries = (client: QueryClient) => {
       // O que ficou no aparelho da conta anterior (ou de uma sessão que desapareceu sem
       // SIGNED_OUT) sai; as listas montadas voltam ao início e vão buscar os dados da conta nova.
       clearAllDeviceData(userId);
+      // Rascunhos, anexos copiados, URLs assinados… que a conta anterior deixou em memória.
+      // Tem de correr antes de o AuthContext trocar o utilizador (este listener regista-se ao
+      // carregar a App, antes do efeito do AuthProvider): a árvore remonta já sem nada da anterior.
+      resetSessionMemory();
       if (owner) {
         client.getMutationCache().clear();
         void client.resetQueries();

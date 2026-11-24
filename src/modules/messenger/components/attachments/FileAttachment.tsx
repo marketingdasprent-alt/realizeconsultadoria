@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Download, FileText, Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { onSessionReset } from '@/lib/session-memory';
 import { pdfFirstPage } from '@/modules/webmail/lib/pdfThumb';
 import { useAttachmentUrl } from '../../hooks/useAttachmentUrl';
 import { fileTypeLabel, formatBytes } from '../../lib/files';
@@ -8,6 +9,8 @@ import type { ChatMessage } from '../../types';
 
 // A 1.ª página de cada PDF desenha-se uma vez por sessão (o URL assinado muda, o ficheiro não).
 const pdfPages = new Map<string, Promise<string | null>>();
+// As miniaturas são de ficheiros de conversas da conta que as abriu.
+onSessionReset(() => pdfPages.clear());
 const pdfPreview = (key: string, url: string) => {
   let page = pdfPages.get(key);
   if (!page) {

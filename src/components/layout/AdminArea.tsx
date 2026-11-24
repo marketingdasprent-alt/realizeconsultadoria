@@ -3,6 +3,7 @@ import { Navigate, Outlet, useLocation } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { PrintPreviewHost } from '@/components/admin/PrintPreviewHost';
 import { ProtectedRoute } from '@/components/ProtectedRoute';
+import { RemountOnUserChange } from '@/components/RemountOnUserChange';
 import { useAuth } from '@/contexts/AuthContext';
 import { MfaGate } from '@/modules/auth/components/MfaGate';
 import { ROUTES } from '@/lib/constants';
@@ -39,13 +40,17 @@ const ShellByRole: React.FC = () => {
  */
 export const AppShell: React.FC = () => (
   <ProtectedRoute>
-    {/* Quem ativou a confirmação em dois passos faz o código antes de ver qualquer ecrã */}
-    <MfaGate>
-      {/* A empresa escolhida no menu vale no Workspace e no painel de admin */}
-      <CompanyScopeProvider>
-        <ShellByRole />
-      </CompanyScopeProvider>
-    </MfaGate>
+    {/* Outra conta no mesmo separador: nada do estado da anterior (ficha, separadores, empresa
+        escolhida…) fica montado */}
+    <RemountOnUserChange>
+      {/* Quem ativou a confirmação em dois passos faz o código antes de ver qualquer ecrã */}
+      <MfaGate>
+        {/* A empresa escolhida no menu vale no Workspace e no painel de admin */}
+        <CompanyScopeProvider>
+          <ShellByRole />
+        </CompanyScopeProvider>
+      </MfaGate>
+    </RemountOnUserChange>
   </ProtectedRoute>
 );
 

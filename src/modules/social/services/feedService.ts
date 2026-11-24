@@ -1,6 +1,7 @@
 // Feed no Supabase: publicações (feed_posts), comentários, reações e ficheiros (feed-files).
 // As regras da BD decidem quem vê o quê (empresa / departamento).
 import { supabase } from '@/integrations/supabase/client';
+import { onSessionReset, sessionEpoch } from '@/lib/session-memory';
 import type { Database, Json } from '@/integrations/supabase/types';
 import type { FeedAttachment } from '../types';
 
@@ -17,6 +18,8 @@ const safeFileName = (name: string): string =>
     .slice(-80) || 'ficheiro';
 
 const signedUrls = new Map<string, { url: string; expires: number }>();
+// Um URL assinado vale para quem o pediu: outra conta no mesmo separador pede o seu.
+onSessionReset(() => signedUrls.clear());
 
 export const feedService = {
   /** Publicações visíveis, mais recentes primeiro (`before` carrega as anteriores). */
@@ -163,8 +166,10 @@ export const feedService = {
   getFileUrl: async (path: string) => {
     const cached = signedUrls.get(path);
     if (cached && cached.expires > Date.now()) return { data: cached.url, error: null };
+    const epoch = sessionEpoch();
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
-    if (data?.signedUrl) {
+    // A conta mudou durante o pedido: o URL é da anterior e não fica em cache.
+    if (data?.signedUrl && epoch === sessionEpoch()) {
       signedUrls.set(path, { url: data.signedUrl, expires: Date.now() + 50 * 60_000 });
     }
     return { data: data?.signedUrl ?? null, error };

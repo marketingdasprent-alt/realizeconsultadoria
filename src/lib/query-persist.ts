@@ -167,6 +167,8 @@ export const persistQueries = (client: QueryClient) => {
       // SIGNED_OUT) sai; as listas montadas voltam ao início e vão buscar os dados da conta nova.
       clearAllDeviceData(userId);
       // Rascunhos, anexos copiados, URLs assinados… que a conta anterior deixou em memória.
+      // Tem de correr antes de o AuthContext trocar o utilizador (este listener regista-se ao
+      // carregar a App, antes do efeito do AuthProvider): a árvore remonta já sem nada da anterior.
       resetSessionMemory();
       if (owner) {
         client.getMutationCache().clear();

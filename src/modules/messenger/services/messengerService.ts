@@ -1,7 +1,7 @@
 // Chamadas do Messenger ao Supabase (tabelas chat_*, funções chat_* e bucket chat-files).
 // Tudo passa pelas regras de acesso da BD: só os membros leem e escrevem numa conversa.
 import { supabase } from '@/integrations/supabase/client';
-import { onSessionReset } from '@/lib/session-memory';
+import { onSessionReset, sessionEpoch } from '@/lib/session-memory';
 import type { Database } from '@/integrations/supabase/types';
 import type { MemberFlag } from '../types';
 
@@ -263,8 +263,10 @@ export const messengerService = {
   getFileUrl: async (path: string) => {
     const cached = signedUrls.get(path);
     if (cached && cached.expires > Date.now()) return { data: cached.url, error: null };
+    const epoch = sessionEpoch();
     const { data, error } = await supabase.storage.from(BUCKET).createSignedUrl(path, 3600);
-    if (data?.signedUrl) {
+    // A conta mudou durante o pedido: o URL é da anterior e não fica em cache.
+    if (data?.signedUrl && epoch === sessionEpoch()) {
       signedUrls.set(path, { url: data.signedUrl, expires: Date.now() + 50 * 60_000 });
     }
     return { data: data?.signedUrl ?? null, error };

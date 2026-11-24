@@ -5,6 +5,7 @@ import { Loader2, MailOpen } from 'lucide-react';
 import { Sheet, SheetContent, SheetTitle } from '@/components/ui/sheet';
 import { toast } from '@/hooks/use-toast';
 import { cn } from '@/lib/utils';
+import { sessionEpoch } from '@/lib/session-memory';
 import { ConnectMailDialog } from '../components/ConnectMailDialog';
 import { FolderManageDialogs, type FolderEdit } from '../components/FolderManageDialogs';
 import { NewMailFolderDialog } from '../components/NewMailFolderDialog';
@@ -105,6 +106,9 @@ const WebmailPage: React.FC = () => {
   const draftRef = useRef(draft);
   draftRef.current = draft;
   const mountedRef = useRef(true);
+  // Conta com que esta página abriu: um envio que falha tarde, já noutra conta, não devolve o
+  // rascunho da anterior à sessão.
+  const epochRef = useRef(sessionEpoch());
   useEffect(() => {
     mountedRef.current = true;
     return () => {
@@ -114,7 +118,7 @@ const WebmailPage: React.FC = () => {
   const waiting = useRef<ComposeDraft[]>([]);
   const reopen = (back: ComposeDraft) => {
     if (!mountedRef.current) {
-      if (!composeSession.get()) composeSession.set(back);
+      if (!composeSession.get() && epochRef.current === sessionEpoch()) composeSession.set(back);
       return;
     }
     if (draftRef.current) {

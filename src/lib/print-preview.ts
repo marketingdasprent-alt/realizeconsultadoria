@@ -2,6 +2,7 @@
 // (window.open), que os browsers bloqueiam quando o documento só fica pronto depois de
 // carregar dados — o clique do utilizador já "expirou" e aparece o aviso dos pop-ups.
 import { useSyncExternalStore } from 'react';
+import { onSessionReset } from './session-memory';
 
 export interface PrintPreview {
   title: string;
@@ -35,6 +36,9 @@ export const closePrintPreview = (): void => {
   current = null;
   emit();
 };
+
+// O documento aberto (folha de ponto, recibo…) é da conta que o abriu.
+onSessionReset(closePrintPreview);
 
 /** O documento aberto na pré-visualização (null quando fechada). */
 export const usePrintPreview = (): PrintPreview | null =>

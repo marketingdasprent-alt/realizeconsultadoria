@@ -85,6 +85,48 @@ describe('AuthContext: troca de conta no mesmo separador', () => {
     expect(screen.getByTestId('loading').textContent).toBe('false');
   });
 
+  const startSwitchToU2 = async () => {
+    const roleOfU2 = deferred<{ data: string | null; error: unknown }>();
+    vi.mocked(accessService.getUserRole).mockImplementation(((id: string) =>
+      id === 'u1'
+        ? Promise.resolve({ data: 'employee', error: null })
+        : roleOfU2.promise) as never);
+    renderProbe();
+    await waitFor(() => expect(screen.getByTestId('user').textContent).toBe('u1'));
+    act(() => auth.listener?.('SIGNED_IN', sessionOf('u2')));
+    expect(screen.getByTestId('loading').textContent).toBe('true');
+    return roleOfU2;
+  };
+
+  it('outro evento da conta nova durante a leitura do papel não deixa o ecrã preso a carregar', async () => {
+    const roleOfU2 = await startSwitchToU2();
+
+    // O Supabase volta a emitir SIGNED_IN/TOKEN_REFRESHED ao regressar ao separador.
+    act(() => auth.listener?.('TOKEN_REFRESHED', sessionOf('u2')));
+
+    await act(async () => roleOfU2.resolve({ data: 'employee', error: null }));
+    await waitFor(() => expect(screen.getByTestId('user').textContent).toBe('u2'));
+    expect(screen.getByTestId('loading').textContent).toBe('false');
+  });
+
+  it('sair durante a troca de conta leva ao login, sem ficar preso a carregar', async () => {
+    await startSwitchToU2();
+
+    act(() => auth.listener?.('SIGNED_OUT', null));
+
+    await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));
+    expect(screen.getByTestId('user').textContent).toBe('ninguém');
+  });
+
+  it('a base não responder na troca de conta também deixa de carregar (sem mostrar a anterior)', async () => {
+    const roleOfU2 = await startSwitchToU2();
+
+    await act(async () => roleOfU2.resolve({ data: null, error: new Error('sem rede') }));
+
+    await waitFor(() => expect(screen.getByTestId('loading').textContent).toBe('false'));
+    expect(screen.getByTestId('user').textContent).toBe('ninguém');
+  });
+
   it('a mesma conta a renovar a sessão não pisca nem volta a ler o papel', async () => {
     vi.mocked(accessService.getUserRole).mockResolvedValue({
       data: 'employee',

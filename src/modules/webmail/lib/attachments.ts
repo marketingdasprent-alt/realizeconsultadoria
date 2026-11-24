@@ -1,7 +1,7 @@
 // Anexos do Webmail: o servidor lê a mensagem inteira a cada anexo (demora), por isso o que já
 // foi buscado fica em memória nesta sessão — abrir, pré-visualizar, descarregar e reencaminhar
 // o mesmo anexo só pede uma vez.
-import { onSessionReset } from '@/lib/session-memory';
+import { onSessionReset, sessionEpoch } from '@/lib/session-memory';
 import { mailService, type MailError } from '../services/mailService';
 
 export interface LoadedAttachment {
@@ -60,9 +60,16 @@ export const loadAttachment = (
       const mime = mimeFromName(result.data.mime, filename);
       return { filename, mime, blob: new Blob([decode(base64) as BlobPart], { type: mime }) };
     });
+  // Se a conta mudar antes de o anexo chegar, quem o pediu recebe-o mas a nova conta não o herda.
+  const epoch = sessionEpoch();
   cache.set(key, pending);
-  // Falhou: não fica em cache (a próxima tentativa volta a pedir).
-  pending.catch(() => cache.delete(key));
+  void pending.then(
+    () => {
+      if (epoch !== sessionEpoch()) cache.delete(key);
+    },
+    // Falhou: não fica em cache (a próxima tentativa volta a pedir).
+    () => cache.delete(key)
+  );
   while (cache.size > MAX_CACHED) cache.delete(cache.keys().next().value as string);
   return pending;
 };

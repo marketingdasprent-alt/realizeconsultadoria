@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { ImageOff, Loader2 } from 'lucide-react';
-import { onSessionReset } from '@/lib/session-memory';
+import { onSessionReset, sessionEpoch } from '@/lib/session-memory';
 import { ImageLightbox } from '@/modules/social/components/feed/ImageLightbox';
 import { useFileUrl } from '@/modules/social/hooks/useFileUrl';
 import type { FeedAttachment } from '@/modules/social/types';
@@ -14,8 +14,10 @@ onSessionReset(() => cache.clear());
 const resolveTicketUrl = async (path: string) => {
   const hit = cache.get(path);
   if (hit && Date.now() - hit.at < 4 * 60_000) return hit.url;
+  const epoch = sessionEpoch();
   const url = await supportService.getAttachmentUrl(path);
-  cache.set(path, { url, at: Date.now() });
+  // A conta mudou durante o pedido: o URL é da anterior e não fica em cache.
+  if (epoch === sessionEpoch()) cache.set(path, { url, at: Date.now() });
   return url;
 };
 

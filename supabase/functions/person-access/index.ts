@@ -73,10 +73,16 @@ serve(async (req: Request) => {
   if (!isUuid(body.user_id)) return fail('Pessoa inválida.');
   const { data: employee } = await db
     .from('employees')
-    .select('id, name')
+    .select('id, name, company_id')
     .eq('user_id', body.user_id)
     .maybeSingle();
   if (!employee) return fail('Esta pessoa não tem ficha de colaborador.');
+  // Só o administrador da empresa da pessoa (ou o super admin): isAdminAccount é global.
+  const { data: manages } = await db.rpc('rz_is_company_admin_for', {
+    p_user: userId,
+    p_company: (employee as { company_id: string }).company_id,
+  });
+  if (manages !== true) return fail('Só os administradores desta empresa podem fazer isto.');
 
   try {
     switch (body.action) {
@@ -111,10 +117,19 @@ serve(async (req: Request) => {
         // Só caixas já ligadas ao Webmail (as outras ligam-se no admin, em Acessos)
         const { data: linked } = await db
           .from('mail_accounts')
-          .select('id')
+          .select('id, company_id')
           .eq('access_id', body.access_id)
           .maybeSingle();
         if (!linked) return fail('Esta caixa ainda não está ligada ao Webmail.');
+        // A caixa tem de ser da mesma empresa da pessoa.
+        // Caixas antigas sem empresa só as liga o super admin.
+        const linkedCompany = (linked as { company_id: string | null }).company_id;
+        if (linkedCompany === null) {
+          const { data: isSuper } = await db.rpc('is_super_admin_member', { _user_id: userId });
+          if (isSuper !== true) return fail('Esta caixa é de outra empresa.');
+        } else if (linkedCompany !== (employee as { company_id: string }).company_id) {
+          return fail('Esta caixa é de outra empresa.');
+        }
         if (body.on === true) {
           const { error } = await db
             .from('employee_department_emails')

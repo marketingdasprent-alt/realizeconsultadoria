@@ -91,7 +91,7 @@ describe('QA multi-org PR1: useAdminPermissions por papel', () => {
     const p = await load();
     expect(p.isSuperAdmin).toBe(false);
     expect(p.canView('employees')).toBe(true);
-    for (const m of ['marketing', 'legal', 'accesses', 'timeclock', 'support']) {
+    for (const m of ['marketing', 'legal', 'accesses', 'support']) {
       expect(p.canView(m)).toBe(false);
     }
     expect(p.canViewTopic('settings', 'groups')).toBe(false);

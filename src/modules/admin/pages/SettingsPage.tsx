@@ -1027,12 +1027,15 @@ const SettingsPage = () => {
                         <SelectValue placeholder="Selecione a empresa" />
                       </SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="all">Todas as Empresas</SelectItem>
-                        {companies.map(company => (
-                          <SelectItem key={company.id} value={company.id}>
-                            {company.name}
-                          </SelectItem>
-                        ))}
+                        {/* "Todas" é um aviso da plataforma: só o super admin. */}
+                        {isSuperAdmin && <SelectItem value="all">Todas as Empresas</SelectItem>}
+                        {companies
+                          .filter(company => isSuperAdmin || adminCompanyIds.includes(company.id))
+                          .map(company => (
+                            <SelectItem key={company.id} value={company.id}>
+                              {company.name}
+                            </SelectItem>
+                          ))}
                       </SelectContent>
                     </Select>
                   </div>

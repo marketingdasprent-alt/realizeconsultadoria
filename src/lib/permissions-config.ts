@@ -347,7 +347,6 @@ export const COMPANY_ADMIN_EXCLUDED_MODULES: readonly string[] = [
   'legal',
   'marketing',
   'accesses',
-  'timeclock',
   'support',
 ];
 

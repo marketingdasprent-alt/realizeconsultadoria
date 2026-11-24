@@ -2,7 +2,6 @@ import { useState, useEffect, useCallback } from 'react';
 import {
   companyService,
   type Company,
-  type CompanyInsert,
   type CompanyUpdate,
 } from '@/modules/admin/services/companyService';
 

@@ -28,7 +28,7 @@ describe('buildEmployeeDetails', () => {
 
   it('ao criar envia company_id', () => {
     const details = buildEmployeeDetails(form(), 'create');
-    expect(details.company_id).toBe('company-1');
+    expect(details).toHaveProperty('company_id', 'company-1');
   });
 
   it('mantém o tratamento dos restantes campos nos dois modos', () => {

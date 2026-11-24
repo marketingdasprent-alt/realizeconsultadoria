@@ -3,7 +3,7 @@ import { employeeService } from '../employeeService';
 
 const single = vi.fn();
 const eq = vi.fn(() => ({ select: () => ({ single }) }));
-const update = vi.fn(() => ({ eq }));
+const update = vi.fn((_values: Record<string, unknown>) => ({ eq }));
 
 vi.mock('@/integrations/supabase/client', () => ({
   supabase: {

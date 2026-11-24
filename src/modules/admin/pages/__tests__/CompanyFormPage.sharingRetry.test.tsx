@@ -81,10 +81,12 @@ describe('Partilha: erro a ler as empresas da conta', () => {
     // Outro consumidor da mesma query (ou o regresso da rede) refaz o pedido
     let release: (value: unknown) => void = () => {};
     myCompanies.mockReturnValueOnce(new Promise(resolve => (release = resolve)));
-    void act(() => {
+    await act(async () => {
       void client.refetchQueries({ queryKey: ['admin', 'sharing', 'companies'] });
     });
-    await waitFor(() => expect(myCompanies).toHaveBeenCalledTimes(2));
+    // O pedido novo está mesmo a correr e a árvore já foi renderizada com esse estado
+    await waitFor(() => expect(client.isFetching()).toBe(1));
+    await act(async () => {});
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.queryByRole('status')).not.toBeInTheDocument();
     await act(async () => release(ADMIN));
@@ -92,13 +94,21 @@ describe('Partilha: erro a ler as empresas da conta', () => {
   });
 
   it('repetir e falhar outra vez: o botão volta a estar disponível', async () => {
-    myCompanies.mockRejectedValue(FAIL);
+    myCompanies.mockRejectedValueOnce(FAIL);
     renderPage();
     await alertText();
+    let fail: (reason: unknown) => void = () => {};
+    myCompanies.mockReturnValueOnce(new Promise((_, reject) => (fail = reject)));
     await userEvent.click(retryButton());
-    await waitFor(() => expect(myCompanies).toHaveBeenCalledTimes(2));
+    // Durante o pedido: "A tentar…" e bloqueado; depois da falha volta a estar disponível
+    expect(await screen.findByRole('button', { name: /a tentar/i })).toHaveAttribute(
+      'aria-disabled',
+      'true'
+    );
+    await act(async () => fail(FAIL));
     await waitFor(() => expect(retryButton()).toHaveTextContent('Tentar de novo'));
     expect(retryButton()).not.toHaveAttribute('aria-disabled', 'true');
+    expect(screen.getByRole('alert')).toBeInTheDocument();
   });
 
   it('repetir com sucesso como administrador abre a Partilha', async () => {

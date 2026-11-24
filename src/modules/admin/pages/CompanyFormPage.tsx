@@ -315,6 +315,7 @@ const CompanyFormPage = () => {
                     variant="outline"
                     // aria-disabled (e não disabled) para o foco do teclado não se perder
                     aria-disabled={myCompanies.isFetching}
+                    className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
                     onClick={() => {
                       if (!myCompanies.isFetching) void myCompanies.refetch();
                     }}

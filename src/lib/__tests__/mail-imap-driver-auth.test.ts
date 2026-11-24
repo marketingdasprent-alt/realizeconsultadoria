@@ -46,7 +46,13 @@ describe('driver IMAP: recusa de login', () => {
       const onAuth = vi.fn(async () => mailError('reauth'));
       const driver = createImapDriver(cfg, onAuth);
       const failure = expect(
-        driver.list({ folder: 'inbox', limit: 1, withoutSnippets: true })
+        driver.list({
+          folder: 'inbox',
+          query: null,
+          pageToken: null,
+          limit: 1,
+          withoutSnippets: true,
+        })
       ).rejects.toMatchObject({ code: 'provider_error' });
       await vi.advanceTimersByTimeAsync(801);
       await failure;
@@ -63,7 +69,13 @@ describe('driver IMAP: recusa de login', () => {
     const onAuth = vi.fn(async () => mailError('reauth', 'O servidor recusou o acesso à caixa.'));
     const driver = createImapDriver(cfg, onAuth);
     await expect(
-      driver.list({ folder: 'inbox', limit: 1, withoutSnippets: true })
+      driver.list({
+        folder: 'inbox',
+        query: null,
+        pageToken: null,
+        limit: 1,
+        withoutSnippets: true,
+      })
     ).rejects.toMatchObject({ code: 'reauth', message: 'O servidor recusou o acesso à caixa.' });
     expect(onAuth).toHaveBeenCalledTimes(1);
     expect(transport.connect).toHaveBeenCalledTimes(1);

@@ -94,6 +94,9 @@ const CompanyFormPage = () => {
   const myCompanies = useMyCompanies();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // "Tentar de novo" na Partilha: o React Query apaga o erro e volta a "a carregar" (sem dados),
+  // o que desmontava o aviso e o botão; assim ficam até o pedido acabar.
+  const [retryingSharing, setRetryingSharing] = useState(false);
   // Quem está a guardar: "nova" ou o id da empresa (o formulário de outra empresa não fica preso)
   const [savingFor, setSavingFor] = useState<string | null>(null);
   // O estado "a guardar" só chega depois da validação do formulário: este impede o duplo envio
@@ -128,6 +131,7 @@ const CompanyFormPage = () => {
   const sharingPending =
     requestedTab === 'partilha' &&
     !myCompanies.error &&
+    !retryingSharing &&
     (myCompanies.isLoading || (myCompanies.isFetching && !canSeeSharing));
   // Sem direito à Partilha, o endereço com ?tab=partilha abre em Dados (nada de página vazia).
   const sharingBlocked = requestedTab === 'partilha' && !sharingPending && !canSeeSharing;
@@ -302,10 +306,15 @@ const CompanyFormPage = () => {
                     type="button"
                     size="sm"
                     variant="outline"
-                    disabled={myCompanies.isFetching}
-                    onClick={() => void myCompanies.refetch()}
+                    disabled={myCompanies.isFetching || retryingSharing}
+                    onClick={() => {
+                      setRetryingSharing(true);
+                      void Promise.resolve(myCompanies.refetch()).finally(() =>
+                        setRetryingSharing(false)
+                      );
+                    }}
                   >
-                    {myCompanies.isFetching ? 'A tentar…' : 'Tentar de novo'}
+                    {myCompanies.isFetching || retryingSharing ? 'A tentar…' : 'Tentar de novo'}
                   </Button>
                 </>
               ) : (

@@ -150,6 +150,8 @@ BEGIN
       ('operação: quem já é super admin não se duplica', 'sa', 'aal2', 'P0001:already_super_admin', 'SELECT public.rz_add_super_admin(''' || sb || ''')::text'),
       ('email: o admin de A vê o NOME do super admin na ficha da empresa mas não o email', 'adA', 'aal1', 'true/true',
         'SELECT (count(*) FILTER (WHERE kind = ''super_admin'') >= 1)::text || ''/'' || (count(*) FILTER (WHERE kind = ''super_admin'' AND email <> '''') = 0)::text FROM public.rz_company_viewers(''' || kA || ''')'),
+      ('email: o admin de A não vê o início do email do super admin no nome (sem ficha)', 'adA', 'aal1', '0',
+        'SELECT count(*)::text FROM public.rz_company_viewers(''' || kA || ''') WHERE kind = ''super_admin'' AND name LIKE ''zz-emp-%'''),
       ('email: o super admin continua a ver o email', 'sa', 'aal1', 'true',
         'SELECT (count(*) FILTER (WHERE kind = ''super_admin'' AND email <> '''') >= 1)::text FROM public.rz_company_viewers(''' || kA || ''')'),
       ('candidatos: banido e por confirmar não aparecem', 'sa', 'aal1', '0',

@@ -85,7 +85,9 @@ CREATE POLICY "Logos: apagar" ON storage.objects
   USING (bucket_id = 'company-logos' AND public.rz_can_write_logo(name));
 
 -- ============================================================================================ 2. Super admins
--- NOT VALID + VALIDATE: o ADD CONSTRAINT não varre a tabela; só o VALIDATE o faz (tudo na mesma transação).
+-- Falha depressa (5 s) em vez de ficar à espera, e a bloquear a auditoria, se houver uma transação a usá-la.
+-- A tabela de auditoria é pequena: o CHECK valida-se na própria migração.
+SET LOCAL lock_timeout = '5s';
 ALTER TABLE public.cross_company_audit DROP CONSTRAINT IF EXISTS cross_company_audit_action_check;
 ALTER TABLE public.cross_company_audit ADD CONSTRAINT cross_company_audit_action_check
   CHECK ((action = ANY (ARRAY['read'::text, 'write'::text, 'delete'::text, 'export'::text, 'reveal'::text,
@@ -114,8 +116,10 @@ AS $function$
 $function$;
 REVOKE ALL ON FUNCTION public.rz_other_usable_super_admins(uuid) FROM PUBLIC, anon, authenticated;
 
--- A plataforma nunca fica sem super admin utilizável, por NENHUM caminho (RPC, SQL direto, service_role, conta
--- apagada em auth.users, TRUNCATE): o trigger vale para todos. O advisory lock serializa as retiradas em paralelo.
+-- A plataforma nunca fica sem super admin utilizável por NENHUM caminho que escreva em platform_admins (RPC, SQL
+-- direto, service_role, conta apagada em auth.users por cascade, TRUNCATE). O advisory lock serializa as retiradas
+-- em paralelo. Não impede, por fora desta tabela, banir a conta ou apagar o fator TOTP do último utilizável: a
+-- recuperação é por SQL com service_role (reativar ou inserir em platform_admins, que o trigger permite).
 CREATE OR REPLACE FUNCTION public.rz_platform_admins_guard()
  RETURNS trigger
  LANGUAGE plpgsql
@@ -374,8 +378,10 @@ BEGIN
     FROM people p ORDER BY p.uid, p.rk
   )
   SELECT b.uid,
-         coalesce(nullif(trim(e.ename), ''), nullif(trim(u.raw_user_meta_data ->> 'name'), ''),
-                  split_part(u.email::text, '@', 1)) AS vname,
+         CASE WHEN b.k = 'super_admin' AND NOT public.rz_is_super_admin()
+              THEN coalesce(nullif(trim(e.ename), ''), 'Super administrador')
+              ELSE coalesce(nullif(trim(e.ename), ''), nullif(trim(u.raw_user_meta_data ->> 'name'), ''),
+                            split_part(u.email::text, '@', 1)) END AS vname,
          CASE WHEN b.k = 'super_admin' AND NOT public.rz_is_super_admin() THEN ''::text ELSE u.email::text END, b.k, b.r,
          -- Tem pertença de administrador ativa nesta empresa (mesmo que apareça como super admin):
          -- é por aqui que se conta o último administrador.

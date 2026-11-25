@@ -1,6 +1,8 @@
-// Separadores de Empresas (a antiga "Partilha entre empresas" passou para aqui): a ficha de cada
-// empresa tem Dados, Administradores, Colaboradores e Partilha; a lista tem Empresas e, só para o
-// super admin, Grupos. O estado vive no endereço (?tab= e ?sub=), por isso os links funcionam.
+// Secções de Empresas (a antiga "Partilha entre empresas" passou para aqui). Na ficha de cada empresa
+// o utilizador vê três secções (Identidade, Equipa, Ligações com outras empresas: ver companySections.ts),
+// mas o endereço guarda as chaves de sempre (?tab=dados|administradores|colaboradores|partilha), por
+// isso todos os links antigos continuam a funcionar. A lista tem Empresas e, só para o super admin,
+// Grupos e Equipa da plataforma. O estado vive no endereço (?tab= e ?sub=).
 import { ROUTES } from '@/lib/constants';
 
 export const COMPANY_TABS = ['dados', 'administradores', 'colaboradores', 'partilha'] as const;
@@ -10,17 +12,29 @@ export type CompanyTab = (typeof COMPANY_TABS)[number];
 export const SHARE_SUBS = ['codigo', 'pedidos', 'acesso', 'grupo', 'quem-ve'] as const;
 export type ShareSub = (typeof SHARE_SUBS)[number];
 
-export type ListTab = 'empresas' | 'grupos';
+export type ListTab = 'empresas' | 'grupos' | 'equipa';
 
-export const parseCompanyTab = (raw: string | null): CompanyTab =>
-  (COMPANY_TABS as readonly string[]).includes(raw ?? '') ? (raw as CompanyTab) : 'dados';
+/** Nomes em linguagem de utilizador que também se aceitam no endereço. */
+const TAB_ALIASES: Record<string, CompanyTab> = {
+  identidade: 'dados',
+  equipa: 'administradores',
+  ligacoes: 'partilha',
+};
+
+export const parseCompanyTab = (raw: string | null): CompanyTab => {
+  const value = raw ?? '';
+  if ((COMPANY_TABS as readonly string[]).includes(value)) return value as CompanyTab;
+  return TAB_ALIASES[value] ?? 'dados';
+};
 
 export const parseShareSub = (raw: string | null): ShareSub =>
   (SHARE_SUBS as readonly string[]).includes(raw ?? '') ? (raw as ShareSub) : 'codigo';
 
-/** "Grupos" é do super admin: para os outros, qualquer ?tab=grupos fica na lista de empresas. */
-export const parseListTab = (raw: string | null, isSuperAdmin: boolean): ListTab =>
-  raw === 'grupos' && isSuperAdmin ? 'grupos' : 'empresas';
+/** "Grupos" e "Equipa" são do super admin: para os outros, qualquer outro ?tab= fica em Empresas. */
+export const parseListTab = (raw: string | null, isSuperAdmin: boolean): ListTab => {
+  if (!isSuperAdmin) return 'empresas';
+  return raw === 'grupos' || raw === 'equipa' ? raw : 'empresas';
+};
 
 const companyPath = (companyId: string) => ROUTES.ADMIN.COMPANY_EDIT.replace(':id', companyId);
 

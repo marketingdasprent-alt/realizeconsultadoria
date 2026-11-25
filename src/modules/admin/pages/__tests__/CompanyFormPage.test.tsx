@@ -182,17 +182,33 @@ beforeEach(() => {
 });
 
 describe('CompanyFormPage — edição', () => {
-  it('carrega a empresa por id e abre nos Dados, com os separadores da ficha', async () => {
+  it('carrega a empresa por id e abre na Identidade, com as três secções da ficha', async () => {
     renderAt('/admin/empresas/c1');
     expect(await screen.findByDisplayValue('Acme Lda')).toBeInTheDocument();
     expect(getById).toHaveBeenCalledWith('c1');
-    expect(screen.getByRole('heading', { name: 'Acme Lda' })).toBeInTheDocument();
-    expect(screen.getByText('Dados da empresa')).toBeInTheDocument();
-    for (const name of ['Dados', 'Administradores', 'Colaboradores', 'Partilha']) {
+    expect(screen.getByRole('heading', { level: 1, name: 'Acme Lda' })).toBeInTheDocument();
+    for (const name of ['Identidade', 'Equipa', 'Ligações com outras empresas']) {
       expect(screen.getByRole('tab', { name })).toBeInTheDocument();
     }
-    expect(screen.getByRole('tab', { name: 'Dados' })).toHaveAttribute('data-state', 'active');
+    // Os rótulos antigos já não aparecem como separadores
+    for (const name of ['Dados', 'Administradores', 'Colaboradores', 'Partilha']) {
+      expect(screen.queryByRole('tab', { name })).not.toBeInTheDocument();
+    }
+    expect(screen.getByRole('tab', { name: 'Identidade' })).toHaveAttribute('data-state', 'active');
+    for (const title of ['Contactos', 'Morada']) {
+      expect(screen.getByRole('heading', { level: 2, name: title })).toBeInTheDocument();
+    }
     expect(screen.queryByTestId('admins-section')).not.toBeInTheDocument();
+  });
+
+  it('o cabeçalho mostra NIF, grupo, administradores e colaboradores', async () => {
+    renderAt('/admin/empresas/c1');
+    await screen.findByDisplayValue('Acme Lda');
+    const header = screen.getByRole('banner');
+    expect(header).toHaveTextContent('123456789');
+    expect(header).toHaveTextContent('Administradores');
+    expect(header).toHaveTextContent('Colaboradores');
+    expect(header).toHaveTextContent('Ativa');
   });
 
   it('?tab=administradores abre os administradores desta empresa', async () => {
@@ -207,18 +223,53 @@ describe('CompanyFormPage — edição', () => {
     expect(employees).toHaveTextContent('Colaboradores de Acme Lda (c1, inativa)');
   });
 
-  it('mudar de separador não apaga o que ainda não foi guardado em Dados', async () => {
+  it('mudar de secção não apaga o que ainda não foi guardado na Identidade', async () => {
     const user = userEvent.setup();
     renderAt('/admin/empresas/c1');
     const name = await screen.findByDisplayValue('Acme Lda');
     fireEvent.change(name, { target: { value: 'Acme Editada' } });
-    await user.click(screen.getByRole('tab', { name: 'Administradores' }));
+    await user.click(screen.getByRole('tab', { name: 'Equipa' }));
     expect(await screen.findByTestId('admins-section')).toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Dados' }));
+    expect(screen.getByTestId('where')).toHaveTextContent('/admin/empresas/c1');
+    await user.click(screen.getByRole('tab', { name: 'Identidade' }));
     expect(screen.getByDisplayValue('Acme Editada')).toBeInTheDocument();
   });
 
-  describe('separador Partilha (era a página "Partilha entre empresas")', () => {
+  it('com alterações por guardar avisa, e Descartar repõe os dados guardados', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/empresas/c1');
+    const name = await screen.findByDisplayValue('Acme Lda');
+    expect(screen.queryByText(/tem alterações por guardar/i)).not.toBeInTheDocument();
+    fireEvent.change(name, { target: { value: 'Acme Editada' } });
+    expect(await screen.findByText(/tem alterações por guardar/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'Descartar' }));
+    expect(await screen.findByDisplayValue('Acme Lda')).toBeInTheDocument();
+    expect(screen.queryByText(/tem alterações por guardar/i)).not.toBeInTheDocument();
+  });
+
+  it('a barra de guardar continua à vista noutra secção quando há alterações', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/empresas/c1');
+    const name = await screen.findByDisplayValue('Acme Lda');
+    await user.click(screen.getByRole('tab', { name: 'Equipa' }));
+    expect(screen.queryByRole('button', { name: /guardar alterações/i })).not.toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Identidade' }));
+    fireEvent.change(name, { target: { value: 'Acme Editada' } });
+    await user.click(screen.getByRole('tab', { name: 'Equipa' }));
+    expect(screen.getByRole('button', { name: /guardar alterações/i })).toBeInTheDocument();
+  });
+
+  it('?tab=colaboradores abre a Equipa já nos colaboradores e Administradores troca por dentro', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/empresas/c1?tab=colaboradores');
+    expect(await screen.findByTestId('employees-section')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Equipa' })).toHaveAttribute('data-state', 'active');
+    await user.click(screen.getByRole('button', { name: 'Administradores' }));
+    expect(await screen.findByTestId('admins-section')).toBeInTheDocument();
+    expect(screen.queryByTestId('employees-section')).not.toBeInTheDocument();
+  });
+
+  describe('secção Ligações com outras empresas (era a página "Partilha entre empresas")', () => {
     it('?tab=partilha abre a Partilha com a empresa fixada (sem escolher empresa)', async () => {
       renderAt('/admin/empresas/c1?tab=partilha');
       expect(await screen.findByTestId('sharing-section')).toHaveTextContent('Acme Lda');
@@ -228,7 +279,9 @@ describe('CompanyFormPage — edição', () => {
       canViewSharing = false;
       renderAt('/admin/empresas/c1?tab=partilha');
       expect(await screen.findByDisplayValue('Acme Lda')).toBeInTheDocument();
-      expect(screen.queryByRole('tab', { name: 'Partilha' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('tab', { name: 'Ligações com outras empresas' })
+      ).not.toBeInTheDocument();
       expect(screen.queryByTestId('sharing-section')).not.toBeInTheDocument();
     });
 
@@ -236,7 +289,9 @@ describe('CompanyFormPage — edição', () => {
       myCompanies.data = [{ company_id: 'c1', role: 'colaborador' }];
       renderAt('/admin/empresas/c1?tab=partilha');
       expect(await screen.findByDisplayValue('Acme Lda')).toBeInTheDocument();
-      expect(screen.queryByRole('tab', { name: 'Partilha' })).not.toBeInTheDocument();
+      expect(
+        screen.queryByRole('tab', { name: 'Ligações com outras empresas' })
+      ).not.toBeInTheDocument();
       expect(screen.queryByTestId('sharing-section')).not.toBeInTheDocument();
     });
 
@@ -249,7 +304,7 @@ describe('CompanyFormPage — edição', () => {
     it('?tab=partilha sem direito: aviso claro em vez de cair em Dados calado', async () => {
       myCompanies.data = [{ company_id: 'c1', role: 'colaborador' }];
       renderAt('/admin/empresas/c1?tab=partilha');
-      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso à partilha/i);
+      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso às ligações/i);
       expect(screen.queryByTestId('sharing-section')).not.toBeInTheDocument();
     });
 
@@ -258,7 +313,7 @@ describe('CompanyFormPage — edição', () => {
       myCompanies.error = new Error('rede');
       renderAt('/admin/empresas/c1?tab=partilha');
       const alert = await screen.findByRole('alert');
-      expect(alert).toHaveTextContent(/não foi possível carregar a partilha/i);
+      expect(alert).toHaveTextContent(/não foi possível carregar as ligações/i);
       await userEvent.click(screen.getByRole('button', { name: /tentar de novo/i }));
       expect(refetchMine).toHaveBeenCalledTimes(1);
     });
@@ -267,7 +322,7 @@ describe('CompanyFormPage — edição', () => {
       myCompanies.data = undefined;
       renderAt('/admin/empresas/c1?tab=partilha');
       const alert = await screen.findByRole('alert');
-      expect(alert).toHaveTextContent(/não foi possível carregar a partilha/i);
+      expect(alert).toHaveTextContent(/não foi possível carregar as ligações/i);
       expect(alert).not.toHaveTextContent(/não tem acesso/i);
     });
 
@@ -275,7 +330,7 @@ describe('CompanyFormPage — edição', () => {
       myCompanies.data = [{ company_id: 'c1', role: 'colaborador' }];
       myCompanies.error = new Error('rede');
       renderAt('/admin/empresas/c1?tab=partilha');
-      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso à partilha/i);
+      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso às ligações/i);
     });
 
     it('sem a permissão "sharing" o aviso é "sem acesso", sem "Tentar de novo"', async () => {
@@ -283,7 +338,7 @@ describe('CompanyFormPage — edição', () => {
       myCompanies.data = undefined;
       myCompanies.error = new Error('rede');
       renderAt('/admin/empresas/c1?tab=partilha');
-      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso à partilha/i);
+      expect(await screen.findByRole('alert')).toHaveTextContent(/não tem acesso às ligações/i);
       expect(screen.queryByRole('button', { name: /tentar de novo/i })).not.toBeInTheDocument();
     });
 
@@ -335,7 +390,7 @@ describe('CompanyFormPage — edição', () => {
       expect(toast).toHaveBeenCalledWith({ title: 'Empresa atualizada com sucesso!' })
     );
     expect(screen.getByTestId('where')).toHaveTextContent('/admin/empresas/c1');
-    expect(screen.getByRole('tab', { name: 'Dados' })).toHaveAttribute('data-state', 'active');
+    expect(screen.getByRole('tab', { name: 'Identidade' })).toHaveAttribute('data-state', 'active');
   });
 
   it('erro ao guardar mostra o erro e não sai da página', async () => {
@@ -529,7 +584,7 @@ describe('CompanyFormPage — fluxo de guardar e navegar', () => {
     renderAt('/admin/empresas/nova');
     await screen.findByRole('heading', { name: 'Nova empresa' });
     fill();
-    const form = screen.getByRole('button', { name: /criar empresa/i }).closest('form')!;
+    const form = document.getElementById('company-form')!;
     fireEvent.submit(form);
     fireEvent.submit(form);
     await waitFor(() => expect(createWithAdmin).toHaveBeenCalledTimes(1));
@@ -656,10 +711,10 @@ describe('CompanyFormPage — erros de leitura', () => {
 });
 
 describe('CompanyFormPage — títulos', () => {
-  it('a hierarquia de títulos não salta: h1 e depois h2 "Dados da empresa"', async () => {
+  it('a hierarquia de títulos não salta: h1 e depois h2 "Identidade"', async () => {
     renderAt('/admin/empresas/c1');
     await screen.findByDisplayValue('Acme Lda');
     expect(screen.getByRole('heading', { level: 1, name: 'Acme Lda' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 2, name: 'Dados da empresa' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Identidade' })).toBeInTheDocument();
   });
 });

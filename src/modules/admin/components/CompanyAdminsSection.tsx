@@ -18,6 +18,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { useAdminPermissions } from '@/hooks/useAdminPermissions';
 import { QueryState } from './sharing/QueryState';
 import { ReauthDialog } from './sharing/ReauthDialog';
 import {
@@ -108,6 +109,7 @@ const ViewerRow: React.FC<{
  * retira aqui). Qualquer administrador da empresa adiciona ou retira outros, menos o último.
  */
 const AdminsPanel: React.FC<CompanyAdminsSectionProps> = ({ company }) => {
+  const { isSuperAdmin } = useAdminPermissions();
   const viewersQuery = useCompanyViewers(company.id);
   const employeesQuery = useCompanyEmployeesWithAccount(company.id);
   const action = useMembershipAction();
@@ -145,9 +147,9 @@ const AdminsPanel: React.FC<CompanyAdminsSectionProps> = ({ company }) => {
     <section aria-labelledby="company-admins" className="space-y-4">
       <ReauthDialog open={action.reauthOpen} onDone={action.finishReauth} />
       <div>
-        <h3 id="company-admins" className="text-base font-semibold">
+        <h2 id="company-admins" className="text-base font-semibold">
           Administradores
-        </h3>
+        </h2>
         <p className="text-sm text-muted-foreground">
           Quem administra ou gere <strong>{company.name}</strong>. Pode haver vários, mas a empresa
           nunca fica sem administrador.
@@ -182,6 +184,13 @@ const AdminsPanel: React.FC<CompanyAdminsSectionProps> = ({ company }) => {
             />
           ))}
         </ul>
+        {platform.length > 0 && (
+          <p className="mt-2 text-xs text-muted-foreground">
+            A equipa da plataforma são os super administradores: veem todas as empresas, por isso
+            aparecem em todas. Não se retiram aqui.
+            {isSuperAdmin && ' Gerem-se em Empresas, separador Equipa da plataforma.'}
+          </p>
+        )}
       </QueryState>
 
       <div className="space-y-2 rounded-lg border p-3">

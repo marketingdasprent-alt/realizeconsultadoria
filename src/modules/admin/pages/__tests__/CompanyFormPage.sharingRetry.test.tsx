@@ -42,6 +42,11 @@ vi.mock('@/hooks/useAdminPermissions', () => ({
 vi.mock('../../components/company/CompanySharing', () => ({
   CompanySharing: () => <div data-testid="sharing-section">Partilha</div>,
 }));
+// Os números do cabeçalho têm leituras próprias: aqui só conta a leitura das empresas da conta
+vi.mock('../../hooks/useCompanyListFacts', () => ({ useCompanyListFacts: () => new Map() }));
+vi.mock('../../hooks/useCompanyMembership', () => ({
+  useCompanyEmployees: () => ({ data: undefined }),
+}));
 vi.mock('../../components/CompanyAdminsSection', () => ({ CompanyAdminsSection: () => null }));
 vi.mock('../../components/CompanyEmployeesSection', () => ({
   CompanyEmployeesSection: () => null,
@@ -77,7 +82,7 @@ describe('Partilha: erro a ler as empresas da conta', () => {
   it('um novo pedido que não veio do botão (ex.: a rede voltou) não troca o aviso pelo spinner', async () => {
     myCompanies.mockRejectedValueOnce(FAIL);
     renderPage();
-    expect(await alertText()).toHaveTextContent(/não foi possível carregar a partilha/i);
+    expect(await alertText()).toHaveTextContent(/não foi possível carregar as ligações/i);
     // Outro consumidor da mesma query (ou o regresso da rede) refaz o pedido
     let release: (value: unknown) => void = () => {};
     myCompanies.mockReturnValueOnce(new Promise(resolve => (release = resolve)));
@@ -126,7 +131,7 @@ describe('Partilha: erro a ler as empresas da conta', () => {
     await alertText();
     await userEvent.click(retryButton());
     await waitFor(() =>
-      expect(screen.getByRole('alert')).toHaveTextContent(/não tem acesso à partilha/i)
+      expect(screen.getByRole('alert')).toHaveTextContent(/não tem acesso às ligações/i)
     );
     expect(screen.queryByRole('button', { name: /tentar/i })).not.toBeInTheDocument();
   });

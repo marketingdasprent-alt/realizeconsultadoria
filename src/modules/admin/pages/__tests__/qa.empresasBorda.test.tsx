@@ -151,14 +151,14 @@ describe('QA PR #80: /admin/partilha → Empresas (de ponta a ponta)', () => {
     expect(screen.getByTestId('where')).toHaveTextContent(
       '/admin/empresas/c1?tab=partilha&sub=quem-ve'
     );
-    expect(selectedTabs()).toEqual(['Partilha', 'Quem pode ver']);
+    expect(selectedTabs()).toEqual(['Ligações com outras empresas', 'Quem pode ver']);
   });
 
   it('?tab=xpto (desconhecido) cai no Código, sem página vazia nem erro', async () => {
     renderAt('/admin/partilha?tab=xpto');
     expect(await screen.findByTestId('painel-codigo')).toBeInTheDocument();
     expect(screen.getByTestId('where')).toHaveTextContent('/admin/empresas/c1?tab=partilha');
-    expect(selectedTabs()).toEqual(['Partilha', 'Código']);
+    expect(selectedTabs()).toEqual(['Ligações com outras empresas', 'Código']);
   });
 
   it('?tab=grupos como super admin abre a zona Grupos da lista', async () => {
@@ -181,29 +181,31 @@ describe('QA PR #80: ficha da empresa', () => {
   it('?tab=partilha&sub=xpto abre a Partilha no Código', async () => {
     renderAt('/admin/empresas/c1?tab=partilha&sub=xpto');
     expect(await screen.findByTestId('painel-codigo')).toBeInTheDocument();
-    expect(selectedTabs()).toEqual(['Partilha', 'Código']);
+    expect(selectedTabs()).toEqual(['Ligações com outras empresas', 'Código']);
   });
 
-  it('Dados continua montado: o que se escreveu sobrevive a ir a outro separador e voltar', async () => {
+  it('Identidade continua montada: o que se escreveu sobrevive a ir a outro separador e voltar', async () => {
     const user = userEvent.setup();
     renderAt('/admin/empresas/c1');
-    await screen.findByRole('tab', { name: 'Dados' });
+    await screen.findByRole('tab', { name: 'Identidade' });
     const name = nameInput();
     await user.clear(name);
     await user.type(name, 'Alfa editada');
-    await user.click(screen.getByRole('tab', { name: 'Administradores' }));
+    await user.click(screen.getByRole('tab', { name: 'Equipa' }));
     expect(await screen.findByText('admins')).toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Partilha' }));
+    await user.click(screen.getByRole('tab', { name: 'Ligações com outras empresas' }));
     expect(await screen.findByTestId('painel-codigo')).toBeInTheDocument();
-    await user.click(screen.getByRole('tab', { name: 'Dados' }));
+    await user.click(screen.getByRole('tab', { name: 'Identidade' }));
     expect(nameInput()).toBe(name); // o mesmo nó do DOM: nunca foi desmontado
     expect(nameInput().value).toBe('Alfa editada');
   });
 
-  it('admin de c1 não vê a Partilha de c2 (?tab=partilha cai em Dados, sem painéis)', async () => {
+  it('admin de c1 não vê a Partilha de c2 (?tab=partilha cai na Identidade, sem painéis)', async () => {
     renderAt('/admin/empresas/c2?tab=partilha');
-    await screen.findByRole('tab', { name: 'Dados' });
-    expect(screen.queryByRole('tab', { name: 'Partilha' })).not.toBeInTheDocument();
+    await screen.findByRole('tab', { name: 'Identidade' });
+    expect(
+      screen.queryByRole('tab', { name: 'Ligações com outras empresas' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId('painel-codigo')).not.toBeInTheDocument();
     await waitFor(() => expect(nameInput()).toBeInTheDocument());
   });
@@ -211,8 +213,10 @@ describe('QA PR #80: ficha da empresa', () => {
   it('sem a permissão "sharing" não há Partilha nem pelo endereço', async () => {
     state.canViewSharing = false;
     renderAt('/admin/empresas/c1?tab=partilha&sub=quem-ve');
-    await screen.findByRole('tab', { name: 'Dados' });
-    expect(screen.queryByRole('tab', { name: 'Partilha' })).not.toBeInTheDocument();
+    await screen.findByRole('tab', { name: 'Identidade' });
+    expect(
+      screen.queryByRole('tab', { name: 'Ligações com outras empresas' })
+    ).not.toBeInTheDocument();
     expect(screen.queryByTestId('painel-quem-ve')).not.toBeInTheDocument();
   });
 });

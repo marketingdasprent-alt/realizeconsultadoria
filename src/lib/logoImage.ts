@@ -7,7 +7,12 @@ export const LOGO_MAX_SIDE = 512;
 export const LOGO_MAX_INPUT_BYTES = 5 * 1024 * 1024;
 /** O limite do bucket company-logos. */
 export const LOGO_MAX_OUTPUT_BYTES = 1024 * 1024;
-export const LOGO_ACCEPTED_TYPES = ['image/png', 'image/jpeg', 'image/webp', 'image/svg+xml'] as const;
+export const LOGO_ACCEPTED_TYPES = [
+  'image/png',
+  'image/jpeg',
+  'image/webp',
+  'image/svg+xml',
+] as const;
 
 export type LogoErrorCode = 'type' | 'size' | 'decode' | 'encode' | 'too_big';
 

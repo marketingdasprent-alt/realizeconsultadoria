@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useQueryClient } from '@tanstack/react-query';
 import { ArrowLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useToast } from '@/hooks/use-toast';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -12,10 +12,22 @@ import type { CreateCompanyWithAdminInput } from '@/lib/schemas';
 import { companyService, type Company } from '@/modules/admin/services/companyService';
 import { COMPANIES_ACTIVE_KEY } from '../context/CompanyScopeContext';
 import { CompanyForm } from '../components/CompanyForm';
-import { CompanyAdminsSection } from '../components/CompanyAdminsSection';
-import { CompanyEmployeesSection } from '../components/CompanyEmployeesSection';
+import { CompanyHeader } from '../components/company/CompanyHeader';
+import { CompanySaveBar } from '../components/company/CompanySaveBar';
 import { CompanySharing } from '../components/company/CompanySharing';
+import { CompanyTeamSection } from '../components/company/CompanyTeamSection';
+import { LogoField } from '../components/company/LogoField';
+import { useCompanyEmployees } from '../hooks/useCompanyMembership';
+import { useCompanyListFacts } from '../hooks/useCompanyListFacts';
 import { useMyCompanies } from '../hooks/useSharing';
+import {
+  COMPANY_SECTIONS,
+  SECTION_LABEL,
+  sectionOf,
+  tabOfSection,
+  type CompanySection,
+  type TeamTab,
+} from '../lib/companySections';
 import { parseCompanyTab, type CompanyTab } from '../lib/companyTabs';
 import { managesCompany } from '../lib/sharing';
 
@@ -72,6 +84,22 @@ const Page = ({ title, children }: { title: string; children: React.ReactNode })
   );
 };
 
+/** Cabeçalho com os números da empresa (grupo, administradores e colaboradores). */
+const LiveHeader = ({ company, onBack }: { company: Company; onBack: () => void }) => {
+  const { isSuperAdmin } = useAdminPermissions();
+  const facts = useCompanyListFacts([company.id], isSuperAdmin).get(company.id);
+  const employees = useCompanyEmployees(company.id);
+  return (
+    <CompanyHeader
+      company={company}
+      group={facts?.group ?? null}
+      admins={facts?.admins ?? null}
+      employees={employees.data ? employees.data.length : null}
+      onBack={onBack}
+    />
+  );
+};
+
 /**
  * Página completa de uma empresa (em vez de um pop-up): dados da empresa e, em edição, os seus
  * administradores. Sem id é a criação; depois de criar abre a página de edição da empresa nova.
@@ -94,6 +122,9 @@ const CompanyFormPage = () => {
   const myCompanies = useMyCompanies();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [attempt, setAttempt] = useState(0);
+  // Alterações por guardar no formulário (o aviso e a barra) e a chave que o repõe ao descartar.
+  const [dirty, setDirty] = useState(false);
+  const [formKey, setFormKey] = useState(0);
   // Falhou a leitura das empresas da conta: sem dados, ao repetir (botão, rede que volta, outro
   // consumidor da mesma query) o React Query apaga o erro e volta a "a carregar". Fica registado
   // até chegarem dados, para o aviso e o botão não se desmontarem pelo caminho.
@@ -155,6 +186,21 @@ const CompanyFormPage = () => {
       { replace: true }
     );
 
+  const section = sectionOf(tab);
+  const changeSection = (next: string) =>
+    changeTab(tabOfSection(next as CompanySection, tab === 'colaboradores' ? tab : undefined));
+
+  useEffect(() => {
+    if (!dirty) return;
+    const warn = (event: BeforeUnloadEvent) => event.preventDefault();
+    window.addEventListener('beforeunload', warn);
+    return () => window.removeEventListener('beforeunload', warn);
+  }, [dirty]);
+
+  const leave = useCallback(() => {
+    if (dirty && !window.confirm('Tem alterações por guardar. Sair mesmo assim?')) return;
+    navigate(ROUTES.ADMIN.COMPANIES);
+  }, [dirty, navigate]);
   const goToList = useCallback(() => navigate(ROUTES.ADMIN.COMPANIES), [navigate]);
 
   useEffect(() => {
@@ -259,116 +305,128 @@ const CompanyFormPage = () => {
     );
   }
 
-  const dataCard = (
-    <Card className="max-w-4xl shadow-card">
-      <CardHeader>
-        <h2 className="text-lg font-semibold leading-none tracking-tight">Dados da empresa</h2>
-      </CardHeader>
-      <CardContent className="pt-0">
-        {/* A chave faz o formulário nascer de novo por empresa (e vazio em "nova") */}
-        <CompanyForm
-          key={company?.id ?? 'nova'}
-          initialData={company}
-          onSubmit={handleSubmit}
-          onCancel={goToList}
-          isLoading={savingFor === (company?.id ?? 'nova')}
-        />
-      </CardContent>
-    </Card>
+  const FORM_ID = 'company-form';
+  const dataForm = (
+    // A chave faz o formulário nascer de novo por empresa (e vazio em "nova"), e ao descartar
+    <CompanyForm
+      key={`${company?.id ?? 'nova'}:${formKey}`}
+      formId={FORM_ID}
+      hideActions
+      initialData={company}
+      onSubmit={handleSubmit}
+      onCancel={goToList}
+      onDirtyChange={setDirty}
+      isLoading={savingFor === (company?.id ?? 'nova')}
+      logoSlot={
+        company ? (
+          <LogoField
+            company={company}
+            onChanged={logoPath => {
+              setLoaded(prev =>
+                prev?.id === company.id && prev.status === 'ok'
+                  ? { ...prev, company: { ...prev.company, logo_path: logoPath } }
+                  : prev
+              );
+              void queryClient.invalidateQueries({ queryKey: COMPANIES_ACTIVE_KEY });
+            }}
+          />
+        ) : undefined
+      }
+    />
+  );
+  const saveBar = (
+    <CompanySaveBar
+      formId={FORM_ID}
+      isNew={!company}
+      onDataSection={section === 'identidade'}
+      dirty={dirty}
+      saving={savingFor === (company?.id ?? 'nova')}
+      onDiscard={() => (company ? (setFormKey(value => value + 1), setDirty(false)) : goToList())}
+    />
   );
 
-  return (
-    <div className="space-y-4">
-      <div className="flex items-center gap-3">
-        <BackButton onClick={goToList} />
-        <div className="min-w-0">
-          <h1 className="truncate text-[26px] font-extrabold leading-tight tracking-tight">
-            {company ? company.name : 'Nova empresa'}
-          </h1>
-          <p className="text-[14px] text-rz-muted">
-            {company
-              ? 'Dados da empresa e quem a administra.'
-              : 'A empresa nasce com o seu primeiro administrador.'}
-          </p>
-        </div>
+  if (!company) {
+    return (
+      <div className="max-w-4xl space-y-4 pb-24">
+        <CompanyHeader
+          company={null}
+          group={null}
+          admins={null}
+          employees={null}
+          onBack={goToList}
+        />
+        {dataForm}
+        {saveBar}
       </div>
+    );
+  }
 
-      {company ? (
-        <Tabs value={tab} onValueChange={changeTab} className="max-w-4xl">
-          <TabsList className="h-auto flex-wrap">
-            <TabsTrigger value="dados">Dados</TabsTrigger>
-            <TabsTrigger value="administradores">Administradores</TabsTrigger>
-            <TabsTrigger value="colaboradores">Colaboradores</TabsTrigger>
-            {canSeeSharing && <TabsTrigger value="partilha">Partilha</TabsTrigger>}
-          </TabsList>
-          {sharingBlocked && (
-            <div
-              role="alert"
-              className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
-            >
-              {canView('sharing') && myCompanies.data === undefined ? (
-                <>
-                  <span>Não foi possível carregar a Partilha desta empresa.</span>
-                  <Button
-                    type="button"
-                    size="sm"
-                    variant="outline"
-                    // aria-disabled (e não disabled) para o foco do teclado não se perder
-                    aria-disabled={myCompanies.isFetching}
-                    className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
-                    onClick={() => {
-                      if (!myCompanies.isFetching) void myCompanies.refetch();
-                    }}
-                  >
-                    {myCompanies.isFetching ? 'A tentar…' : 'Tentar de novo'}
-                  </Button>
-                </>
-              ) : (
-                <span>Não tem acesso à Partilha desta empresa.</span>
-              )}
-            </div>
-          )}
-          {/* Dados fica montado: mudar de separador não apaga o que ainda não foi guardado */}
-          <TabsContent value="dados" forceMount className="mt-4 data-[state=inactive]:hidden">
-            {dataCard}
-          </TabsContent>
-          <TabsContent value="administradores" className="mt-4">
+  return (
+    <div className="max-w-4xl space-y-4 pb-24">
+      <LiveHeader company={company} onBack={leave} />
+      <Tabs value={section} onValueChange={changeSection}>
+        <TabsList className="h-auto flex-wrap">
+          {COMPANY_SECTIONS.filter(item => item !== 'ligacoes' || canSeeSharing).map(item => (
+            <TabsTrigger key={item} value={item}>
+              {SECTION_LABEL[item]}
+            </TabsTrigger>
+          ))}
+        </TabsList>
+        {sharingBlocked && (
+          <div
+            role="alert"
+            className="mt-4 flex flex-wrap items-center gap-3 rounded-lg border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"
+          >
+            {canView('sharing') && myCompanies.data === undefined ? (
+              <>
+                <span>Não foi possível carregar as ligações desta empresa.</span>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  // aria-disabled (e não disabled) para o foco do teclado não se perder
+                  aria-disabled={myCompanies.isFetching}
+                  className="aria-disabled:pointer-events-none aria-disabled:opacity-50"
+                  onClick={() => {
+                    if (!myCompanies.isFetching) void myCompanies.refetch();
+                  }}
+                >
+                  {myCompanies.isFetching ? 'A tentar…' : 'Tentar de novo'}
+                </Button>
+              </>
+            ) : (
+              <span>Não tem acesso às ligações desta empresa.</span>
+            )}
+          </div>
+        )}
+        {/* Identidade fica montada: mudar de secção não apaga o que ainda não foi guardado */}
+        <TabsContent value="identidade" forceMount className="mt-4 data-[state=inactive]:hidden">
+          {dataForm}
+        </TabsContent>
+        <TabsContent value="equipa" className="mt-4">
+          <CompanyTeamSection
+            company={{ id: company.id, name: company.name, isActive: company.is_active }}
+            tab={(tab === 'colaboradores' ? tab : 'administradores') satisfies TeamTab}
+            onTab={changeTab}
+          />
+        </TabsContent>
+        {canSeeSharing && (
+          <TabsContent value="ligacoes" className="mt-4">
             <Card className="shadow-card">
-              {/* A secção traz o seu próprio título "Administradores" */}
               <CardContent className="pt-6">
-                <CompanyAdminsSection company={{ id: company.id, name: company.name }} />
+                <CompanySharing company={{ id: company.id, name: company.name }} />
               </CardContent>
             </Card>
           </TabsContent>
-          <TabsContent value="colaboradores" className="mt-4">
-            <Card className="shadow-card">
-              {/* A secção traz o seu próprio título "Colaboradores" */}
-              <CardContent className="pt-6">
-                <CompanyEmployeesSection
-                  company={{ id: company.id, name: company.name, isActive: company.is_active }}
-                />
-              </CardContent>
-            </Card>
-          </TabsContent>
-          {canSeeSharing && (
-            <TabsContent value="partilha" className="mt-4">
-              <Card className="shadow-card">
-                <CardContent className="pt-6">
-                  <CompanySharing company={{ id: company.id, name: company.name }} />
-                </CardContent>
-              </Card>
-            </TabsContent>
-          )}
-          {sharingPending && (
-            <div role="status" className="flex justify-center py-10">
-              <Loader2 className="h-6 w-6 animate-spin text-rz-primary" aria-hidden="true" />
-              <span className="sr-only">A carregar…</span>
-            </div>
-          )}
-        </Tabs>
-      ) : (
-        dataCard
-      )}
+        )}
+        {sharingPending && (
+          <div role="status" className="flex justify-center py-10">
+            <Loader2 className="h-6 w-6 animate-spin text-rz-primary" aria-hidden="true" />
+            <span className="sr-only">A carregar…</span>
+          </div>
+        )}
+      </Tabs>
+      {saveBar}
     </div>
   );
 };

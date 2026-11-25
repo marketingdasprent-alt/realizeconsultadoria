@@ -76,6 +76,15 @@ vi.mock('../../components/CompanyEmployeesSection', () => ({
   ),
 }));
 
+// A logo grava por si (fora do formulário): o botão simula a troca e avisa a página.
+vi.mock('../../components/company/LogoField', () => ({
+  LogoField: ({ onChanged }: { onChanged: (logoPath: string | null) => void }) => (
+    <button type="button" onClick={() => onChanged('c1/nova.png')}>
+      simular troca de logo
+    </button>
+  ),
+}));
+
 const COMPANY = {
   id: 'c1',
   name: 'Acme Lda',
@@ -245,6 +254,39 @@ describe('CompanyFormPage — edição', () => {
     await user.click(screen.getByRole('button', { name: 'Descartar' }));
     expect(await screen.findByDisplayValue('Acme Lda')).toBeInTheDocument();
     expect(screen.queryByText(/tem alterações por guardar/i)).not.toBeInTheDocument();
+  });
+
+  it('trocar a logo não apaga o aviso de alterações por guardar nem o que se escreveu', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/empresas/c1');
+    const name = await screen.findByDisplayValue('Acme Lda');
+    fireEvent.change(name, { target: { value: 'Acme Editada' } });
+    expect(await screen.findByText(/tem alterações por guardar/i)).toBeInTheDocument();
+    await user.click(screen.getByRole('button', { name: 'simular troca de logo' }));
+    await waitFor(() => expect(invalidate).toHaveBeenCalledWith(COMPANIES_ACTIVE));
+    expect(screen.getByText(/tem alterações por guardar/i)).toBeInTheDocument();
+    expect(screen.getByDisplayValue('Acme Editada')).toBeInTheDocument();
+  });
+
+  it('Guardar com dados inválidos a partir da Equipa volta à Identidade e mostra o erro', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/empresas/c1?tab=administradores');
+    expect(await screen.findByTestId('admins-section')).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText(/^email \*/i), { target: { value: 'sem-arroba' } });
+    await user.click(await screen.findByRole('button', { name: /guardar alterações/i }));
+    expect(await screen.findByText('Email inválido')).toBeInTheDocument();
+    expect(screen.getByRole('tab', { name: 'Identidade' })).toHaveAttribute('data-state', 'active');
+    expect(update).not.toHaveBeenCalled();
+    await waitFor(() => expect(screen.getByLabelText(/^email \*/i)).toHaveFocus());
+  });
+
+  it('voltar à Equipa abre o último separador escolhido (colaboradores)', async () => {
+    const user = userEvent.setup();
+    renderAt('/admin/empresas/c1?tab=colaboradores');
+    expect(await screen.findByTestId('employees-section')).toBeInTheDocument();
+    await user.click(screen.getByRole('tab', { name: 'Identidade' }));
+    await user.click(screen.getByRole('tab', { name: 'Equipa' }));
+    expect(await screen.findByTestId('employees-section')).toBeInTheDocument();
   });
 
   it('a barra de guardar continua à vista noutra secção quando há alterações', async () => {

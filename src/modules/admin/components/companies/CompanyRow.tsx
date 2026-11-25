@@ -2,7 +2,7 @@ import React from 'react';
 import { Link } from 'react-router-dom';
 import { MoreHorizontal, Trash2 } from 'lucide-react';
 import { CompanyLogo } from '@/components/admin/CompanyLogo';
-import { Badge } from '@/components/ui/badge';
+import { Badge, badgeVariants } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -50,6 +50,18 @@ export const CompanyRow: React.FC<CompanyRowProps> = ({
     <TableRow
       onClick={event => {
         if (!canManage || (event.target as HTMLElement).closest(OWN_ACTION)) return;
+        // Ctrl/Cmd/Shift/Alt+clique, botão do meio ou direito: não são "abrir".
+        if (
+          event.button !== 0 ||
+          event.ctrlKey ||
+          event.metaKey ||
+          event.shiftKey ||
+          event.altKey
+        ) {
+          return;
+        }
+        // Duplo clique (o 2.º clique) e cliques que terminam uma seleção de texto também não.
+        if (event.detail > 1 || window.getSelection()?.toString()) return;
         onOpen(company);
       }}
       className={cn(canManage && 'cursor-pointer focus-within:bg-muted/50')}
@@ -80,15 +92,18 @@ export const CompanyRow: React.FC<CompanyRowProps> = ({
             type="button"
             data-row-action
             onClick={() => onToggleStatus(company)}
-            aria-label={`${company.is_active ? 'Desativar' : 'Ativar'} ${name}`}
+            aria-label={`${company.is_active ? 'Ativa' : 'Desativada'}: ${company.is_active ? 'desativar' : 'ativar'} ${name}`}
             className="rounded-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rz-primary"
           >
-            <Badge
-              variant={company.is_active ? 'default' : 'secondary'}
-              className="cursor-pointer py-0 text-xs transition-opacity hover:opacity-80"
+            {/* span (o Badge é um div, que não pode estar dentro de um botão) com o mesmo aspeto */}
+            <span
+              className={cn(
+                badgeVariants({ variant: company.is_active ? 'default' : 'secondary' }),
+                'cursor-pointer py-0 text-xs transition-opacity hover:opacity-80'
+              )}
             >
               {company.is_active ? 'Ativa' : 'Desativada'}
-            </Badge>
+            </span>
           </button>
         ) : (
           <Badge variant={company.is_active ? 'default' : 'secondary'} className="py-0 text-xs">

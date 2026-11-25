@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Loader2, ShieldAlert } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -38,6 +38,11 @@ export const AddPlatformAdminDialog: React.FC<AddPlatformAdminDialogProps> = ({
   const list = candidates.data ?? [];
   const picked = list.find(item => item.user_id === chosen);
 
+  // Fechar (cancelar, Esc ou depois de adicionar) limpa a escolha: ao reabrir não vem a anterior
+  useEffect(() => {
+    if (!open) setChosen('');
+  }, [open]);
+
   return (
     <Dialog open={open} onOpenChange={next => !next && !busy && onClose()}>
       <DialogContent className="max-w-md">
@@ -76,8 +81,8 @@ export const AddPlatformAdminDialog: React.FC<AddPlatformAdminDialogProps> = ({
               className="flex items-start gap-2 rounded-lg border border-amber-500/40 p-3 text-sm"
             >
               <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden />
-              Ainda não tem o segundo passo. Só terá acesso de super administrador depois de o
-              ativar.
+              Ainda não ativou o segundo passo. Peça-lhe para o ativar nas Definições e tente
+              depois.
             </p>
           )}
         </QueryState>
@@ -88,7 +93,7 @@ export const AddPlatformAdminDialog: React.FC<AddPlatformAdminDialogProps> = ({
           <Button
             type="button"
             variant="gold"
-            disabled={busy || !chosen}
+            disabled={busy || !picked || !picked.mfa_enabled}
             onClick={() => onConfirm(chosen)}
           >
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}

@@ -1,4 +1,5 @@
 import React from 'react';
+import { createPortal } from 'react-dom';
 import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 
@@ -27,7 +28,8 @@ export const CompanySaveBar: React.FC<CompanySaveBarProps> = ({
   onDiscard,
 }) => {
   if (!isNew && !onDataSection && !dirty) return null;
-  return (
+  // No <body>: um antepassado com transform (a animação da página) faria o "fixed" seguir o conteúdo.
+  return createPortal(
     <div
       role="group"
       aria-label="Ações da ficha"
@@ -53,6 +55,7 @@ export const CompanySaveBar: React.FC<CompanySaveBarProps> = ({
           {saving ? 'A guardar…' : isNew ? 'Criar empresa' : 'Guardar alterações'}
         </Button>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };

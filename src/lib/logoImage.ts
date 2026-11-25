@@ -14,7 +14,10 @@ export const LOGO_ACCEPTED_TYPES = [
   'image/svg+xml',
 ] as const;
 
-export type LogoErrorCode = 'type' | 'size' | 'decode' | 'encode' | 'too_big';
+/** Acima disto (largura x altura) a tela gasta memória a mais, mesmo com o ficheiro pequeno. */
+export const LOGO_MAX_INPUT_PIXELS = 40_000_000;
+
+export type LogoErrorCode = 'type' | 'size' | 'pixels' | 'decode' | 'encode' | 'too_big';
 
 export class LogoError extends Error {
   readonly code: LogoErrorCode;
@@ -28,6 +31,7 @@ export class LogoError extends Error {
 const LOGO_ERROR_TEXT: Record<LogoErrorCode, string> = {
   type: 'Use uma imagem PNG, JPG, WebP ou SVG.',
   size: 'A imagem é grande demais. O máximo são 5 MB.',
+  pixels: 'A imagem tem dimensões grandes demais. Experimente uma mais pequena.',
   decode: 'Não foi possível ler esta imagem. Experimente outro ficheiro.',
   encode: 'Não foi possível preparar a imagem. Experimente outro ficheiro.',
   too_big: 'A imagem continua grande demais depois de reduzida. Experimente outro ficheiro.',
@@ -85,6 +89,9 @@ export const prepareLogo = async (file: File): Promise<PreparedLogo> => {
   const invalid = validateLogoFile(file);
   if (invalid) throw invalid;
   const image = await loadImage(file);
+  if (image.naturalWidth * image.naturalHeight > LOGO_MAX_INPUT_PIXELS) {
+    throw new LogoError('pixels');
+  }
   const isSvg = file.type === 'image/svg+xml';
   const { width, height } = fitWithin(image.naturalWidth, image.naturalHeight);
   const canvas = document.createElement('canvas');

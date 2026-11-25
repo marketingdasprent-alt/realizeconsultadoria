@@ -1,9 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   LOGO_MAX_INPUT_BYTES,
   LogoError,
   fitWithin,
   logoErrorText,
+  prepareLogo,
   validateLogoFile,
 } from '../logoImage';
 
@@ -51,6 +52,37 @@ describe('logoErrorText', () => {
   it('traduz o código para português e nunca mostra o código', () => {
     expect(logoErrorText(new LogoError('type'))).toMatch(/PNG, JPG, WebP ou SVG/);
     expect(logoErrorText(new LogoError('size'))).toMatch(/5 MB/);
+    expect(logoErrorText(new LogoError('pixels'))).toMatch(/dimensões grandes demais/);
     expect(logoErrorText(new Error('x'))).toMatch(/Não foi possível ler/);
+  });
+});
+
+describe('prepareLogo — dimensões', () => {
+  afterEach(() => vi.unstubAllGlobals());
+
+  const stubImage = (naturalWidth: number, naturalHeight: number) => {
+    vi.stubGlobal(
+      'Image',
+      class {
+        naturalWidth = naturalWidth;
+        naturalHeight = naturalHeight;
+        onload: (() => void) | null = null;
+        onerror: (() => void) | null = null;
+        set src(_value: string) {
+          queueMicrotask(() => this.onload?.());
+        }
+      }
+    );
+    URL.createObjectURL = vi.fn(() => 'blob:teste');
+    URL.revokeObjectURL = vi.fn();
+  };
+
+  it('recusa uma imagem com mais de 40 milhões de píxeis, sem a desenhar', async () => {
+    stubImage(8000, 5001);
+    const createCanvas = vi.spyOn(document, 'createElement');
+    const file = new File(['x'], 'grande.png', { type: 'image/png' });
+    await expect(prepareLogo(file)).rejects.toMatchObject({ code: 'pixels' });
+    expect(createCanvas).not.toHaveBeenCalledWith('canvas');
+    createCanvas.mockRestore();
   });
 });

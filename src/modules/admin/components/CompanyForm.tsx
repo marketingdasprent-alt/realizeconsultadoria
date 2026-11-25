@@ -1,4 +1,4 @@
-import React, { useEffect, useId } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import {
   useForm,
@@ -27,6 +27,8 @@ interface CompanyFormProps {
   hideActions?: boolean;
   /** Avisa quando há alterações por guardar. */
   onDirtyChange?: (dirty: boolean) => void;
+  /** Chamado quando o envio falha a validação (a página mostra a secção dos campos). */
+  onInvalid?: () => void;
   /** A logo, mostrada no cartão Identidade (só quando a empresa já existe). */
   logoSlot?: React.ReactNode;
   /** Na criação traz também o primeiro administrador e o grupo (campos admin_* e group_*). */
@@ -205,6 +207,7 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({
   formId,
   hideActions,
   onDirtyChange,
+  onInvalid,
   logoSlot,
   onSubmit,
   onCancel,
@@ -214,6 +217,7 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({
     register,
     handleSubmit,
     reset,
+    setFocus,
     formState: { errors, isDirty },
     watch,
     setValue,
@@ -239,24 +243,27 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({
 
   // Quem usa o formulário dá-lhe uma `key` por empresa (ou "nova"), por isso a criação nasce vazia.
   // Aqui só se repõem os valores quando a empresa em edição é atualizada.
+  const appliedValues = useRef('');
   useEffect(() => {
     if (initialData) {
-      // keepDirtyValues: guardar a logo (ou outro dado) atualiza a empresa e não apaga o que se
-      // está a escrever nos campos.
-      reset(
-        {
-          name: initialData.name,
-          nif: initialData.nif,
-          email: initialData.email,
-          phone: initialData.phone || '',
-          address: initialData.address || '',
-          city: initialData.city || '',
-          postal_code: initialData.postal_code || '',
-          notes: initialData.notes || '',
-          is_active: initialData.is_active,
-        },
-        { keepDirtyValues: true }
-      );
+      const values = {
+        name: initialData.name,
+        nif: initialData.nif,
+        email: initialData.email,
+        phone: initialData.phone || '',
+        address: initialData.address || '',
+        city: initialData.city || '',
+        postal_code: initialData.postal_code || '',
+        notes: initialData.notes || '',
+        is_active: initialData.is_active,
+      };
+      // A logo (e outros dados que não são campos do formulário) muda `initialData` sem mudar
+      // estes valores: sem este teste o reset apagava o aviso "Tem alterações por guardar".
+      const serialized = JSON.stringify(values);
+      if (serialized === appliedValues.current) return;
+      appliedValues.current = serialized;
+      // keepDirtyValues: guardar a empresa atualiza os dados e não apaga o que se está a escrever.
+      reset(values, { keepDirtyValues: true });
     }
   }, [initialData, reset]);
 
@@ -266,15 +273,23 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({
 
   return (
     <form
-      onSubmit={handleSubmit(data =>
-        // Em edição só seguem os campos da empresa (os do administrador e do grupo são da criação).
-        initialData
-          ? onSubmit(data)
-          : onSubmit({
-              ...data,
-              group_id: data.group_id === NEW_GROUP ? '' : data.group_id,
-              group_name: data.group_id === NEW_GROUP ? (data.group_name ?? '').trim() : '',
-            })
+      noValidate
+      onSubmit={handleSubmit(
+        data =>
+          // Em edição só seguem os campos da empresa (os do administrador e do grupo são da criação).
+          initialData
+            ? onSubmit(data)
+            : onSubmit({
+                ...data,
+                group_id: data.group_id === NEW_GROUP ? '' : data.group_id,
+                group_name: data.group_id === NEW_GROUP ? (data.group_name ?? '').trim() : '',
+              }),
+        invalid => {
+          onInvalid?.();
+          const first = Object.keys(invalid)[0] as keyof CreateCompanyWithAdminInput | undefined;
+          // Depois de a página mostrar a secção: um campo escondido não recebe o foco
+          if (first) window.setTimeout(() => setFocus(first), 0);
+        }
       )}
       id={formId}
       className="space-y-4"

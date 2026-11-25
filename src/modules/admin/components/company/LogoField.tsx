@@ -16,6 +16,14 @@ import { useToast } from '@/hooks/use-toast';
 import { LOGO_ACCEPTED_TYPES, logoErrorText, prepareLogo } from '@/lib/logoImage';
 import { companyLogoService } from '../../services/companyLogoService';
 
+const RETRY_TEXT = 'Tente outra vez dentro de instantes.';
+
+/** A mensagem do servidor quando existe (os erros do Supabase são objetos simples). */
+const serverMessage = (error: unknown): string => {
+  const message = (error as { message?: unknown } | null)?.message;
+  return typeof message === 'string' && message.trim() ? message.trim() : RETRY_TEXT;
+};
+
 interface LogoFieldProps {
   company: { id: string; name: string; logo_path: string | null };
   /** Chamado com o caminho novo, ou null quando a logo foi retirada. */
@@ -44,7 +52,7 @@ export const LogoField: React.FC<LogoFieldProps> = ({ company, onChanged }) => {
     try {
       const logo = await prepareLogo(file);
       const { data, error } = await companyLogoService.upload(company.id, logo, company.logo_path);
-      if (error || !data) return fail('Tente outra vez dentro de instantes.');
+      if (error || !data) return fail(serverMessage(error));
       onChanged(data);
       toast({ title: 'Logo atualizada' });
     } catch (error) {
@@ -57,12 +65,18 @@ export const LogoField: React.FC<LogoFieldProps> = ({ company, onChanged }) => {
   const remove = async () => {
     if (!company.logo_path || busy) return;
     setBusy(true);
-    const { error } = await companyLogoService.remove(company.id, company.logo_path);
-    setBusy(false);
-    setConfirming(false);
-    if (error) return fail('Tente outra vez dentro de instantes.');
-    onChanged(null);
-    toast({ title: 'Logo retirada' });
+    try {
+      const { error } = await companyLogoService.remove(company.id, company.logo_path);
+      if (error) return fail(serverMessage(error));
+      onChanged(null);
+      toast({ title: 'Logo retirada' });
+    } catch (error) {
+      fail(serverMessage(error));
+    } finally {
+      // Nunca deixa o botão ocupado nem o diálogo preso
+      setBusy(false);
+      setConfirming(false);
+    }
   };
 
   return (

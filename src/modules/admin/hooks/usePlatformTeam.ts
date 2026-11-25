@@ -1,7 +1,7 @@
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { isMfaRequired, sharingErrorText } from '../lib/sharing';
+import { isMfaRequired, isReauthRequired, sharingErrorText } from '../lib/sharing';
 import { superAdminService } from '../services/superAdminService';
 import { useRefreshSharing } from './useSharing';
 
@@ -46,6 +46,15 @@ export const useSuperAdminAction = () => {
       setCodeOpen(true);
     });
 
+  // Se o ecrã sai com o diálogo do código aberto, a promessa pendente não fica à espera para sempre
+  useEffect(
+    () => () => {
+      resolver.current?.(false);
+      resolver.current = null;
+    },
+    []
+  );
+
   const finishCode = useCallback((ok: boolean) => {
     resolver.current?.(ok);
     resolver.current = null;
@@ -66,10 +75,28 @@ export const useSuperAdminAction = () => {
         } catch (error) {
           if (!isMfaRequired(error)) throw error;
           if (!(await askCode())) return false;
-          await action();
+          try {
+            await action();
+          } catch (second) {
+            if (!isReauthRequired(second)) throw second;
+            // Mesmo depois do código a base acha a sessão antiga: outro código não resolve
+            toast({
+              title: 'Não foi possível concluir',
+              description: 'A sua sessão está demasiado antiga. Saia e entre outra vez.',
+              variant: 'destructive',
+            });
+            return false;
+          }
         }
         toast({ title: success });
-        await Promise.all([refetch(), refreshSharing()]);
+        // A ação já resultou: atualizar as listas é à parte e um erro aqui não a desfaz
+        void (async () => {
+          try {
+            await Promise.all([refetch(), refreshSharing()]);
+          } catch {
+            // as listas atualizam-se na próxima leitura
+          }
+        })();
         return true;
       } catch (error) {
         toast({

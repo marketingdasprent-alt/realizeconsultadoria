@@ -75,7 +75,7 @@ const Page = ({ title, children }: { title: string; children: React.ReactNode })
     <div className="space-y-4">
       <div className="flex items-center gap-3">
         <BackButton onClick={() => navigate(ROUTES.ADMIN.COMPANIES)} />
-        <h1 className="text-[26px] font-extrabold leading-tight tracking-tight">{title}</h1>
+        <h1 className="text-[26px] font-bold leading-tight tracking-tight">{title}</h1>
       </div>
       <Card className="shadow-card">
         <CardContent className="py-8 text-center text-muted-foreground">{children}</CardContent>
@@ -187,8 +187,11 @@ const CompanyFormPage = () => {
     );
 
   const section = sectionOf(tab);
+  // A última escolha em Equipa (administradores | colaboradores) abre ao voltar a essa secção
+  const lastTeamTab = useRef<TeamTab>('administradores');
+  if (tab === 'administradores' || tab === 'colaboradores') lastTeamTab.current = tab;
   const changeSection = (next: string) =>
-    changeTab(tabOfSection(next as CompanySection, tab === 'colaboradores' ? tab : undefined));
+    changeTab(tabOfSection(next as CompanySection, lastTeamTab.current));
 
   useEffect(() => {
     if (!dirty) return;
@@ -239,8 +242,15 @@ const CompanyFormPage = () => {
         if (error) throw error;
         // Só atualiza se o utilizador ainda estiver nesta empresa (não apaga a que abriu entretanto)
         if (updated) {
+          // O logo_path vem do estado (a logo pode ter mudado enquanto o guardar corria)
           setLoaded(prev =>
-            prev?.id === company.id ? { id: company.id, status: 'ok', company: updated } : prev
+            prev?.id === company.id && prev.status === 'ok'
+              ? {
+                  id: company.id,
+                  status: 'ok',
+                  company: { ...updated, logo_path: prev.company.logo_path },
+                }
+              : prev
           );
         }
         // A lista de empresas do seletor do admin passa a ter o nome novo
@@ -316,6 +326,7 @@ const CompanyFormPage = () => {
       onSubmit={handleSubmit}
       onCancel={goToList}
       onDirtyChange={setDirty}
+      onInvalid={() => changeSection('identidade')}
       isLoading={savingFor === (company?.id ?? 'nova')}
       logoSlot={
         company ? (

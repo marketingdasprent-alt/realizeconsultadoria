@@ -117,7 +117,7 @@ describe('CompaniesPage', () => {
   it('clicar no estado alterna e não abre a ficha', async () => {
     const user = userEvent.setup();
     renderPage();
-    await user.click(screen.getByRole('button', { name: 'Desativar Acme Lda' }));
+    await user.click(screen.getByRole('button', { name: /desativar Acme Lda/i }));
     await waitFor(() => expect(toggleStatus).toHaveBeenCalledWith('c1', false));
     expect(screen.getByTestId('where')).toHaveTextContent(/^\/admin\/empresas$/);
   });

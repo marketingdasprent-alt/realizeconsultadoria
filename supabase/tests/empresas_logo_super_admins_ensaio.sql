@@ -13,14 +13,15 @@ DO $t$
 DECLARE
   v_ids uuid[] := ARRAY[]::uuid[];
   v_k integer;
-  sa uuid; sb uuid; adA uuid; adB uuid; adC uuid; plain uuid;
+  sa uuid; sb uuid; adA uuid; adB uuid; adC uuid; plain uuid; adBan uuid; adUnc uuid; adNoMfa uuid;
   kA uuid; kB uuid; empA uuid;
   v_nif text := 'ZZ' || substr(upper(md5(gen_random_uuid()::text)), 1, 8);
-  v_names text[] := ARRAY['sa','sb','adA','adB','adC','plain'];
+  v_names text[] := ARRAY['sa','sb','adA','adB','adC','plain','adBan','adUnc','adNoMfa'];
   r record;
   v_i integer := 0;
   v_who uuid;
   v_got text;
+  v_msg text;
   v_claims text;
   v_now bigint := extract(epoch FROM now())::bigint;
   v_rep text := '';
@@ -31,26 +32,35 @@ DECLARE
   empP uuid;
 BEGIN
   SELECT count(*) INTO v_real FROM public.platform_admins WHERE active;
+  -- Função temporária (só existe nesta sessão) para provar o TRUNCATE sem tocar em nada fora da transação.
+  EXECUTE 'CREATE FUNCTION pg_temp.ensaio_truncate() RETURNS text LANGUAGE plpgsql AS $f$ BEGIN TRUNCATE public.platform_admins; RETURN ''ok''; END $f$';
   FOR v_k IN 1 .. array_length(v_names, 1) LOOP
     v_ids := v_ids || gen_random_uuid();
-    INSERT INTO auth.users (id, instance_id, aud, role, email, created_at, updated_at)
+    INSERT INTO auth.users (id, instance_id, aud, role, email, email_confirmed_at, banned_until, created_at, updated_at)
     VALUES (v_ids[v_k], '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated',
-            'zz-emp-' || v_names[v_k] || '@invalid.example', now(), now());
+            'zz-emp-' || v_names[v_k] || '@invalid.example',
+            CASE WHEN v_names[v_k] = 'adUnc' THEN NULL ELSE now() END,
+            CASE WHEN v_names[v_k] = 'adBan' THEN now() + interval '1 day' ELSE NULL END, now(), now());
   END LOOP;
   sa := v_ids[1]; sb := v_ids[2]; adA := v_ids[3]; adB := v_ids[4]; adC := v_ids[5]; plain := v_ids[6];
+  adBan := v_ids[7]; adUnc := v_ids[8]; adNoMfa := v_ids[9];
 
   INSERT INTO public.companies (name, nif, email) VALUES ('ZZ EMP A', v_nif || 'A', 'a@invalid.example') RETURNING id INTO kA;
   INSERT INTO public.companies (name, nif, email) VALUES ('ZZ EMP B', v_nif || 'B', 'b@invalid.example') RETURNING id INTO kB;
   INSERT INTO public.platform_admins (user_id, active, mfa_required) VALUES (sa, true, false), (sb, true, false);
   INSERT INTO public.company_memberships (company_id, user_id, role, origin, status)
   VALUES (kA, adA, 'admin', 'convite', 'ativo'), (kB, adB, 'admin', 'convite', 'ativo'),
-         (kA, adC, 'admin', 'convite', 'ativo');
+         (kA, adC, 'admin', 'convite', 'ativo'), (kA, adBan, 'admin', 'convite', 'ativo'),
+         (kA, adUnc, 'admin', 'convite', 'ativo'), (kA, adNoMfa, 'admin', 'convite', 'ativo');
   INSERT INTO public.user_roles (user_id, role) VALUES (sa, 'admin'), (sb, 'admin'), (adA, 'admin'), (adB, 'admin'), (adC, 'admin');
   INSERT INTO public.employees (name, email, company_id) VALUES ('ZZ Func A', 'zz-func-a@invalid.example', kA) RETURNING id INTO empA;
   INSERT INTO storage.objects (bucket_id, name) VALUES ('company-logos', kA::text || '/seed.webp');
-  -- sb tem o segundo passo (TOTP) verificado; sa não.
+  -- sb tem o segundo passo (TOTP) verificado; sa não. Os candidatos têm-no (exigência para promover), menos adNoMfa.
   INSERT INTO auth.mfa_factors (id, user_id, factor_type, status, created_at, updated_at)
-  VALUES (gen_random_uuid(), sb, 'totp', 'verified', now(), now());
+  VALUES (gen_random_uuid(), sb, 'totp', 'verified', now(), now()),
+         (gen_random_uuid(), adC, 'totp', 'verified', now(), now()),
+         (gen_random_uuid(), adBan, 'totp', 'verified', now(), now()),
+         (gen_random_uuid(), adUnc, 'totp', 'verified', now(), now());
 
   FOR r IN
     SELECT * FROM (VALUES
@@ -137,7 +147,13 @@ BEGIN
       ('operação: remover também exige aal2', 'sa', 'aal1', 'RZ402', 'SELECT public.rz_remove_super_admin(''' || sb || ''')::text'),
       ('operação: só quem já administra uma empresa pode ser promovido', 'sa', 'aal2', '22023', 'SELECT public.rz_add_super_admin(''' || plain || ''')::text'),
       ('operação: argumento nulo recusado', 'sa', 'aal2', '22023', 'SELECT public.rz_add_super_admin(NULL)::text'),
-      ('operação: quem já é super admin não se duplica', 'sa', 'aal2', 'P0001', 'SELECT public.rz_add_super_admin(''' || sb || ''')::text'),
+      ('operação: quem já é super admin não se duplica', 'sa', 'aal2', 'P0001:already_super_admin', 'SELECT public.rz_add_super_admin(''' || sb || ''')::text'),
+      -- ---------------- super admins: elegibilidade de quem se promove
+      ('elegível: conta banida é recusada', 'sa', 'aal2', 'P0001:account_not_eligible', 'SELECT public.rz_add_super_admin(''' || adBan || ''')::text'),
+      ('elegível: email por confirmar é recusado', 'sa', 'aal2', 'P0001:account_not_eligible', 'SELECT public.rz_add_super_admin(''' || adUnc || ''')::text'),
+      ('elegível: sem segundo passo verificado é recusado', 'sa', 'aal2', 'P0001:mfa_not_enabled', 'SELECT public.rz_add_super_admin(''' || adNoMfa || ''')::text'),
+      ('elegível: nada ficou gravado para os recusados', 'pg', 'aal1', '0',
+        'SELECT count(*)::text FROM public.platform_admins WHERE user_id IN (''' || adBan || ''', ''' || adUnc || ''', ''' || adNoMfa || ''')'),
       -- ---------------- super admins: adicionar e retirar
       ('adicionar: super admin promove o admin de A', 'sa', 'aal2', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_add_super_admin(''' || adC || ''')) q'),
       ('adicionar: fica ativo, com MFA obrigatório e quem o adicionou', 'pg', 'aal1', 'true/true/true',
@@ -173,7 +189,31 @@ BEGIN
       ,
       ('identidade: preparação, a conta de colaborador fica ligada ao super admin sb', 'pg', 'aal1', 'ok',
         'WITH i AS (INSERT INTO public.employees (name, email, company_id, user_id, admin_user_id) VALUES (''ZZ Ligado'', ''zz-ligado@invalid.example'', ''' || kA || ''', ''' || plain || ''', ''' || sb || ''') RETURNING 1) SELECT ''ok'' FROM i'),
-      ('identidade: a conta de colaborador ligada ao super admin não o retira', 'plain', 'aal2', '22023', 'SELECT public.rz_remove_super_admin(''' || sb || ''')::text')
+      ('identidade: a conta ligada ao super admin NÃO gere super admins (só vale a conta própria)', 'plain', 'aal2', '42501', 'SELECT public.rz_remove_super_admin(''' || sb || ''')::text'),
+      ('identidade: a conta ligada ao super admin NÃO vê a lista', 'plain', 'aal2', '42501', 'SELECT count(*)::text FROM public.rz_list_super_admins()'),
+      ('identidade: a conta ligada ao super admin NÃO vê os candidatos', 'plain', 'aal2', '42501', 'SELECT count(*)::text FROM public.rz_super_admin_candidates()'),
+      -- ---------------- o trigger de platform_admins vale para qualquer caminho (service_role, SQL direto, cascade)
+      ('trigger: o SQL direto não desativa o último super admin', 'pg', 'aal1', 'P0001:last_super_admin',
+        'WITH u AS (UPDATE public.platform_admins SET active = false WHERE user_id = ''' || sb || ''' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('trigger: o SQL direto não apaga o último super admin', 'pg', 'aal1', 'P0001:last_super_admin',
+        'WITH d AS (DELETE FROM public.platform_admins WHERE user_id = ''' || sb || ''' RETURNING 1) SELECT count(*)::text FROM d'),
+      ('trigger: o SQL direto não muda o user_id do último', 'pg', 'aal1', 'P0001:last_super_admin',
+        'WITH u AS (UPDATE public.platform_admins SET user_id = ''' || plain || ''' WHERE user_id = ''' || sb || ''' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('trigger: TRUNCATE é recusado', 'pg', 'aal1', 'P0001:last_super_admin', 'SELECT pg_temp.ensaio_truncate()'),
+      ('trigger: apagar a conta do último (cascade) é recusado', 'pg', 'aal1', 'P0001:last_super_admin',
+        'WITH d AS (DELETE FROM auth.users WHERE id = ''' || sb || ''' RETURNING 1) SELECT count(*)::text FROM d'),
+      ('trigger: sb continua ativo depois de tudo isto', 'pg', 'aal1', 'true',
+        'SELECT active::text FROM public.platform_admins WHERE user_id = ''' || sb || ''''),
+      ('trigger: reativar não é bloqueado (sa volta)', 'pg', 'aal1', '1',
+        'WITH u AS (UPDATE public.platform_admins SET active = true WHERE user_id = ''' || sa || ''' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('trigger: com outro utilizável, desativar passa', 'pg', 'aal1', '1',
+        'WITH u AS (UPDATE public.platform_admins SET active = false WHERE user_id = ''' || sa || ''' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('trigger: preparação, sa volta e sb é banido', 'pg', 'aal1', 'ok',
+        'WITH u AS (UPDATE public.platform_admins SET active = true WHERE user_id = ''' || sa || ''' RETURNING 1), b AS (UPDATE auth.users SET banned_until = now() + interval ''1 day'' WHERE id = ''' || sb || ''' RETURNING 1) SELECT ''ok'' FROM u, b'),
+      ('trigger: com o outro banido, desativar o único utilizável é recusado', 'pg', 'aal1', 'P0001:last_super_admin',
+        'WITH u AS (UPDATE public.platform_admins SET active = false WHERE user_id = ''' || sa || ''' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('RPC: um super admin banido não retira o único utilizável (os banidos não contam)', 'sb', 'aal2', 'P0001:last_super_admin',
+        'SELECT public.rz_remove_super_admin(''' || sa || ''')::text')
     ) AS t(nm, who, variant, expect, sql)
   LOOP
     v_i := v_i + 1;
@@ -198,9 +238,12 @@ BEGIN
       EXECUTE 'RESET ROLE';
     EXCEPTION WHEN OTHERS THEN
       v_got := SQLSTATE;
+      v_msg := SQLSTATE || ':' || SQLERRM;
       EXECUTE 'RESET ROLE';
     END;
-    v_ok := (v_got = r.expect) OR (r.expect = '*ERR' AND v_got ~ '^[0-9A-Z]{5}$');
+    -- Esperado: o SQLSTATE ('42501') ou, para distinguir erros com o mesmo código, 'SQLSTATE:mensagem'.
+    v_ok := (v_got = r.expect) OR (v_msg = r.expect) OR (r.expect = '*ERR' AND v_got ~ '^[0-9A-Z]{5}$');
+    v_msg := NULL;
     IF v_ok THEN
       v_pass := v_pass + 1;
       v_rep := v_rep || 'OK    ' || v_i || ' ' || r.nm || E'\n';

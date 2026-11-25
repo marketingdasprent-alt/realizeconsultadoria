@@ -13,7 +13,14 @@ DROP FUNCTION IF EXISTS public.rz_add_super_admin(uuid);
 DROP FUNCTION IF EXISTS public.rz_super_admin_candidates();
 DROP FUNCTION IF EXISTS public.rz_list_super_admins();
 DROP FUNCTION IF EXISTS public.rz_super_admin_assert();
+DROP FUNCTION IF EXISTS public.rz_super_admin_direct();
 DROP FUNCTION IF EXISTS public.rz_person_name(uuid);
+
+-- O trigger que impede a plataforma de ficar sem super admin sai com a migração.
+DROP TRIGGER IF EXISTS rz_platform_admins_guard_truncate ON public.platform_admins;
+DROP TRIGGER IF EXISTS rz_platform_admins_guard_row ON public.platform_admins;
+DROP FUNCTION IF EXISTS public.rz_platform_admins_guard();
+DROP FUNCTION IF EXISTS public.rz_other_usable_super_admins(uuid);
 
 -- O CHECK da auditoria fica alargado (as ações 'super_admin_add'/'super_admin_remove' já gravadas não se
 -- apagam: a auditoria é imutável) e é inofensivo.

@@ -11,8 +11,13 @@ DECLARE
 BEGIN
   SELECT count(*) INTO v_n FROM pg_proc p JOIN pg_namespace n ON n.oid = p.pronamespace
    WHERE n.nspname = 'public' AND p.proname IN ('rz_list_super_admins', 'rz_super_admin_candidates',
-     'rz_add_super_admin', 'rz_remove_super_admin', 'rz_super_admin_assert', 'rz_person_name', 'rz_can_write_logo');
+     'rz_add_super_admin', 'rz_remove_super_admin', 'rz_super_admin_assert', 'rz_super_admin_direct',
+     'rz_other_usable_super_admins', 'rz_platform_admins_guard', 'rz_person_name', 'rz_can_write_logo');
   v_rep := v_rep || CASE WHEN v_n = 0 THEN 'OK    ' ELSE 'FALHA ' END || 'funções removidas (restam ' || v_n || E')\n';
+  v_fail := v_fail + (v_n <> 0)::int;
+  SELECT count(*) INTO v_n FROM pg_trigger WHERE tgrelid = 'public.platform_admins'::regclass AND tgname LIKE 'rz_platform_admins_guard%';
+  v_rep := v_rep || CASE WHEN v_n = 0 THEN 'OK    ' ELSE 'FALHA ' END || 'triggers de platform_admins removidos (restam ' || v_n || E')
+';
   v_fail := v_fail + (v_n <> 0)::int;
   SELECT count(*) INTO v_n FROM pg_policies WHERE schemaname = 'storage' AND tablename = 'objects' AND policyname LIKE 'Logos:%';
   v_rep := v_rep || CASE WHEN v_n = 0 THEN 'OK    ' ELSE 'FALHA ' END || 'políticas do storage removidas (restam ' || v_n || E')\n';

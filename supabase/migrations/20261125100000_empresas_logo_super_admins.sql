@@ -85,15 +85,62 @@ CREATE POLICY "Logos: apagar" ON storage.objects
   USING (bucket_id = 'company-logos' AND public.rz_can_write_logo(name));
 
 -- ============================================================================================ 2. Super admins
--- Falha depressa em vez de bloquear a auditoria se houver uma transação a usá-la.
-SET LOCAL lock_timeout = '5s';
+-- NOT VALID + VALIDATE: o CHECK entra sem varrer a tabela sob lock exclusivo; a validação corre depois com um lock leve.
 ALTER TABLE public.cross_company_audit DROP CONSTRAINT IF EXISTS cross_company_audit_action_check;
 ALTER TABLE public.cross_company_audit ADD CONSTRAINT cross_company_audit_action_check
   CHECK ((action = ANY (ARRAY['read'::text, 'write'::text, 'delete'::text, 'export'::text, 'reveal'::text,
     'support_read'::text, 'support_grant'::text, 'support_revoke'::text, 'share_request'::text,
     'share_approve'::text, 'share_revoke'::text, 'flag_change'::text, 'super_admin_access'::text,
     'group_create'::text, 'group_update'::text, 'group_members'::text, 'group_capabilities'::text,
-    'group_dissolve'::text, 'super_admin_add'::text, 'super_admin_remove'::text])));
+    'group_dissolve'::text, 'super_admin_add'::text, 'super_admin_remove'::text]))) NOT VALID;
+ALTER TABLE public.cross_company_audit VALIDATE CONSTRAINT cross_company_audit_action_check;
+
+-- Quantos super admins ATIVOS E UTILIZÁVEIS há, sem contar p_except (conta apagada ou banida não conta).
+CREATE OR REPLACE FUNCTION public.rz_other_usable_super_admins(p_except uuid)
+ RETURNS integer
+ LANGUAGE sql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT count(*)::integer
+  FROM public.platform_admins pa
+  JOIN auth.users u ON u.id = pa.user_id
+  WHERE pa.active AND pa.user_id IS DISTINCT FROM p_except
+    AND u.deleted_at IS NULL AND (u.banned_until IS NULL OR u.banned_until <= now());
+$function$;
+REVOKE ALL ON FUNCTION public.rz_other_usable_super_admins(uuid) FROM PUBLIC, anon, authenticated;
+
+-- A plataforma nunca fica sem super admin utilizável, por NENHUM caminho (RPC, SQL direto, service_role, conta
+-- apagada em auth.users, TRUNCATE): o trigger vale para todos. O advisory lock serializa as retiradas em paralelo.
+CREATE OR REPLACE FUNCTION public.rz_platform_admins_guard()
+ RETURNS trigger
+ LANGUAGE plpgsql
+ SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF TG_OP = 'TRUNCATE' THEN
+    PERFORM public.rz_fail('last_super_admin', 'Não se pode esvaziar a lista de super administradores.');
+  END IF;
+  IF OLD.active AND (TG_OP = 'DELETE' OR NEW.active IS NOT TRUE OR NEW.user_id IS DISTINCT FROM OLD.user_id) THEN
+    PERFORM pg_advisory_xact_lock(hashtext('rz_super_admins'));
+    IF public.rz_other_usable_super_admins(OLD.user_id) < 1 THEN
+      PERFORM public.rz_fail('last_super_admin', 'A plataforma tem de ter pelo menos um super administrador.');
+    END IF;
+  END IF;
+  RETURN CASE WHEN TG_OP = 'DELETE' THEN OLD ELSE NEW END;
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.rz_platform_admins_guard() FROM PUBLIC, anon, authenticated;
+
+DROP TRIGGER IF EXISTS rz_platform_admins_guard_row ON public.platform_admins;
+CREATE TRIGGER rz_platform_admins_guard_row
+  BEFORE UPDATE OF active, user_id OR DELETE ON public.platform_admins
+  FOR EACH ROW EXECUTE FUNCTION public.rz_platform_admins_guard();
+DROP TRIGGER IF EXISTS rz_platform_admins_guard_truncate ON public.platform_admins;
+CREATE TRIGGER rz_platform_admins_guard_truncate
+  BEFORE TRUNCATE ON public.platform_admins
+  FOR EACH STATEMENT EXECUTE FUNCTION public.rz_platform_admins_guard();
 
 -- Nome a mostrar de uma conta (ficha de colaborador, nome do registo ou início do email).
 CREATE OR REPLACE FUNCTION public.rz_person_name(p_user uuid)
@@ -113,6 +160,24 @@ AS $function$
 $function$;
 REVOKE ALL ON FUNCTION public.rz_person_name(uuid) FROM PUBLIC, anon, authenticated;
 
+-- Super admin PELA PRÓPRIA CONTA: quem herda o poder por uma ficha de colaborador ligada (rz_identity_ids) não
+-- vê nem gere super admins. A sessão tem de passar também por rz_is_super_admin() (que aplica o mfa_required).
+CREATE OR REPLACE FUNCTION public.rz_super_admin_direct()
+ RETURNS uuid
+ LANGUAGE plpgsql
+ STABLE SECURITY DEFINER
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+BEGIN
+  IF auth.uid() IS NULL OR NOT public.rz_is_super_admin()
+     OR NOT EXISTS (SELECT 1 FROM public.platform_admins pa WHERE pa.user_id = auth.uid() AND pa.active) THEN
+    PERFORM public.rz_fail('not_platform_admin');
+  END IF;
+  RETURN auth.uid();
+END;
+$function$;
+REVOKE ALL ON FUNCTION public.rz_super_admin_direct() FROM PUBLIC, anon, authenticated;
+
 -- Quem gere super admins: super admin, com MFA (aal2) e confirmação recente.
 CREATE OR REPLACE FUNCTION public.rz_super_admin_assert()
  RETURNS uuid
@@ -121,11 +186,10 @@ CREATE OR REPLACE FUNCTION public.rz_super_admin_assert()
  SET search_path TO 'public', 'pg_temp'
 AS $function$
 DECLARE
-  v_user uuid := public.rz_uid();
+  v_user uuid;
 BEGIN
-  IF NOT public.rz_is_super_admin() THEN
-    PERFORM public.rz_fail('not_platform_admin');
-  END IF;
+  PERFORM public.rz_super_admin_direct();
+  v_user := public.rz_uid();
   IF coalesce(auth.jwt() ->> 'aal', '') <> 'aal2' THEN
     RAISE EXCEPTION 'mfa_required' USING ERRCODE = 'RZ402',
       DETAIL = 'Confirme com o código da autenticação em dois passos.';
@@ -136,6 +200,7 @@ END;
 $function$;
 REVOKE ALL ON FUNCTION public.rz_super_admin_assert() FROM PUBLIC, anon, authenticated;
 
+DROP FUNCTION IF EXISTS public.rz_list_super_admins();
 CREATE OR REPLACE FUNCTION public.rz_list_super_admins()
  RETURNS TABLE(user_id uuid, name text, email text, since timestamp with time zone, mfa_enabled boolean,
                added_by_name text, is_self boolean)
@@ -144,9 +209,7 @@ CREATE OR REPLACE FUNCTION public.rz_list_super_admins()
  SET search_path TO 'public', 'pg_temp'
 AS $function$
 BEGIN
-  IF NOT public.rz_is_super_admin() THEN
-    PERFORM public.rz_fail('not_platform_admin');
-  END IF;
+  PERFORM public.rz_super_admin_direct();
   RETURN QUERY
   SELECT pa.user_id,
          public.rz_person_name(pa.user_id),
@@ -163,6 +226,7 @@ END;
 $function$;
 
 -- Candidatos: quem já administra alguma empresa e ainda não é super admin.
+DROP FUNCTION IF EXISTS public.rz_super_admin_candidates();
 CREATE OR REPLACE FUNCTION public.rz_super_admin_candidates()
  RETURNS TABLE(user_id uuid, name text, email text, companies text, mfa_enabled boolean)
  LANGUAGE plpgsql
@@ -170,9 +234,7 @@ CREATE OR REPLACE FUNCTION public.rz_super_admin_candidates()
  SET search_path TO 'public', 'pg_temp'
 AS $function$
 BEGIN
-  IF NOT public.rz_is_super_admin() THEN
-    PERFORM public.rz_fail('not_platform_admin');
-  END IF;
+  PERFORM public.rz_super_admin_direct();
   RETURN QUERY
   SELECT cm.user_id, public.rz_person_name(cm.user_id), u.email::text,
          string_agg(c.name, ', ' ORDER BY c.name),
@@ -210,6 +272,18 @@ BEGIN
                   WHERE cm.user_id = p_user AND cm.role = 'admin' AND cm.status = 'ativo') THEN
     PERFORM public.rz_fail('invalid_argument', 'Só se pode promover quem já administra uma empresa.');
   END IF;
+  -- A conta tem de existir, estar confirmada e ativa, e não ser de correio nem anónima.
+  IF NOT EXISTS (SELECT 1 FROM auth.users u
+                  WHERE u.id = p_user AND u.email_confirmed_at IS NOT NULL AND u.deleted_at IS NULL
+                    AND (u.banned_until IS NULL OR u.banned_until <= now())
+                    AND coalesce(u.is_anonymous, false) = false
+                    AND coalesce(u.raw_app_meta_data ->> 'mail_only', '') <> 'true') THEN
+    PERFORM public.rz_fail('account_not_eligible', 'Esta conta não está confirmada ou está bloqueada.');
+  END IF;
+  -- Sem segundo passo verificado a conta nunca chegaria a aal2: ficaria super admin sem poder usá-lo.
+  IF NOT EXISTS (SELECT 1 FROM auth.mfa_factors f WHERE f.user_id = p_user AND f.status = 'verified') THEN
+    PERFORM public.rz_fail('mfa_not_enabled', 'Esta pessoa ainda não ativou o segundo passo (autenticador).');
+  END IF;
   INSERT INTO public.platform_admins (user_id, active, mfa_required, created_by, created_at)
   VALUES (p_user, true, true, v_actor, now())
   ON CONFLICT (user_id) DO UPDATE
@@ -242,8 +316,8 @@ BEGIN
   IF NOT FOUND THEN
     PERFORM public.rz_fail('not_found', 'Esta pessoa não é super administradora.');
   END IF;
-  IF (SELECT count(*) FROM public.platform_admins pa
-       WHERE pa.active AND pa.user_id <> p_user) < 1 THEN
+  -- O trigger de platform_admins repete esta regra para qualquer caminho; aqui dá-se a mensagem certa.
+  IF public.rz_other_usable_super_admins(p_user) < 1 THEN
     PERFORM public.rz_fail('last_super_admin', 'A plataforma tem de ter pelo menos um super administrador.');
   END IF;
   UPDATE public.platform_admins SET active = false WHERE user_id = p_user;

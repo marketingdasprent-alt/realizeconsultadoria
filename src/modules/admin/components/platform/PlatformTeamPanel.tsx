@@ -16,6 +16,7 @@ import { QueryState } from '../sharing/QueryState';
 import { useSuperAdminAction, useSuperAdmins } from '../../hooks/usePlatformTeam';
 import { superAdminService, type SuperAdmin } from '../../services/superAdminService';
 import { ReauthDialog } from '../sharing/ReauthDialog';
+import { MfaConfirmDialog } from './MfaConfirmDialog';
 import { AddPlatformAdminDialog } from './AddPlatformAdminDialog';
 
 const sinceText = (iso: string) =>
@@ -103,8 +104,9 @@ export const PlatformTeamPanel: React.FC = () => {
       <ReauthDialog
         open={action.reauthOpen}
         onDone={action.finishReauth}
-        description="Alterar quem é super administrador exige um login recente. Por segurança, confirme que é você."
+        description="Alterar quem é super administrador exige um início de sessão recente. Por segurança, confirme que é você."
       />
+      <MfaConfirmDialog open={action.codeOpen} onDone={action.finishCode} />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="platform-team" className="text-lg font-semibold">

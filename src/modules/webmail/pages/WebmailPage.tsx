@@ -63,6 +63,18 @@ import { providerOf, type MailProvider } from '../lib/providers';
 import type { ComposeDraft, MailAccount, MailFolder, MailSummary } from '../types';
 
 /** Webmail (briefing §9): caixas ligadas, caixa unificada, ler, escrever e organizar. */
+/** Mais do que isto, as barras em baixo já não cabem num ecrã normal. */
+const MAX_COMPOSERS = 5;
+
+interface OpenComposer {
+  key: string;
+  draft: ComposeDraft;
+  minimized: boolean;
+}
+
+let composerSeq = 0;
+const newComposerKey = () => `m${Date.now().toString(36)}-${++composerSeq}`;
+
 const WebmailPage: React.FC = () => {
   const mail = useMailAccounts();
   const prefetch = usePrefetchMessage();
@@ -82,29 +94,42 @@ const WebmailPage: React.FC = () => {
   const [solo] = useState(isReaderWindow);
   const [soloTried, setSoloTried] = useState(false);
   const soloOpened = useRef(false);
-  // Uma mensagem que ficou a meio ao sair do Email volta, minimizada.
-  const [draft, setDraftState] = useState<ComposeDraft | null>(() => composeSession.get());
-  const [composerMinimized, setComposerMinimized] = useState(() => !!composeSession.get());
-  useEffect(() => {
-    if (!draft) composeSession.set(null);
-  }, [draft]);
-  // Com uma mensagem já aberta (ou minimizada) não se abre outra por cima: volta-se a ela.
-  const setDraft = (next: ComposeDraft | null) => {
-    if (next && draft) {
-      setComposerMinimized(false);
+  // Várias mensagens abertas ao mesmo tempo, como no Gmail e no Outlook: uma grande à frente e
+  // as outras em barras no fundo do ecrã (cada uma pode ir para a sua janela do navegador).
+  // As que ficaram a meio ao sair do Email voltam, minimizadas.
+  const [composers, setComposers] = useState<OpenComposer[]>(() =>
+    composeSession.all().map(([key, draft]) => ({ key, draft, minimized: true }))
+  );
+  const composersRef = useRef(composers);
+  composersRef.current = composers;
+  /** Abre uma mensagem nova à frente; as que estavam abertas ficam em barras em baixo. */
+  const openComposer = (next: ComposeDraft) => {
+    if (composersRef.current.length >= MAX_COMPOSERS) {
       toast({
-        title: 'Já tem uma mensagem aberta',
-        description: 'Envie-a ou descarte-a primeiro.',
+        title: `Já tem ${MAX_COMPOSERS} mensagens abertas`,
+        description: 'Envie ou feche uma delas para abrir outra.',
       });
       return;
     }
-    setComposerMinimized(false);
-    setDraftState(next);
+    setComposers(list => [
+      ...list.map(item => ({ ...item, minimized: true })),
+      { key: newComposerKey(), draft: next, minimized: false },
+    ]);
   };
-  // Anulado ou falhou: o email volta a abrir — mas nunca por cima de outro que se esteja a
-  // escrever (fica à espera) nem perdido se a pessoa já saiu do Email (fica na sessão).
-  const draftRef = useRef(draft);
-  draftRef.current = draft;
+  const setDraft = (next: ComposeDraft) => openComposer(next);
+  const closeComposer = (key: string) => {
+    composeSession.set(key, null);
+    setComposers(list => list.filter(item => item.key !== key));
+  };
+  const minimizeComposer = (key: string) =>
+    setComposers(list =>
+      list.map(item => (item.key === key ? { ...item, minimized: true } : item))
+    );
+  /** Põe esta à frente; a que estava grande passa a barra. */
+  const restoreComposer = (key: string) =>
+    setComposers(list => list.map(item => ({ ...item, minimized: item.key !== key })));
+  // Anulado ou falhou: o email volta a abrir à frente, sem fechar os outros — nem perdido se a
+  // pessoa já saiu do Email (fica na sessão).
   const mountedRef = useRef(true);
   // Conta com que esta página abriu: um envio que falha tarde, já noutra conta, não devolve o
   // rascunho da anterior à sessão.
@@ -115,28 +140,16 @@ const WebmailPage: React.FC = () => {
       mountedRef.current = false;
     };
   }, []);
-  const waiting = useRef<ComposeDraft[]>([]);
   const reopen = (back: ComposeDraft) => {
     if (!mountedRef.current) {
-      if (!composeSession.get() && epochRef.current === sessionEpoch()) composeSession.set(back);
+      if (epochRef.current === sessionEpoch()) composeSession.set(newComposerKey(), back);
       return;
     }
-    if (draftRef.current) {
-      waiting.current.push(back);
-      toast({
-        title: 'O email voltou para trás',
-        description: 'Abre outra vez quando fechar a mensagem que está a escrever.',
-      });
-      return;
-    }
-    setComposerMinimized(false);
-    setDraftState(back);
+    setComposers(list => [
+      ...list.map(item => ({ ...item, minimized: true })),
+      { key: newComposerKey(), draft: back, minimized: false },
+    ]);
   };
-  useEffect(() => {
-    if (draft || !waiting.current.length) return;
-    const next = waiting.current.shift();
-    if (next) setDraftState(next);
-  }, [draft]);
   const [connect, setConnect] = useState<MailProvider | null>(null);
   const [settings, setSettings] = useState<MailAccount | null>(null);
   const [conversion, setConversion] = useState<MailConversion | null>(null);
@@ -735,30 +748,50 @@ const WebmailPage: React.FC = () => {
           return result.error;
         }}
       />
-      <MailComposer
-        draft={draft}
-        accounts={accounts}
-        contacts={people.contacts}
-        lists={people.lists}
-        onClose={() => setDraft(null)}
-        minimized={composerMinimized}
-        onMinimize={() => setComposerMinimized(true)}
-        onRestore={() => setComposerMinimized(false)}
-        onSend={async (input, asItWas) => {
-          const result = await actions.send(input);
-          // Anulou nos 10 s: o email volta a abrir exatamente como estava (com os anexos)
-          if (result === 'undone') {
-            reopen(asItWas);
-            return false;
-          }
-          const ok = result;
-          // Falhou: o email volta a abrir exatamente como estava (texto, citação, assinatura
-          // escolhida e anexos), como no "Anular" — antes reabria sem assinatura e sem anexos.
-          if (!ok) reopen({ ...asItWas, restored: true });
-          return ok;
-        }}
-        toBase64={actions.toBase64}
-      />
+      {composers.map(item => {
+        // Lugar da barra em baixo: só contam as que estão minimizadas, pela ordem de abertura.
+        const dockIndex = composers.filter(other => other.minimized).indexOf(item);
+        return (
+          <MailComposer
+            key={item.key}
+            sessionKey={item.key}
+            dockIndex={Math.max(0, dockIndex)}
+            othersOpen={composers.length > 1}
+            otherMessages={composers
+              .filter(other => other.key !== item.key)
+              .map(other => ({
+                key: other.key,
+                // O assunto como está agora (a mensagem guarda-se na sessão a cada alteração)
+                title:
+                  (composeSession.get(other.key)?.subject ?? other.draft.subject ?? '').trim() ||
+                  'Nova mensagem',
+              }))}
+            onSwitchTo={restoreComposer}
+            draft={item.draft}
+            accounts={accounts}
+            contacts={people.contacts}
+            lists={people.lists}
+            onClose={() => closeComposer(item.key)}
+            minimized={item.minimized}
+            onMinimize={() => minimizeComposer(item.key)}
+            onRestore={() => restoreComposer(item.key)}
+            onSend={async (input, asItWas) => {
+              const result = await actions.send(input);
+              // Anulou nos 10 s: o email volta a abrir exatamente como estava (com os anexos)
+              if (result === 'undone') {
+                reopen(asItWas);
+                return false;
+              }
+              const ok = result;
+              // Falhou: o email volta a abrir exatamente como estava (texto, citação, assinatura
+              // escolhida e anexos), como no "Anular" — antes reabria sem assinatura e sem anexos.
+              if (!ok) reopen({ ...asItWas, restored: true });
+              return ok;
+            }}
+            toBase64={actions.toBase64}
+          />
+        );
+      })}
       <ContactListsDialog
         open={listsOpen}
         onClose={() => setListsOpen(false)}

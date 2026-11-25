@@ -64,7 +64,31 @@ interface MailComposerProps {
   /** `asItWas`: o email como estava, para reabrir se o envio for anulado. */
   onSend: (input: ComposeInput, asItWas: ComposeDraft) => Promise<boolean>;
   toBase64: (file: File) => Promise<string>;
+  /** Chave desta mensagem (há várias abertas ao mesmo tempo, como no Gmail). */
+  sessionKey?: string;
+  /** Lugar da barra minimizada em baixo (0 = a mais à direita), para não ficarem umas por cima das outras. */
+  dockIndex?: number;
+  /**
+   * Há outras mensagens abertas (em barras em baixo): a janela grande não prende a página,
+   * para se poder clicar numa barra e passar para outra mensagem, como no Gmail.
+   */
+  othersOpen?: boolean;
+  /**
+   * As outras mensagens abertas: aparecem no topo da janela grande, para passar para elas também
+   * com o teclado (o Tab fica dentro da janela e não chega às barras em baixo).
+   */
+  otherMessages?: { key: string; title: string }[];
+  onSwitchTo?: (key: string) => void;
 }
+
+/** Largura de cada barra minimizada e o espaço entre elas. */
+const DOCK_SLOT = 332;
+
+/** Barras minimizadas lado a lado no fundo do ecrã; num ecrã estreito ficam umas por cima das outras. */
+const dockStyle = (index: number): React.CSSProperties =>
+  typeof window !== 'undefined' && window.innerWidth < 720
+    ? { right: 16, bottom: index * 48 }
+    : { right: 16 + index * DOCK_SLOT, bottom: 0 };
 
 /** Linha dos destinatários: não é <label> (as etiquetas têm botões lá dentro). */
 const RecipientRow: React.FC<{ label: string; children: React.ReactNode }> = ({
@@ -98,6 +122,11 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   onRestore,
   onSend,
   toBase64,
+  sessionKey = 'mensagem',
+  dockIndex = 0,
+  othersOpen = false,
+  otherMessages = [],
+  onSwitchTo,
 }) => {
   const { colleagues } = useDirectory();
   // App de email para clientes de fora: sem o "Usar IA" (é da Realize)
@@ -113,6 +142,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   const popout = useWindowPopout(!!draft, () => {
     setPopped(false);
     win.undock();
+    // Volta grande para a página (as outras mensagens abertas minimizam-se).
+    onRestore?.();
   });
   useEffect(() => {
     if (!draft) setPopped(false);
@@ -270,7 +301,7 @@ export const MailComposer: React.FC<MailComposerProps> = ({
     setFields(f => ({ ...f, body: result.text, subject: result.subject }));
     if (minimizedRef.current)
       toast({ title: 'A IA terminou o email', description: 'Abra a mensagem para rever.' });
-  });
+  }, sessionKey);
   const size = files.reduce((total, file) => total + file.size, 0);
   const remoteItems = remote?.items ?? [];
   const remoteSize = remoteItems.reduce((total, item) => total + item.size, 0);
@@ -360,8 +391,8 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   useEffect(() => {
     if (!draft) return;
     // Ainda sem nada escrito: não vale a pena reabrir.
-    if (!hasContent) return composeSession.set(null);
-    composeSession.set({
+    if (!hasContent) return composeSession.set(sessionKey, null);
+    composeSession.set(sessionKey, {
       ...draft,
       accountId: accountId || draft.accountId,
       to: fields.to,
@@ -493,8 +524,11 @@ export const MailComposer: React.FC<MailComposerProps> = ({
 
   const openPopout = (at?: { left: number; top: number }) => {
     void saver.flush();
-    if (popout.open(at)) setPopped(true);
-    else
+    if (popout.open(at)) {
+      setPopped(true);
+      // Noutra janela, a mensagem passa a ser uma barra em baixo: dá lugar às outras.
+      onMinimize?.();
+    } else
       toast({
         title: 'O navegador bloqueou a janela nova',
         description: 'Permita janelas pop-up para este site, ou use o botão "Abrir noutra janela".',
@@ -577,6 +611,26 @@ export const MailComposer: React.FC<MailComposerProps> = ({
           >
             <DialogTitle className="px-5 pb-3 pt-5 text-[18px] font-extrabold">{title}</DialogTitle>
           </div>
+          {otherMessages.length > 0 && onSwitchTo && (
+            <nav
+              aria-label="Outras mensagens abertas"
+              className="-mt-1 flex flex-wrap items-center gap-1.5 px-5 pb-3 text-[12.5px]"
+            >
+              <span className="font-semibold text-rz-muted">Outras abertas:</span>
+              {otherMessages.map(other => (
+                <button
+                  key={other.key}
+                  type="button"
+                  onClick={() => onSwitchTo(other.key)}
+                  aria-label={`Passar para a mensagem «${other.title}»`}
+                  className="max-w-[14rem] truncate rounded-full bg-rz-canvas px-3 py-1 font-semibold text-rz-ink hover:bg-rz-primary-soft focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rz-primary/40"
+                  title={`Passar para «${other.title}»`}
+                >
+                  {other.title}
+                </button>
+              ))}
+            </nav>
+          )}
         </>
       )}
       <Row label="De">
@@ -866,7 +920,10 @@ export const MailComposer: React.FC<MailComposerProps> = ({
   return (
     <>
       {draft && minimized && !popped && (
-        <div className="fixed bottom-0 right-4 z-50 flex w-[min(320px,calc(100vw-2rem))] items-center gap-1 rounded-t-2xl bg-rz-ink px-4 py-2.5 text-white shadow-rz-pop">
+        <div
+          style={dockStyle(dockIndex)}
+          className="fixed z-[60] flex w-[min(320px,calc(100vw-2rem))] items-center gap-1 rounded-t-2xl bg-rz-ink px-4 py-2.5 text-white shadow-rz-pop"
+        >
           <button
             type="button"
             onClick={onRestore}
@@ -895,7 +952,10 @@ export const MailComposer: React.FC<MailComposerProps> = ({
         </div>
       )}
       {draft && popped && (
-        <div className="fixed bottom-0 right-4 z-50 flex w-[min(360px,calc(100vw-2rem))] items-center gap-2 rounded-t-2xl bg-rz-ink px-4 py-2.5 text-white shadow-rz-pop">
+        <div
+          style={dockStyle(dockIndex)}
+          className="fixed z-[60] flex w-[min(320px,calc(100vw-2rem))] items-center gap-2 rounded-t-2xl bg-rz-ink px-4 py-2.5 text-white shadow-rz-pop"
+        >
           <span className="min-w-0 flex-1 truncate text-[14px] font-bold">
             {fields.subject.trim() || title} (noutra janela)
           </span>
@@ -925,14 +985,19 @@ export const MailComposer: React.FC<MailComposerProps> = ({
         )}
       <Dialog
         open={!!draft && !minimized && !popped}
-        modal={!win.floating}
+        modal={!win.floating && !othersOpen}
         onOpenChange={open => !open && void close()}
       >
         <DialogContent
           onInteractOutside={event => event.preventDefault()}
           // Solta, a janela convive com a página: só o Esc de dentro dela a fecha.
           onEscapeKeyDown={event => {
-            if (win.floating && !(event.target as Element | null)?.closest?.('[role="dialog"]'))
+            // Solta ou com outras mensagens abertas, a página continua usável: um Esc carregado
+            // fora desta janela (numa barra, na pesquisa) não a fecha.
+            if (
+              (win.floating || othersOpen) &&
+              !(event.target as Element | null)?.closest?.('[role="dialog"]')
+            )
               event.preventDefault();
           }}
           style={win.style}

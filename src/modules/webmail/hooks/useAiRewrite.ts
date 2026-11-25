@@ -16,7 +16,8 @@ export const keepsSubject = (subject: string) => /^\s*(re|fw|fwd|enc|res)\s*:/i.
  * janela minimizada; se a pessoa sair do Email entretanto, o resultado vai para a mensagem
  * guardada e aparece quando voltar.
  */
-export const useAiRewrite = (apply: (draft: AiDraft) => void) => {
+/** `sessionKey`: a mensagem do Email onde guardar o resultado se a pessoa sair (sem ela, não guarda). */
+export const useAiRewrite = (apply: (draft: AiDraft) => void, sessionKey?: string) => {
   const [busy, setBusy] = useState(false);
   // Antes e depois da IA: enquanto não se mexer no texto, dá para desfazer.
   const [undo, setUndo] = useState<{ before: AiDraft; after: AiDraft } | null>(null);
@@ -43,9 +44,9 @@ export const useAiRewrite = (apply: (draft: AiDraft) => void) => {
         setUndo({ before, after });
         applyRef.current(after);
       } else {
-        const saved = composeSession.get();
+        const saved = sessionKey ? composeSession.get(sessionKey) : null;
         if (saved && (saved.body ?? '') === before.text)
-          composeSession.set({ ...saved, body: after.text, subject: after.subject });
+          composeSession.set(sessionKey!, { ...saved, body: after.text, subject: after.subject });
       }
     } catch (error: unknown) {
       toast({

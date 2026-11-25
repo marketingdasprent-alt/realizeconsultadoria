@@ -62,13 +62,13 @@ const file = () => new File(['x'], 'fatura.pdf', { type: 'application/pdf' });
 
 /** Põe em memória o que uma conta deixa para trás ao sair sem recarregar a app. */
 const leaveTracesOfAccountOne = () => {
-  composeSession.set({ subject: 'Proposta da conta 1' } as unknown as ComposeDraft);
+  composeSession.set('m1', { subject: 'Proposta da conta 1' } as unknown as ComposeDraft);
   attachmentClipboard.copy([file()]);
   dropToConversation('conversa-1', [file()]);
 };
 
 const expectNoTraces = () => {
-  expect(composeSession.get()).toBeNull();
+  expect(composeSession.all()).toEqual([]);
   expect(attachmentClipboard.get()).toEqual([]);
   expect(takeDropped('conversa-1')).toEqual([]);
 };
@@ -81,7 +81,7 @@ describe('memória da sessão (módulos com estado fora do React)', () => {
     stop = null;
     auth.listener = null;
     localStorage.clear();
-    composeSession.set(null);
+    for (const [key] of composeSession.all()) composeSession.set(key, null);
     attachmentClipboard.clear();
     takeDropped('conversa-1');
   });
@@ -203,11 +203,11 @@ describe('memória da sessão (módulos com estado fora do React)', () => {
   it('a mesma conta a renovar o token mantém o rascunho', () => {
     session('u1');
     stop = persistQueries(new QueryClient());
-    composeSession.set({ subject: 'Em curso' } as unknown as ComposeDraft);
+    composeSession.set('m1', { subject: 'Em curso' } as unknown as ComposeDraft);
 
     auth.listener?.('TOKEN_REFRESHED', { user: { id: 'u1' } });
     auth.listener?.('SIGNED_IN', { user: { id: 'u1' } });
 
-    expect(composeSession.get()).not.toBeNull();
+    expect(composeSession.get('m1')).not.toBeNull();
   });
 });

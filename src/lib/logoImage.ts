@@ -89,10 +89,11 @@ export const prepareLogo = async (file: File): Promise<PreparedLogo> => {
   const invalid = validateLogoFile(file);
   if (invalid) throw invalid;
   const image = await loadImage(file);
-  if (image.naturalWidth * image.naturalHeight > LOGO_MAX_INPUT_PIXELS) {
+  const isSvg = file.type === 'image/svg+xml';
+  // O SVG é vetorial (desenha-se sempre até 512 px): só as imagens de píxeis têm limite de dimensões.
+  if (!isSvg && image.naturalWidth * image.naturalHeight > LOGO_MAX_INPUT_PIXELS) {
     throw new LogoError('pixels');
   }
-  const isSvg = file.type === 'image/svg+xml';
   const { width, height } = fitWithin(image.naturalWidth, image.naturalHeight);
   const canvas = document.createElement('canvas');
   canvas.width = width;

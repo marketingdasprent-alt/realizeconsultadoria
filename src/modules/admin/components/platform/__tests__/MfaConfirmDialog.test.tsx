@@ -2,7 +2,7 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { MemoryRouter } from 'react-router-dom';
-import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterAll, beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 
 const mocks = vi.hoisted(() => ({ status: vi.fn(), verify: vi.fn() }));
 
@@ -12,7 +12,24 @@ vi.mock('@/modules/auth/services/mfaService', () => ({
 
 import { MfaConfirmDialog } from '../MfaConfirmDialog';
 
+// O campo do código (input-otp) deixa temporizadores que disparavam depois de o jsdom fechar
+// ("window is not defined", erro não tratado no fim do ficheiro). Guardam-se e cancelam-se no fim.
+const pendingTimers = new Set<ReturnType<typeof setTimeout>>();
+const realSetTimeout = globalThis.setTimeout;
+
 beforeAll(() => {
+  globalThis.setTimeout = ((handler: TimerHandler, delay?: number, ...args: unknown[]) => {
+    const id = realSetTimeout(
+      (...a: unknown[]) => {
+        pendingTimers.delete(id);
+        if (typeof handler === 'function') handler(...a);
+      },
+      delay,
+      ...args
+    );
+    pendingTimers.add(id);
+    return id;
+  }) as typeof setTimeout;
   // O campo do código (input-otp) usa estas duas coisas, que o jsdom não tem.
   document.elementFromPoint ??= () => null;
   vi.stubGlobal(
@@ -23,6 +40,12 @@ beforeAll(() => {
       disconnect() {}
     }
   );
+});
+
+afterAll(() => {
+  pendingTimers.forEach(id => clearTimeout(id));
+  pendingTimers.clear();
+  globalThis.setTimeout = realSetTimeout;
 });
 
 const renderDialog = (open = true) => {

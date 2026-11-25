@@ -1,5 +1,14 @@
-import React, { useState } from 'react';
-import { AlertTriangle, CheckCircle2, CircleDashed, Loader2, Mail, Plus, X } from 'lucide-react';
+import React, { useMemo, useState } from 'react';
+import {
+  AlertTriangle,
+  CheckCircle2,
+  CircleDashed,
+  Loader2,
+  Mail,
+  PenLine,
+  Plus,
+  X,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useEmployeeEmails } from '../../hooks/useEmployeeEmails';
 import { mailboxState } from '../../lib/credentials';
@@ -8,6 +17,7 @@ import { AccessPanel } from '../accesses/panel/AccessPanel';
 import type { AccessPanelTarget } from '../accesses/panel/useAccessForm';
 import { EmployeeEmailPicker } from './EmployeeEmailPicker';
 import { FileSection } from './files/FileRow';
+import { PersonAccessDialog } from '@/modules/workspace/components/PersonAccessDialog';
 
 const STATE = {
   linked: { label: 'Ligada', icon: CheckCircle2, className: 'bg-emerald-50 text-emerald-700' },
@@ -84,7 +94,16 @@ const EmployeeEmailsTab: React.FC<{ employeeId: string }> = ({ employeeId }) => 
   const { data, employee, emails, busy, add, remove, test } = useEmployeeEmails(employeeId);
   const [picking, setPicking] = useState(false);
   const [panel, setPanel] = useState<AccessPanelTarget | null>(null);
+  const [signaturesOpen, setSignaturesOpen] = useState(false);
   const hasAccount = !!employee?.user_id;
+  // As assinaturas são de cada pessoa em cada caixa: só com conta na app e uma caixa ligada.
+  const canSign = hasAccount && emails.some(email => !!email.mailbox);
+  // A mesma pessoa entre desenhos: a ficha atualiza-se sozinha (ex.: depois de ligar uma caixa)
+  // e o diálogo não pode voltar ao início nem perder a pesquisa por isso.
+  const signer = useMemo(
+    () => (employee?.user_id ? { userId: employee.user_id, name: employee.name } : null),
+    [employee?.user_id, employee?.name]
+  );
 
   return (
     <FileSection
@@ -96,13 +115,30 @@ const EmployeeEmailsTab: React.FC<{ employeeId: string }> = ({ employeeId }) => 
       }
       count={emails.length}
       action={
-        <button
-          type="button"
-          onClick={() => setPicking(v => !v)}
-          className="inline-flex h-9 items-center gap-1.5 rounded-full bg-rz-primary px-4 text-[13px] font-bold text-white"
-        >
-          <Plus className="h-4 w-4" /> Ligar email
-        </button>
+        <div className="flex flex-wrap items-center gap-2">
+          <button
+            type="button"
+            onClick={() => setSignaturesOpen(true)}
+            disabled={!canSign}
+            title={
+              canSign
+                ? 'Assinaturas de email deste colaborador, em cada caixa'
+                : hasAccount
+                  ? 'Ligue primeiro uma caixa de email'
+                  : 'Disponível quando o colaborador tiver conta na app'
+            }
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-white px-4 text-[13px] font-bold text-rz-ink ring-1 ring-rz-line hover:bg-rz-canvas disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <PenLine className="h-4 w-4" /> Assinaturas
+          </button>
+          <button
+            type="button"
+            onClick={() => setPicking(v => !v)}
+            className="inline-flex h-9 items-center gap-1.5 rounded-full bg-rz-primary px-4 text-[13px] font-bold text-white"
+          >
+            <Plus className="h-4 w-4" /> Ligar email
+          </button>
+        </div>
       }
     >
       {picking && employee && (
@@ -136,6 +172,11 @@ const EmployeeEmailsTab: React.FC<{ employeeId: string }> = ({ employeeId }) => 
           ))}
         </ul>
       )}
+      <PersonAccessDialog
+        person={signaturesOpen ? signer : null}
+        tab="signatures"
+        onClose={() => setSignaturesOpen(false)}
+      />
       <AccessPanel
         target={panel}
         data={data}

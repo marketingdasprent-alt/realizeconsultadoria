@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Loader2, ShieldAlert } from 'lucide-react';
+import { Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
   Dialog,
@@ -75,16 +75,6 @@ export const AddPlatformAdminDialog: React.FC<AddPlatformAdminDialogProps> = ({
           {picked && (
             <p className="text-xs text-muted-foreground">Administra {picked.companies}.</p>
           )}
-          {picked && !picked.mfa_enabled && (
-            <p
-              role="alert"
-              className="flex items-start gap-2 rounded-lg border border-amber-500/40 p-3 text-sm"
-            >
-              <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0 text-amber-500" aria-hidden />
-              Ainda não ativou o segundo passo. Peça-lhe para o ativar nas Definições e tente
-              depois.
-            </p>
-          )}
         </QueryState>
         <DialogFooter>
           <Button type="button" variant="outline" onClick={onClose} disabled={busy}>
@@ -93,7 +83,7 @@ export const AddPlatformAdminDialog: React.FC<AddPlatformAdminDialogProps> = ({
           <Button
             type="button"
             variant="gold"
-            disabled={busy || !picked || !picked.mfa_enabled}
+            disabled={busy || !picked}
             onClick={() => onConfirm(chosen)}
           >
             {busy && <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden />}

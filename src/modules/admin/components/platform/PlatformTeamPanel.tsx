@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Loader2, ShieldCheck, ShieldOff, UserMinus, UserPlus } from 'lucide-react';
+import { Loader2, UserMinus, UserPlus } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -15,8 +15,8 @@ import { companyInitials } from '@/lib/companyName';
 import { QueryState } from '../sharing/QueryState';
 import { useSuperAdminAction, useSuperAdmins } from '../../hooks/usePlatformTeam';
 import { superAdminService, type SuperAdmin } from '../../services/superAdminService';
+import { ReauthDialog } from '../sharing/ReauthDialog';
 import { AddPlatformAdminDialog } from './AddPlatformAdminDialog';
-import { MfaConfirmDialog } from './MfaConfirmDialog';
 
 const sinceText = (iso: string) =>
   new Date(iso).toLocaleDateString('pt-PT', { day: 'numeric', month: 'long', year: 'numeric' });
@@ -47,15 +47,10 @@ const AdminRow: React.FC<{
       </p>
     </div>
     <Badge
-      variant={admin.mfa_enabled ? 'default' : 'secondary'}
-      className="self-start sm:self-center"
+      variant="outline"
+      className="self-start font-normal text-muted-foreground sm:self-center"
     >
-      {admin.mfa_enabled ? (
-        <ShieldCheck className="mr-1 h-3.5 w-3.5" aria-hidden />
-      ) : (
-        <ShieldOff className="mr-1 h-3.5 w-3.5" aria-hidden />
-      )}
-      {admin.mfa_enabled ? 'Segundo passo ativo' : 'Sem segundo passo'}
+      Segundo passo: {admin.mfa_enabled ? 'ativo' : 'desativado'}
     </Badge>
     <Button
       type="button"
@@ -105,14 +100,18 @@ export const PlatformTeamPanel: React.FC = () => {
       aria-labelledby="platform-team"
       className="space-y-4 rounded-2xl border p-4 shadow-card"
     >
-      <MfaConfirmDialog open={action.codeOpen} onDone={action.finishCode} />
+      <ReauthDialog
+        open={action.reauthOpen}
+        onDone={action.finishReauth}
+        description="Alterar quem é super administrador exige um login recente. Por segurança, confirme que é você."
+      />
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div>
           <h2 id="platform-team" className="text-lg font-semibold">
             Super administradores
           </h2>
           <p className="text-sm text-muted-foreground">
-            Veem e gerem todas as empresas. Alterar quem são pede o código do autenticador.
+            Veem e gerem todas as empresas. O segundo passo (autenticador) é opcional.
           </p>
         </div>
         <Button type="button" variant="gold" onClick={() => setAdding(true)}>

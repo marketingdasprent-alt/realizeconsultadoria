@@ -103,23 +103,26 @@ describe('AddPlatformAdminDialog', () => {
     expect(screen.getByRole('button', { name: 'Adicionar' })).toBeEnabled();
   });
 
-  it('escolher alguém sem segundo passo mostra o aviso e não deixa adicioná-lo', async () => {
-    const { onConfirm } = renderDialog();
-    await pick('Sara Dias');
-    expect(screen.getByText('Administra Beta Lda, Gama Lda.')).toBeInTheDocument();
-    expect(screen.getByRole('alert')).toHaveTextContent(
-      'Ainda não ativou o segundo passo. Peça-lhe para o ativar nas Definições e tente depois.'
-    );
-    const add = screen.getByRole('button', { name: 'Adicionar' });
-    expect(add).toBeDisabled();
-    await userEvent.click(add);
-    expect(onConfirm).not.toHaveBeenCalled();
-  });
-
-  it('trocar para alguém com segundo passo tira o aviso e ativa Adicionar', async () => {
+  it('escolher alguém sem segundo passo ativa Adicionar e não mostra nenhum aviso de segundo passo', async () => {
     renderDialog();
     await pick('Sara Dias');
-    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText('Administra Beta Lda, Gama Lda.')).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    expect(screen.queryByText(/segundo passo/i)).not.toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Adicionar' })).toBeEnabled();
+  });
+
+  it('Adicionar chama onConfirm também para alguém sem segundo passo', async () => {
+    const { onConfirm } = renderDialog();
+    await pick('Sara Dias');
+    await userEvent.click(screen.getByRole('button', { name: 'Adicionar' }));
+    expect(onConfirm).toHaveBeenCalledTimes(1);
+    expect(onConfirm).toHaveBeenCalledWith('u3');
+  });
+
+  it('trocar de candidato mantém Adicionar ativo e sem aviso', async () => {
+    renderDialog();
+    await pick('Sara Dias');
     await pick('Rui Costa');
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Adicionar' })).toBeEnabled();

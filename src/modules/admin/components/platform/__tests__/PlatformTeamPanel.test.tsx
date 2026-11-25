@@ -11,8 +11,7 @@ const mocks = vi.hoisted(() => ({
   candidates: vi.fn(),
   add: vi.fn(),
   remove: vi.fn(),
-  mfaStatus: vi.fn(),
-  mfaVerify: vi.fn(),
+  reauthenticate: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
@@ -24,11 +23,17 @@ vi.mock('../../../services/superAdminService', () => ({
     remove: mocks.remove,
   },
 }));
-vi.mock('@/modules/auth/services/mfaService', () => ({
-  mfaService: { status: mocks.mfaStatus, verify: mocks.mfaVerify },
+vi.mock('../../../services/sharingService', () => ({
+  sharingService: { reauthenticate: mocks.reauthenticate },
+}));
+vi.mock('@/contexts/AuthContext', () => ({
+  useAuth: () => ({ user: { email: 'ana@realize.pt' } }),
 }));
 
 import { PlatformTeamPanel } from '../PlatformTeamPanel';
+
+// Os diálogos Radix com userEvent demoram: em máquinas carregadas 5 s não chegam
+vi.setConfig({ testTimeout: 15_000 });
 
 const ANA = {
   user_id: 'u1',
@@ -68,17 +73,6 @@ beforeAll(() => {
   Element.prototype.releasePointerCapture ??= () => {};
   Element.prototype.setPointerCapture ??= () => {};
   Element.prototype.scrollIntoView ??= () => {};
-  // O campo do código (input-otp) também sonda o ponto do rato; o jsdom não tem elementFromPoint.
-  document.elementFromPoint ??= () => null;
-  // O campo do código (input-otp) observa o tamanho; o jsdom não tem ResizeObserver.
-  vi.stubGlobal(
-    'ResizeObserver',
-    class {
-      observe() {}
-      unobserve() {}
-      disconnect() {}
-    }
-  );
 });
 
 const renderPanel = () => {
@@ -112,8 +106,7 @@ describe('PlatformTeamPanel', () => {
     mocks.candidates.mockResolvedValue([CANDIDATE, CANDIDATE_NO_MFA]);
     mocks.add.mockResolvedValue(undefined);
     mocks.remove.mockResolvedValue(undefined);
-    mocks.mfaStatus.mockResolvedValue({ active: { id: 'factor-1' } });
-    mocks.mfaVerify.mockResolvedValue(undefined);
+    mocks.reauthenticate.mockResolvedValue(undefined);
   });
 
   describe('lista', () => {
@@ -122,7 +115,8 @@ describe('PlatformTeamPanel', () => {
       expect(
         await screen.findByRole('heading', { name: 'Super administradores' })
       ).toBeInTheDocument();
-      expect(screen.getByText(/pede o código do autenticador/)).toBeInTheDocument();
+      expect(screen.getByText(/Veem e gerem todas as empresas/)).toBeInTheDocument();
+      expect(screen.getByText(/O segundo passo \(autenticador\) é opcional\./)).toBeInTheDocument();
     });
 
     it('mostra nome, email, desde quando e quem adicionou', async () => {
@@ -134,11 +128,26 @@ describe('PlatformTeamPanel', () => {
       expect(screen.getByText(/^Desde 10 de janeiro de 2025$/)).toBeVisible();
     });
 
-    it('mostra se o segundo passo está ativo ou não, por pessoa', async () => {
+    it('mostra se o segundo passo está ativo ou desativado, por pessoa, sem o tratar como falta', async () => {
       renderPanel();
       await screen.findByText('Rui Costa');
-      expect(row('Ana Silva').getByText('Segundo passo ativo')).toBeInTheDocument();
-      expect(row('Rui Costa').getByText('Sem segundo passo')).toBeInTheDocument();
+      expect(row('Ana Silva').getByText('Segundo passo: ativo')).toBeInTheDocument();
+      expect(row('Rui Costa').getByText('Segundo passo: desativado')).toBeInTheDocument();
+      expect(screen.queryByText('Sem segundo passo')).not.toBeInTheDocument();
+    });
+
+    it('o selo do segundo passo é neutro (cinzento) e sem ícone, esteja ativo ou não', async () => {
+      renderPanel();
+      await screen.findByText('Rui Costa');
+      for (const [who, text] of [
+        ['Ana Silva', 'Segundo passo: ativo'],
+        ['Rui Costa', 'Segundo passo: desativado'],
+      ] as const) {
+        const badge = row(who).getByText(text);
+        expect(badge).toHaveClass('text-muted-foreground');
+        expect(badge.className).not.toMatch(/destructive|red|amber|yellow|green|emerald/);
+        expect(badge.querySelector('svg')).toBeNull();
+      }
     });
 
     it('mostra as iniciais de cada pessoa', async () => {
@@ -249,37 +258,79 @@ describe('PlatformTeamPanel', () => {
       expect(screen.getByRole('alertdialog')).toBeInTheDocument();
     });
 
-    it('se pede o código (mfa_required) abre o diálogo do autenticador e, confirmado, repete uma vez', async () => {
-      mocks.remove.mockRejectedValueOnce(new SharingError('mfa_required'));
+    it('retirar funciona sem nenhum diálogo de código nem de palavra-passe', async () => {
       const user = userEvent.setup();
       renderPanel();
       const dialog = await confirmRemoval(user);
       await user.click(within(dialog).getByRole('button', { name: 'Retirar acesso' }));
 
-      expect(await screen.findByText('Confirme com o autenticador')).toBeInTheDocument();
+      await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith('u2'));
+      await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ title: 'Acesso retirado' }));
+      expect(screen.queryByText('Confirme a sua palavra-passe')).not.toBeInTheDocument();
+      expect(screen.queryByText('Confirme com o autenticador')).not.toBeInTheDocument();
+      expect(mocks.reauthenticate).not.toHaveBeenCalled();
+      expect(mocks.remove).toHaveBeenCalledTimes(1);
+    });
+
+    it('se pede login recente (reauth_required) abre o diálogo da palavra-passe e, confirmada, repete uma vez', async () => {
+      mocks.remove.mockRejectedValueOnce(new SharingError('reauth_required'));
+      const user = userEvent.setup();
+      renderPanel();
+      const dialog = await confirmRemoval(user);
+      await user.click(within(dialog).getByRole('button', { name: 'Retirar acesso' }));
+
+      expect(await screen.findByText('Confirme a sua palavra-passe')).toBeInTheDocument();
+      expect(screen.getByText(/exige um login recente/)).toBeInTheDocument();
       expect(mocks.remove).toHaveBeenCalledTimes(1);
 
-      await user.type(await screen.findByLabelText('Código de 6 dígitos'), '123456');
-      await waitFor(() => expect(mocks.mfaVerify).toHaveBeenCalledWith('factor-1', '123456'));
+      await user.type(await screen.findByLabelText('Palavra-passe'), 'segredo-certo');
+      await user.click(screen.getByRole('button', { name: 'Confirmar' }));
+      await waitFor(() =>
+        expect(mocks.reauthenticate).toHaveBeenCalledWith('ana@realize.pt', 'segredo-certo')
+      );
       await waitFor(() => expect(mocks.remove).toHaveBeenCalledTimes(2));
       expect(mocks.remove).toHaveBeenLastCalledWith('u2');
       await waitFor(() => expect(mocks.toast).toHaveBeenCalledWith({ title: 'Acesso retirado' }));
+      await waitFor(() =>
+        expect(screen.queryByText('Confirme a sua palavra-passe')).not.toBeInTheDocument()
+      );
     });
 
-    it('desistir do código (Escape) não repete a retirada nem mostra erro', async () => {
-      mocks.remove.mockRejectedValue(new SharingError('mfa_required'));
+    it('desistir da palavra-passe (Cancelar) não repete a retirada nem mostra erro', async () => {
+      mocks.remove.mockRejectedValue(new SharingError('reauth_required'));
       const user = userEvent.setup();
       renderPanel();
       const dialog = await confirmRemoval(user);
       await user.click(within(dialog).getByRole('button', { name: 'Retirar acesso' }));
-      await screen.findByText('Confirme com o autenticador');
+      const reauth = await screen.findByRole('dialog', { name: 'Confirme a sua palavra-passe' });
 
-      await user.keyboard('{Escape}');
+      await user.click(within(reauth).getByRole('button', { name: 'Cancelar' }));
       await waitFor(() =>
-        expect(screen.queryByText('Confirme com o autenticador')).not.toBeInTheDocument()
+        expect(screen.queryByText('Confirme a sua palavra-passe')).not.toBeInTheDocument()
       );
       expect(mocks.remove).toHaveBeenCalledTimes(1);
+      expect(mocks.reauthenticate).not.toHaveBeenCalled();
       expect(mocks.toast).not.toHaveBeenCalled();
+    });
+
+    it('se depois da palavra-passe a base volta a recusar mostra o toast de erro e não pede outra vez', async () => {
+      mocks.remove.mockRejectedValue(new SharingError('reauth_required'));
+      const user = userEvent.setup();
+      renderPanel();
+      const dialog = await confirmRemoval(user);
+      await user.click(within(dialog).getByRole('button', { name: 'Retirar acesso' }));
+      await user.type(await screen.findByLabelText('Palavra-passe'), 'segredo-certo');
+      await user.click(screen.getByRole('button', { name: 'Confirmar' }));
+
+      await waitFor(() =>
+        expect(mocks.toast).toHaveBeenCalledWith({
+          title: 'Não foi possível concluir',
+          description: 'Confirme a sua palavra-passe para continuar.',
+          variant: 'destructive',
+        })
+      );
+      expect(mocks.remove).toHaveBeenCalledTimes(2);
+      expect(screen.queryByText('Confirme a sua palavra-passe')).not.toBeInTheDocument();
     });
   });
 
@@ -313,16 +364,31 @@ describe('PlatformTeamPanel', () => {
       expect(mocks.candidates).not.toHaveBeenCalled();
     });
 
-    it('avisa quando o candidato não tem segundo passo e não deixa adicioná-lo', async () => {
+    it('um candidato sem segundo passo deixa Adicionar ativo e não mostra aviso nenhum', async () => {
       const user = userEvent.setup();
       renderPanel();
       const dialog = await openAdd(user);
       await choose(user, dialog, 'Tiago Reis');
-      expect(within(dialog).getByRole('alert')).toHaveTextContent(
-        'Ainda não ativou o segundo passo'
-      );
-      expect(within(dialog).getByRole('button', { name: 'Adicionar' })).toBeDisabled();
+      expect(within(dialog).queryByRole('alert')).not.toBeInTheDocument();
+      expect(within(dialog).queryByText(/segundo passo/i)).not.toBeInTheDocument();
+      expect(within(dialog).getByRole('button', { name: 'Adicionar' })).toBeEnabled();
       expect(mocks.add).not.toHaveBeenCalled();
+    });
+
+    it('adicionar um candidato sem segundo passo chama add, sem diálogo de código', async () => {
+      const user = userEvent.setup();
+      renderPanel();
+      const dialog = await openAdd(user);
+      await choose(user, dialog, 'Tiago Reis');
+      await user.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
+
+      await waitFor(() => expect(mocks.add).toHaveBeenCalledWith('u8'));
+      expect(mocks.add).toHaveBeenCalledTimes(1);
+      await waitFor(() =>
+        expect(mocks.toast).toHaveBeenCalledWith({ title: 'Super administrador adicionado' })
+      );
+      expect(screen.queryByText('Confirme com o autenticador')).not.toBeInTheDocument();
+      expect(mocks.reauthenticate).not.toHaveBeenCalled();
     });
 
     it('confirmar chama add com o id, dá o aviso, relê a lista e fecha o diálogo', async () => {
@@ -370,19 +436,23 @@ describe('PlatformTeamPanel', () => {
       ).toBeInTheDocument();
     });
 
-    it('com mfa_required pede o código e, confirmado, repete a adição uma vez', async () => {
-      mocks.add.mockRejectedValueOnce(new SharingError('mfa_required'));
+    it('com reauth_required pede a palavra-passe e, confirmada, repete a adição uma vez', async () => {
+      mocks.add.mockRejectedValueOnce(new SharingError('reauth_required'));
       const user = userEvent.setup();
       renderPanel();
       const dialog = await openAdd(user);
       await choose(user, dialog);
       await user.click(within(dialog).getByRole('button', { name: 'Adicionar' }));
 
-      await screen.findByText('Confirme com o autenticador');
-      await user.type(await screen.findByLabelText('Código de 6 dígitos'), '654321');
+      await screen.findByText('Confirme a sua palavra-passe');
+      await user.type(await screen.findByLabelText('Palavra-passe'), 'segredo-certo');
+      await user.click(screen.getByRole('button', { name: 'Confirmar' }));
       await waitFor(() => expect(mocks.add).toHaveBeenCalledTimes(2));
       expect(mocks.add).toHaveBeenLastCalledWith('u9');
-      expect(mocks.mfaVerify).toHaveBeenCalledWith('factor-1', '654321');
+      expect(mocks.reauthenticate).toHaveBeenCalledWith('ana@realize.pt', 'segredo-certo');
+      await waitFor(() =>
+        expect(mocks.toast).toHaveBeenCalledWith({ title: 'Super administrador adicionado' })
+      );
     });
 
     it('Cancelar fecha o diálogo sem adicionar', async () => {

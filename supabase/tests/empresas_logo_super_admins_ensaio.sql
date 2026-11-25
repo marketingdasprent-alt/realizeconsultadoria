@@ -55,7 +55,7 @@ BEGIN
   INSERT INTO public.user_roles (user_id, role) VALUES (sa, 'admin'), (sb, 'admin'), (adA, 'admin'), (adB, 'admin'), (adC, 'admin');
   INSERT INTO public.employees (name, email, company_id) VALUES ('ZZ Func A', 'zz-func-a@invalid.example', kA) RETURNING id INTO empA;
   INSERT INTO storage.objects (bucket_id, name) VALUES ('company-logos', kA::text || '/seed.webp');
-  -- sb tem o segundo passo (TOTP) verificado; sa não. Os candidatos têm-no (exigência para promover), menos adNoMfa.
+  -- sb tem o segundo passo (TOTP) verificado; sa não. adC, adBan e adUnc têm-no; adNoMfa não (o TOTP não é obrigatório).
   INSERT INTO auth.mfa_factors (id, user_id, factor_type, status, created_at, updated_at)
   VALUES (gen_random_uuid(), sb, 'totp', 'verified', now(), now()),
          (gen_random_uuid(), adC, 'totp', 'verified', now(), now()),
@@ -142,9 +142,10 @@ BEGIN
       ('escalada: anon não chama a função', 'anon', 'aal2', '42501', 'SELECT public.rz_add_super_admin(''' || adC || ''')::text'),
       ('escalada: ninguém chama o auxiliar interno', 'sa', 'aal2', '42501', 'SELECT public.rz_super_admin_assert()::text'),
       -- ---------------- super admins: exigências da operação
-      ('operação: sessão aal1 é recusada (precisa de MFA)', 'sa', 'aal1', 'RZ402', 'SELECT public.rz_add_super_admin(''' || adC || ''')::text'),
-      ('operação: aal2 com confirmação antiga é recusado', 'sa', 'stale', 'RZ401', 'SELECT public.rz_add_super_admin(''' || adC || ''')::text'),
-      ('operação: remover também exige aal2', 'sa', 'aal1', 'RZ402', 'SELECT public.rz_remove_super_admin(''' || sb || ''')::text'),
+      ('operação: aal1 com confirmação antiga é recusado (precisa de login recente, não de TOTP)', 'sa', 'stale1', 'RZ401', 'SELECT public.rz_add_super_admin(''' || adC || ''')::text'),
+      ('operação: login recente SÓ por link/OTP (sem palavra-passe) é recusado', 'sa', 'otp1', 'RZ401', 'SELECT public.rz_add_super_admin(''' || adC || ''')::text'),
+      ('operação: aal2 com confirmação antiga também é recusado', 'sa', 'stale', 'RZ401', 'SELECT public.rz_add_super_admin(''' || adC || ''')::text'),
+      ('operação: retirar com confirmação antiga é recusado', 'sa', 'stale1', 'RZ401', 'SELECT public.rz_remove_super_admin(''' || sb || ''')::text'),
       ('operação: só quem já administra uma empresa pode ser promovido', 'sa', 'aal2', '22023', 'SELECT public.rz_add_super_admin(''' || plain || ''')::text'),
       ('operação: argumento nulo recusado', 'sa', 'aal2', '22023', 'SELECT public.rz_add_super_admin(NULL)::text'),
       ('operação: quem já é super admin não se duplica', 'sa', 'aal2', 'P0001:already_super_admin', 'SELECT public.rz_add_super_admin(''' || sb || ''')::text'),
@@ -159,28 +160,34 @@ BEGIN
       -- ---------------- super admins: elegibilidade de quem se promove
       ('elegível: conta banida é recusada', 'sa', 'aal2', 'P0001:account_not_eligible', 'SELECT public.rz_add_super_admin(''' || adBan || ''')::text'),
       ('elegível: email por confirmar é recusado', 'sa', 'aal2', 'P0001:account_not_eligible', 'SELECT public.rz_add_super_admin(''' || adUnc || ''')::text'),
-      ('elegível: sem segundo passo verificado é recusado', 'sa', 'aal2', 'P0001:mfa_not_enabled', 'SELECT public.rz_add_super_admin(''' || adNoMfa || ''')::text'),
       ('elegível: nada ficou gravado para os recusados', 'pg', 'aal1', '0',
-        'SELECT count(*)::text FROM public.platform_admins WHERE user_id IN (''' || adBan || ''', ''' || adUnc || ''', ''' || adNoMfa || ''')'),
+        'SELECT count(*)::text FROM public.platform_admins WHERE user_id IN (''' || adBan || ''', ''' || adUnc || ''')'),
+      ('sem TOTP: promover quem não tem segundo passo funciona (aal1, sem código)', 'sa', 'aal1', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_add_super_admin(''' || adNoMfa || ''')) q'),
+      ('sem TOTP: fica ativo, sem MFA obrigatório e com quem o adicionou', 'pg', 'aal1', 'true/false/true',
+        'SELECT active::text || ''/'' || mfa_required::text || ''/'' || (created_by = ''' || sa || ''')::text FROM public.platform_admins WHERE user_id = ''' || adNoMfa || ''''),
+      ('sem TOTP: o promovido já gere super admins em aal1 (vê a lista)', 'adNoMfa', 'aal1', 'true', 'SELECT (count(*) >= 3)::text FROM public.rz_list_super_admins()'),
+      ('sem TOTP: o promovido retira outro super admin sem código (aal1)', 'adNoMfa', 'aal1', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_remove_super_admin(''' || sb || ''')) q'),
+      ('sem TOTP: repor sb (preparação, só nesta transação)', 'pg', 'aal1', '1', 'WITH u AS (UPDATE public.platform_admins SET active = true WHERE user_id = ''' || sb || ''' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('sem TOTP: quem foi promovido sem TOTP é retirado sem código (aal1)', 'sa', 'aal1', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_remove_super_admin(''' || adNoMfa || ''')) q'),
       -- ---------------- super admins: adicionar e retirar
-      ('adicionar: super admin promove o admin de A', 'sa', 'aal2', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_add_super_admin(''' || adC || ''')) q'),
-      ('adicionar: fica ativo, com MFA obrigatório e quem o adicionou', 'pg', 'aal1', 'true/true/true',
+      ('adicionar: super admin promove o admin de A (aal1, sem código)', 'sa', 'aal1', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_add_super_admin(''' || adC || ''')) q'),
+      ('adicionar: fica ativo, com MFA obrigatório porque já tem TOTP, e quem o adicionou', 'pg', 'aal1', 'true/true/true',
         'SELECT active::text || ''/'' || mfa_required::text || ''/'' || (created_by = ''' || sa || ''')::text FROM public.platform_admins WHERE user_id = ''' || adC || ''''),
       ('adicionar: fica na auditoria', 'pg', 'aal1', '1',
         'SELECT count(*)::text FROM public.cross_company_audit WHERE action = ''super_admin_add'' AND resource_id = ''' || adC || ''' AND actor_user_id = ''' || sa || ''''),
       ('adicionar: já aparece na lista', 'sa', 'aal1', 'true',
         'SELECT (count(*) FILTER (WHERE user_id = ''' || adC || ''') = 1)::text FROM public.rz_list_super_admins()'),
-      ('mfa_required: o promovido em aal1 NÃO tem poder de super admin', 'adC', 'aal1', '42501', 'SELECT count(*)::text FROM public.rz_list_super_admins()'),
-      ('mfa_required: o promovido em aal2 tem', 'adC', 'aal2', 'true', 'SELECT (count(*) >= 3)::text FROM public.rz_list_super_admins()'),
+      ('promovido com TOTP: sem aal2 não tem poder (o segundo passo que ativou protege-o)', 'adC', 'aal1', '42501', 'SELECT count(*)::text FROM public.rz_list_super_admins()'),
+      ('promovido: em aal2 também tem', 'adC', 'aal2', 'true', 'SELECT (count(*) >= 3)::text FROM public.rz_list_super_admins()'),
       ('retirar: um super admin não se retira a si próprio', 'sa', 'aal2', '22023', 'SELECT public.rz_remove_super_admin(''' || sa || ''')::text'),
       ('retirar: quem não é super admin dá "não encontrado"', 'sa', 'aal2', '02000', 'SELECT public.rz_remove_super_admin(''' || plain || ''')::text'),
-      ('retirar: super admin retira o promovido', 'sa', 'aal2', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_remove_super_admin(''' || adC || ''')) q'),
+      ('retirar: super admin retira o promovido (aal1)', 'sa', 'aal1', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_remove_super_admin(''' || adC || ''')) q'),
       ('retirar: fica inativo (não apagado) e na auditoria', 'pg', 'aal1', 'false/1',
         'SELECT (SELECT active::text FROM public.platform_admins WHERE user_id = ''' || adC || ''') || ''/'' || (SELECT count(*)::text FROM public.cross_company_audit WHERE action = ''super_admin_remove'' AND resource_id = ''' || adC || ''')'),
       ('retirar: o retirado já não tem poder de super admin', 'pg', 'aal1', 'false',
         'SELECT public.rz_is_super_admin_for(''' || adC || ''')::text'),
       ('re-promover: o mesmo utilizador volta a ser adicionado', 'sa', 'aal2', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_add_super_admin(''' || adC || '''))  q'),
-      ('re-promover: fica ativo outra vez, com MFA obrigatório e a nova autoria', 'pg', 'aal1', 'true/true/true',
+      ('re-promover: fica ativo outra vez, com MFA obrigatório (tem TOTP) e com a nova autoria', 'pg', 'aal1', 'true/true/true',
         'SELECT active::text || ''/'' || mfa_required::text || ''/'' || (created_by = ''' || sa || ''')::text FROM public.platform_admins WHERE user_id = ''' || adC || ''''),
       ('re-promover: a auditoria tem 2 registos de adicionar', 'pg', 'aal1', '2',
         'SELECT count(*)::text FROM public.cross_company_audit WHERE action = ''super_admin_add'' AND resource_id = ''' || adC || ''''),
@@ -229,7 +236,7 @@ BEGIN
       ('trigger: com o outro banido, desativar o único utilizável é recusado', 'pg', 'aal1', 'P0001:last_super_admin',
         'WITH u AS (UPDATE public.platform_admins SET active = false WHERE user_id = ''' || sa || ''' RETURNING 1) SELECT count(*)::text FROM u'),
       ('utilizável: com MFA obrigatório e sem fator TOTP não conta (adNoMfa promovido à força só nesta transação)', 'pg', 'aal1', 'ok',
-        'WITH i AS (INSERT INTO public.platform_admins (user_id, active, mfa_required) VALUES (''' || adNoMfa || ''', true, true) RETURNING 1) SELECT ''ok'' FROM i'),
+        'WITH i AS (INSERT INTO public.platform_admins (user_id, active, mfa_required) VALUES (''' || adNoMfa || ''', true, true) ON CONFLICT (user_id) DO UPDATE SET active = true, mfa_required = true RETURNING 1) SELECT ''ok'' FROM i'),
       ('utilizável: sem ninguém que chegue a aal2 (sb banido, adNoMfa sem fator) não se desativa o último', 'pg', 'aal1', 'P0001:last_super_admin',
         'WITH u AS (UPDATE public.platform_admins SET active = false WHERE user_id = ''' || sa || ''' RETURNING 1), v AS (UPDATE public.platform_admins SET active = false WHERE user_id = ''' || sb || ''' RETURNING 1) SELECT count(*)::text FROM u, v'),
       ('banido: um super admin banido já não gere super admins (sessão ainda válida)', 'sb', 'aal2', '42501',
@@ -238,10 +245,12 @@ BEGIN
   LOOP
     v_i := v_i + 1;
     v_who := CASE r.who WHEN 'sa' THEN sa WHEN 'sb' THEN sb WHEN 'adA' THEN adA WHEN 'adB' THEN adB
-                        WHEN 'adC' THEN adC WHEN 'plain' THEN plain ELSE NULL END;
+                        WHEN 'adC' THEN adC WHEN 'plain' THEN plain WHEN 'adNoMfa' THEN adNoMfa ELSE NULL END;
     v_claims := CASE
       WHEN v_who IS NULL THEN '{"role":"' || CASE r.who WHEN 'anon' THEN 'anon' ELSE 'postgres' END || '"}'
       WHEN r.variant = 'aal2' THEN '{"sub":"' || v_who || '","role":"authenticated","aal":"aal2","amr":[{"method":"password","timestamp":' || v_now || '},{"method":"totp","timestamp":' || v_now || '}]}'
+      WHEN r.variant = 'otp1' THEN '{"sub":"' || v_who || '","role":"authenticated","aal":"aal1","amr":[{"method":"otp","timestamp":' || v_now || '}]}'
+      WHEN r.variant = 'stale1' THEN '{"sub":"' || v_who || '","role":"authenticated","aal":"aal1","amr":[{"method":"password","timestamp":' || (v_now - 3600) || '}]}'
       WHEN r.variant = 'stale' THEN '{"sub":"' || v_who || '","role":"authenticated","aal":"aal2","amr":[{"method":"password","timestamp":' || (v_now - 3600) || '},{"method":"totp","timestamp":' || (v_now - 3600) || '}]}'
       ELSE '{"sub":"' || v_who || '","role":"authenticated","aal":"aal1","amr":[{"method":"password","timestamp":' || v_now || '}]}'
     END;

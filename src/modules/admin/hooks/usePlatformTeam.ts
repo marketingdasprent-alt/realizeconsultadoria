@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useToast } from '@/hooks/use-toast';
-import { isMfaRequired, isReauthRequired, sharingErrorText } from '../lib/sharing';
+import { isReauthRequired, sharingErrorText } from '../lib/sharing';
 import { superAdminService } from '../services/superAdminService';
 import { useRefreshSharing } from './useSharing';
 
@@ -29,24 +29,24 @@ export const useSuperAdminCandidates = (enabled: boolean) =>
   });
 
 /**
- * Executa uma escrita sobre super admins. Se a base pedir o código do autenticador
- * (`mfa_required`, ou uma confirmação antiga), abre o diálogo, espera o código e repete a chamada
- * uma vez. O ecrã tem de mostrar `<MfaConfirmDialog open={codeOpen} onDone={finishCode} />`.
+ * Executa uma escrita sobre super admins. O segundo passo (TOTP) não é obrigatório: se a base pedir
+ * um login recente (`reauth_required`), abre o diálogo da palavra-passe e repete a chamada uma vez.
+ * O ecrã tem de mostrar `<ReauthDialog open={reauthOpen} onDone={finishReauth} />`.
  */
 export const useSuperAdminAction = () => {
   const { toast } = useToast();
   const refreshSharing = useRefreshSharing();
   const [pending, setPending] = useState(false);
-  const [codeOpen, setCodeOpen] = useState(false);
+  const [reauthOpen, setReauthOpen] = useState(false);
   const resolver = useRef<((ok: boolean) => void) | null>(null);
 
-  const askCode = () =>
+  const askReauth = () =>
     new Promise<boolean>(resolve => {
       resolver.current = resolve;
-      setCodeOpen(true);
+      setReauthOpen(true);
     });
 
-  // Se o ecrã sai com o diálogo do código aberto, a promessa pendente não fica à espera para sempre
+  // Se o ecrã sai com o diálogo aberto, a promessa pendente não fica à espera para sempre
   useEffect(
     () => () => {
       resolver.current?.(false);
@@ -55,13 +55,13 @@ export const useSuperAdminAction = () => {
     []
   );
 
-  const finishCode = useCallback((ok: boolean) => {
+  const finishReauth = useCallback((ok: boolean) => {
     resolver.current?.(ok);
     resolver.current = null;
-    setCodeOpen(false);
+    setReauthOpen(false);
   }, []);
 
-  /** Devolve `true` se correu bem; `false` se falhou ou a pessoa desistiu do código. */
+  /** Devolve `true` se correu bem; `false` se falhou ou a pessoa desistiu da palavra-passe. */
   const run = useCallback(
     async (
       action: () => Promise<void>,
@@ -73,20 +73,9 @@ export const useSuperAdminAction = () => {
         try {
           await action();
         } catch (error) {
-          if (!isMfaRequired(error)) throw error;
-          if (!(await askCode())) return false;
-          try {
-            await action();
-          } catch (second) {
-            if (!isReauthRequired(second)) throw second;
-            // Mesmo depois do código a base acha a sessão antiga: outro código não resolve
-            toast({
-              title: 'Não foi possível concluir',
-              description: 'A sua sessão está demasiado antiga. Saia e entre outra vez.',
-              variant: 'destructive',
-            });
-            return false;
-          }
+          if (!isReauthRequired(error)) throw error;
+          if (!(await askReauth())) return false;
+          await action();
         }
         toast({ title: success });
         // A ação já resultou: atualizar as listas é à parte e um erro aqui não a desfaz
@@ -112,5 +101,5 @@ export const useSuperAdminAction = () => {
     [toast, refreshSharing]
   );
 
-  return { run, pending, codeOpen, finishCode };
+  return { run, pending, reauthOpen, finishReauth };
 };

@@ -17,12 +17,14 @@ import { sharingService } from '../../services/sharingService';
 
 interface ReauthDialogProps {
   open: boolean;
+  /** Texto por baixo do título (por omissão fala de partilhas). */
+  description?: string;
   /** `true` quando a palavra-passe foi confirmada; `false` se a pessoa desistiu. */
   onDone: (ok: boolean) => void;
 }
 
 /** Pede a palavra-passe outra vez: partilhar dados sensíveis exige um login recente. */
-export const ReauthDialog: React.FC<ReauthDialogProps> = ({ open, onDone }) => {
+export const ReauthDialog: React.FC<ReauthDialogProps> = ({ open, onDone, description }) => {
   const { user } = useAuth();
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -56,7 +58,8 @@ export const ReauthDialog: React.FC<ReauthDialogProps> = ({ open, onDone }) => {
           <DialogHeader>
             <DialogTitle>Confirme a sua palavra-passe</DialogTitle>
             <DialogDescription>
-              Esta partilha dá acesso a dados sensíveis. Por segurança, confirme que é você.
+              {description ??
+                'Esta partilha dá acesso a dados sensíveis. Por segurança, confirme que é você.'}
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-2">

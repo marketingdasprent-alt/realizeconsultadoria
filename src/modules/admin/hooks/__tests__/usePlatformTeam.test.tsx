@@ -9,11 +9,15 @@ const mocks = vi.hoisted(() => ({
   refresh: vi.fn(),
   list: vi.fn(),
   candidates: vi.fn(),
+  levels: vi.fn(),
 }));
 
 vi.mock('@/hooks/use-toast', () => ({ useToast: () => ({ toast: mocks.toast }) }));
 vi.mock('../useSharing', () => ({
   useRefreshSharing: () => mocks.refresh,
+}));
+vi.mock('@/modules/auth/services/mfaService', () => ({
+  mfaService: { levels: mocks.levels },
 }));
 vi.mock('../../services/superAdminService', () => ({
   superAdminService: { list: mocks.list, candidates: mocks.candidates },
@@ -82,6 +86,8 @@ describe('useSuperAdminAction', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mocks.refresh.mockResolvedValue(undefined);
+    // Por omissão a conta não tem segundo passo obrigatório
+    mocks.levels.mockResolvedValue({ currentLevel: 'aal1', nextLevel: 'aal1' });
   });
 
   const setup = () => renderHook(() => useSuperAdminAction());
@@ -100,14 +106,38 @@ describe('useSuperAdminAction', () => {
     expect(mocks.toast).toHaveBeenCalledWith({ title: 'Acesso retirado' });
     expect(refetch).toHaveBeenCalledTimes(1);
     expect(mocks.refresh).toHaveBeenCalledTimes(1);
-    expect(result.current.codeOpen).toBe(false);
+    expect(result.current.reauthOpen).toBe(false);
     expect(result.current.pending).toBe(false);
   });
 
-  it('mfa_required abre o diálogo e, com o código confirmado, repete UMA vez e dá o aviso', async () => {
+  it('adicionar e retirar funcionam sem diálogo nenhum (sem código nem palavra-passe)', async () => {
+    const add = vi.fn().mockResolvedValue(undefined);
+    const remove = vi.fn().mockResolvedValue(undefined);
+    const { result } = setup();
+    const done: boolean[] = [];
+    await act(async () => {
+      done.push(await result.current.run(add, 'Super administrador adicionado', vi.fn()));
+      done.push(await result.current.run(remove, 'Acesso retirado', vi.fn()));
+    });
+    expect(done).toEqual([true, true]);
+    expect(add).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(result.current.reauthOpen).toBe(false);
+    expect(mocks.toast).toHaveBeenCalledTimes(2);
+  });
+
+  it('sem pedido em curso nenhum diálogo está aberto, nada está pendente e não se consultam os níveis', () => {
+    const { result } = setup();
+    expect(result.current.reauthOpen).toBe(false);
+    expect(result.current.codeOpen).toBe(false);
+    expect(result.current.pending).toBe(false);
+    expect(mocks.levels).not.toHaveBeenCalled();
+  });
+
+  it('reauth_required abre o diálogo da palavra-passe e, confirmada, repete UMA vez e dá o aviso', async () => {
     const action = vi
       .fn()
-      .mockRejectedValueOnce(new SharingError('mfa_required'))
+      .mockRejectedValueOnce(new SharingError('reauth_required'))
       .mockResolvedValueOnce(undefined);
     const refetch = vi.fn();
     const { result } = setup();
@@ -115,53 +145,35 @@ describe('useSuperAdminAction', () => {
     act(() => {
       promise = result.current.run(action, 'Super administrador adicionado', refetch);
     });
-    await waitFor(() => expect(result.current.codeOpen).toBe(true));
+    await waitFor(() => expect(result.current.reauthOpen).toBe(true));
     expect(action).toHaveBeenCalledTimes(1);
     expect(mocks.toast).not.toHaveBeenCalled();
 
     await act(async () => {
-      result.current.finishCode(true);
+      result.current.finishReauth(true);
       await promise;
     });
 
     expect(await promise).toBe(true);
     expect(action).toHaveBeenCalledTimes(2);
+    expect(result.current.reauthOpen).toBe(false);
     expect(result.current.codeOpen).toBe(false);
     expect(mocks.toast).toHaveBeenCalledTimes(1);
     expect(mocks.toast).toHaveBeenCalledWith({ title: 'Super administrador adicionado' });
     expect(refetch).toHaveBeenCalledTimes(1);
   });
 
-  it('reauth_required (confirmação antiga) também pede o código', async () => {
-    const action = vi
-      .fn()
-      .mockRejectedValueOnce(new SharingError('reauth_required'))
-      .mockResolvedValueOnce(undefined);
-    const { result } = setup();
-    let promise: Promise<boolean> = Promise.resolve(false);
-    act(() => {
-      promise = result.current.run(action, 'feito', vi.fn());
-    });
-    await waitFor(() => expect(result.current.codeOpen).toBe(true));
-    await act(async () => {
-      result.current.finishCode(true);
-      await promise;
-    });
-    expect(await promise).toBe(true);
-    expect(action).toHaveBeenCalledTimes(2);
-  });
-
-  it('desistir do código devolve false, não repete e não mostra aviso nenhum', async () => {
-    const action = vi.fn().mockRejectedValue(new SharingError('mfa_required'));
+  it('desistir da palavra-passe devolve false, não repete e não mostra aviso nenhum', async () => {
+    const action = vi.fn().mockRejectedValue(new SharingError('reauth_required'));
     const refetch = vi.fn();
     const { result } = setup();
     let promise: Promise<boolean> = Promise.resolve(true);
     act(() => {
       promise = result.current.run(action, 'feito', refetch);
     });
-    await waitFor(() => expect(result.current.codeOpen).toBe(true));
+    await waitFor(() => expect(result.current.reauthOpen).toBe(true));
     await act(async () => {
-      result.current.finishCode(false);
+      result.current.finishReauth(false);
       await promise;
     });
     expect(await promise).toBe(false);
@@ -169,32 +181,204 @@ describe('useSuperAdminAction', () => {
     expect(mocks.toast).not.toHaveBeenCalled();
     expect(refetch).not.toHaveBeenCalled();
     expect(mocks.refresh).not.toHaveBeenCalled();
-    expect(result.current.codeOpen).toBe(false);
+    expect(result.current.reauthOpen).toBe(false);
     expect(result.current.pending).toBe(false);
   });
 
-  it('se a repetição também falha dá toast destructive e NÃO pede o código outra vez', async () => {
+  it('se a repetição também falha dá toast destructive e NÃO pede a palavra-passe outra vez', async () => {
     const action = vi
       .fn()
-      .mockRejectedValueOnce(new SharingError('mfa_required'))
+      .mockRejectedValueOnce(new SharingError('reauth_required'))
       .mockRejectedValueOnce(new SharingError('last_super_admin'));
     const { result } = setup();
     let promise: Promise<boolean> = Promise.resolve(true);
     act(() => {
       promise = result.current.run(action, 'feito', vi.fn());
     });
-    await waitFor(() => expect(result.current.codeOpen).toBe(true));
+    await waitFor(() => expect(result.current.reauthOpen).toBe(true));
     await act(async () => {
-      result.current.finishCode(true);
+      result.current.finishReauth(true);
       await promise;
     });
     expect(await promise).toBe(false);
     expect(action).toHaveBeenCalledTimes(2);
-    expect(result.current.codeOpen).toBe(false);
+    expect(result.current.reauthOpen).toBe(false);
+    expect(mocks.toast).toHaveBeenCalledTimes(1);
     expect(mocks.toast).toHaveBeenCalledWith({
       title: 'Não foi possível concluir',
       description: 'A plataforma tem de ter pelo menos um super administrador.',
       variant: 'destructive',
+    });
+  });
+
+  it('se depois da palavra-passe a base volta a pedir login recente (2.ª falha) mostra o toast de erro, sem pedir outra vez', async () => {
+    const action = vi.fn().mockRejectedValue(new SharingError('reauth_required'));
+    const { result } = setup();
+    let promise: Promise<boolean> = Promise.resolve(true);
+    act(() => {
+      promise = result.current.run(action, 'feito', vi.fn());
+    });
+    await waitFor(() => expect(result.current.reauthOpen).toBe(true));
+    await act(async () => {
+      result.current.finishReauth(true);
+      await promise;
+    });
+    expect(await promise).toBe(false);
+    expect(action).toHaveBeenCalledTimes(2);
+    expect(result.current.reauthOpen).toBe(false);
+    expect(mocks.toast).toHaveBeenCalledTimes(1);
+    expect(mocks.toast).toHaveBeenCalledWith({
+      title: 'Não foi possível concluir',
+      description: 'A sua sessão está demasiado antiga. Saia e entre outra vez.',
+      variant: 'destructive',
+    });
+  });
+
+  describe('segundo passo depois da palavra-passe', () => {
+    const startRun = (
+      result: { current: ReturnType<typeof useSuperAdminAction> },
+      action: () => Promise<void>,
+      refetch: () => unknown = vi.fn()
+    ) => {
+      let promise: Promise<boolean> = Promise.resolve(false);
+      act(() => {
+        promise = result.current.run(action, 'Super administrador adicionado', refetch);
+      });
+      return () => promise;
+    };
+
+    const passPassword = async (result: { current: ReturnType<typeof useSuperAdminAction> }) => {
+      await waitFor(() => expect(result.current.reauthOpen).toBe(true));
+      await act(async () => {
+        result.current.finishReauth(true);
+      });
+    };
+
+    it.each([
+      ['aal1 -> aal1 (sem segundo passo)', { currentLevel: 'aal1', nextLevel: 'aal1' }],
+      ['aal2 -> aal2 (sessão já confirmada)', { currentLevel: 'aal2', nextLevel: 'aal2' }],
+      ['levels() devolve null', null],
+    ])('%s: depois da palavra-passe repete logo, sem diálogo do código', async (_name, level) => {
+      mocks.levels.mockResolvedValue(level);
+      const action = vi
+        .fn()
+        .mockRejectedValueOnce(new SharingError('reauth_required'))
+        .mockResolvedValueOnce(undefined);
+      const { result } = setup();
+      const promise = startRun(result, action);
+      await passPassword(result);
+      await expect(promise()).resolves.toBe(true);
+      expect(mocks.levels).toHaveBeenCalledTimes(1);
+      expect(result.current.codeOpen).toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(mocks.toast).toHaveBeenCalledWith({ title: 'Super administrador adicionado' });
+    });
+
+    it('com segundo passo obrigatório (aal1 -> aal2) abre o diálogo do código e só repete depois dele', async () => {
+      mocks.levels.mockResolvedValue({ currentLevel: 'aal1', nextLevel: 'aal2' });
+      const action = vi
+        .fn()
+        .mockRejectedValueOnce(new SharingError('reauth_required'))
+        .mockResolvedValueOnce(undefined);
+      const refetch = vi.fn();
+      const { result } = setup();
+      const promise = startRun(result, action, refetch);
+      await passPassword(result);
+      await waitFor(() => expect(result.current.codeOpen).toBe(true));
+      expect(result.current.reauthOpen).toBe(false);
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(mocks.toast).not.toHaveBeenCalled();
+
+      await act(async () => {
+        result.current.finishCode(true);
+        await promise();
+      });
+      await expect(promise()).resolves.toBe(true);
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(result.current.codeOpen).toBe(false);
+      expect(result.current.pending).toBe(false);
+      expect(mocks.toast).toHaveBeenCalledTimes(1);
+      expect(mocks.toast).toHaveBeenCalledWith({ title: 'Super administrador adicionado' });
+      expect(refetch).toHaveBeenCalledTimes(1);
+    });
+
+    it('desistir do código devolve false, não repete e não mostra aviso', async () => {
+      mocks.levels.mockResolvedValue({ currentLevel: 'aal1', nextLevel: 'aal2' });
+      const action = vi.fn().mockRejectedValue(new SharingError('reauth_required'));
+      const refetch = vi.fn();
+      const { result } = setup();
+      const promise = startRun(result, action, refetch);
+      await passPassword(result);
+      await waitFor(() => expect(result.current.codeOpen).toBe(true));
+      await act(async () => {
+        result.current.finishCode(false);
+        await promise();
+      });
+      await expect(promise()).resolves.toBe(false);
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(mocks.toast).not.toHaveBeenCalled();
+      expect(refetch).not.toHaveBeenCalled();
+      expect(mocks.refresh).not.toHaveBeenCalled();
+      expect(result.current.codeOpen).toBe(false);
+      expect(result.current.pending).toBe(false);
+    });
+
+    it('depois do código, se a base ainda recusa por sessão antiga, avisa sem pedir nada outra vez', async () => {
+      mocks.levels.mockResolvedValue({ currentLevel: 'aal1', nextLevel: 'aal2' });
+      const action = vi.fn().mockRejectedValue(new SharingError('reauth_required'));
+      const { result } = setup();
+      const promise = startRun(result, action);
+      await passPassword(result);
+      await waitFor(() => expect(result.current.codeOpen).toBe(true));
+      await act(async () => {
+        result.current.finishCode(true);
+        await promise();
+      });
+      await expect(promise()).resolves.toBe(false);
+      expect(action).toHaveBeenCalledTimes(2);
+      expect(result.current.reauthOpen).toBe(false);
+      expect(result.current.codeOpen).toBe(false);
+      expect(mocks.toast).toHaveBeenCalledTimes(1);
+      expect(mocks.toast).toHaveBeenCalledWith({
+        title: 'Não foi possível concluir',
+        description: 'A sua sessão está demasiado antiga. Saia e entre outra vez.',
+        variant: 'destructive',
+      });
+    });
+
+    it('desistir da palavra-passe não consulta os níveis nem abre o código', async () => {
+      mocks.levels.mockResolvedValue({ currentLevel: 'aal1', nextLevel: 'aal2' });
+      const action = vi.fn().mockRejectedValue(new SharingError('reauth_required'));
+      const { result } = setup();
+      const promise = startRun(result, action);
+      await waitFor(() => expect(result.current.reauthOpen).toBe(true));
+      await act(async () => {
+        result.current.finishReauth(false);
+        await promise();
+      });
+      await expect(promise()).resolves.toBe(false);
+      expect(mocks.levels).not.toHaveBeenCalled();
+      expect(result.current.codeOpen).toBe(false);
+      expect(action).toHaveBeenCalledTimes(1);
+    });
+
+    it('se o ecrã sai com o diálogo do código aberto, a ação pendente termina em false e não repete', async () => {
+      mocks.levels.mockResolvedValue({ currentLevel: 'aal1', nextLevel: 'aal2' });
+      const action = vi.fn().mockRejectedValue(new SharingError('reauth_required'));
+      const { result, unmount } = setup();
+      const promise = startRun(result, action);
+      await passPassword(result);
+      await waitFor(() => expect(result.current.codeOpen).toBe(true));
+      unmount();
+      await expect(promise()).resolves.toBe(false);
+      expect(action).toHaveBeenCalledTimes(1);
+      expect(mocks.toast).not.toHaveBeenCalled();
+    });
+
+    it('finishCode sem nenhum pedido pendente não faz nada de mal', () => {
+      const { result } = setup();
+      expect(() => act(() => result.current.finishCode(true))).not.toThrow();
+      expect(result.current.codeOpen).toBe(false);
     });
   });
 
@@ -208,7 +392,7 @@ describe('useSuperAdminAction', () => {
     });
     expect(ok).toBe(false);
     expect(action).toHaveBeenCalledTimes(1);
-    expect(result.current.codeOpen).toBe(false);
+    expect(result.current.reauthOpen).toBe(false);
     expect(mocks.toast).toHaveBeenCalledWith({
       title: 'Não foi possível concluir',
       description: 'Esta pessoa já é super administradora.',
@@ -230,32 +414,6 @@ describe('useSuperAdminAction', () => {
     });
   });
 
-  it('se depois do código a base ainda acha a sessão antiga avisa para sair e entrar, sem pedir outro código', async () => {
-    const action = vi
-      .fn()
-      .mockRejectedValueOnce(new SharingError('mfa_required'))
-      .mockRejectedValueOnce(new SharingError('reauth_required'));
-    const { result } = setup();
-    let promise: Promise<boolean> = Promise.resolve(true);
-    act(() => {
-      promise = result.current.run(action, 'feito', vi.fn());
-    });
-    await waitFor(() => expect(result.current.codeOpen).toBe(true));
-    await act(async () => {
-      result.current.finishCode(true);
-      await promise;
-    });
-    expect(await promise).toBe(false);
-    expect(action).toHaveBeenCalledTimes(2);
-    expect(result.current.codeOpen).toBe(false);
-    expect(mocks.toast).toHaveBeenCalledTimes(1);
-    expect(mocks.toast).toHaveBeenCalledWith({
-      title: 'Não foi possível concluir',
-      description: 'A sua sessão está demasiado antiga. Saia e entre outra vez.',
-      variant: 'destructive',
-    });
-  });
-
   it('se só a atualização das listas falha, a ação já feita continua a contar como sucesso', async () => {
     const action = vi.fn().mockResolvedValue(undefined);
     const refetch = vi.fn().mockRejectedValue(new Error('rede'));
@@ -269,14 +427,14 @@ describe('useSuperAdminAction', () => {
     expect(mocks.toast).toHaveBeenCalledWith({ title: 'Acesso retirado' });
   });
 
-  it('se o ecrã sai com o diálogo do código aberto, a ação pendente termina em false e não repete', async () => {
-    const action = vi.fn().mockRejectedValue(new SharingError('mfa_required'));
+  it('se o ecrã sai com o diálogo da palavra-passe aberto, a ação pendente termina em false e não repete', async () => {
+    const action = vi.fn().mockRejectedValue(new SharingError('reauth_required'));
     const { result, unmount } = setup();
     let promise: Promise<boolean> = Promise.resolve(true);
     act(() => {
       promise = result.current.run(action, 'feito', vi.fn());
     });
-    await waitFor(() => expect(result.current.codeOpen).toBe(true));
+    await waitFor(() => expect(result.current.reauthOpen).toBe(true));
     unmount();
     await expect(promise).resolves.toBe(false);
     expect(action).toHaveBeenCalledTimes(1);
@@ -304,9 +462,9 @@ describe('useSuperAdminAction', () => {
     expect(result.current.pending).toBe(false);
   });
 
-  it('finishCode sem nenhum pedido pendente não faz nada de mal', () => {
+  it('finishReauth sem nenhum pedido pendente não faz nada de mal', () => {
     const { result } = setup();
-    expect(() => act(() => result.current.finishCode(true))).not.toThrow();
-    expect(result.current.codeOpen).toBe(false);
+    expect(() => act(() => result.current.finishReauth(true))).not.toThrow();
+    expect(result.current.reauthOpen).toBe(false);
   });
 });

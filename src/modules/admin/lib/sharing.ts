@@ -204,7 +204,6 @@ const ERROR_TEXT: Record<string, string> = {
   mfa_required: 'Confirme com o código da sua aplicação de autenticação.',
   already_super_admin: 'Esta pessoa já é super administradora.',
   last_super_admin: 'A plataforma tem de ter pelo menos um super administrador.',
-  mfa_not_enabled: 'Esta pessoa ainda não ativou o segundo passo (autenticador).',
   account_not_eligible: 'Esta conta não está confirmada ou está bloqueada.',
   invalid_argument: 'Há dados em falta ou inválidos. Reveja o formulário.',
   unknown_capability: 'Uma das permissões escolhidas não existe.',
@@ -233,11 +232,6 @@ export const sharingErrorText = (error: unknown): string => {
 
 export const isReauthRequired = (error: unknown): boolean =>
   error instanceof SharingError && error.code === 'reauth_required';
-
-/** A base pede o código do autenticador (sessão sem o segundo passo ou confirmação antiga). */
-export const isMfaRequired = (error: unknown): boolean =>
-  error instanceof SharingError &&
-  (error.code === 'mfa_required' || error.code === 'reauth_required');
 
 /**
  * Converte o erro do Supabase num SharingError: `message` traz o código estável do contrato.

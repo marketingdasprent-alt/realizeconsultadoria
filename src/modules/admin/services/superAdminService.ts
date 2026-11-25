@@ -1,6 +1,6 @@
 // Super administradores: quem são e quem pode passar a ser (rz_list_super_admins e companhia).
-// Só um super admin lê; adicionar e retirar exigem sessão aal2 (código do autenticador) e uma
-// confirmação recente, por isso o servidor pode responder mfa_required ou reauth_required.
+// Só um super admin lê; adicionar e retirar exigem um login recente (palavra-passe confirmada há menos de 10 minutos),
+// por isso o servidor pode responder reauth_required. O segundo passo (autenticador) é opcional.
 import { supabase } from '@/integrations/supabase/client';
 import { toSharingError } from '../lib/sharing';
 

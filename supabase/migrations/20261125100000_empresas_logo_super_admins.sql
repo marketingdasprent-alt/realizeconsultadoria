@@ -85,7 +85,7 @@ CREATE POLICY "Logos: apagar" ON storage.objects
   USING (bucket_id = 'company-logos' AND public.rz_can_write_logo(name));
 
 -- ============================================================================================ 2. Super admins
--- NOT VALID + VALIDATE: o CHECK entra sem varrer a tabela sob lock exclusivo; a validação corre depois com um lock leve.
+-- NOT VALID + VALIDATE: o ADD CONSTRAINT não varre a tabela; só o VALIDATE o faz (tudo na mesma transação).
 ALTER TABLE public.cross_company_audit DROP CONSTRAINT IF EXISTS cross_company_audit_action_check;
 ALTER TABLE public.cross_company_audit ADD CONSTRAINT cross_company_audit_action_check
   CHECK ((action = ANY (ARRAY['read'::text, 'write'::text, 'delete'::text, 'export'::text, 'reveal'::text,
@@ -95,7 +95,8 @@ ALTER TABLE public.cross_company_audit ADD CONSTRAINT cross_company_audit_action
     'group_dissolve'::text, 'super_admin_add'::text, 'super_admin_remove'::text]))) NOT VALID;
 ALTER TABLE public.cross_company_audit VALIDATE CONSTRAINT cross_company_audit_action_check;
 
--- Quantos super admins ATIVOS E UTILIZÁVEIS há, sem contar p_except (conta apagada ou banida não conta).
+-- Quantos super admins ATIVOS E UTILIZÁVEIS há, sem contar p_except: conta apagada ou banida não conta, nem quem
+-- tem o MFA obrigatório e nenhum fator TOTP verificado (nunca chegaria a aal2).
 CREATE OR REPLACE FUNCTION public.rz_other_usable_super_admins(p_except uuid)
  RETURNS integer
  LANGUAGE sql
@@ -106,7 +107,10 @@ AS $function$
   FROM public.platform_admins pa
   JOIN auth.users u ON u.id = pa.user_id
   WHERE pa.active AND pa.user_id IS DISTINCT FROM p_except
-    AND u.deleted_at IS NULL AND (u.banned_until IS NULL OR u.banned_until <= now());
+    AND u.deleted_at IS NULL AND (u.banned_until IS NULL OR u.banned_until <= now())
+    AND (NOT pa.mfa_required
+         OR EXISTS (SELECT 1 FROM auth.mfa_factors f
+                     WHERE f.user_id = pa.user_id AND f.factor_type = 'totp' AND f.status = 'verified'));
 $function$;
 REVOKE ALL ON FUNCTION public.rz_other_usable_super_admins(uuid) FROM PUBLIC, anon, authenticated;
 
@@ -122,8 +126,12 @@ BEGIN
   IF TG_OP = 'TRUNCATE' THEN
     PERFORM public.rz_fail('last_super_admin', 'Não se pode esvaziar a lista de super administradores.');
   END IF;
+  IF TG_LEVEL = 'STATEMENT' THEN
+    -- Antes de qualquer lock de linha (mesma ordem da RPC: advisory primeiro), para não haver deadlock.
+    PERFORM pg_advisory_xact_lock(hashtextextended('rz_super_admins', 0));
+    RETURN NULL;
+  END IF;
   IF OLD.active AND (TG_OP = 'DELETE' OR NEW.active IS NOT TRUE OR NEW.user_id IS DISTINCT FROM OLD.user_id) THEN
-    PERFORM pg_advisory_xact_lock(hashtext('rz_super_admins'));
     IF public.rz_other_usable_super_admins(OLD.user_id) < 1 THEN
       PERFORM public.rz_fail('last_super_admin', 'A plataforma tem de ter pelo menos um super administrador.');
     END IF;
@@ -137,6 +145,10 @@ DROP TRIGGER IF EXISTS rz_platform_admins_guard_row ON public.platform_admins;
 CREATE TRIGGER rz_platform_admins_guard_row
   BEFORE UPDATE OF active, user_id OR DELETE ON public.platform_admins
   FOR EACH ROW EXECUTE FUNCTION public.rz_platform_admins_guard();
+DROP TRIGGER IF EXISTS rz_platform_admins_guard_lock ON public.platform_admins;
+CREATE TRIGGER rz_platform_admins_guard_lock
+  BEFORE UPDATE OF active, user_id OR DELETE ON public.platform_admins
+  FOR EACH STATEMENT EXECUTE FUNCTION public.rz_platform_admins_guard();
 DROP TRIGGER IF EXISTS rz_platform_admins_guard_truncate ON public.platform_admins;
 CREATE TRIGGER rz_platform_admins_guard_truncate
   BEFORE TRUNCATE ON public.platform_admins
@@ -170,7 +182,10 @@ CREATE OR REPLACE FUNCTION public.rz_super_admin_direct()
 AS $function$
 BEGIN
   IF auth.uid() IS NULL OR NOT public.rz_is_super_admin()
-     OR NOT EXISTS (SELECT 1 FROM public.platform_admins pa WHERE pa.user_id = auth.uid() AND pa.active) THEN
+     OR NOT EXISTS (SELECT 1 FROM public.platform_admins pa JOIN auth.users u ON u.id = pa.user_id
+                     WHERE pa.user_id = auth.uid() AND pa.active
+                       AND u.deleted_at IS NULL AND (u.banned_until IS NULL OR u.banned_until <= now())
+                       AND (NOT pa.mfa_required OR coalesce(auth.jwt() ->> 'aal', '') = 'aal2')) THEN
     PERFORM public.rz_fail('not_platform_admin');
   END IF;
   RETURN auth.uid();
@@ -259,7 +274,7 @@ DECLARE
   v_actor uuid;
 BEGIN
   v_actor := public.rz_super_admin_assert();
-  PERFORM pg_advisory_xact_lock(hashtext('rz_super_admins'));
+  PERFORM pg_advisory_xact_lock(hashtextextended('rz_super_admins', 0));
   -- Quem esperava pelo lock pode ter sido retirado entretanto: confirma outra vez, já com o estado final.
   v_actor := public.rz_super_admin_assert();
   IF p_user IS NULL THEN
@@ -281,7 +296,8 @@ BEGIN
     PERFORM public.rz_fail('account_not_eligible', 'Esta conta não está confirmada ou está bloqueada.');
   END IF;
   -- Sem segundo passo verificado a conta nunca chegaria a aal2: ficaria super admin sem poder usá-lo.
-  IF NOT EXISTS (SELECT 1 FROM auth.mfa_factors f WHERE f.user_id = p_user AND f.status = 'verified') THEN
+  IF NOT EXISTS (SELECT 1 FROM auth.mfa_factors f
+                  WHERE f.user_id = p_user AND f.factor_type = 'totp' AND f.status = 'verified') THEN
     PERFORM public.rz_fail('mfa_not_enabled', 'Esta pessoa ainda não ativou o segundo passo (autenticador).');
   END IF;
   INSERT INTO public.platform_admins (user_id, active, mfa_required, created_by, created_at)
@@ -303,7 +319,7 @@ DECLARE
   v_actor uuid;
 BEGIN
   v_actor := public.rz_super_admin_assert();
-  PERFORM pg_advisory_xact_lock(hashtext('rz_super_admins'));
+  PERFORM pg_advisory_xact_lock(hashtextextended('rz_super_admins', 0));
   v_actor := public.rz_super_admin_assert();
   IF p_user IS NULL THEN
     PERFORM public.rz_fail('invalid_argument');

@@ -17,6 +17,7 @@ DROP FUNCTION IF EXISTS public.rz_super_admin_direct();
 DROP FUNCTION IF EXISTS public.rz_person_name(uuid);
 
 -- O trigger que impede a plataforma de ficar sem super admin sai com a migração.
+DROP TRIGGER IF EXISTS rz_platform_admins_guard_lock ON public.platform_admins;
 DROP TRIGGER IF EXISTS rz_platform_admins_guard_truncate ON public.platform_admins;
 DROP TRIGGER IF EXISTS rz_platform_admins_guard_row ON public.platform_admins;
 DROP FUNCTION IF EXISTS public.rz_platform_admins_guard();

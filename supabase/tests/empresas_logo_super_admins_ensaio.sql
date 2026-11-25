@@ -212,7 +212,11 @@ BEGIN
         'WITH u AS (UPDATE public.platform_admins SET active = true WHERE user_id = ''' || sa || ''' RETURNING 1), b AS (UPDATE auth.users SET banned_until = now() + interval ''1 day'' WHERE id = ''' || sb || ''' RETURNING 1) SELECT ''ok'' FROM u, b'),
       ('trigger: com o outro banido, desativar o único utilizável é recusado', 'pg', 'aal1', 'P0001:last_super_admin',
         'WITH u AS (UPDATE public.platform_admins SET active = false WHERE user_id = ''' || sa || ''' RETURNING 1) SELECT count(*)::text FROM u'),
-      ('RPC: um super admin banido não retira o único utilizável (os banidos não contam)', 'sb', 'aal2', 'P0001:last_super_admin',
+      ('utilizável: com MFA obrigatório e sem fator TOTP não conta (adNoMfa promovido à força só nesta transação)', 'pg', 'aal1', 'ok',
+        'WITH i AS (INSERT INTO public.platform_admins (user_id, active, mfa_required) VALUES (''' || adNoMfa || ''', true, true) RETURNING 1) SELECT ''ok'' FROM i'),
+      ('utilizável: sem ninguém que chegue a aal2 (sb banido, adNoMfa sem fator) não se desativa o último', 'pg', 'aal1', 'P0001:last_super_admin',
+        'WITH u AS (UPDATE public.platform_admins SET active = false WHERE user_id = ''' || sa || ''' RETURNING 1), v AS (UPDATE public.platform_admins SET active = false WHERE user_id = ''' || sb || ''' RETURNING 1) SELECT count(*)::text FROM u, v'),
+      ('banido: um super admin banido já não gere super admins (sessão ainda válida)', 'sb', 'aal2', '42501',
         'SELECT public.rz_remove_super_admin(''' || sa || ''')::text')
     ) AS t(nm, who, variant, expect, sql)
   LOOP

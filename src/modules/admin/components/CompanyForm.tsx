@@ -1,4 +1,5 @@
-import React, { useEffect, useId } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
+import { cn } from '@/lib/utils';
 import {
   useForm,
   type FieldError,
@@ -20,6 +21,16 @@ import type { Company } from '@/modules/admin/services/companyService';
 
 interface CompanyFormProps {
   initialData?: Company | null;
+  /** Id do <form>: o botão Guardar da página (fora do formulário) liga-se por `form={formId}`. */
+  formId?: string;
+  /** Esconde Cancelar e Guardar (a página mostra a sua própria barra). */
+  hideActions?: boolean;
+  /** Avisa quando há alterações por guardar. */
+  onDirtyChange?: (dirty: boolean) => void;
+  /** Chamado quando o envio falha a validação (a página mostra a secção dos campos). */
+  onInvalid?: () => void;
+  /** A logo, mostrada no cartão Identidade (só quando a empresa já existe). */
+  logoSlot?: React.ReactNode;
   /** Na criação traz também o primeiro administrador e o grupo (campos admin_* e group_*). */
   onSubmit: (data: CreateCompanyWithAdminInput) => Promise<void>;
   onCancel: () => void;
@@ -35,6 +46,17 @@ interface FieldProps {
   wide?: boolean;
   autoComplete?: string;
 }
+
+const Card: React.FC<{ title: string; className?: string; children: React.ReactNode }> = ({
+  title,
+  className,
+  children,
+}) => (
+  <section className={cn('space-y-4 rounded-2xl border p-5 shadow-card', className)}>
+    <h2 className="text-base font-semibold">{title}</h2>
+    {children}
+  </section>
+);
 
 /** Rótulo ligado ao campo (htmlFor/id) e erro anunciado (aria-invalid/aria-describedby). */
 const Field: React.FC<FieldProps> = ({ label, registration, error, type, wide, autoComplete }) => {
@@ -101,9 +123,9 @@ const NewCompanyAdminFields: React.FC<{
   ];
   const selectValue = groupId === NEW_GROUP ? NEW_GROUP : groupId || NO_GROUP;
   return (
-    <>
-      <div className="border-t pt-4">
-        <h3 className="text-sm font-semibold">Primeiro administrador</h3>
+    <Card title="Primeiro administrador e grupo">
+      <div>
+        <h4 className="text-sm font-semibold">Primeiro administrador</h4>
         <p className="text-xs text-muted-foreground">
           Cria a conta de quem vai gerir esta empresa. Gere só esta empresa e recebe os dados de
           acesso por email.
@@ -133,7 +155,7 @@ const NewCompanyAdminFields: React.FC<{
         />
       </div>
       <div className="border-t pt-4">
-        <h3 className="text-sm font-semibold">Grupo de empresas (opcional)</h3>
+        <h4 className="text-sm font-semibold">Grupo de empresas (opcional)</h4>
         <p className="text-xs text-muted-foreground">
           Empresas do mesmo grupo partilham o Feed (só leitura). Sem grupo, a empresa tem o seu
           próprio Feed e organograma.
@@ -176,12 +198,17 @@ const NewCompanyAdminFields: React.FC<{
           />
         )}
       </div>
-    </>
+    </Card>
   );
 };
 
 export const CompanyForm: React.FC<CompanyFormProps> = ({
   initialData,
+  formId,
+  hideActions,
+  onDirtyChange,
+  onInvalid,
+  logoSlot,
   onSubmit,
   onCancel,
   isLoading,
@@ -190,7 +217,8 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({
     register,
     handleSubmit,
     reset,
-    formState: { errors },
+    setFocus,
+    formState: { errors, isDirty },
     watch,
     setValue,
   } = useForm<CreateCompanyWithAdminInput>({
@@ -215,9 +243,10 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({
 
   // Quem usa o formulário dá-lhe uma `key` por empresa (ou "nova"), por isso a criação nasce vazia.
   // Aqui só se repõem os valores quando a empresa em edição é atualizada.
+  const appliedValues = useRef('');
   useEffect(() => {
     if (initialData) {
-      reset({
+      const values = {
         name: initialData.name,
         nif: initialData.nif,
         email: initialData.email,
@@ -227,43 +256,78 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({
         postal_code: initialData.postal_code || '',
         notes: initialData.notes || '',
         is_active: initialData.is_active,
-      });
+      };
+      // A logo (e outros dados que não são campos do formulário) muda `initialData` sem mudar
+      // estes valores: sem este teste o reset apagava o aviso "Tem alterações por guardar".
+      const serialized = JSON.stringify(values);
+      if (serialized === appliedValues.current) return;
+      appliedValues.current = serialized;
+      // keepDirtyValues: guardar a empresa atualiza os dados e não apaga o que se está a escrever.
+      reset(values, { keepDirtyValues: true });
     }
   }, [initialData, reset]);
 
+  useEffect(() => {
+    onDirtyChange?.(isDirty);
+  }, [isDirty, onDirtyChange]);
+
   return (
     <form
-      onSubmit={handleSubmit(data =>
-        // Em edição só seguem os campos da empresa (os do administrador e do grupo são da criação).
-        initialData
-          ? onSubmit(data)
-          : onSubmit({
-              ...data,
-              group_id: data.group_id === NEW_GROUP ? '' : data.group_id,
-              group_name: data.group_id === NEW_GROUP ? (data.group_name ?? '').trim() : '',
-            })
+      noValidate
+      onSubmit={handleSubmit(
+        data =>
+          // Em edição só seguem os campos da empresa (os do administrador e do grupo são da criação).
+          initialData
+            ? onSubmit(data)
+            : onSubmit({
+                ...data,
+                group_id: data.group_id === NEW_GROUP ? '' : data.group_id,
+                group_name: data.group_id === NEW_GROUP ? (data.group_name ?? '').trim() : '',
+              }),
+        invalid => {
+          onInvalid?.();
+          const first = Object.keys(invalid)[0] as keyof CreateCompanyWithAdminInput | undefined;
+          // Depois de a página mostrar a secção: um campo escondido não recebe o foco
+          if (first) window.setTimeout(() => setFocus(first), 0);
+        }
       )}
-      className="space-y-4 mt-4"
+      id={formId}
+      className="space-y-4"
     >
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-        <Field label="Nome da Empresa *" registration={register('name')} error={errors.name} wide />
-        <Field label="NIF *" registration={register('nif')} error={errors.nif} />
-        <Field label="Telefone" registration={register('phone')} error={errors.phone} />
-        <Field
-          label="Email *"
-          type="email"
-          registration={register('email')}
-          error={errors.email}
-          wide
-        />
-        <Field label="Morada" registration={register('address')} error={errors.address} wide />
-        <Field label="Cidade" registration={register('city')} error={errors.city} />
-        <Field
-          label="Código Postal"
-          registration={register('postal_code')}
-          error={errors.postal_code}
-        />
-      </div>
+      <Card title="Identidade">
+        {logoSlot}
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            label="Nome da Empresa *"
+            registration={register('name')}
+            error={errors.name}
+            wide
+          />
+          <Field label="NIF *" registration={register('nif')} error={errors.nif} />
+        </div>
+      </Card>
+      <Card title="Contactos">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field
+            label="Email *"
+            type="email"
+            registration={register('email')}
+            error={errors.email}
+          />
+          <Field label="Telefone" registration={register('phone')} error={errors.phone} />
+        </div>
+      </Card>
+      <Card title="Morada">
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <Field label="Morada" registration={register('address')} error={errors.address} wide />
+          <Field label="Cidade" registration={register('city')} error={errors.city} />
+          <Field
+            label="Código Postal"
+            registration={register('postal_code')}
+            error={errors.postal_code}
+          />
+        </div>
+      </Card>
       {!initialData && (
         <NewCompanyAdminFields
           register={register}
@@ -272,14 +336,16 @@ export const CompanyForm: React.FC<CompanyFormProps> = ({
           onGroupChange={value => setValue('group_id', value)}
         />
       )}
-      <div className="flex justify-end gap-3 pt-4">
-        <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
-          Cancelar
-        </Button>
-        <Button type="submit" variant="gold" disabled={isLoading}>
-          {isLoading ? 'A guardar...' : initialData ? 'Guardar Alterações' : 'Criar Empresa'}
-        </Button>
-      </div>
+      {!hideActions && (
+        <div className="flex justify-end gap-3 pt-4">
+          <Button type="button" variant="outline" onClick={onCancel} disabled={isLoading}>
+            Cancelar
+          </Button>
+          <Button type="submit" variant="gold" disabled={isLoading}>
+            {isLoading ? 'A guardar...' : initialData ? 'Guardar Alterações' : 'Criar Empresa'}
+          </Button>
+        </div>
+      )}
     </form>
   );
 };

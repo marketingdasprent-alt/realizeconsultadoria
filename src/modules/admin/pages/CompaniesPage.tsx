@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import { Plus, Search, Edit, Trash2, MoreHorizontal, Loader2 } from 'lucide-react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { Plus, Search, Loader2 } from 'lucide-react';
 import { AdminPageTitle } from '@/components/admin/AdminPageHeader';
 import { CompanyScopeNotice } from '@/components/admin/CompanyScopeNotice';
 import { Button } from '@/components/ui/button';
@@ -14,13 +14,6 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Badge } from '@/components/ui/badge';
 import { useToast } from '@/hooks/use-toast';
 import DeleteConfirmDialog from '@/components/admin/DeleteConfirmDialog';
 import { useAdminPermissions } from '@/hooks/useAdminPermissions';
@@ -28,9 +21,11 @@ import { useCompanies } from '@/hooks/useCompanies';
 import type { Company } from '@/modules/admin/services/companyService';
 import { ROUTES } from '@/lib/constants';
 import { AllGroupsPanel } from '../components/sharing/AllGroupsPanel';
+import { CompanyRow } from '../components/companies/CompanyRow';
+import { PlatformTeamPanel } from '../components/platform/PlatformTeamPanel';
 import { useCompanyScope } from '../context/CompanyScopeContext';
 import { useCompanyListFacts } from '../hooks/useCompanyListFacts';
-import { parseListTab } from '../lib/companyTabs';
+import { parseListTab, type ListTab } from '../lib/companyTabs';
 import { inScope } from '../lib/companyScope';
 
 const CompaniesPage = () => {
@@ -46,12 +41,12 @@ const CompaniesPage = () => {
   const [params, setParams] = useSearchParams();
   // "Grupos" (criar grupos, pôr e tirar empresas) é só do super admin.
   const listTab = parseListTab(params.get('tab'), isSuperAdmin);
-  const changeListTab = (tab: 'empresas' | 'grupos') =>
+  const changeListTab = (tab: ListTab) =>
     setParams(
       previous => {
         const next = new URLSearchParams(previous);
-        if (tab === 'grupos') next.set('tab', 'grupos');
-        else next.delete('tab');
+        if (tab === 'empresas') next.delete('tab');
+        else next.set('tab', tab);
         return next;
       },
       { replace: true }
@@ -86,10 +81,10 @@ const CompaniesPage = () => {
       toast({ title: 'Empresa eliminada com sucesso!' });
       setDeleteDialogOpen(false);
       setCompanyToDelete(null);
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro',
-        description: error.message || 'Ocorreu um erro ao eliminar.',
+        description: error instanceof Error ? error.message : 'Ocorreu um erro ao eliminar.',
         variant: 'destructive',
       });
     } finally {
@@ -106,10 +101,11 @@ const CompaniesPage = () => {
         title: 'Estado atualizado',
         description: `A empresa ${company.name} está agora ${!company.is_active ? 'Ativa' : 'Desativada'}.`,
       });
-    } catch (error: any) {
+    } catch (error: unknown) {
       toast({
         title: 'Erro ao atualizar estado',
-        description: error.message || 'Ocorreu um erro ao alterar o estado.',
+        description:
+          error instanceof Error ? error.message : 'Ocorreu um erro ao alterar o estado.',
         variant: 'destructive',
       });
     }
@@ -146,6 +142,7 @@ const CompaniesPage = () => {
               [
                 ['empresas', 'Empresas'],
                 ['grupos', 'Grupos'],
+                ['equipa', 'Equipa da plataforma'],
               ] as const
             ).map(([key, label]) => (
               <button
@@ -167,6 +164,8 @@ const CompaniesPage = () => {
 
         {listTab === 'grupos' ? (
           <AllGroupsPanel />
+        ) : listTab === 'equipa' ? (
+          <PlatformTeamPanel />
         ) : (
           <>
             <CompanyScopeNotice />
@@ -221,73 +220,16 @@ const CompaniesPage = () => {
                       </TableRow>
                     ) : (
                       filteredCompanies.map(company => (
-                        <TableRow key={company.id}>
-                          <TableCell className="font-medium">
-                            {canManage ? (
-                              <Link
-                                to={ROUTES.ADMIN.COMPANY_EDIT.replace(':id', company.id)}
-                                className="hover:underline"
-                              >
-                                {company.name}
-                              </Link>
-                            ) : (
-                              company.name
-                            )}
-                          </TableCell>
-                          <TableCell>{company.nif}</TableCell>
-                          <TableCell className="hidden md:table-cell">{company.email}</TableCell>
-                          <TableCell className="hidden md:table-cell">
-                            {company.city || '-'}
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                            {facts.get(company.id)?.group ?? '—'}
-                          </TableCell>
-                          <TableCell className="hidden lg:table-cell">
-                            {facts.get(company.id)?.admins ?? '—'}
-                          </TableCell>
-                          <TableCell
-                            className="py-1 px-2"
-                            onClick={e => {
-                              if (canAdministerPlatform) {
-                                e.stopPropagation();
-                                handleToggleStatus(company);
-                              }
-                            }}
-                          >
-                            <Badge
-                              variant={company.is_active ? 'default' : 'secondary'}
-                              className={`text-xs py-0 ${canAdministerPlatform ? 'cursor-pointer hover:opacity-80 transition-opacity' : ''}`}
-                            >
-                              {company.is_active ? 'Ativa' : 'Desativada'}
-                            </Badge>
-                          </TableCell>
-                          <TableCell>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon">
-                                  <MoreHorizontal className="h-4 w-4" />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                {canManage && (
-                                  <DropdownMenuItem onClick={() => handleEdit(company)}>
-                                    <Edit className="h-4 w-4 mr-2" />
-                                    Editar
-                                  </DropdownMenuItem>
-                                )}
-                                {canAdministerPlatform && (
-                                  <DropdownMenuItem
-                                    onClick={() => openDeleteDialog(company)}
-                                    className="text-destructive"
-                                  >
-                                    <Trash2 className="h-4 w-4 mr-2" />
-                                    Eliminar
-                                  </DropdownMenuItem>
-                                )}
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </TableCell>
-                        </TableRow>
+                        <CompanyRow
+                          key={company.id}
+                          company={company}
+                          facts={facts.get(company.id)}
+                          canManage={canManage}
+                          canAdministerPlatform={canAdministerPlatform}
+                          onOpen={handleEdit}
+                          onToggleStatus={handleToggleStatus}
+                          onDelete={openDeleteDialog}
+                        />
                       ))
                     )}
                   </TableBody>

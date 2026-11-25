@@ -55,8 +55,7 @@ const renderPage = () =>
   );
 
 const openRowMenu = async (user: ReturnType<typeof userEvent.setup>) => {
-  const row = screen.getByText('Acme Lda').closest('tr')!;
-  await user.click(row.querySelector('button')!);
+  await user.click(screen.getByRole('button', { name: 'Mais ações de Acme Lda' }));
 };
 
 beforeEach(() => {
@@ -75,25 +74,70 @@ describe('CompaniesPage', () => {
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('"Editar" navega para a página da empresa, sem abrir pop-up', async () => {
+  it('clicar em qualquer sítio da linha abre a ficha, sem pop-up', async () => {
     const user = userEvent.setup();
     renderPage();
-    await openRowMenu(user);
-    await user.click(await screen.findByRole('menuitem', { name: /editar/i }));
+    await user.click(screen.getByText('123456789'));
     expect(screen.getByTestId('where')).toHaveTextContent('/admin/empresas/c1');
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
   });
 
-  it('sem permissão de gerir não há "Nova Empresa", "Editar", "Eliminar" nem toggle', async () => {
+  it('clicar no nome abre a ficha uma só vez (a ligação e a linha não navegam duas vezes)', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const link = screen.getByRole('link', { name: 'Acme Lda' });
+    expect(link).toHaveAttribute('href', '/admin/empresas/c1');
+    await user.click(link);
+    expect(screen.getByTestId('where')).toHaveTextContent('/admin/empresas/c1');
+    expect(screen.getByText('Página de edição')).toBeInTheDocument();
+  });
+
+  it('com o teclado: Tab chega ao nome, com foco visível, e Enter abre a ficha', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    const link = screen.getByRole('link', { name: 'Acme Lda' });
+    expect(link.className).toMatch(/focus-visible:ring/);
+    // Antes da lista há os separadores do super admin: Tab até chegar ao nome
+    for (let i = 0; i < 8 && document.activeElement !== link; i += 1) await user.tab();
+    expect(link).toHaveFocus();
+    await user.keyboard('{Enter}');
+    expect(screen.getByTestId('where')).toHaveTextContent('/admin/empresas/c1');
+    expect(screen.getByText('Página de edição')).toBeInTheDocument();
+  });
+
+  it('os 3 pontos só abrem o menu: não abrem a ficha', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await openRowMenu(user);
+    expect(await screen.findByRole('menuitem', { name: /eliminar/i })).toBeInTheDocument();
+    expect(screen.queryByRole('menuitem', { name: /editar/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/admin\/empresas$/);
+  });
+
+  it('clicar no estado alterna e não abre a ficha', async () => {
+    const user = userEvent.setup();
+    renderPage();
+    await user.click(screen.getByRole('button', { name: /desativar Acme Lda/i }));
+    await waitFor(() => expect(toggleStatus).toHaveBeenCalledWith('c1', false));
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/admin\/empresas$/);
+  });
+
+  it('mostra as iniciais da empresa quando não tem logo', () => {
+    renderPage();
+    expect(screen.getByText('AL')).toBeInTheDocument();
+  });
+
+  it('sem permissão de gerir não há "Nova Empresa", ligação, menu nem toggle, e a linha não abre', async () => {
     canManage = false;
     const user = userEvent.setup();
     renderPage();
     expect(screen.queryByRole('button', { name: /nova empresa/i })).not.toBeInTheDocument();
-    await openRowMenu(user);
-    expect(screen.queryByRole('menuitem', { name: /editar/i })).not.toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /eliminar/i })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText('Ativa'));
+    expect(screen.queryByRole('link', { name: 'Acme Lda' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /mais ações/i })).not.toBeInTheDocument();
+    await user.click(screen.getByText('123456789'));
+    await user.click(screen.getByText('Ativa'));
     expect(toggleStatus).not.toHaveBeenCalled();
+    expect(screen.getByTestId('where')).toHaveTextContent(/^\/admin\/empresas$/);
   });
 
   it('com permissão de gerir, "Eliminar" pede confirmação e só depois apaga', async () => {
@@ -110,22 +154,16 @@ describe('CompaniesPage', () => {
     await waitFor(() => expect(deleteCompany).toHaveBeenCalledWith('c1'));
   });
 
-  it('com permissão de gerir, clicar no estado alterna Ativa/Desativada', async () => {
-    const user = userEvent.setup();
-    renderPage();
-    await user.click(screen.getByText('Ativa'));
-    await waitFor(() => expect(toggleStatus).toHaveBeenCalledWith('c1', false));
-  });
-
-  it('administrador de empresa (não super admin) edita mas não cria, elimina nem ativa/desativa', async () => {
+  it('administrador de empresa (não super admin) abre a ficha, mas não cria, elimina nem ativa/desativa', async () => {
     isSuperAdmin = false;
     const user = userEvent.setup();
     renderPage();
     expect(screen.queryByRole('button', { name: /nova empresa/i })).not.toBeInTheDocument();
-    fireEvent.click(screen.getByText('Ativa'));
+    expect(screen.queryByRole('button', { name: /mais ações/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /desativar/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole('navigation', { name: 'Empresas' })).not.toBeInTheDocument();
+    await user.click(screen.getByText('Ativa'));
     expect(toggleStatus).not.toHaveBeenCalled();
-    await openRowMenu(user);
-    expect(await screen.findByRole('menuitem', { name: /editar/i })).toBeInTheDocument();
-    expect(screen.queryByRole('menuitem', { name: /eliminar/i })).not.toBeInTheDocument();
+    expect(screen.getByTestId('where')).toHaveTextContent('/admin/empresas/c1');
   });
 });

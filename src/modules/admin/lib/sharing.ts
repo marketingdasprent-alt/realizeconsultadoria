@@ -201,6 +201,11 @@ const ERROR_TEXT: Record<string, string> = {
   module_not_grantable: 'Uma das permissões escolhidas não pode ser partilhada.',
   reauth_required: 'Confirme a sua palavra-passe para continuar.',
   reauth_failed: 'A palavra-passe não está certa.',
+  mfa_required: 'Confirme com o código da sua aplicação de autenticação.',
+  already_super_admin: 'Esta pessoa já é super administradora.',
+  last_super_admin: 'A plataforma tem de ter pelo menos um super administrador.',
+  mfa_not_enabled: 'Esta pessoa ainda não ativou o segundo passo (autenticador).',
+  account_not_eligible: 'Esta conta não está confirmada ou está bloqueada.',
   invalid_argument: 'Há dados em falta ou inválidos. Reveja o formulário.',
   unknown_capability: 'Uma das permissões escolhidas não existe.',
   nothing_to_grant: 'Escolha pelo menos uma permissão para partilhar.',
@@ -229,6 +234,11 @@ export const sharingErrorText = (error: unknown): string => {
 export const isReauthRequired = (error: unknown): boolean =>
   error instanceof SharingError && error.code === 'reauth_required';
 
+/** A base pede o código do autenticador (sessão sem o segundo passo ou confirmação antiga). */
+export const isMfaRequired = (error: unknown): boolean =>
+  error instanceof SharingError &&
+  (error.code === 'mfa_required' || error.code === 'reauth_required');
+
 /**
  * Converte o erro do Supabase num SharingError: `message` traz o código estável do contrato.
  * Função inexistente (PGRST202 / 42883) significa que a migração ainda não foi aplicada.
@@ -241,6 +251,7 @@ export const toSharingError = (error: {
   if (error.code === 'PGRST202' || error.code === '42883' || error.code === '42P01')
     return new SharingError('unavailable');
   if (error.code === 'RZ401') return new SharingError('reauth_required', error.details ?? null);
+  if (error.code === 'RZ402') return new SharingError('mfa_required', error.details ?? null);
   if (error.code === 'RZ429') return new SharingError('rate_limited', error.details ?? null);
   const code = /^[a-z_]+$/.test(error.message ?? '') ? (error.message as string) : 'unknown';
   return new SharingError(code, error.details ?? null);

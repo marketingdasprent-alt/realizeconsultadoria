@@ -1190,6 +1190,7 @@ export type Database = {
           email: string;
           id: string;
           is_active: boolean;
+          logo_path: string | null;
           name: string;
           nif: string;
           notes: string | null;
@@ -1206,6 +1207,7 @@ export type Database = {
           email: string;
           id?: string;
           is_active?: boolean;
+          logo_path?: string | null;
           name: string;
           nif: string;
           notes?: string | null;
@@ -1222,6 +1224,7 @@ export type Database = {
           email?: string;
           id?: string;
           is_active?: boolean;
+          logo_path?: string | null;
           name?: string;
           nif?: string;
           notes?: string | null;

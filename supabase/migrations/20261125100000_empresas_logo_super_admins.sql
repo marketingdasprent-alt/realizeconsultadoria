@@ -14,7 +14,8 @@ ALTER TABLE public.companies ADD COLUMN IF NOT EXISTS logo_path text;
 
 ALTER TABLE public.companies DROP CONSTRAINT IF EXISTS companies_logo_path_check;
 ALTER TABLE public.companies ADD CONSTRAINT companies_logo_path_check
-  CHECK (logo_path IS NULL OR (char_length(logo_path) <= 300 AND logo_path LIKE id::text || '/%'));
+  CHECK (logo_path IS NULL OR (logo_path ~ ('^' || id::text || '/[A-Za-z0-9._-]{1,100}[.](webp|png|jpe?g)$')
+                               AND logo_path !~ '[.][.]'));
 
 -- O administrador da empresa muda a logo da sua empresa: logo_path junta-se às colunas livres do guarda
 -- (o resto do corpo da função mantém-se igual).
@@ -46,7 +47,8 @@ ON CONFLICT (id) DO UPDATE
 SET public = true, file_size_limit = 1048576,
     allowed_mime_types = ARRAY['image/webp', 'image/png', 'image/jpeg'];
 
--- Pode escrever o ficheiro "<empresa>/<nome>"? Só super admin ou administrador dessa empresa, e só nessa pasta.
+-- Pode escrever o ficheiro "<empresa>/<nome>"? Só super admin ou administrador dessa empresa, só nessa pasta
+-- (um nível) e só com nome simples e extensão webp, png ou jpg.
 CREATE OR REPLACE FUNCTION public.rz_can_write_logo(p_name text)
  RETURNS boolean
  LANGUAGE sql
@@ -57,6 +59,8 @@ AS $function$
     CASE
       WHEN array_length(storage.foldername(p_name), 1) = 1
        AND (storage.foldername(p_name))[1] ~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$'
+       AND storage.filename(p_name) ~ '^[A-Za-z0-9._-]{1,100}[.](webp|png|jpe?g)$'
+       AND storage.filename(p_name) !~ '[.][.]'
       THEN public.rz_is_company_admin(((storage.foldername(p_name))[1])::uuid)
     END, false);
 $function$;
@@ -65,7 +69,7 @@ GRANT EXECUTE ON FUNCTION public.rz_can_write_logo(text) TO authenticated;
 
 DROP POLICY IF EXISTS "Logos: ver" ON storage.objects;
 CREATE POLICY "Logos: ver" ON storage.objects
-  FOR SELECT TO authenticated USING (bucket_id = 'company-logos');
+  FOR SELECT TO authenticated USING (bucket_id = 'company-logos' AND public.rz_can_write_logo(name));
 DROP POLICY IF EXISTS "Logos: enviar" ON storage.objects;
 CREATE POLICY "Logos: enviar" ON storage.objects
   FOR INSERT TO authenticated
@@ -81,6 +85,8 @@ CREATE POLICY "Logos: apagar" ON storage.objects
   USING (bucket_id = 'company-logos' AND public.rz_can_write_logo(name));
 
 -- ============================================================================================ 2. Super admins
+-- Falha depressa em vez de bloquear a auditoria se houver uma transação a usá-la.
+SET LOCAL lock_timeout = '5s';
 ALTER TABLE public.cross_company_audit DROP CONSTRAINT IF EXISTS cross_company_audit_action_check;
 ALTER TABLE public.cross_company_audit ADD CONSTRAINT cross_company_audit_action_check
   CHECK ((action = ANY (ARRAY['read'::text, 'write'::text, 'delete'::text, 'export'::text, 'reveal'::text,
@@ -96,8 +102,8 @@ CREATE OR REPLACE FUNCTION public.rz_person_name(p_user uuid)
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
 AS $function$
-  SELECT coalesce(nullif(trim(e.ename), ''), nullif(trim(u.raw_user_meta_data ->> 'name'), ''),
-                  split_part(u.email::text, '@', 1))
+  -- Só a ficha de colaborador ou o email: o nome do perfil da conta é editável por quem a tem.
+  SELECT coalesce(nullif(trim(e.ename), ''), split_part(u.email::text, '@', 1))
   FROM auth.users u
   LEFT JOIN LATERAL (
     SELECT emp.name AS ename FROM public.employees emp
@@ -158,7 +164,7 @@ $function$;
 
 -- Candidatos: quem já administra alguma empresa e ainda não é super admin.
 CREATE OR REPLACE FUNCTION public.rz_super_admin_candidates()
- RETURNS TABLE(user_id uuid, name text, email text, companies text)
+ RETURNS TABLE(user_id uuid, name text, email text, companies text, mfa_enabled boolean)
  LANGUAGE plpgsql
  STABLE SECURITY DEFINER
  SET search_path TO 'public', 'pg_temp'
@@ -169,7 +175,8 @@ BEGIN
   END IF;
   RETURN QUERY
   SELECT cm.user_id, public.rz_person_name(cm.user_id), u.email::text,
-         string_agg(c.name, ', ' ORDER BY c.name)
+         string_agg(c.name, ', ' ORDER BY c.name),
+         EXISTS (SELECT 1 FROM auth.mfa_factors f WHERE f.user_id = cm.user_id AND f.status = 'verified')
   FROM public.company_memberships cm
   JOIN auth.users u ON u.id = cm.user_id
   JOIN public.companies c ON c.id = cm.company_id
@@ -191,6 +198,8 @@ DECLARE
 BEGIN
   v_actor := public.rz_super_admin_assert();
   PERFORM pg_advisory_xact_lock(hashtext('rz_super_admins'));
+  -- Quem esperava pelo lock pode ter sido retirado entretanto: confirma outra vez, já com o estado final.
+  v_actor := public.rz_super_admin_assert();
   IF p_user IS NULL THEN
     PERFORM public.rz_fail('invalid_argument');
   END IF;
@@ -221,6 +230,7 @@ DECLARE
 BEGIN
   v_actor := public.rz_super_admin_assert();
   PERFORM pg_advisory_xact_lock(hashtext('rz_super_admins'));
+  v_actor := public.rz_super_admin_assert();
   IF p_user IS NULL THEN
     PERFORM public.rz_fail('invalid_argument');
   END IF;

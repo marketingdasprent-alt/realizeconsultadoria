@@ -1,12 +1,12 @@
 -- Rollback de 20261125100000_empresas_logo_super_admins.sql
 --
--- Remove as funções e políticas novas, a coluna companies.logo_path e repõe o CHECK da auditoria.
+-- Remove as funções e políticas novas, a coluna companies.logo_path e repõe o guarda de empresas.
 -- ATENÇÃO: apagar a coluna perde os caminhos das logos já escolhidas (os ficheiros ficam no bucket).
 -- O bucket "company-logos" NÃO se apaga aqui (o Supabase recusa se tiver ficheiros); se estiver vazio:
 --   DELETE FROM storage.buckets WHERE id = 'company-logos';
 -- As linhas de platform_admins não são tocadas. Quem foi promovido por esta funcionalidade continua
 -- super admin; para o retirar: UPDATE public.platform_admins SET active = false WHERE user_id = '<id>';
--- As entradas de auditoria 'super_admin_add'/'super_admin_remove' têm de sair antes de repor o CHECK.
+-- A auditoria não se toca (é imutável): o CHECK com as 2 ações novas fica como está.
 
 DROP FUNCTION IF EXISTS public.rz_remove_super_admin(uuid);
 DROP FUNCTION IF EXISTS public.rz_add_super_admin(uuid);
@@ -15,14 +15,8 @@ DROP FUNCTION IF EXISTS public.rz_list_super_admins();
 DROP FUNCTION IF EXISTS public.rz_super_admin_assert();
 DROP FUNCTION IF EXISTS public.rz_person_name(uuid);
 
-DELETE FROM public.cross_company_audit WHERE action IN ('super_admin_add', 'super_admin_remove');
-ALTER TABLE public.cross_company_audit DROP CONSTRAINT IF EXISTS cross_company_audit_action_check;
-ALTER TABLE public.cross_company_audit ADD CONSTRAINT cross_company_audit_action_check
-  CHECK ((action = ANY (ARRAY['read'::text, 'write'::text, 'delete'::text, 'export'::text, 'reveal'::text,
-    'support_read'::text, 'support_grant'::text, 'support_revoke'::text, 'share_request'::text,
-    'share_approve'::text, 'share_revoke'::text, 'flag_change'::text, 'super_admin_access'::text,
-    'group_create'::text, 'group_update'::text, 'group_members'::text, 'group_capabilities'::text,
-    'group_dissolve'::text])));
+-- O CHECK da auditoria fica alargado (as ações 'super_admin_add'/'super_admin_remove' já gravadas não se
+-- apagam: a auditoria é imutável) e é inofensivo.
 
 DROP POLICY IF EXISTS "Logos: apagar" ON storage.objects;
 DROP POLICY IF EXISTS "Logos: substituir" ON storage.objects;

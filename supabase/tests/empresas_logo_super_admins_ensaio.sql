@@ -5,7 +5,9 @@
 --
 -- Papéis: sa/sb = super admins sintéticos; adA/adB = administradores das empresas A/B; adC = administrador
 -- de A (candidato a promoção); plain = conta sem papel. Sessões: aal2 (MFA, login recente), aal1, stale
--- (aal2 mas com a confirmação com mais de 10 minutos).
+-- (aal2 mas com a confirmação com mais de 10 minutos). A corrida do advisory lock entre dois super admins não se
+-- testa numa só transação: a segunda chamada a rz_super_admin_assert depois do lock está no código.
+-- O ramo last_super_admin é só defesa: quem age está ativo e é diferente do alvo, logo sobra sempre alguém.
 
 DO $t$
 DECLARE
@@ -25,7 +27,10 @@ DECLARE
   v_pass integer := 0;
   v_fail integer := 0;
   v_ok boolean;
+  v_real integer;
+  empP uuid;
 BEGIN
+  SELECT count(*) INTO v_real FROM public.platform_admins WHERE active;
   FOR v_k IN 1 .. array_length(v_names, 1) LOOP
     v_ids := v_ids || gen_random_uuid();
     INSERT INTO auth.users (id, instance_id, aud, role, email, created_at, updated_at)
@@ -70,6 +75,18 @@ BEGIN
         'WITH d AS (DELETE FROM storage.objects WHERE bucket_id = ''company-logos'' AND name = ''' || kA || '/seed.webp'' RETURNING 1) SELECT count(*)::text FROM d'),
       ('logo: admin de A NÃO substitui a logo de B', 'adA', 'aal1', '0',
         'WITH u AS (UPDATE storage.objects SET name = name WHERE bucket_id = ''company-logos'' AND name = ''' || kB || '/s.webp'' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('logo: admin de A NÃO muda o nome do seu ficheiro para a pasta de B (WITH CHECK)', 'adA', 'aal1', '42501',
+        'WITH u AS (UPDATE storage.objects SET name = ''' || kB || '/x.webp'' WHERE bucket_id = ''company-logos'' AND name = ''' || kA || '/a.webp'' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('logo: admin de A substitui o seu próprio ficheiro', 'adA', 'aal1', '1',
+        'WITH u AS (UPDATE storage.objects SET name = ''' || kA || '/b.webp'' WHERE bucket_id = ''company-logos'' AND name = ''' || kA || '/a.webp'' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('logo: extensão .svg recusada mesmo com o tipo declarado png', 'adA', 'aal1', '42501',
+        'WITH i AS (INSERT INTO storage.objects (bucket_id, name, owner, metadata) VALUES (''company-logos'', ''' || kA || '/x.svg'', auth.uid(), ''{"mimetype":"image/png"}''::jsonb) RETURNING 1) SELECT ''ok'' FROM i'),
+      ('logo: nome com .. recusado', 'adA', 'aal1', '42501',
+        'WITH i AS (INSERT INTO storage.objects (bucket_id, name, owner) VALUES (''company-logos'', ''' || kA || '/a..webp'', auth.uid()) RETURNING 1) SELECT ''ok'' FROM i'),
+      ('logo: admin de B não lista nem vê as pastas de A', 'adB', 'aal1', '0',
+        'SELECT count(*)::text FROM storage.objects WHERE bucket_id = ''company-logos'' AND name LIKE ''' || kA || '/%'''),
+      ('logo: admin de A vê os seus ficheiros', 'adA', 'aal1', 'true',
+        'SELECT (count(*) >= 1)::text FROM storage.objects WHERE bucket_id = ''company-logos'' AND name LIKE ''' || kA || '/%'''),
       ('logo: admin de A apaga a logo de A', 'adA', 'aal1', '1',
         'WITH d AS (DELETE FROM storage.objects WHERE bucket_id = ''company-logos'' AND name = ''' || kA || '/seed.webp'' RETURNING 1) SELECT count(*)::text FROM d'),
       -- ---------------- logo: coluna companies.logo_path
@@ -77,6 +94,12 @@ BEGIN
         'WITH u AS (UPDATE public.companies SET logo_path = ''' || kA || '/a.webp'' WHERE id = ''' || kA || ''' RETURNING 1) SELECT count(*)::text FROM u'),
       ('coluna: caminho de outra empresa é recusado (CHECK)', 'adA', 'aal1', '23514',
         'WITH u AS (UPDATE public.companies SET logo_path = ''' || kB || '/a.webp'' WHERE id = ''' || kA || ''' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('coluna: caminho com .. é recusado', 'adA', 'aal1', '23514',
+        'WITH u AS (UPDATE public.companies SET logo_path = ''' || kA || '/../' || kB || '/a.webp'' WHERE id = ''' || kA || ''' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('coluna: caminho com ? ou # é recusado', 'adA', 'aal1', '23514',
+        'WITH u AS (UPDATE public.companies SET logo_path = ''' || kA || '/a.webp?x=1'' WHERE id = ''' || kA || ''' RETURNING 1) SELECT count(*)::text FROM u'),
+      ('coluna: subpasta é recusada', 'adA', 'aal1', '23514',
+        'WITH u AS (UPDATE public.companies SET logo_path = ''' || kA || '/x/a.webp'' WHERE id = ''' || kA || ''' RETURNING 1) SELECT count(*)::text FROM u'),
       ('coluna: o guarda continua a recusar o NIF a um admin de empresa', 'adA', 'aal1', '42501',
         'WITH u AS (UPDATE public.companies SET nif = ''' || v_nif || 'X'' WHERE id = ''' || kA || ''' RETURNING 1) SELECT count(*)::text FROM u'),
       ('coluna: o super admin muda o NIF', 'sa', 'aal1', '1',
@@ -104,7 +127,7 @@ BEGIN
         'WITH i AS (INSERT INTO public.platform_admins (user_id) VALUES (''' || adA || ''') RETURNING 1) SELECT count(*)::text FROM i'),
       ('escalada: UPDATE direto em platform_admins recusado', 'sa', 'aal2', '42501',
         'WITH u AS (UPDATE public.platform_admins SET active = false WHERE user_id = ''' || sb || ''' RETURNING 1) SELECT count(*)::text FROM u'),
-      ('escalada: ligar a ficha de A a um super admin (admin_user_id) é recusado', 'adA', 'aal2', '*ERR',
+      ('escalada: ligar a ficha de A a um super admin (admin_user_id) é recusado pelo guarda', 'adA', 'aal2', '42501',
         'WITH u AS (UPDATE public.employees SET admin_user_id = ''' || sa || ''' WHERE id = ''' || empA || ''' RETURNING 1) SELECT count(*)::text FROM u'),
       ('escalada: anon não chama a função', 'anon', 'aal2', '42501', 'SELECT public.rz_add_super_admin(''' || adC || ''')::text'),
       ('escalada: ninguém chama o auxiliar interno', 'sa', 'aal2', '42501', 'SELECT public.rz_super_admin_assert()::text'),
@@ -123,6 +146,8 @@ BEGIN
         'SELECT count(*)::text FROM public.cross_company_audit WHERE action = ''super_admin_add'' AND resource_id = ''' || adC || ''' AND actor_user_id = ''' || sa || ''''),
       ('adicionar: já aparece na lista', 'sa', 'aal1', 'true',
         'SELECT (count(*) FILTER (WHERE user_id = ''' || adC || ''') = 1)::text FROM public.rz_list_super_admins()'),
+      ('mfa_required: o promovido em aal1 NÃO tem poder de super admin', 'adC', 'aal1', '42501', 'SELECT count(*)::text FROM public.rz_list_super_admins()'),
+      ('mfa_required: o promovido em aal2 tem', 'adC', 'aal2', 'true', 'SELECT (count(*) >= 3)::text FROM public.rz_list_super_admins()'),
       ('retirar: um super admin não se retira a si próprio', 'sa', 'aal2', '22023', 'SELECT public.rz_remove_super_admin(''' || sa || ''')::text'),
       ('retirar: quem não é super admin dá "não encontrado"', 'sa', 'aal2', '02000', 'SELECT public.rz_remove_super_admin(''' || plain || ''')::text'),
       ('retirar: super admin retira o promovido', 'sa', 'aal2', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_remove_super_admin(''' || adC || ''')) q'),
@@ -130,15 +155,25 @@ BEGIN
         'SELECT (SELECT active::text FROM public.platform_admins WHERE user_id = ''' || adC || ''') || ''/'' || (SELECT count(*)::text FROM public.cross_company_audit WHERE action = ''super_admin_remove'' AND resource_id = ''' || adC || ''')'),
       ('retirar: o retirado já não tem poder de super admin', 'pg', 'aal1', 'false',
         'SELECT public.rz_is_super_admin_for(''' || adC || ''')::text'),
+      ('re-promover: o mesmo utilizador volta a ser adicionado', 'sa', 'aal2', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_add_super_admin(''' || adC || '''))  q'),
+      ('re-promover: fica ativo outra vez, com MFA obrigatório e a nova autoria', 'pg', 'aal1', 'true/true/true',
+        'SELECT active::text || ''/'' || mfa_required::text || ''/'' || (created_by = ''' || sa || ''')::text FROM public.platform_admins WHERE user_id = ''' || adC || ''''),
+      ('re-promover: a auditoria tem 2 registos de adicionar', 'pg', 'aal1', '2',
+        'SELECT count(*)::text FROM public.cross_company_audit WHERE action = ''super_admin_add'' AND resource_id = ''' || adC || ''''),
+      ('re-promover: retirado de novo', 'sa', 'aal2', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_remove_super_admin(''' || adC || ''')) q'),
       ('retirar: o retirado deixa de gerir super admins', 'adC', 'aal2', '42501', 'SELECT public.rz_add_super_admin(''' || adC || ''')::text'),
-      ('real: João e Thiago continuam ativos e intactos', 'pg', 'aal1', '2',
+      ('real: os super admins reais continuam ativos e intactos', 'pg', 'aal1', v_real::text,
         'SELECT count(*)::text FROM public.platform_admins WHERE active AND user_id NOT IN (''' || sa || ''', ''' || sb || ''', ''' || adC || ''')'),
-      ('último: só sa e sb ativos (os outros desativados só nesta transação)', 'pg', 'aal1', 'ok',
+      ('preparação do "último": só sa e sb ativos (os reais ficam desativados só nesta transação)', 'pg', 'aal1', 'ok',
         'WITH u AS (UPDATE public.platform_admins SET active = false WHERE active AND user_id NOT IN (''' || sa || ''', ''' || sb || ''') RETURNING 1) SELECT ''ok'' FROM (SELECT count(*) FROM u) q'),
       ('último: sb retira sa', 'sb', 'aal2', 'ok', 'SELECT ''ok'' FROM (SELECT public.rz_remove_super_admin(''' || sa || ''')) q'),
       ('último: ficou exatamente 1 super admin ativo (sb)', 'pg', 'aal1', '1',
         'SELECT count(*)::text FROM public.platform_admins WHERE active'),
-      ('último: o único super admin não se retira a si próprio', 'sb', 'aal2', '22023', 'SELECT public.rz_remove_super_admin(''' || sb || ''')::text')
+      ('último: quem fica sozinho não se retira a si próprio', 'sb', 'aal2', '22023', 'SELECT public.rz_remove_super_admin(''' || sb || ''')::text')
+      ,
+      ('identidade: preparação, a conta de colaborador fica ligada ao super admin sb', 'pg', 'aal1', 'ok',
+        'WITH i AS (INSERT INTO public.employees (name, email, company_id, user_id, admin_user_id) VALUES (''ZZ Ligado'', ''zz-ligado@invalid.example'', ''' || kA || ''', ''' || plain || ''', ''' || sb || ''') RETURNING 1) SELECT ''ok'' FROM i'),
+      ('identidade: a conta de colaborador ligada ao super admin não o retira', 'plain', 'aal2', '22023', 'SELECT public.rz_remove_super_admin(''' || sb || ''')::text')
     ) AS t(nm, who, variant, expect, sql)
   LOOP
     v_i := v_i + 1;

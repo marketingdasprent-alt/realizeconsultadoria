@@ -3,7 +3,7 @@ import { format } from 'date-fns';
 import { pt } from 'date-fns/locale';
 import { CheckCircle2, Megaphone } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { RichText } from '../RichText';
+import { NoticeText } from './NoticeText';
 import { NoticeReactions } from './NoticeReactions';
 import type { NoticeReaction } from '../../lib/noticeReactions';
 import type { Notice } from '../../types';
@@ -44,10 +44,7 @@ export const NoticeCard: React.FC<NoticeCardProps> = ({
       </div>
     </header>
     <h3 className="mt-3 text-[17px] font-bold">{notice.title}</h3>
-    <RichText
-      text={notice.message}
-      className="mt-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed text-rz-ink/90"
-    />
+    <NoticeText text={notice.message} className="mt-1" />
     <NoticeReactions reactions={reactions} onReact={onReact} />
     <div className="mt-4">
       {notice.read ? (

@@ -1,5 +1,15 @@
 import React, { useRef } from 'react';
-import { Loader2, Mail, Paperclip, Smartphone, X } from 'lucide-react';
+import {
+  Bold,
+  Italic,
+  List,
+  ListOrdered,
+  Loader2,
+  Mail,
+  Paperclip,
+  Smartphone,
+  X,
+} from 'lucide-react';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
@@ -7,6 +17,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { insertAtCursor } from '@/lib/insertAtCursor';
 import { EmojiPicker } from '@/modules/messenger/components/EmojiPicker';
 import type { BroadcastDraft, BroadcastErrors } from '../../lib/broadcast';
+import { applyFormat, type FormatAction } from '../../lib/broadcastFormat';
 import type { BroadcastAttachment } from '../../services/broadcastService';
 import { BroadcastAi } from './BroadcastAi';
 import { BroadcastSignaturePicker } from './BroadcastSignaturePicker';
@@ -42,6 +53,14 @@ const Field: React.FC<{ id: string; label: string; error?: string; children: Rea
   </div>
 );
 
+const FORMAT_BUTTONS: { action: FormatAction; label: string; icon: typeof Bold; hint?: string }[] =
+  [
+    { action: 'bold', label: 'Negrito', icon: Bold, hint: 'Ctrl+B' },
+    { action: 'italic', label: 'Itálico', icon: Italic, hint: 'Ctrl+I' },
+    { action: 'bullets', label: 'Lista com pontos', icon: List },
+    { action: 'numbers', label: 'Lista numerada', icon: ListOrdered },
+  ];
+
 const size = (bytes: number) =>
   bytes > 1024 * 1024 ? `${(bytes / 1024 / 1024).toFixed(1)} MB` : `${Math.ceil(bytes / 1024)} KB`;
 
@@ -62,6 +81,18 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
 }) => {
   const fileInput = useRef<HTMLInputElement>(null);
   const messageRef = useRef<HTMLTextAreaElement>(null);
+  /** Formata o que está selecionado (as marcas ficam no texto e saem formatadas no email e no Feed). */
+  const format = (action: FormatAction) => {
+    const field = messageRef.current;
+    const start = field?.selectionStart ?? draft.message.length;
+    const end = field?.selectionEnd ?? draft.message.length;
+    const result = applyFormat(draft.message, start, end, action);
+    onChange({ message: result.value });
+    requestAnimationFrame(() => {
+      field?.focus();
+      field?.setSelectionRange(result.selection[0], result.selection[1]);
+    });
+  };
   return (
     <div className="space-y-4">
       <Field id="bc-subject" label="Assunto" error={errors.subject}>
@@ -75,14 +106,45 @@ export const BroadcastFields: React.FC<BroadcastFieldsProps> = ({
         />
       </Field>
       <Field id="bc-message" label="Mensagem" error={errors.message}>
+        <div
+          role="toolbar"
+          aria-label="Formatação da mensagem"
+          aria-controls="bc-message"
+          className="flex flex-wrap items-center gap-1"
+        >
+          {FORMAT_BUTTONS.map(({ action, label, icon: Icon, hint }) => (
+            <button
+              key={action}
+              type="button"
+              onMouseDown={event => event.preventDefault() /* não tira a seleção do texto */}
+              onClick={() => format(action)}
+              aria-label={label}
+              title={hint ? `${label} (${hint})` : label}
+              className="flex h-9 w-9 items-center justify-center rounded-lg text-rz-muted ring-1 ring-rz-line hover:bg-rz-canvas hover:text-rz-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rz-primary/40"
+            >
+              <Icon className="h-4 w-4" />
+            </button>
+          ))}
+        </div>
         <Textarea
           id="bc-message"
           ref={messageRef}
           value={draft.message}
           onChange={event => onChange({ message: event.target.value })}
-          placeholder="Escreva aqui. Uma linha em branco começa um parágrafo novo; endereços (https://…) ficam ligações."
+          onKeyDown={event => {
+            if (!(event.ctrlKey || event.metaKey) || event.altKey || event.shiftKey) return;
+            const key = event.key.toLowerCase();
+            if (key !== 'b' && key !== 'i') return;
+            event.preventDefault();
+            format(key === 'b' ? 'bold' : 'italic');
+          }}
+          placeholder="Escreva aqui. Selecione texto e use os botões acima para negrito, itálico e listas. Uma linha em branco começa um parágrafo novo; endereços (https://…) ficam ligações."
           className="min-h-[220px] text-[14px] leading-relaxed"
         />
+        <p className="text-[12px] text-rz-muted">
+          No email e na app, **assim** fica a negrito, _assim_ em itálico e as linhas com «- » ou
+          «1. » ficam em lista.
+        </p>
         {/* Emoji e IA por baixo da caixa (dentro dela tapavam o texto ao deslizar). */}
         <div className="flex flex-wrap items-start gap-1.5">
           <EmojiPicker

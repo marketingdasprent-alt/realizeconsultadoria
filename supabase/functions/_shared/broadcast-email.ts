@@ -1,5 +1,7 @@
 // HTML dos comunicados (Pessoas → Comunicados). A mensagem chega em texto: escapa-se, as linhas
-// em branco fazem parágrafos e os endereços (https://…) ficam ligações.
+// em branco fazem parágrafos, os endereços (https://…) ficam ligações e a formatação simples
+// (**negrito**, _itálico_, listas com "- " e "1. ") passa a HTML (ver broadcast-format.ts).
+import { parseBlocks, type InlinePart } from './broadcast-format.ts';
 
 const escapeHtml = (text: string) =>
   text
@@ -19,15 +21,29 @@ const linkify = (html: string) =>
     '<a href="$1" style="color:#B7933D;text-decoration:underline;">$1</a>'
   );
 
-/** Texto → parágrafos HTML (seguro). */
+/** Um pedaço de linha: escapado, com ligações e, se for o caso, negrito/itálico. */
+const inlineHtml = (parts: InlinePart[]): string =>
+  parts
+    .map(part => {
+      let html = linkify(escapeHtml(part.text));
+      if (part.italic) html = `<em>${html}</em>`;
+      if (part.bold) html = `<strong>${html}</strong>`;
+      return html;
+    })
+    .join('');
+
+/** Texto → parágrafos e listas HTML (seguro: tudo o que vem do texto é escapado). */
 export const messageToHtml = (message: string): string =>
-  message
-    .trim()
-    .split(/\n\s*\n/)
-    .map(
-      paragraph =>
-        `<p style="margin:0 0 14px 0;line-height:1.6;">${linkify(escapeHtml(paragraph)).replace(/\n/g, '<br>')}</p>`
-    )
+  parseBlocks(message)
+    .map(block => {
+      if (block.kind === 'paragraph')
+        return `<p style="margin:0 0 14px 0;line-height:1.6;">${block.lines.map(inlineHtml).join('<br>')}</p>`;
+      const tag = block.kind === 'bullets' ? 'ul' : 'ol';
+      const items = block.items
+        .map(item => `<li style="margin:0 0 6px 0;line-height:1.6;">${inlineHtml(item)}</li>`)
+        .join('');
+      return `<${tag} style="margin:0 0 14px 0;padding-left:22px;">${items}</${tag}>`;
+    })
     .join('');
 
 /**
